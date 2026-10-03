@@ -107,6 +107,7 @@ function enlist(p) {
   p.id = 'p' + (++S.pseq);
   p.met = S.age;
   delete p.stranger;
+  lookOf(p);
   S.people.push(p);
   S.vars.new = p.name; S.vars.newId = p.id;
   return p;
@@ -140,6 +141,11 @@ function makePerson(spec) {
   };
   if (p.kind === 'child') p.role = '아이';
   return p;
+}
+// 생김새 (js/avatar.js). 같은 인생의 같은 id면 늘 같은 얼굴. 가족·아이는 피부색이 나와 같음
+function lookOf(p) {
+  if (!p.appearance && window.Avatar) p.appearance = Avatar.make(`${S.id}:${p.id}`, p.gender, { feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null });
+  return p.appearance || null;
 }
 function meetDefault() {
   const a = S.age;
@@ -325,11 +331,21 @@ function fire(ev) {
   S.last[ev.id] = S.age;
   if (ev.onStart) ev.onStart(S, api);
   if (ev.choices) {
-    const text = fill(textOf(ev.text));
+    const raw = textOf(ev.text), text = fill(raw);
     const tv = {}; TRANSIENT.forEach(k => { tv[k] = S.vars[k]; });
-    S.pending.push({ id: ev.id, text, tv });
+    S.pending.push({ id: ev.id, text, tv, who: whoIn(raw) });
     log(text, { t: 'ask' });
   } else applyOutcome(ev);
+}
+// 이벤트 문장에 나오는 사람 (이벤트 창 위에 아바타로 보여줌)
+function whoIn(raw) {
+  if (typeof raw !== 'string') return null;
+  if (/\{fp\b/.test(raw)) return S.vars.fp || null;
+  if (/\{mainName\b/.test(raw)) return S.vars.mainId || null;
+  if (/\{lover\b/.test(raw)) return S.vars.loverId || null;
+  if (/\{partner\b/.test(raw)) { const m = mainPartner(); return m ? m.id : null; }
+  if (/\{new\b/.test(raw)) return S.vars.newId || null;
+  return null;
 }
 const trigger = id => fire(EVENTS[id]);
 const choicesOf = ev => ev.choices.filter(c => !c.if || c.if(S, api));
@@ -340,7 +356,9 @@ function currentEvent() {
   const ev = EVENTS[p.id];
   if (!ev) { S.pending.shift(); return currentEvent(); }
   Object.assign(S.vars, p.tv);
-  return { text: p.text, choices: choicesOf(ev).map(c => fill(resolve(c.label))) };
+  const wp = p.who && person(p.who);
+  const who = wp ? { look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp) } : null;
+  return { text: p.text, who, choices: choicesOf(ev).map(c => fill(resolve(c.label))) };
 }
 function choose(i) {
   const p = S.pending[0];
@@ -803,6 +821,7 @@ function makeStranger(pl, night) {
   });
   p.id = 'x' + (++S.xseq);
   p.stranger = true;
+  lookOf(p);
   return p;
 }
 function doingFor(pl, p, night, taken) {
@@ -1066,6 +1085,8 @@ function newLife(opt = {}) {
     place: null, here: [], visits: {}, regular: {},
   };
   if (tr.start) for (const k in tr.start) S.stats[k] = COND.includes(k) ? clamp(S.stats[k] + tr.start[k], 0, 100) : S.stats[k] + tr.start[k];
+  S.look = window.Avatar ? Avatar.make(`${S.id}:me`, gender) : null;
+  S.skin = S.look ? S.look.skin : 1;
   const w = D.wealth.find(x => x.id === S.wealth);
   S.money = w.money;
   const dr = D.dreams.find(x => x.id === S.dream);
@@ -1100,6 +1121,8 @@ function load() {
 function migrate(s) {
   S = s;
   Object.assign(s, { v: 4, xseq: 0, place: null, here: [], visits: {}, regular: {} });
+  s.look = window.Avatar ? Avatar.make(`${s.id}:me`, s.gender) : null;
+  s.skin = s.look ? s.look.skin : 1;
   for (const p of s.people) if (p.hangout === undefined) p.hangout = pickHangout(p.hobby, npcAge(p));
   return s;
 }
@@ -1110,7 +1133,7 @@ window.Game = {
   newLife, ageUp, choose, currentEvent,
   actionList, canDo, costOf, doAction, needsSubject,
   places: placeList, goPlace, leavePlace, here: hereList, talkTo, place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
-  people: () => alive(), person, interactions, interact, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,
+  people: () => alive(), person, interactions, interact, look: lookOf, myLook: () => S.look, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,
   crimes: () => D.crimes.filter(c => S.age >= c.minAge && meets(c.req)), canCrime, crimeOdds, commitCrime,
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,
   roleText, karmaLabel, trait, job, mainPartner, season, fmtMoney, josa,

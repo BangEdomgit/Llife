@@ -20,6 +20,8 @@ const wxIcon = k => (WX[k] && WX[k].icon) || '';
 const genderKo = g => g === 'm' ? '남' : '여';
 const isMoney = k => k === 'money';
 const pbar = p => { const n = Math.round(p * 5); return '▰'.repeat(n) + '▱'.repeat(5 - n); };
+// 아바타 크기: 관계 목록 32×42 / 장소 48×64 / 상세·이벤트 60×80
+const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, G.npcAge(p)) : '';
 function abHTML(k, v) {
   const g = G.gradeInfo(v);
   return `<span class="ab" title="${v}"><span>${G.LABEL[k]}</span><span class="g g-${g.letter}">${g.letter}</span><span class="pb">${pbar(g.pct)}</span></span>`;
@@ -124,7 +126,7 @@ function hereRow(h) {
   const p = h.p;
   const who = h.stranger ? `<b>처음 보는 사람</b> <span class="dim">${ageBand(G.npcAge(p))} ${genderKo(p.gender)}</span>`
     : `<b>${esc(G.pname(p))}</b> <span class="dim">${G.npcAge(p)}살 ${esc(G.relLabel(p))}</span>`;
-  return `<button type="button" class="hp${h.used ? ' used' : ''}" data-hp="${h.key}">
+  return `<button type="button" class="hp${h.used ? ' used' : ''}" data-hp="${h.key}">${av(p, 48)}
     <span class="hw">${who}</span><span class="hd">${esc(h.doing)}${h.used ? ' · 이야기함' : ''}</span></button>`;
 }
 function renderWhere(S) {
@@ -176,8 +178,9 @@ function openEvent() {
   const ev = G.currentEvent();
   if (!ev) return;
   const S = G.state(), se = G.season();
+  const who = ev.who && window.Avatar ? `<div class="ev-who">${Avatar.render(ev.who.look, 60, ev.who.age)}<span><b>${esc(ev.who.name)}</b><br><span class="dim">${ev.who.age}살, ${esc(ev.who.rel)}</span></span></div>` : '';
   showModal('event', `${S.age}살 ${se.icon} ${se.id} ${wxIcon(S.weather)}`,
-    `<p>${esc(ev.text)}</p><div class="choices">${ev.choices.map((c, i) => `<button type="button" data-c="${i}">[${i + 1}] ${esc(c)}</button>`).join('')}</div>`, false, ev.text);
+    `${who}<p>${esc(ev.text)}</p><div class="choices">${ev.choices.map((c, i) => `<button type="button" data-c="${i}">[${i + 1}] ${esc(c)}</button>`).join('')}</div>`, false, ev.text);
 }
 
 /* 관계 목록 */
@@ -194,7 +197,7 @@ function openPeople() {
     const extra = [];
     if (G.heartOk(p) || p.heart > 0) extra.push(`설렘 <b>${mini(p.heart)}</b>`);
     if (p.grudge >= 15) extra.push(`원한 <b class="r">${mini(p.grudge)}</b>`);
-    return `<button type="button" class="prow" data-pv="${p.id}">
+    return `<button type="button" class="prow" data-pv="${p.id}">${av(p, 32)}
       <span><b>${esc(G.pname(p))}</b> <span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}</span></span>
       <span class="pl">${esc(G.relLabel(p))}</span>
       <span class="pm">친밀 <b>${mini(p.close)}</b>  ${extra.join('  ')}</span>
@@ -215,7 +218,7 @@ function openPerson(id) {
   }).join('');
   const tags = [];
   const mine = p.partner || p.spouse || p.secret;
-  if (p.taken && !mine) tags.push('<span class="tag">애인 있음</span>');
+  if (p.taken && !mine && p.kind !== 'family' && p.kind !== 'child') tags.push('<span class="tag">애인 있음</span>');
   if (p.secret) tags.push('<span class="tag warn">들키면 안 됨</span>');
   if (p.debt) tags.push(`<span class="tag warn">빌린 돈 ${G.fmtMoney(p.debt)}</span>`);
   if (p.ex) tags.push('<span class="tag">예전에 사귐</span>');
@@ -224,7 +227,7 @@ function openPerson(id) {
   const acts = its.map(it =>
     `<button type="button" data-i="${it.id}"${it.ok ? '' : ' disabled'}>${it.icon} ${it.label}${it.cost ? ` <small>${G.fmtMoney(it.cost)}</small>` : ''}${anyFree && !it.free ? ' <small>행동 1</small>' : ''}</button>`).join('');
   showModal('person', `${G.pname(p)}`, `
-    <p><b>${esc(G.pname(p))}</b> <span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}, ${esc(G.relLabel(p))}</span></p>
+    <div class="p-top">${av(p, 60)}<div class="p-who"><b>${esc(G.pname(p))}</b><span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}, ${esc(G.relLabel(p))}</span></div></div>
     <div class="stats">${stats}</div>
     ${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}
     <dl class="prof">${prof}</dl>
@@ -240,8 +243,7 @@ function openStranger(key) {
   if (!h) return;   // 말 걸기에 성공하면 엔진이 이 사람을 관계 목록으로 옮김 → 클릭 처리에서 openPerson으로 넘어감
   const p = h.p;
   showModal('stranger', '처음 보는 사람', `
-    <p><b>처음 보는 사람</b> <span class="dim">${ageBand(G.npcAge(p))} ${genderKo(p.gender)}</span></p>
-    <p class="dim">${esc(h.doing)}.</p>
+    <div class="p-top">${av(p, 60)}<div class="p-who"><b>처음 보는 사람</b><span class="dim">${ageBand(G.npcAge(p))} ${genderKo(p.gender)}</span><span class="dim">${esc(h.doing)}.</span></div></div>
     <div class="igrid"><button type="button" data-talk="${h.key}"${h.used ? ' disabled' : ''}>💬 말 걸기 <small>행동 안 씀</small></button></div>
     <p class="hint">${h.used ? '대화가 이어지지 않았다. 다음에 또 마주칠지도.' : '말을 걸면 이름과 특징을 알 수 있다. 잘 받아주면 관계 목록에 추가된다.'}</p>
     <button type="button" class="back" data-back>← 닫기</button>`, true, key);
@@ -320,8 +322,9 @@ function openMe() {
     if (G.univLabel()) lines.push(`${G.univLabel()} ${G.majorLabel() || ''}${sc.gpaN ? `, 학점 ${sc.gpa.toFixed(2)}` : ''}${sc.degree ? ' 졸업' : ''}`);
     school = `<p class="sec-t">성적표</p>${S.age <= 18 && !sc.sat ? `<div class="subj">${subj}</div>` : ''}${lines.map(l => `<p class="dim" style="font-size:13px">${esc(l)}</p>`).join('')}`;
   }
+  const me = G.myLook() && window.Avatar ? Avatar.render(G.myLook(), 60, S.age) : '';
   showModal('me', `📋 ${S.name}`, `
-    <dl class="prof">${prof}</dl>
+    <div class="me-top">${me}<dl class="prof">${prof}</dl></div>
     <p class="sec-t">능력치</p>
     <div class="stats">${ab}</div>
     <p class="hint">능력치는 100에서 멈추지 않는다. F부터 SS까지, 등급이 오를수록 올리기 어렵다.</p>

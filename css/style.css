@@ -15,6 +15,7 @@
   --btn-hover:rgba(255,255,255,.14);
   --btn-on:rgba(255,211,107,.2);
   --page-bg:#10141c;
+  --av-bg:rgba(255,255,255,.08);
   --mono:'Nanum Gothic Coding','D2Coding',ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){
@@ -175,3 +176,17 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .show-btn{width:46px;height:46px;border-radius:50%;font-size:20px;background:var(--panel-bg);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 @media (prefers-reduced-motion:reduce){.app{transition:none}}
 .dice{padding:2px 8px;font-size:12px}
+
+/* 아바타 */
+.av{display:block;flex:none}
+.av-bg{fill:var(--av-bg);stroke:var(--panel-border);stroke-width:1.5}
+.prow{grid-template-columns:auto 1fr auto}
+.prow .av{grid-row:1/3}
+.prow .pm{grid-column:2/-1}
+.p-top{display:flex;gap:12px;align-items:center}
+.p-top .p-who{display:grid;gap:2px}
+.ev-who{display:flex;gap:10px;align-items:center;font-size:13.5px}
+.me-top{display:flex;gap:12px;align-items:center}
+.hp .av{grid-row:1/3}
+.hp .hw{align-self:end}
+.hp .hd{align-self:start}
