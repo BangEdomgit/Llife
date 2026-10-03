@@ -102,6 +102,7 @@ function render(S) {
   if (bg.w !== S.weather) { WeatherBG.setWeather(WX[S.weather].p, bg.w === null); bg.w = S.weather; }
   if (bg.t !== S.time) { WeatherBG.setTime(S.time, bg.t === null); bg.t = S.time; }
 
+  maybeScene(S);
   // 모달
   if (S.pending.length) openEvent();
   else if (S.ended && endingFor !== S.id) { endingFor = S.id; openEnding(); }
@@ -152,6 +153,74 @@ function renderWhere(S) {
     <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· 행동 1</span></p>
     <div class="acts">${actButtons(acts) || '<p class="empty">여기선 딱히 할 게 없다.</p>'}</div>`;
 }
+
+/* ---------- 연출 (S.scene) ---------- */
+// 함께 밤을 보낸 뒤: ♂♀ 맞물림 → 💓 → 암전 → 다음 날 아침(초상화 + 아침 한 줄 + 바닥의 옷) → (임신이면) 정자·난자
+// 키스·포옹·끌어당기기: 실루엣 한 장. 행위 자체는 그리지 않음
+const sceneEl = $('#scene'), sceneBox = $('#sceneBox');
+const calm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+let sceneSeen = null, sceneQueue = [], sceneTimer = null;
+const PROFILE = 'M38,12 C22,12 10,24 10,42 C10,54 14,62 18,68 L18,96 L44,96 L44,82 C48,82 52,80 53,76 C54,72 52,70 54,68 C56,67 57,65 55,63 C57,62 58,60 56,58 L60,54 C61,52 60,51 58,50 C56,44 56,38 54,32 C50,20 46,12 38,12 Z';
+const SIL = {
+  kiss: `<svg viewBox="0 0 200 110" class="sil"><g transform="translate(40,4) rotate(-6 30 90)"><path d="${PROFILE}"/></g><g transform="translate(160,6) scale(-1,1) rotate(-6 30 90)"><path d="${PROFILE}"/></g><path class="sil-heart" d="M100,8 c-4,-6 -12,-2 -8,4 l8,8 l8,-8 c4,-6 -4,-10 -8,-4 Z"/></svg>`,
+  hug: `<svg viewBox="0 0 200 110" class="sil"><circle cx="118" cy="34" r="15"/><path d="M98,110 C98,74 104,56 118,52 C132,56 140,74 140,110 Z"/><circle cx="84" cy="30" r="16"/><path d="M60,110 C60,74 68,54 84,50 C100,54 106,74 106,110 Z"/><path d="M96,66 C112,58 132,60 138,76 C140,83 135,85 131,80 C124,71 110,72 98,78 Z"/></svg>`,
+  pull: `<svg viewBox="0 0 200 110" class="sil"><circle cx="70" cy="30" r="15"/><path d="M48,110 C48,74 56,54 70,50 C84,54 92,74 92,110 Z"/><g transform="rotate(-10 128 110)"><circle cx="128" cy="32" r="14"/><path d="M108,110 C108,76 114,58 128,54 C142,58 148,76 148,110 Z"/></g><path d="M86,70 C98,66 110,72 116,82 C118,86 113,88 110,84 C104,78 96,76 88,78 Z"/></svg>`,
+};
+function floorClothes(p) {
+  const c = Avatar.topColor(G.look(p));
+  const under = p.gender === 'f'
+    ? '<path d="M150,30 q8,-12 16,0 q8,-12 16,0 M146,30 L186,30" fill="none" stroke="var(--text)" stroke-width="2" opacity=".45"/>'
+    : '<path d="M146,18 L186,18 L188,40 L171,40 L166,27 L161,40 L144,40 Z M146,23 L186,23" fill="none" stroke="var(--text)" stroke-width="2" stroke-linejoin="round" opacity=".45"/>';
+  return `<svg class="floor" viewBox="0 0 240 44" aria-hidden="true"><path d="M20,38 C14,30 24,18 40,20 C52,10 74,14 78,24 C92,22 100,32 92,38 C70,44 40,44 20,38 Z" fill="${c}"/>
+    <path d="M34,30 Q48,24 60,32 M62,24 Q72,28 80,34" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="2"/>${under}</svg>`;
+}
+const CONCEIVE = `<svg class="conceive" viewBox="0 0 300 120" aria-hidden="true"><defs><radialGradient id="egg" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#fff2e6"/><stop offset="1" stop-color="#e9a88e"/></radialGradient></defs>
+  <circle class="glow" cx="232" cy="60" r="48" fill="#ffd9a8"/>
+  ${[[196, 30], [268, 34], [272, 86], [200, 92], [232, 18], [234, 104]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4" fill="#e9b9a3" opacity=".7"/>`).join('')}
+  <circle cx="232" cy="60" r="34" fill="url(#egg)"/>
+  ${[1, 2, 3].map(i => `<g class="sp sp${i}"><ellipse cx="0" cy="0" rx="5" ry="3.4" fill="#f4f4f4"/><path class="tail" d="M-5,0 q-6,-4 -12,0 t-12,0 t-12,0" fill="none" stroke="#f4f4f4" stroke-width="1.4"/></g>`).join('')}</svg>`;
+function sceneCard(html) {
+  sceneBox.innerHTML = html;
+  const b = sceneBox.querySelector('button');
+  if (b) b.focus({ preventScroll: true });
+}
+// 다음 날 아침 카드: 만족감에 따라 표정·머리가 달라진 초상화(80×107) + 아침 한 줄 + 바닥의 옷
+function morningCard(sc, p) {
+  const S = G.state(), look = { age: G.npcAge(p), after: { sat: sc.sat, personality: p.personality, lipstick: S.gender === 'f' && p.gender === 'm' } };
+  return `<div class="sc-card sc-morning"><p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
+    <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button></div>`;
+}
+function playScene(sc) {
+  const p = G.person(sc.pid);
+  if (!p || !window.Avatar) { G.clearScene(); return; }
+  sceneEl.hidden = false;
+  clearTimeout(sceneTimer);
+  if (sc.kind !== 'night') {
+    sceneQueue = [];
+    sceneCard(`<div class="sc-card">${SIL[sc.kind] || ''}<p>${esc(sc.text || '')}</p><button type="button" data-sc-next>계속</button></div>`);
+    return;
+  }
+  sceneQueue = [morningCard(sc, p)].concat(sc.preg ? [`<div class="sc-card">${CONCEIVE}<p class="sc-later">몇 주 뒤…</p><button type="button" data-sc-next>계속</button></div>`] : []);
+  if (calm) { nextScene(); return; }
+  sceneCard(`<div class="sc-night"><div class="sym"><span class="m">♂</span><span class="f">♀</span></div><div class="beat">💓</div></div>`);
+  sceneTimer = setTimeout(nextScene, 2300);
+}
+function nextScene() {
+  clearTimeout(sceneTimer);
+  if (sceneQueue.length) { sceneCard(sceneQueue.shift()); return; }
+  sceneEl.hidden = true; sceneBox.innerHTML = '';
+  G.clearScene();
+}
+function maybeScene(S) {
+  const sc = S.scene, key = sc && `${S.id}:${sc.n}`;
+  if (!sc || sceneSeen === key) return;
+  sceneSeen = key;
+  playScene(sc);
+}
+// 버튼이나 맞물림 화면 아무 데나 누르면 다음으로 (맞물림 중이면 바로 아침으로)
+sceneEl.addEventListener('click', e => {
+  if (e.target.closest('[data-sc-next]') || sceneBox.querySelector('.sc-night')) nextScene();
+});
 
 /* ---------- 모달 ---------- */
 function showModal(mode, title, html, closable = true, arg = null) {
@@ -476,6 +545,7 @@ mBody.addEventListener('click', e => {
 });
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey || (e.target && e.target.tagName === 'INPUT')) return;
+  if (!sceneEl.hidden) { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { e.preventDefault(); nextScene(); } return; }
   if (modalMode === 'event' && /^[1-9]$/.test(e.key)) { G.choose(+e.key - 1); e.preventDefault(); }
   else if (e.key === 'Escape' && !modal.hidden && !$('#mClose').hidden) closeModal();
 });

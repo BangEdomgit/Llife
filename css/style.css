@@ -195,3 +195,40 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .ev-who{display:flex;gap:10px;align-items:center;font-size:13.5px}
 .me-top{display:flex;gap:12px;align-items:center}
 
+
+/* 연출 — 함께 밤을 보낸 뒤 / 키스·포옹 / 임신 */
+.scene-wrap{position:fixed;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55);animation:scFade .35s ease-out}
+.scene-wrap[hidden]{display:none}
+.scene{width:100%;max-width:420px}
+.sc-card{display:grid;justify-items:center;gap:10px;padding:18px 16px;text-align:center;background:var(--modal-bg);border:1px solid var(--panel-border);border-radius:4px;font-size:14.5px;line-height:1.6;animation:scFade .5s ease-out}
+.sc-card p{margin:0}
+.sc-card button{padding:8px 22px;font-size:14px}
+.sc-t{font-size:12.5px;color:var(--accent);letter-spacing:2px}
+.sc-sat{font-size:12.5px}
+.sc-later{color:var(--text-dim);animation:scFade 1s ease-out 1.5s both}
+.sil{width:220px;height:auto;fill:var(--text);opacity:.85}
+.sil .sil-heart{fill:var(--minus)}
+.floor{width:200px;height:auto;opacity:.9}
+.sc-night{height:220px;display:grid;place-items:center;position:relative;background:#000;border-radius:4px;animation:scDark 2.3s ease-in forwards}
+.sc-night .sym{font-size:46px;color:var(--text);display:flex}
+.sc-night .m{display:inline-block;animation:symL .8s ease-out both}
+.sc-night .f{display:inline-block;margin-left:-14px;animation:symR .8s ease-out both}
+.sc-night .beat{position:absolute;bottom:42px;font-size:26px;opacity:0;animation:beat .45s ease-in-out .8s 3 alternate}
+.conceive{width:100%;max-width:300px;background:#0b0d14;border-radius:4px}
+.conceive .glow{opacity:0;animation:glow .5s ease-out 1.3s forwards}
+.conceive .sp{transform-box:fill-box}
+.conceive .sp1{animation:sp1 1.5s ease-in forwards}
+.conceive .sp2{animation:sp2 1.5s ease-in forwards}
+.conceive .sp3{animation:sp3 1.5s ease-in forwards}
+.conceive .tail{animation:wig .18s ease-in-out infinite alternate;transform-origin:-5px 0}
+@keyframes scFade{from{opacity:0}to{opacity:1}}
+@keyframes scDark{0%,70%{opacity:1}100%{opacity:.15}}
+@keyframes symL{from{transform:translateX(-70px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes symR{from{transform:translateX(70px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes beat{from{opacity:.4;transform:scale(.9)}to{opacity:1;transform:scale(1.2)}}
+@keyframes glow{to{opacity:.55}}
+@keyframes sp1{from{transform:translate(18px,60px)}to{transform:translate(196px,60px)}}
+@keyframes sp2{0%{transform:translate(6px,36px);opacity:1}80%{opacity:.8}100%{transform:translate(150px,46px);opacity:0}}
+@keyframes sp3{0%{transform:translate(0,86px);opacity:1}80%{opacity:.8}100%{transform:translate(140px,76px);opacity:0}}
+@keyframes wig{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
+@media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *{animation:none!important}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}}

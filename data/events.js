@@ -1123,7 +1123,7 @@ GAME_DATA.events = [
     onStart: (s, a) => a.focus(romanceCand(a, 65)),
     text: '{fp|이} 할 말이 있다며 나를 불러냈다. 좋아한다고 했다.',
     choices: [
-      { label: '받아준다', memory: true, effect: { happy: [6, 10] },
+      { label: '받아준다', memory: true, scene: 'kiss', effect: { happy: [6, 10] },
         do: (s, a) => a.startRelation(a.focused(), !!a.main()),
         text: (s, a) => a.focused().secret ? '{fp|와} 몰래 만나기 시작했다.' : '{fp|와} 사귀게 됐다!' },
       { label: '미안하다고 한다', p: { heart: [-25, -15], close: [-6, -3] }, text: '{fp|이} 괜찮다며 먼저 돌아섰다.' },

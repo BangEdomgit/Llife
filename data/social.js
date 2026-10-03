@@ -10,6 +10,7 @@
 // run(s, p, a) → 결과. p: 상대 호감도 변화 / effect: 내 스탯 / risk: 애인에게 들킬 확률 / riskTaken: 상대 애인에게 들킬 확률
 //                pregnant: 아이가 생길 확률 (엔진이 나이·아이 수로 보정) / moveTo: 상대와 같이 다른 장소로 이동
 // noFree: true  → 장소에 같이 있어도 늘 행동 1 (이동하는 것들)
+// scene: 'kiss' | 'hug' | 'pull' → 화면에 실루엣 연출
 // 문장의 {p}는 상대 이름 (조사는 {p|와} 처럼)
 //
 // intimate: true → 엔진이 '함께 밤을 보냄'으로 처리 (성욕 해소, 기술·궁합, 만족감에 따라 설렘 변화). mood: 분위기 보정
@@ -109,7 +110,7 @@ GAME_DATA.social = [
       if (!ok) return { p: { heart: [-18, -12], close: [-8, -4] }, effect: { happy: [-8, -4] },
         text: ['{p|이} 미안하다고 했다.', '{p|은} 친구로 지내고 싶다고 했다.'] };
       const sneaky = !!a.main();
-      return { do: () => a.startRelation(p, sneaky), memory: true, effect: { happy: [6, 10] }, risk: sneaky ? .15 : 0,
+      return { do: () => a.startRelation(p, sneaky), memory: true, scene: 'kiss', effect: { happy: [6, 10] }, risk: sneaky ? .15 : 0,
         text: sneaky ? '{p|와} 몰래 만나기 시작했다. 아무도 몰라야 한다.'
           : p.taken ? '{p|은} 만나던 사람과 정리하고 내 손을 잡았다.' : '{p|와} 사귀게 됐다!' };
     } },
@@ -123,7 +124,7 @@ GAME_DATA.social = [
   { id: 'propose', label: '청혼하기', icon: '💍',
     if: (s, p, a) => p.partner && p.heart >= 65 && p.trust >= 50 && s.age >= 22 && !a.jailed(),
     run: (s, p, a) => p.heart + p.trust / 2 + a.rand(-10, 10) >= 95
-      ? { do: () => a.marry(p), memory: true, effect: { happy: 12, money: -1500 }, text: '{p|이} 고개를 끄덕였다. 결혼식을 올렸다!' }
+      ? { do: () => a.marry(p), memory: true, scene: 'hug', effect: { happy: 12, money: -1500 }, text: '{p|이} 고개를 끄덕였다. 결혼식을 올렸다!' }
       : { p: { heart: -10 }, effect: { happy: -5 }, text: '{p|은} 아직은 아니라고 했다.' } },
 
   /* ── 술집 ── */
@@ -177,7 +178,7 @@ GAME_DATA.social = [
   { id: 'takeHome', label: '집으로 데려가기', icon: '🏠', noFree: true,
     if: (s, p, a) => ['bar', 'concert'].includes(s.place) && a.isHere(p) && !s.flags.married && adultPair(s, p, a) && p.heart >= 45 && p.close >= 30 && !a.jailed(),
     run: (s, p, a) => a.charmed(p, 'bed', a.need('takeHome')) ? {
-      moveTo: 'home', bring: true, p: { heart: [2, 4] },
+      moveTo: 'home', bring: true, scene: 'pull', p: { heart: [2, 4] },
       risk: a.main() && a.main() !== p ? .1 : 0,
       text: !s.flags.ownPlace ? '부모님이 주무시는 걸 확인하고 {p|와} 조용히 현관문을 열었다.'
         : ['택시 창밖으로 불빛이 길게 번졌다. {p|와} 우리 집 앞에서 내렸다.', '{p|와} 말없이 걸었다. 어느새 우리 집 골목이었다.'],

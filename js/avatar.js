@@ -185,6 +185,24 @@ function clothes(a, top, kid, skin, hw, adult) {
   return out;
 }
 
+/* ---------- 함께 밤을 보낸 다음 날 아침 (어른만) ---------- */
+// 만족감 구간(0~4)마다 눈·입·볼, 머리 흐트러짐이 달라짐. 옷 대신 맨 어깨와 이불
+const SLEEPY = (x, y) => `<path d="M${x - 4.5},${y - .5} Q${x},${y + 2.8} ${x + 4.5},${y - .5}" fill="none" stroke="${LINE}" stroke-width="2" stroke-linecap="round"/>`;   // 나른하게 감은 눈
+const HAPPY = (x, y) => `<path d="M${x - 4.5},${y + 1.5} Q${x},${y - 3.5} ${x + 4.5},${y + 1.5}" fill="none" stroke="${LINE}" stroke-width="2.2" stroke-linecap="round"/>`;  // 웃으며 감은 눈
+const FROWN = `<path d="M54,90 Q60,86 66,90" fill="none" stroke="${LINE}" stroke-width="2" stroke-linecap="round"/>`;
+const tierOf = v => v >= 90 ? 4 : v >= 70 ? 3 : v >= 50 ? 2 : v >= 30 ? 1 : 0;
+function morningBody(a, skin, skinD, hw) {
+  const blanketY = a.g === 'f' ? 130 : 138;
+  return `<path d="${body(false, hw)}" fill="${skinD}"/>
+    <path d="M47,121 Q53,124 58,122 M62,122 Q67,124 73,121" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="M0,${blanketY + 6} C20,${blanketY - 4} 40,${blanketY + 4} 60,${blanketY} C80,${blanketY - 4} 100,${blanketY + 5} 120,${blanketY - 2} L120,160 L0,160 Z" fill="#ece6da"/>
+    <path d="M18,${blanketY + 12} Q34,${blanketY + 22} 30,160 M84,${blanketY + 10} Q76,${blanketY + 24} 88,160 M52,${blanketY + 8} Q58,${blanketY + 18} 54,${blanketY + 30}" fill="none" stroke="#cfc6b6" stroke-width="1.6" stroke-linecap="round"/>`;
+}
+function messyHair(hc, n) {
+  const strands = ['M40,40 q-7,-4 -9,4', 'M78,36 q8,-5 11,3', 'M55,31 q-2,-9 6,-10', 'M34,58 q-7,1 -6,8', 'M86,56 q7,2 5,9'];
+  return strands.slice(0, n).map(d => `<path d="${d}" fill="none" stroke="${hc}" stroke-width="2.4" stroke-linecap="round"/>`).join('');
+}
+
 /* ---------- 그리기 ---------- */
 function render(a, size = 48, state = 25) {
   const st = typeof state === 'object' && state ? state : { age: state };
@@ -192,6 +210,7 @@ function render(a, size = 48, state = 25) {
   const w = Math.round(size), h = Math.round(size * 4 / 3);
   if (!a) return `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/></svg>`;
   const kid = age <= 12, teen = age >= 13 && age <= 18, adult = age >= 20;
+  const af = adult && st.after ? st.after : null, tier = af ? tierOf(af.sat ?? 50) : -1;
   const hw = halfWidth(a, kid, adult);
   const skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86);
   const old = age >= 40 && a.gray < (age - 38) / 22;   // 40대부터 흰머리 확률 증가
@@ -210,24 +229,34 @@ function render(a, size = 48, state = 25) {
   if (style.bun) o += `<circle cx="${style.bun[0]}" cy="${style.bun[1]}" r="${style.bun[2]}" fill="${shade(hc, .9)}"/>`;
   // 목, 몸
   o += `<path d="M51,${neckTop} L69,${neckTop} L69,${neckBot} L51,${neckBot} Z" fill="${skinD}"/>`;
-  o += clothes(a, top, kid, skinD, hw, adult);
+  o += af ? morningBody(a, skin, skinD, hw) : clothes(a, top, kid, skinD, hw, adult);
   if (a.buds) o += `<path d="M34,78 C30,96 40,112 47,130" fill="none" stroke="#f4f4f4" stroke-width="1.3"/>`;
   // 귀, 얼굴
   o += `<ellipse cx="33.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/><ellipse cx="86.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
   if (a.buds) o += `<circle cx="33" cy="76" r="2.6" fill="#f4f4f4"/>`;
   o += `<path d="${FACES[a.face] || FACES[0]}" fill="${skin}"/>`;
   // 볼, 주근깨, 주름
-  if (kid || a.blush) o += `<ellipse cx="44" cy="84" rx="5" ry="3" fill="#e8857a" opacity=".28"/><ellipse cx="76" cy="84" rx="5" ry="3" fill="#e8857a" opacity=".28"/>`;
+  const blush = af ? [0, 0, .25, .42, .55][tier] + (af.personality === 'shy' && tier >= 2 ? .15 : 0) : kid || a.blush ? .28 : 0;
+  if (blush) o += `<ellipse cx="44" cy="84" rx="5.5" ry="3.2" fill="#e8857a" opacity="${blush}"/><ellipse cx="76" cy="84" rx="5.5" ry="3.2" fill="#e8857a" opacity="${blush}"/>`;
   if (a.freckles) o += [[43, 80], [46, 82], [49, 80], [71, 80], [74, 82], [77, 80]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".9" fill="${shade(skin, .62)}"/>`).join('');
   if (age >= 45) o += `<path d="M41,77 Q44,79 47,78 M73,78 Q76,79 79,77" fill="none" stroke="${shade(skin, .75)}" stroke-width="1"/>`;
   // 눈, 눈썹, 코, 입
-  o += ex.map((x, i) => (EYES[a.eyes] || EYES[0])(x, ey, i ? 1 : -1)).join('');
-  o += `<path d="${ex.map((x, i) => (BROWS[a.brows] || BROWS[0])(x, ey - 10, i ? 1 : -1)).join(' ')}" fill="none" stroke="${browC}" stroke-width="${browW}" stroke-linecap="round"/>`;
+  const eyeOf = (x, i) => {
+    if (af && tier >= 3 && af.personality === 'playful' && i === 1) return HAPPY(x, ey);   // 장난형: 윙크
+    if (af && tier === 4) return HAPPY(x, ey);
+    if (af && tier === 3) return SLEEPY(x, ey);
+    return (EYES[a.eyes] || EYES[0])(x, ey, i ? 1 : -1);
+  };
+  o += ex.map(eyeOf).join('');
+  const brow = af && tier <= 1 ? (x, y, s) => `M${x - 6 * s},${y - 1} L${x + 6 * s},${y + 2}` : af && tier >= 3 ? BROWS[1] : (BROWS[a.brows] || BROWS[0]);
+  o += `<path d="${ex.map((x, i) => brow(x, ey - 10, i ? 1 : -1)).join(' ')}" fill="none" stroke="${browC}" stroke-width="${browW}" stroke-linecap="round"/>`;
   o += `<path d="M60,76 Q57.5,82 61,83" fill="none" stroke="${shade(skin, .7)}" stroke-width="1.5" stroke-linecap="round"/>`;
-  o += MOUTHS[a.mouth] || MOUTHS[0];
+  o += af ? (tier === 0 ? FROWN : tier === 1 ? MOUTHS[2] : tier >= 3 && af.personality !== 'cool' ? MOUTHS[1] : MOUTHS[0]) : (MOUTHS[a.mouth] || MOUTHS[0]);
+  if (af && af.lipstick && tier >= 3) o += `<path d="M75,90 q2.5,-3 5,0 q2.5,-3 5,0 q-2.5,4 -5,4 q-2.5,0 -5,-4 Z" fill="#c43c4f" opacity=".75" transform="rotate(-12 80 90)"/>`;   // 볼에 립스틱 자국
   if (a.dimples) o += `<path d="M50,87 q-1.5,2 0,3.5 M70,87 q1.5,2 0,3.5" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.1" stroke-linecap="round"/>`;
   // 앞머리
   o += `<path d="${style.front}" fill="${hc}"${style.thin ? ' opacity=".9"' : ''}/>`;
+  if (af && tier >= 2) o += messyHair(hc, [0, 0, 1, 3, 5][tier]);
   if (style.sides) o += `<path d="M33,58 L33,72 L36,72 L36,56 Z M87,58 L87,72 L84,72 L84,56 Z" fill="${hc}" opacity=".45"/>`;
   if (style.band) o += `<circle cx="${style.band[0]}" cy="${style.band[1]}" r="2.6" fill="${TOP_COLORS[a.tc]}"/>`;
   // 안경
@@ -236,6 +265,7 @@ function render(a, size = 48, state = 25) {
   return o + '</svg>';
 }
 
-window.Avatar = { make, render };
+const topColor = a => TOP_COLORS[(a && a.tc) || 0];
+window.Avatar = { make, render, topColor };
 window.renderAvatar = render;
 })();

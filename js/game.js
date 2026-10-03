@@ -506,7 +506,9 @@ function applyOutcome(o, target) {
   const text = o.text != null ? fill(textOf(o.text), ctx) : '';
   if (text) log(text, { memory: !!resolve(o.memory), deltas });
   else if (deltas.length) log('', { t: 'info', deltas });
-  if (sx) { afterSex(tp, sx, ctx); guiltCheck(tp, sx, ctx); }
+  if (sx) { if (S.scene) S.scene.text = text; afterSex(tp, sx, ctx); guiltCheck(tp, sx, ctx); }
+  // 키스·포옹·끌어당기기 실루엣 연출 (화면이 S.scene을 보고 그림)
+  if (o.scene && tp && S.age >= C.romanceMinAge && npcAge(tp) >= C.romanceMinAge) S.scene = { kind: o.scene, pid: tp.id, text, n: (S.scene ? S.scene.n : 0) + 1 };
   if (o.pregnant && tp && (!o.intimate || sx) && conceive(tp, resolve(o.pregnant)) && S.scene) S.scene.preg = true;
   // 다른 장소로 이동 (예: 술집에서 집으로 같이, 정신 차려보니 공원)
   if (o.moveTo && PLACES[o.moveTo] && !jailed()) enterPlace(PLACES[o.moveTo], o.bring && tp && !tp.gone ? tp : null);
