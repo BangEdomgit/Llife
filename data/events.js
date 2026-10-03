@@ -3,13 +3,14 @@
 // type
 //   must     조건이 맞으면 계절이 바뀔 때 반드시 터짐 (입학, 수능, 전역 등)
 //   fixed    봄·여름·겨울에 한 번씩 뽑히는 고정 이벤트
-//   random   행동 후 가끔 터짐 (on: ['walk'] 처럼 특정 행동에만 붙일 수 있음)
+//   random   행동 후 가끔 터짐 (on: ['walk'] 처럼 특정 행동, on: ['cafe'] 처럼 특정 장소에만 붙일 수 있음)
 //   karma    업보가 많이 쌓였을 때 (sign: -1 나쁜 일 / 1 좋은 일)
 //   trigger  엔진이 직접 부르는 것 (체포, 바람 들킴 등)
 //
 // 언제: at(나이) / age:[최소,최대] / season:['겨울'] / req / when(s,a) / once:false / cooldown:년 / weight / jail:true(수감 중 전용)
 // 결과: text, effect(내 스탯), p(지금 초점 맞춘 사람의 호감도), karma, heat, set, unset, meet(새 사람), memory, do(s,a)
-// 문장 틀: {name} {fp}(초점 맞춘 사람) {new}(새로 만난 사람) {partner} 그 외 s.vars 값. 조사는 {fp|와} 처럼
+// 문장 틀: {name} {fp}(초점 맞춘 사람) {new}(새로 만난 사람) {partner} {place}(지금 장소) 그 외 s.vars 값. 조사는 {fp|와} 처럼
+// 장소 이벤트에서 쓰는 것: a.here()(지금 여기 있는 아는 사람), a.regular('cafe')(단골인지), s.place, s.placeNight(저녁에 왔는지)
 window.GAME_DATA = window.GAME_DATA || {};
 
 (function () {
@@ -21,6 +22,13 @@ const sibs = a => a.find(p => p.sibling);
 const JOB = (...ids) => s => ids.includes(s.job);
 const wealthIs = (...ids) => s => ids.includes(s.wealth);
 const romanceCand = (a, minHeart) => a.find(p => a.canRomance(p) && !p.partner && !p.spouse && !p.secret && p.heart >= minHeart).sort((x, y) => y.heart - x.heart)[0];
+// 장소: 또래 나이대, 여기서 알게 된 사람, 지금 여기 있는 아는 사람
+const peer = s => s.age < 19 ? [Math.max(4, s.age - 1), s.age + 1] : [Math.max(19, s.age - 6), Math.min(49, s.age + 6)];
+const meetHere = extra => s => Object.assign({ kind: 'friend', ageRange: peer(s), hangout: s.place, close: 20 }, extra && (typeof extra === 'function' ? extra(s) : extra));
+const hereWho = (a, fn) => a.here().filter(p => !fn || fn(p));
+const focusHere = fn => (s, a) => a.focus(a.pick(hereWho(a, fn)));
+const focusNew = (s, a) => a.focus(a.person(s.vars.newId));
+const NOT_ROUTINE = ['playground', 'park', 'cafe', 'library', 'gym', 'pcbang', 'mall', 'hospital', 'center', 'bar', 'church', 'conveni', 'concert'];
 GAME_DATA.events = [
   /* ═════ 반드시 (must) ═════ */
   { id: 'firstSteps', type: 'must', at: 1, text: '처음으로 걸음마를 뗐다. 엄마가 박수를 쳤다.', memory: true, effect: { happy: 3 } },
@@ -155,7 +163,7 @@ GAME_DATA.events = [
   { id: 'collegeFest', type: 'fixed', age: [19, 23], season: ['봄'], req: { flags: ['student'] }, text: '대학 축제. 처음 보는 사람들이랑 밤새 놀았다.', memory: true, effect: { happy: 6 },
     meet: s => ({ kind: 'friend', ageRange: [s.age - 1, s.age + 2], close: 25 }) },
   { id: 'mt', type: 'fixed', age: [19, 21], season: ['봄'], req: { flags: ['student'] }, text: '첫 MT. 밤새 게임하다가 아침에 라면을 먹었다.', memory: true, effect: { happy: 5 } },
-  { id: 'moveOut', type: 'fixed', age: [21, 30], text: '처음으로 자취방을 구했다. 좁지만 온전히 내 공간이다.', memory: true, effect: { happy: 5, money: -300 } },
+  { id: 'moveOut', type: 'fixed', age: [21, 30], req: { noFlags: ['married'] }, text: '처음으로 자취방을 구했다. 좁지만 온전히 내 공간이다.', memory: true, set: 'ownPlace', effect: { happy: 5, money: -300 } },
   { id: 'jobSeason', type: 'fixed', age: [23, 30], once: false, cooldown: 2, req: { job: false, noFlags: ['student', 'inArmy', 'inJail'] }, text: '공채 시즌이다.',
     choices: [
       { label: '원서를 왕창 쓴다', do: (s, a) => a.tryJob(), text: s => s.job ? '드디어 합격 문자가 왔다.' : '불합격 메일만 잔뜩 쌓였다.', effect: s => s.job ? { happy: 6 } : { happy: -4 } },
@@ -295,6 +303,287 @@ GAME_DATA.events = [
     ] },
   { id: 'flu', type: 'random', once: false, cooldown: 3, text: '독감에 걸려 며칠을 앓았다.', effect: { health: -5 } },
   { id: 'foundCoin', type: 'random', on: ['walk'], once: false, cooldown: 5, text: '길에서 만 원을 주웠다.', effect: { money: 1, happy: 1 } },
+
+  /* ═════ 장소 (도착했을 때, 또는 거기서 행동할 때 가끔) ═════ */
+  // 집
+  { id: 'homeBlackout', type: 'random', on: ['home'], age: [5, 50], once: false, cooldown: 6,
+    text: (s, a) => a.here().length ? '갑자기 정전이 됐다. 촛불 하나를 가운데 두고 둘러앉아 이야기했다.' : '갑자기 정전이 됐다. 촛불을 켜고 창밖을 오래 봤다.',
+    do: (s, a) => a.here().forEach(p => a.changeP(p, { close: [2, 4] })), effect: { happy: 2 } },
+  { id: 'homeCleaning', type: 'random', on: ['home'], age: [10, 50], once: false, cooldown: 5,
+    text: '대청소를 했다. 서랍 깊숙한 곳에서 옛날 사진이 나왔다. 한참을 들여다봤다.', effect: { happy: 2, health: 1 } },
+  { id: 'homeCooking', type: 'random', on: ['home', 'rest'], age: [12, 50], once: false, cooldown: 4, text: '냉장고에 남은 재료로 뭔가 만들어보기로 했다.',
+    choices: [
+      { label: '레시피대로 만든다', text: '레시피를 한 줄씩 따라 했다. 먹을 만했다.', effect: { craft: [1, 2], happy: 1 } },
+      { label: '감으로 간다', chance: .5,
+        success: { text: '의외로 맛있었다. 이름을 붙여주고 싶은 맛이었다.', effect: { craft: [2, 3], happy: 4 } },
+        fail: { text: '아무도 두 번째 숟가락을 뜨지 않았다.', effect: { happy: -1 } } },
+    ] },
+  { id: 'homeNoise', type: 'random', on: ['home'], age: [21, 50], once: false, cooldown: 5, req: { flags: ['ownPlace'] }, text: '윗집에서 밤마다 쿵쿵 소리가 난다.',
+    choices: [
+      { label: '올라가서 말한다', chance: .6,
+        success: { meet: s => ({ kind: 'friend', ageRange: [Math.max(19, s.age - 10), s.age + 15], hangout: null, close: 18 }), text: '윗집 {new|이} 몰랐다며 연신 사과했다. 다음 날 귤 한 봉지가 문 앞에 걸려 있었다.', effect: { happy: 2 } },
+        fail: { text: '문이 열리자마자 언성이 높아졌다. 소리는 그대로였다.', effect: { happy: -4 } } },
+      { label: '참는다', text: '이어폰을 끼고 잤다.', effect: { happy: -2 } },
+    ] },
+
+  // 놀이터
+  { id: 'pgSwing', type: 'random', on: ['playground'], once: false, cooldown: 3, text: '그네 줄이 길다. 앞에 선 아이가 자꾸 새치기를 한다.',
+    choices: [
+      { label: '양보한다', text: '그냥 미끄럼틀로 갔다. 미끄럼틀도 재밌었다.', karma: 2 },
+      { label: '따진다', check: { stat: 'charm', diff: 25 },
+        success: { text: '줄이 다시 똑바로 섰다. 다들 나를 쳐다봤다.', effect: { charm: 1, happy: 2 } },
+        fail: { text: '말싸움 끝에 울음이 터졌다. 엄마가 데리러 왔다.', effect: { happy: -2 } } },
+    ] },
+  { id: 'pgToy', type: 'random', on: ['playground'], text: '모래 속에서 누가 잃어버린 장난감 로봇을 찾았다.',
+    choices: [
+      { label: '주인을 찾아준다', karma: 3, meet: s => ({ kind: 'friend', ageRange: [Math.max(4, s.age - 1), s.age + 1], hangout: 'playground', close: 30 }),
+        text: '로봇 주인 {new|이} 고맙다며 내일도 같이 놀자고 했다.', effect: { happy: 3 } },
+      { label: '내가 갖는다', karma: -3, text: '로봇을 주머니에 넣었다. 집에 와서도 꺼내 보지 못했다.', effect: { happy: 1 } },
+    ] },
+  { id: 'pgScrape', type: 'random', on: ['playground', 'play'], once: false, cooldown: 3, text: '미끄럼틀에서 굴러 무릎이 까졌다. 울지 않으려고 입술을 꽉 깨물었다.', effect: { health: -2, fit: 1 } },
+
+  // 공원
+  { id: 'parkDog', type: 'random', on: ['park', 'walk'], once: false, cooldown: 3, text: '강아지 한 마리가 다가와 내 신발 냄새를 킁킁 맡았다.',
+    choices: [
+      { label: '쪼그려 앉아 쓰다듬는다', meet: s => ({ kind: 'friend', ageRange: s.age < 19 ? [25, 60] : peer(s), hangout: 'park', close: 18 }),
+        text: '견주 {new|와} 강아지 얘기로 한참 서 있었다. 강아지가 내 손을 핥았다.', effect: { happy: 4 } },
+      { label: '살짝 비켜선다', text: '강아지가 아쉬운 듯 꼬리를 흔들며 갔다.' },
+    ] },
+  { id: 'parkGuitar', type: 'random', on: ['park', 'walk'], age: [8, 50], season: ['봄', '가을'], once: false, cooldown: 4,
+    text: '잔디밭에서 누가 기타를 치며 노래하고 있었다. 노래가 끝나자 다들 박수를 쳤다.', effect: { happy: 3, art: [0, 1] } },
+  { id: 'parkShower', type: 'random', on: ['park'], age: [13, 50], once: false, cooldown: 3, when: s => ['rain', 'storm', 'cloudy'].includes(s.weather),
+    text: '공원에 있는데 갑자기 소나기가 쏟아졌다.',
+    choices: [
+      { label: '정자로 뛰어간다', meet: meetHere(), do: focusNew, p: { heart: [2, 5] },
+        text: '정자 아래서 비를 피하던 {new|와} 눈이 마주쳤다. 비가 그칠 때까지 이야기했다.' },
+      { label: '그냥 맞는다', text: '흠뻑 젖었다. 이상하게 웃음이 났다.', effect: { happy: 3, health: -1 } },
+    ] },
+  { id: 'parkJanggi', type: 'random', on: ['park', 'walk'], age: [9, 50], once: false, cooldown: 5, text: '벤치에 앉은 할아버지가 장기 한 판 두자고 하셨다.',
+    choices: [
+      { label: '둔다', check: { stat: 'smart', diff: 45 },
+        success: { text: '할아버지가 껄껄 웃으시며 다음에 또 오라고 하셨다.', effect: { smart: 2, happy: 3 } },
+        fail: { text: '스무 수 만에 졌다. 훈수가 더 길었다.', effect: { smart: 1 } } },
+      { label: '정중히 사양한다', text: '꾸벅 인사하고 지나갔다.' },
+    ] },
+
+  // 학교
+  { id: 'schoolLunch', type: 'random', on: ['school'], once: false, cooldown: 2, when: (s, a) => hereWho(a, p => p.kind === 'classmate').length > 0,
+    onStart: focusHere(p => p.kind === 'classmate'), text: '급식에 좋아하는 반찬이 나왔다. {fp|이} 자기 몫을 내 식판에 덜어줬다.', p: { close: [3, 5] }, effect: { happy: 2 } },
+  { id: 'schoolQuiz', type: 'random', on: ['school', 'study'], age: [8, 18], once: false, cooldown: 2, text: '갑자기 쪽지 시험을 본다고 했다. 하나도 안 봤다.',
+    choices: [
+      { label: '아는 만큼 푼다', check: { stat: 'smart', diff: 40 },
+        success: { text: '찍은 것까지 다 맞았다. 오늘은 운이 좋다.', effect: { happy: 3 } },
+        fail: { text: '빈칸이 반이었다. 다음엔 꼭 복습하기로 했다.', effect: { happy: -2, smart: 1 } } },
+      { label: '옆을 슬쩍 본다', karma: -3, chance: .6,
+        success: { text: '들키지 않았다. 점수는 좋았는데 기분은 별로였다.', effect: { happy: 1 } },
+        fail: { text: '선생님과 눈이 마주쳤다. 교무실에 불려갔다.', effect: { happy: -5, rel: { family: -2 } } } },
+    ] },
+  { id: 'schoolNew', type: 'random', on: ['school'], age: [8, 17], once: false, cooldown: 4,
+    meet: s => ({ kind: 'classmate', ageRange: [s.age, s.age], hangout: null, close: 22 }), text: '전학생 {new|이} 내 옆자리에 앉았다. 교과서를 같이 봤다.' },
+
+  // 학원
+  { id: 'acadPraise', type: 'random', on: ['academy', 'cram'], once: false, cooldown: 4, text: '학원 선생님이 내 풀이를 보더니 "너 이거 소질 있다"고 했다.',
+    do: (s, a) => a.subjAdd('math', 4), effect: { smart: 2, happy: 3 } },
+  { id: 'acadSkip', type: 'random', on: ['academy'], age: [12, 18], once: false, cooldown: 3, text: '친구가 학원 빼먹고 코인노래방 가자고 한다.',
+    choices: [
+      { label: '따라간다', text: '목이 쉬도록 불렀다. 집에 오니 학원에서 전화가 와 있었다.', effect: { happy: 5, rel: { mom: -3 } } },
+      { label: '수업 듣는다', text: '창밖으로 친구 뒷모습이 보였다.', effect: { smart: 1 } },
+    ] },
+  { id: 'acadBus', type: 'random', on: ['academy', 'cram'], age: [10, 18], once: false, cooldown: 4,
+    meet: s => ({ kind: 'friend', ageRange: [s.age - 1, s.age + 1], hangout: 'academy', close: 24 }),
+    text: '학원 끝나고 나오니 밤이 깊었다. 같은 반 {new|와} 같은 버스를 타고 졸면서 왔다.' },
+
+  // 대학
+  { id: 'campusTeam', type: 'random', on: ['campus', 'study'], req: { flags: ['student'] }, once: false, cooldown: 2, text: '조별 과제 팀원 한 명이 단톡방에서 사라졌다.',
+    choices: [
+      { label: '내가 다 한다', text: '밤을 새웠다. 발표 날 그 팀원이 나타나 자기 이름을 넣어달라고 했다.', effect: { smart: 2, happy: -4, health: -2 }, do: s => { s.school.studyYear++; } },
+      { label: '교수님께 말한다', check: { stat: 'charm', diff: 60 },
+        success: { text: '교수님이 기여도를 따로 받겠다고 했다. 속이 시원했다.', effect: { happy: 3 } },
+        fail: { text: '"알아서들 해결하세요." 메일 한 줄이 돌아왔다.', effect: { happy: -2 } } },
+    ] },
+  { id: 'campusPen', type: 'random', on: ['campus'], age: [19, 30], once: false, cooldown: 3, meet: meetHere({ close: 18 }), do: focusNew, p: { heart: [1, 4] },
+    text: '교양 수업 옆자리 {new|이} 펜을 빌려달라고 했다. 수업이 끝나고 펜과 함께 커피 쿠폰이 돌아왔다.' },
+  { id: 'campusClub', type: 'random', on: ['campus'], req: { flags: ['student'] }, once: false, cooldown: 4, text: '동아리 홍보 부스 앞을 지나다 붙잡혔다.',
+    choices: [
+      { label: '가입한다', meet: meetHere({ close: 25 }), text: '동아리 방에서 {new|와} 금방 말을 텄다.', effect: { happy: 4, charm: [1, 2] } },
+      { label: '도망간다', text: '전단지만 세 장 받아 들고 빠져나왔다.' },
+    ] },
+
+  // 직장
+  { id: 'officeLunch', type: 'random', on: ['office'], once: false, cooldown: 2, when: (s, a) => hereWho(a, p => p.kind === 'coworker').length > 0,
+    onStart: focusHere(p => p.kind === 'coworker'), text: '점심시간, {fp|이} 회사 근처에 새로 생긴 국숫집에 가자고 했다.', p: { close: [3, 6] }, effect: { happy: 2 } },
+  { id: 'officeGossip', type: 'random', on: ['office'], once: false, cooldown: 4, req: { job: true }, text: '잠깐 쉬러 갔다가 사람들이 내 얘기를 하는 소리를 들었다.',
+    choices: [
+      { label: '모른 척한다', text: '물만 마시고 조용히 돌아왔다. 오후 내내 신경이 쓰였다.', effect: { happy: -3 } },
+      { label: '태연하게 들어가 인사한다', check: { stat: 'charm', diff: 85 },
+        success: { text: '분위기가 잠깐 얼어붙었다. 그 뒤로 뒷말이 사라졌다.', effect: { happy: 2, charm: 1 } },
+        fail: { text: '더 어색해졌다. 다들 갑자기 바빠졌다.', effect: { happy: -4 } } },
+    ] },
+  { id: 'officeRookie', type: 'random', on: ['office', 'work'], age: [24, 50], once: false, cooldown: 4, req: { job: true }, text: '새로 온 막내가 첫날부터 실수를 하고 얼어붙어 있다.',
+    choices: [
+      { label: '수습을 도와준다', karma: 2, meet: s => ({ kind: 'coworker', ageRange: [Math.max(20, s.age - 12), Math.max(21, s.age - 3)], hangout: null, close: 28, trust: 30 }),
+        text: '같이 수습했다. 막내 {new|이} 퇴근길에 음료수를 건넸다.', do: (s, a) => a.perf(3) },
+      { label: '못 본 척한다', text: '내 일도 바빴다.' },
+    ] },
+
+  // 카페
+  { id: 'cafeEyes', type: 'random', on: ['cafe', 'coffee'], age: [16, 49], once: false, cooldown: 3, text: '카페에서 낯선 사람과 눈이 마주쳤다. 둘 다 바로 피하지 않았다.',
+    choices: [
+      { label: '먼저 웃어 보인다', meet: meetHere({ close: 16 }), do: focusNew, p: { heart: [3, 7] },
+        text: '{new|이} 따라 웃었다. 어쩌다 보니 합석까지 했다.' },
+      { label: '시선을 피한다', text: '괜히 컵만 만지작거렸다.' },
+    ] },
+  { id: 'cafeSpill', type: 'random', on: ['cafe'], age: [13, 50], once: false, cooldown: 4,
+    text: s => s.age < 19 ? '옆 사람이 일어나다 내 문제집에 음료를 쏟았다.' : '옆 사람이 일어나다 내 노트북에 커피를 쏟았다.',
+    choices: [
+      { label: '괜찮다고 한다', karma: 3, meet: meetHere({ close: 15 }), text: '{new|이} 연신 사과하더니 연락처를 줬다. 세탁비는 끝내 받지 않았다.' },
+      { label: '화를 낸다', karma: -1, text: '상대가 고개를 숙였다. 화를 내고 나니 더 피곤해졌다.', effect: { happy: -2 } },
+    ] },
+  { id: 'cafeUsual', type: 'random', on: ['cafe', 'coffee'], once: false, cooldown: 3, when: (s, a) => a.regular('cafe'),
+    text: '주문하기도 전에 사장님이 "늘 드시던 걸로요?" 하고 물었다.', effect: { happy: 3 } },
+
+  // 도서관
+  { id: 'libSameBook', type: 'random', on: ['library', 'read'], age: [12, 50], once: false, cooldown: 4, text: '빌리려던 책을 누가 한발 먼저 집어 들었다.',
+    choices: [
+      { label: '양보한다', meet: meetHere({ hobby: 'book', close: 18 }), text: '{new|이} 다 읽으면 빌려주겠다며 연락처를 적어줬다. 같은 책을 좋아하는 사람이었다.' },
+      { label: '먼저 봤다고 한다', check: { stat: 'charm', diff: 50 },
+        success: { text: '상대가 웃으며 책을 넘겨줬다.', effect: { happy: 2 } },
+        fail: { text: '상대도 물러서지 않았다. 결국 사서가 반납 순서대로 하라고 했다.', effect: { happy: -2 } } },
+    ] },
+  { id: 'libNote', type: 'random', on: ['library', 'read'], age: [15, 45], text: '반납된 책 사이에 메모가 끼어 있었다. "이 문장에 밑줄 그은 사람, 누구예요?"',
+    choices: [
+      { label: '답장을 끼워둔다', set: 'libNote', text: '"저요." 한 줄을 적어 같은 자리에 끼워뒀다.', effect: { happy: 2, art: 1 } },
+      { label: '그냥 꽂아둔다', text: '책을 제자리에 꽂았다. 문장은 오래 기억에 남았다.' },
+    ] },
+  { id: 'libNoteReply', type: 'random', on: ['library'], age: [15, 46], req: { flags: ['libNote'] }, weight: 3,
+    text: '그 책에 또 메모가 끼어 있었다. "저도 이 문장 좋아해요. 다음 주 목요일, 3층 창가 자리."',
+    choices: [
+      { label: '나가본다', memory: true, meet: s => ({ kind: 'friend', hobby: 'book', ageRange: peer(s), hangout: 'library', close: 25, gender: s.age >= 19 && Math.random() < .8 ? (s.gender === 'm' ? 'f' : 'm') : undefined }),
+        do: focusNew, p: { heart: [5, 10] }, text: '창가 자리에 그 책을 든 {new|이} 앉아 있었다. 처음 만났는데 할 말이 끝이 없었다.' },
+      { label: '나가지 않는다', text: '목요일 내내 3층 쪽을 쳐다보지 않으려고 애썼다.' },
+    ] },
+  { id: 'libNap', type: 'random', on: ['library', 'study'], once: false, cooldown: 4, text: '열람실에서 깜빡 잠들었다. 깨어보니 폐관 10분 전이었다.', effect: { health: 1, happy: -1 } },
+
+  // 헬스장
+  { id: 'gymPT', type: 'random', on: ['gym'], age: [19, 50], once: false, cooldown: 4, text: 'PT 상담을 받았다. 20회에 150만원이라고 한다.',
+    choices: [
+      { label: '등록한다', if: s => s.money >= 150, text: '첫 수업 다음 날, 계단을 기어서 내려갔다. 그래도 몸이 달라지는 게 느껴졌다.', effect: { money: -150, fit: [6, 10], health: [3, 5], looks: [1, 3] } },
+      { label: '혼자 해본다', text: '유튜브 영상을 보며 따라 했다.', effect: { fit: [1, 2] } },
+    ] },
+  { id: 'gymSpot', type: 'random', on: ['gym', 'exercise'], age: [16, 50], once: false, cooldown: 4, meet: meetHere({ hobby: 'sport', close: 18 }),
+    text: '벤치프레스를 하다 바벨이 안 올라갔다. 옆에 있던 {new|이} 잡아줬다. "무리하지 마세요." 그 뒤로 인사하는 사이가 됐다.' },
+  { id: 'gymMirror', type: 'random', on: ['gym', 'exercise'], age: [16, 50], when: s => s.stats.fit >= 100, text: '거울 속 내 몸이 달라졌다는 걸 처음으로 느꼈다.', memory: true, effect: { looks: [2, 4], happy: 4 } },
+
+  // PC방
+  { id: 'pcDuo', type: 'random', on: ['pcbang', 'game'], age: [12, 45], once: false, cooldown: 3, meet: meetHere({ hobby: 'game', close: 20 }),
+    text: '옆자리 사람이 같은 게임을 하고 있었다. {new|와} 즉석에서 팀을 짜서 연승을 했다.', effect: { happy: 3 } },
+  { id: 'pcAllNight', type: 'random', on: ['pcbang'], age: [14, 40], once: false, cooldown: 3, text: '한 판만 더 하다 보니 창밖이 밝아왔다.', effect: { health: -3, happy: 2 } },
+  { id: 'pcRamen', type: 'random', on: ['pcbang'], once: false, cooldown: 3, when: (s, a) => a.regular('pcbang'), text: '사장님이 라면에 계란을 하나 더 풀어줬다. "단골이니까."', effect: { happy: 3 } },
+
+  // 번화가
+  { id: 'mallBusking', type: 'random', on: ['mall', 'shop'], age: [12, 50], once: false, cooldown: 4, text: '버스킹 마지막 곡이 끝나자 노래하던 사람이 내 쪽을 보고 웃었다.',
+    choices: [
+      { label: '기타 케이스에 돈을 넣는다', karma: 1, effect: s => ({ money: s.age >= 18 ? -1 : 0, happy: 2 }), meet: meetHere({ hobby: 'music', close: 16 }),
+        text: '{new|이} 고맙다며 다음 공연 날짜를 알려줬다.' },
+      { label: '박수만 치고 간다', text: '노래가 귀에 오래 남았다.', effect: { art: [0, 1] } },
+    ] },
+  { id: 'mallScout', type: 'random', on: ['mall', 'shop', 'style'], age: [15, 30], when: s => s.stats.looks >= 110, text: '길에서 누가 명함을 내밀었다. 모델 일을 해볼 생각이 없냐고 한다.',
+    choices: [
+      { label: '해본다', chance: .45,
+        success: { text: '광고 사진 한 장에 내 얼굴이 실렸다. 버스 정류장에서 나를 마주쳤다.', memory: true, effect: { money: [100, 400], charm: [2, 4], happy: 6 } },
+        fail: { text: '알고 보니 프로필 촬영비부터 내라는 곳이었다.', effect: { money: -50, happy: -4 } } },
+      { label: '거절한다', text: '명함은 지갑 속에 오래 남아 있었다.' },
+    ] },
+  { id: 'mallLostKid', type: 'random', on: ['mall'], age: [13, 50], once: false, cooldown: 5, text: '울고 있는 아이를 발견했다. 엄마를 잃어버렸다고 한다.',
+    choices: [
+      { label: '안내데스크에 데려간다', karma: 5, text: '아이 엄마가 뛰어와 몇 번이고 고개를 숙였다.', effect: { happy: 3 } },
+      { label: '못 본 척한다', karma: -3, text: '뒤에서 울음소리가 한참 들렸다.' },
+    ] },
+  { id: 'mallSale', type: 'random', on: ['mall', 'shop'], age: [13, 50], once: false, cooldown: 3, text: '마감 세일. 몇 주째 눈여겨보던 옷이 반값이었다.', effect: s => ({ money: s.age >= 18 ? -15 : -1, looks: [1, 2], happy: 3 }) },
+
+  // 병원
+  { id: 'hospOrange', type: 'random', on: ['hospital'], once: false, cooldown: 4, text: '대기실 옆자리 할머니가 귤 하나를 손에 쥐여주셨다. "젊은 사람이 아프면 쓰나."', effect: { happy: 3 } },
+  { id: 'hospNurse', type: 'random', on: ['hospital', 'doctor'], once: false, cooldown: 3, when: (s, a) => a.regular('hospital'), text: '간호사 선생님이 차트를 보기도 전에 내 이름을 불렀다. "또 오셨네요."', effect: { happy: 1, health: 2 } },
+  { id: 'hospResult', type: 'random', on: ['hospital', 'doctor'], age: [30, 50], once: false, cooldown: 6, text: '검사 결과를 설명하는 의사 선생님 표정이 묘했다. 정밀 검사를 받아보라고 한다.',
+    choices: [
+      { label: '정밀 검사를 받는다', chance: .7, effect: { money: -100 },
+        success: { text: '별것 아니었다. 병원을 나서는데 다리에 힘이 풀렸다.', effect: { happy: 4 } },
+        fail: { text: '초기에 발견해서 다행이라고 했다. 한동안 치료를 받았다.', memory: true, effect: { health: -8, money: -200, happy: -4 } } },
+      { label: '괜찮겠지 하고 넘긴다', chance: .6,
+        success: { text: '정말 괜찮았다. 운이 좋았다.' },
+        fail: { text: '반년 뒤 다시 병원을 찾았다. 그때 받을걸 그랬다.', memory: true, effect: { health: -15, happy: -6 } } },
+    ] },
+
+  // 복지관
+  { id: 'centerStory', type: 'random', on: ['center', 'volunteer'], text: '복지관 할아버지가 젊었을 때 이야기를 해주셨다. 전쟁, 첫사랑, 그리고 망한 국밥집.', memory: true, effect: { art: [1, 2], happy: 2 } },
+  { id: 'centerTeacher', type: 'random', on: ['center', 'volunteer'], age: [14, 50], text: '공부방 아이 하나가 나를 "쌤"이라고 불렀다. 집에 오는 내내 그 소리가 귀에 남았다.', karma: 3, effect: { happy: 4 } },
+  { id: 'centerPartner', type: 'random', on: ['center', 'volunteer'], once: false, cooldown: 4, meet: meetHere({ close: 24, trust: 25 }),
+    text: '같이 봉사하는 {new|와} 손발이 척척 맞았다. 끝나고 같이 떡볶이를 먹었다.', effect: { happy: 2 } },
+
+  // 터미널
+  { id: 'stationWrong', type: 'random', on: ['station', 'travel'], text: '표를 잘못 끊었다. 반대 방향 버스였다.',
+    choices: [
+      { label: '그냥 가본다', text: '계획에 없던 바닷가 마을에 내렸다. 이번 여행에서 그게 제일 좋았다.', memory: true, effect: { happy: 6 } },
+      { label: '다시 끊는다', text: '수수료를 내고 표를 바꿨다.', effect: { money: -2 } },
+    ] },
+  { id: 'stationGoodbye', type: 'random', on: ['station'], once: false, cooldown: 5, text: '대합실에서 누군가 오래 포옹하고 있었다. 괜히 내 쪽이 먹먹했다.', effect: { art: [0, 1] } },
+  { id: 'stationSeat', type: 'random', on: ['station', 'travel'], once: false, cooldown: 4, meet: meetHere({ hobby: 'travel', close: 20 }),
+    text: '{new|와} 같은 버스 옆자리였다. 내릴 때쯤엔 서로 맛집 목록을 주고받고 있었다.', effect: { happy: 2 } },
+
+  // 술집
+  { id: 'barUsual', type: 'random', on: ['bar', 'drink'], once: false, cooldown: 3, when: (s, a) => a.regular('bar'), text: '사장님이 내 잔을 기억하고 있었다. "늘 드시던 걸로?"', effect: { happy: 3 } },
+  { id: 'barBirthday', type: 'random', on: ['bar'], once: false, cooldown: 4, text: '옆 테이블에서 생일 파티가 한창이었다. 얼떨결에 같이 생일 노래를 부르고 건배를 했다.',
+    meet: s => ({ kind: 'friend', ageRange: [Math.max(19, s.age - 8), Math.min(60, s.age + 8)], hangout: 'bar', close: 18 }), effect: { happy: 3 } },
+  { id: 'barBlackout', type: 'random', on: ['bar', 'drink'], once: false, cooldown: 3, text: '너무 마셨다. 다음 날 아침, 어젯밤 기억이 군데군데 비어 있었다.', effect: { health: -4, happy: -1 } },
+  { id: 'barBrawl', type: 'random', on: ['bar'], once: false, cooldown: 4, text: '옆 테이블 취객이 괜히 시비를 걸어왔다.',
+    choices: [
+      { label: '자리를 피한다', text: '계산하고 나왔다. 밤공기가 찼다.' },
+      { label: '맞받아친다', check: { stat: 'fit', diff: 90 },
+        success: { text: '상대가 먼저 꼬리를 내렸다. 가게 안이 조용해졌다.', karma: -2, heat: 4, effect: { happy: 2 } },
+        fail: { text: '코피가 터졌다. 경찰이 와서야 끝났다.', karma: -3, heat: 10, effect: { health: -8, happy: -4 } } },
+    ] },
+
+  // 종교시설
+  { id: 'churchNoodle', type: 'random', on: ['church', 'pray'], once: false, cooldown: 3,
+    meet: s => ({ kind: 'friend', ageRange: [Math.max(40, s.age + 20), Math.max(60, s.age + 40)], hangout: 'church', close: 22, trust: 25 }), text: '모임이 끝나고 국수를 나눠 먹었다. {new|이} 이것저것 물어보시더니 다음 주에도 오라고 하셨다.', effect: { happy: 2 } },
+  { id: 'churchChoir', type: 'random', on: ['church'], age: [8, 50], text: '합창 연습에 들어와 보라는 권유를 받았다.',
+    choices: [
+      { label: '들어간다', meet: meetHere({ hobby: 'music', close: 22 }), text: '{new|이} 옆자리에서 음을 잡아줬다. 생각보다 목소리가 잘 맞았다.', effect: { art: [2, 4], happy: 3 } },
+      { label: '사양한다', text: '맨 뒷자리에서 듣기만 했다. 그것도 좋았다.' },
+    ] },
+  { id: 'churchConfess', type: 'random', on: ['church', 'pray'], once: false, cooldown: 4, when: s => s.karma <= -20, text: '조용히 앉아 있는데, 그동안 모른 척한 일들이 하나씩 떠올랐다.',
+    choices: [
+      { label: '마음속으로 사과한다', karma: 8, text: '용서받을 수 있을지는 몰라도, 조금은 가벼워졌다.', effect: { happy: 2 } },
+      { label: '털고 일어난다', text: '문을 나서자 다시 아무렇지 않은 척했다.' },
+    ] },
+
+  // 편의점
+  { id: 'cvsNeighbor', type: 'random', on: ['conveni', 'snack'], age: [19, 50], once: false, cooldown: 3, when: s => !!s.placeNight,
+    meet: s => ({ kind: 'friend', ageRange: [Math.max(19, s.age - 8), s.age + 12], hangout: 'conveni', close: 18 }),
+    text: '새벽 편의점에서 같은 동네 {new|와} 마주쳤다. 둘 다 슬리퍼 차림이었다. 컵라면을 사이에 두고 웃음이 터졌다.' },
+  { id: 'cvsUmbrella', type: 'random', on: ['conveni'], age: [13, 50], once: false, cooldown: 4, when: s => ['rain', 'storm'].includes(s.weather),
+    text: '비가 쏟아져서 편의점 처마 밑에 갇혔다. 옆에 선 사람이 우산을 같이 쓰자고 했다.',
+    choices: [
+      { label: '같이 쓴다', meet: meetHere({ close: 16 }), do: focusNew, p: { heart: [2, 5] }, text: '{new|와} 우산 하나를 나눠 쓰고 걸었다. 한쪽 어깨가 다 젖었다.' },
+      { label: '그칠 때까지 기다린다', text: '빗소리를 들으며 삼각김밥을 먹었다.' },
+    ] },
+  { id: 'cvsAllowance', type: 'random', on: ['conveni', 'snack'], age: [6, 12], once: false, cooldown: 3, text: '용돈으로 뭘 살지 30분째 고민했다. 결국 제일 처음 집었던 걸 샀다.', effect: { happy: 2 } },
+  { id: 'cvsStaff', type: 'random', on: ['conveni'], once: false, cooldown: 3, when: (s, a) => a.regular('conveni'), text: '알바생이 내가 늘 사는 걸 먼저 계산대에 올려놨다.', effect: { happy: 2 } },
+
+  // 공연장
+  { id: 'concertFan', type: 'random', on: ['concert', 'watch'], once: false, cooldown: 3, meet: meetHere({ hobby: 'music', close: 22 }),
+    text: '옆자리 {new|이} 내가 제일 좋아하는 노래를 한 소절도 안 틀리고 따라 불렀다. 공연이 끝나고 같이 역까지 걸었다.', effect: { happy: 3 } },
+  { id: 'concertWave', type: 'random', on: ['concert', 'watch'], text: '앵콜 곡에서 무대 위 가수가 내 쪽을 보고 손을 흔들었다. 분명히 나였다.', memory: true, effect: { happy: 6 } },
+
+  // 단골 장소
+  { id: 'regularSeat', type: 'random', on: NOT_ROUTINE, age: [13, 50], once: false, cooldown: 3, weight: 1.5, when: s => !!s.regular[s.place],
+    text: '{place}에 올 때마다 늘 같은 자리에 있는 사람이 있다.',
+    choices: [
+      { label: '말을 걸어본다', meet: meetHere({ close: 24 }), text: '{new|와} 인사를 나눴다. 알고 보니 서로 얼굴은 진작부터 알고 있었다.' },
+      { label: '오늘도 그냥 지나친다', text: '오늘도 고개만 살짝 숙였다.' },
+    ] },
+  { id: 'regularMissed', type: 'random', on: NOT_ROUTINE, age: [10, 50], once: false, cooldown: 4, when: s => !!s.regular[s.place],
+    text: '"요즘 왜 안 왔어요?" {place}에서 누가 먼저 안부를 물었다. 별것 아닌데 기분이 좋았다.', effect: { happy: 3 } },
 
   /* ═════ 업보 ═════ */
   { id: 'kLostWallet', type: 'karma', sign: -1, once: false, text: '지갑을 잃어버렸다. 어디서 흘렸는지 모르겠다.', effect: s => ({ money: s.age >= 18 ? [-80, -10] : [-3, -1], happy: -3 }) },

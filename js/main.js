@@ -11,7 +11,7 @@ const PST = ['close', 'trust', 'heart', 'grudge'];
 const app = $('#app'), logBox = $('#log'), modal = $('#modal'), mBody = $('#mBody');
 let bg = { w: null, t: null };
 let logState = { id: null, n: 0 };
-let modalMode = null, modalArg = null, lastFocus = null, endingFor = null;
+let modalMode = null, modalArg = null, lastFocus = null, endingFor = null, personFrom = 'people';
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const bar = v => { const n = Math.round(v / 10); return '■'.repeat(n) + '□'.repeat(10 - n); };
@@ -82,20 +82,14 @@ function render(S) {
   renderLog(S);
 
   const se = G.season();
-  $('#season').textContent = `${se.icon} ${se.id}`;
+  $('#season').textContent = `${se.icon} ${se.id} · ${G.timeLabel()}`;
   $('#ap').textContent = seasonDots(S);
   $('#apNum').textContent = `${S.ap}/${G.config.apPerYear}`;
   $("#peopleBtn").textContent = "👥 관계";
   $('#jobBtn').hidden = S.age < 16;
   $('#crimeBtn').hidden = G.crimes().length === 0 && S.jail === 0;
 
-  const acts = G.actionList();
-  $('#acts').innerHTML = acts.length
-    ? acts.filter(a => S.age >= (a.minAge || 0)).map(a => {
-        const c = G.costOf(a);
-        return `<button type="button" class="act" data-a="${a.id}"${G.canDo(a) ? '' : ' disabled'}${c ? ` title="${G.fmtMoney(c)}"` : ''}><span class="ic" aria-hidden="true">${a.icon}</span>${a.label}</button>`;
-      }).join('') || '<p class="empty">아직은 먹고 자는 게 전부다.</p>'
-    : '<p class="empty">아직은 먹고 자는 게 전부다.</p>';
+  renderWhere(S);
 
   const ageBtn = $('#ageUp');
   ageBtn.textContent = S.ended ? '↻ 새 인생 시작' : S.ap > 0 ? `⏭ 남은 ${S.ap}번 쉬고 1살 먹기` : '＋ 1살 먹기';
@@ -111,10 +105,49 @@ function render(S) {
   else if (modalMode === 'event') closeModal();
   else if (modalMode === 'people') openPeople();
   else if (modalMode === 'person') openPerson(modalArg);
+  else if (modalMode === 'stranger') openStranger(modalArg);
   else if (modalMode === 'jobs') openJobs();
   else if (modalMode === 'crime') openCrime();
   else if (modalMode === 'me') openMe();
   else if (modalMode === 'study') closeModal();
+}
+
+/* ---------- 하단: 장소 고르기 → 거기 있는 사람 + 할 수 있는 것 ---------- */
+function actButtons(acts) {
+  return acts.map(a => {
+    const c = G.costOf(a);
+    return `<button type="button" class="act" data-a="${a.id}"${G.canDo(a) ? '' : ' disabled'}${c ? ` title="${G.fmtMoney(c)}"` : ''}><span class="ic" aria-hidden="true">${a.icon}</span>${a.label}${c ? `<small>${G.fmtMoney(c)}</small>` : ''}</button>`;
+  }).join('');
+}
+const ageBand = age => age < 13 ? '어린이' : age < 20 ? `${age < 16 ? '10대 중반' : '10대 후반'}` : `${Math.floor(age / 10) * 10}대${age % 10 < 4 ? ' 초반' : age % 10 < 7 ? ' 중반' : ' 후반'}`;
+function hereRow(h) {
+  const p = h.p;
+  const who = h.stranger ? `<b>처음 보는 사람</b> <span class="dim">${ageBand(G.npcAge(p))} ${genderKo(p.gender)}</span>`
+    : `<b>${esc(G.pname(p))}</b> <span class="dim">${G.npcAge(p)}살 ${esc(G.relLabel(p))}</span>`;
+  return `<button type="button" class="hp${h.used ? ' used' : ''}" data-hp="${h.key}">
+    <span class="hw">${who}</span><span class="hd">${esc(h.doing)}${h.used ? ' · 이야기함' : ''}</span></button>`;
+}
+function renderWhere(S) {
+  const box = $('#where');
+  if (S.jail) {
+    box.innerHTML = `<div class="acts">${actButtons(G.actionList())}</div>`;
+    return;
+  }
+  const pl = G.place();
+  if (!pl) {
+    const list = G.places();
+    box.innerHTML = list.length
+      ? `<div class="acts places">${list.map(p => `<button type="button" class="act" data-pl="${p.id}"${p.ok ? '' : ' disabled'}${p.why ? ` title="${esc(p.why)}"` : ''}><span class="ic" aria-hidden="true">${p.icon}</span>${esc(p.label)}${p.regular ? '<small>단골</small>' : p.why ? `<small>${esc(p.why)}</small>` : ''}</button>`).join('')}</div>`
+      : '<p class="empty">아직은 먹고 자는 게 전부다.</p>';
+    return;
+  }
+  const here = G.here(), acts = G.actionList();
+  box.innerHTML = `
+    <div class="here-head"><span>📍 <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}</span><button type="button" data-leave>← 돌아가기</button></div>
+    <p class="sec-t">여기 있는 사람들 <span class="dim">· 말 걸기는 행동을 안 씀</span></p>
+    <div class="here">${here.map(hereRow).join('') || '<p class="empty">아무도 없다.</p>'}</div>
+    <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· 행동 1</span></p>
+    <div class="acts">${actButtons(acts) || '<p class="empty">여기선 딱히 할 게 없다.</p>'}</div>`;
 }
 
 /* ---------- 모달 ---------- */
@@ -187,8 +220,9 @@ function openPerson(id) {
   if (p.debt) tags.push(`<span class="tag warn">빌린 돈 ${G.fmtMoney(p.debt)}</span>`);
   if (p.ex) tags.push('<span class="tag">예전에 사귐</span>');
   const prof = G.profile(p).map(f => `<dt>${f.label}</dt><dd${f.value == null ? ' class="unk"' : ''}>${f.value == null ? '???' : esc(f.value)}</dd>`).join('');
-  const acts = G.interactions(id).map(it =>
-    `<button type="button" data-i="${it.id}"${it.ok ? '' : ' disabled'}>${it.icon} ${it.label}${it.cost ? ` <small>${G.fmtMoney(it.cost)}</small>` : ''}</button>`).join('');
+  const its = G.interactions(id), anyFree = its.some(it => it.free);
+  const acts = its.map(it =>
+    `<button type="button" data-i="${it.id}"${it.ok ? '' : ' disabled'}>${it.icon} ${it.label}${it.cost ? ` <small>${G.fmtMoney(it.cost)}</small>` : ''}${anyFree && !it.free ? ' <small>행동 1</small>' : ''}</button>`).join('');
   showModal('person', `${G.pname(p)}`, `
     <p><b>${esc(G.pname(p))}</b> <span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}, ${esc(G.relLabel(p))}</span></p>
     <div class="stats">${stats}</div>
@@ -196,8 +230,21 @@ function openPerson(id) {
     <dl class="prof">${prof}</dl>
     ${G.profile(p).some(f => f.value == null) ? '<p class="hint">더 친해지면 더 알 수 있다.</p>' : ''}
     <div class="igrid">${acts || '<p class="hint">지금은 할 수 있는 게 없다.</p>'}</div>
-    <p class="hint">한 번에 행동 1을 써. (남은 행동 ${S.ap})</p>
-    <button type="button" class="back" data-back>← 목록</button>`, true, id);
+    <p class="hint">${anyFree ? `지금 ${esc(G.place().label)}에 같이 있어서 한 번은 행동을 쓰지 않는다.` : '한 번에 행동 1을 써.'} (남은 행동 ${S.ap})</p>
+    <button type="button" class="back" data-back>${personFrom === 'here' ? '← 닫기' : '← 목록'}</button>`, true, id);
+}
+
+/* 장소에서 처음 보는 사람 */
+function openStranger(key) {
+  const h = G.here().find(x => x.key === key && x.stranger);
+  if (!h) return;   // 말 걸기에 성공하면 엔진이 이 사람을 관계 목록으로 옮김 → 클릭 처리에서 openPerson으로 넘어감
+  const p = h.p;
+  showModal('stranger', '처음 보는 사람', `
+    <p><b>처음 보는 사람</b> <span class="dim">${ageBand(G.npcAge(p))} ${genderKo(p.gender)}</span></p>
+    <p class="dim">${esc(h.doing)}.</p>
+    <div class="igrid"><button type="button" data-talk="${h.key}"${h.used ? ' disabled' : ''}>💬 말 걸기 <small>행동 안 씀</small></button></div>
+    <p class="hint">${h.used ? '대화가 이어지지 않았다. 다음에 또 마주칠지도.' : '말을 걸면 이름과 특징을 알 수 있다. 잘 받아주면 관계 목록에 추가된다.'}</p>
+    <button type="button" class="back" data-back>← 닫기</button>`, true, key);
 }
 
 /* 직업 */
@@ -373,15 +420,22 @@ function confirmRestart() {
 }
 
 /* ---------- 입력 ---------- */
-$('#acts').addEventListener('click', e => {
-  const b = e.target.closest('[data-a]');
-  if (!b) return;
-  const a = G.actionList().find(x => x.id === b.dataset.a);
-  if (a && G.needsSubject(a)) openStudy(); else G.doAction(b.dataset.a);
+$('#where').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  const d = b.dataset;
+  if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) openStudy(); else G.doAction(d.a); }
+  else if (d.pl) G.goPlace(d.pl);
+  else if ('leave' in d) G.leavePlace();
+  else if (d.hp) {
+    const h = G.here().find(x => x.key === d.hp);
+    if (!h) return;
+    if (h.stranger) openStranger(h.key); else { personFrom = 'here'; openPerson(h.key); }
+  }
 });
 $('#meBtn').addEventListener('click', openMe);
 $('#ageUp').addEventListener('click', () => { const S = G.state(); if (S.ended) { draft = null; openCreate(true); } else G.ageUp(); });
-$('#peopleBtn').addEventListener('click', openPeople);
+$('#peopleBtn').addEventListener('click', () => { personFrom = 'people'; openPeople(); });
 $('#jobBtn').addEventListener('click', openJobs);
 $('#crimeBtn').addEventListener('click', openCrime);
 $('#restart').addEventListener('click', confirmRestart);
@@ -394,9 +448,10 @@ mBody.addEventListener('click', e => {
   if (modalMode === 'create') { createClick(b); return; }
   if (d.s) { G.doAction('study', d.s === 'all' ? null : d.s); return; }
   if (d.c != null) G.choose(+d.c);
-  else if (d.pv) openPerson(d.pv);
+  else if (d.pv) { personFrom = 'people'; openPerson(d.pv); }
   else if (d.i) G.interact(modalArg, d.i);
-  else if ('back' in d) openPeople();
+  else if (d.talk) { const id = G.talkTo(d.talk); if (id && !G.state().pending.length) { personFrom = 'here'; openPerson(id); } }
+  else if ('back' in d) { if (modalMode === 'stranger' || personFrom === 'here') closeModal(); else openPeople(); }
   else if (d.j) G.applyJob(d.j);
   else if (d.k) G.commitCrime(d.k);
   else if ('quit' in d) G.quitJob();

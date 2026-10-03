@@ -5,7 +5,8 @@
 const D = window.GAME_DATA;
 const C = D.config;
 const SEASONS = C.seasons;
-const SAVE_KEY = 'llife-save-v3';
+const SAVE_KEY = 'llife-save-v4';
+const OLD_SAVE_KEY = 'llife-save-v3';
 const COND = ['happy', 'health'];             // 상태: 0~100
 const ABIL = D.abilities;                     // 능력: 상한 없음, 등급
 const STATS = COND.concat(ABIL);
@@ -15,7 +16,10 @@ const GR = D.grades;
 const SUBJ = D.subjects.map(x => x.id);
 const KIND_LABEL = { classmate: '같은 반', friend: '친구', coworker: '동료', rival: '앙숙', child: '아이', family: '가족' };
 const EVENTS = Object.fromEntries(D.events.map(e => [e.id, e]));
-const TRANSIENT = ['fp', 'sev', 'late', 'mainId', 'mainName', 'loverId', 'lover', 'debt', 'new', 'attempt', 'uniScore', 'signal', 'fline', 'myValue', 'theirValue', 'satText'];
+const PLACES = Object.fromEntries(D.places.map(p => [p.id, p]));
+const ACTIONS = Object.fromEntries(D.actions.map(a => [a.id, a]));
+const TIMES = ['아침', '낮', '저녁'];
+const TRANSIENT = ['fp', 'sev', 'late', 'mainId', 'mainName', 'loverId', 'lover', 'debt', 'new', 'newId', 'attempt', 'uniScore', 'signal', 'fline', 'myValue', 'theirValue', 'satText', 'placeLabel'];
 
 const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -90,12 +94,26 @@ function relLabel(p) {
   return KIND_LABEL[p.kind] || '아는 사람';
 }
 
-function addPerson(spec) {
-  spec = spec || meetDefault();
-  if (alive().filter(p => p.kind !== 'family').length >= C.maxPeople && spec.kind !== 'child') {
+// 관계 목록이 꽉 차면 제일 덜 친한 사람부터 멀어짐
+function makeRoom(kind) {
+  if (alive().filter(p => p.kind !== 'family').length >= C.maxPeople && kind !== 'child') {
     const drop = alive().filter(p => !['family', 'child'].includes(p.kind) && !p.partner && !p.spouse && !p.secret).sort((a, b) => a.close - b.close)[0];
     if (drop) drop.gone = true;
   }
+}
+// 관계 목록에 정식으로 넣기 (장소에서 처음 본 사람도 말을 걸면 여기로)
+function enlist(p) {
+  makeRoom(p.kind);
+  p.id = 'p' + (++S.pseq);
+  p.met = S.age;
+  delete p.stranger;
+  S.people.push(p);
+  S.vars.new = p.name; S.vars.newId = p.id;
+  return p;
+}
+function addPerson(spec) { return enlist(makePerson(spec || meetDefault())); }
+// 사람 한 명 만들기 (아직 관계 목록에는 안 넣음)
+function makePerson(spec) {
   const gender = spec.gender || (Math.random() < .5 ? 'm' : 'f');
   let ageDiff = spec.ageDiff;
   if (ageDiff == null) {
@@ -103,24 +121,24 @@ function addPerson(spec) {
     ageDiff = rand(Math.max(0, r[0]), Math.max(0, r[1])) - S.age;
   }
   const age = S.age + ageDiff;
+  const hobby = spec.hobby || pick(D.hobbies).id;
   const p = {
-    id: 'p' + (++S.pseq), kind: spec.kind || 'friend', role: spec.role || null,
+    id: null, kind: spec.kind || 'friend', role: spec.role || null,
     name: spec.name || pick(gender === 'm' ? D.namesM : D.namesF), gender, ageDiff,
     close: spec.close ?? rand(15, 30), trust: spec.trust ?? rand(15, 30), heart: 0, grudge: spec.grudge ?? 0,
     taken: spec.taken ?? (age >= 24 ? Math.random() < .35 : age >= 19 ? Math.random() < .15 : false),
     met: S.age, debt: 0, sibling: !!spec.sibling,
     // 프로필 — 친해질수록 보임
     personality: spec.personality || pick(D.personalities).id,
-    hobby: spec.hobby || pick(D.hobbies).id,
+    hobby,
     value: spec.value || pick(D.values).id,
     wealth: spec.wealth || weighted(D.wealth).id,
     dream: pick(D.dreams).id,
     npcJob: age >= 23 ? pick(D.npcJobs) : null,
     feature: pick(D.features),
+    hangout: spec.hangout !== undefined ? spec.hangout : pickHangout(hobby, age),   // 자주 가는 곳
   };
   if (p.kind === 'child') p.role = '아이';
-  S.people.push(p);
-  S.vars.new = p.name;
   return p;
 }
 function meetDefault() {
@@ -173,7 +191,7 @@ function startRelation(p, sneaky) {
 function marry(p) {
   if (!p) return;
   p.partner = false; p.spouse = true;
-  S.flags.married = true;
+  S.flags.married = true; S.flags.ownPlace = true;
 }
 
 /* ═════════ 도우미 ═════════ */
@@ -192,6 +210,7 @@ function fill(t, ctx = {}) {
     else if (k === 'fp') v = pname(person(S.vars.fp));
     else if (k === 'partner') v = pname(mainPartner());
     else if (k === 'hobbyLabel') v = (D.hobbies.find(h => h.id === S.hobby) || {}).label;
+    else if (k === 'place') v = S.place ? PLACES[S.place].label : '';
     else v = S.vars[k];
     v = v == null ? '' : String(v);
     return j && v ? josa(v, j) : v;
@@ -255,7 +274,20 @@ function applyOutcome(o, target) {
   const text = o.text != null ? fill(textOf(o.text), target ? { p: pname(target) } : {}) : '';
   if (text) log(text, { memory: !!o.memory, deltas });
   else if (deltas.length) log('', { t: 'info', deltas });
+  riskCheck(o, tp);
   if (o.then) { const t = resolve(o.then); if (t) trigger(t); }
+}
+// 얽힌 사이: 들키지 않으면 괜찮지만… (risk: 내 애인에게 / riskTaken: 상대 애인에게)
+function riskCheck(o, p) {
+  const risk = resolve(o.risk) || 0, rt = resolve(o.riskTaken) || 0;
+  const m = mainPartner();
+  if (risk && p && m && m !== p && Math.random() < risk + .05 * alive().filter(x => x.secret).length) {
+    S.vars.mainId = m.id; S.vars.mainName = pname(m); S.vars.loverId = p.id; S.vars.lover = pname(p);
+    trigger('affairCaught');
+  } else if (rt && p && p.taken && Math.random() < rt) {
+    S.vars.fp = p.id;
+    trigger('rivalFound');
+  }
 }
 
 /* ═════════ 조건 ═════════ */
@@ -337,7 +369,7 @@ function enterSeason(i) {
   const se = SEASONS[i];
   S.seasonIdx = i;
   S.weather = weighted(Object.keys(se.weather), k => se.weather[k]);
-  S.time = rand(0, 2);
+  updateTime();
   S.log.push({ n: ++S.seq, t: 'season', season: se.id, icon: se.icon, wx: S.weather });
   if (se.months.includes(S.month)) birthday();
   schoolExam(se.id);
@@ -352,6 +384,13 @@ function enterSeason(i) {
   if (pool.length && Math.random() >= C.flavorChance) fire(weighted(pool));
   else log(flavorLine(se.id));
 }
+// 하루의 때: 계절 안에서 행동을 쓸수록 아침 → 낮 → 저녁 (계절의 마지막 행동은 늘 저녁)
+function updateTime() {
+  const i = Math.max(0, S.seasonIdx), se = SEASONS[i], next = SEASONS[i + 1];
+  const len = (next ? next.at : C.apPerYear) - se.at;
+  const k = clamp(S.used - se.at, 0, Math.max(0, len - 1));
+  S.time = len <= 1 ? 1 : Math.min(2, Math.round(k * 2 / (len - 1)));
+}
 // 쓴 행동 수에 맞춰 계절을 넘김. 선택지 이벤트가 걸리면 거기서 멈춤
 function tickSeason() {
   while (!S.pending.length && !S.ended) {
@@ -360,10 +399,12 @@ function tickSeason() {
     else break;
   }
 }
-function maybeRandom(tag) {
-  if (S.pending.length || Math.random() >= C.randomEventChance) return;
-  const pool = D.events.filter(e => e.type === 'random' && (!e.on || e.on.includes(tag)) && eligible(e));
-  if (pool.length) fire(weighted(pool));
+// 랜덤 이벤트: on에 행동 id나 장소 id를 적으면 그때만 (맞는 태그가 있으면 두 배로 잘 뽑힘)
+function maybeRandom(tags, chance = C.randomEventChance) {
+  if (S.pending.length || Math.random() >= chance) return;
+  tags = asList(tags).filter(Boolean);
+  const pool = D.events.filter(e => e.type === 'random' && (!e.on || e.on.some(t => tags.includes(t))) && eligible(e));
+  if (pool.length) fire(weighted(pool, e => (e.weight ?? 1) * (e.on ? 2 : 1)));
 }
 
 
@@ -489,6 +530,7 @@ function arrest(sev, late) {
 }
 function goJail(years) {
   S.jail = years; S.flags.inJail = true;
+  S.place = null; S.here = [];
   if (S.job) { log(`${job(S.job).label} 일자리를 잃었다.`, { t: 'info' }); S.job = null; S.salary = 0; }
   delete S.flags.student;
   const m = mainPartner(); if (m) applyP(m, { trust: -30, heart: -15 });
@@ -612,8 +654,11 @@ function yearly() {
     } else S.salary = Math.round(S.salary * 1.02);
     S.perf = clamp(S.perf - 8, 0, 100);
   }
-  // 어른 NPC 직업 붙이기
-  for (const p of alive()) if (!p.npcJob && npcAge(p) >= 23 && p.kind !== 'family') p.npcJob = pick(D.npcJobs);
+  // 어른 NPC 직업 붙이기, 나이에 안 맞게 된 단골 장소 바꾸기
+  for (const p of alive()) {
+    if (!p.npcJob && npcAge(p) >= 23 && p.kind !== 'family') p.npcJob = pick(D.npcJobs);
+    if (p.hangout && !ageFits(PLACES[p.hangout], npcAge(p))) p.hangout = pickHangout(p.hobby, npcAge(p));
+  }
   if (a >= 20 && !S.flags.student && !S.flags.inArmy && !jailed()) {
     const kids = alive().filter(p => p.kind === 'child').length;
     S.money -= C.livingCost + (S.flags.married ? 600 : 0) + kids * 400;   // 가족이 늘면 생활비도 늘어남
@@ -651,6 +696,7 @@ function after() {
 function advanceYear() {
   S.age++;
   S.ap = C.apPerYear; S.used = 0; S.seasonIdx = -1;
+  S.place = null; S.here = [];
   S.log.push({ n: ++S.seq, t: 'year', age: S.age });
   yearly();
   if (S.age >= C.endAge) return;
@@ -668,11 +714,14 @@ function ageUp() {
 
 /* ═════════ 행동 ═════════ */
 const busy = () => !!S.ended || S.pending.length > 0;
-function spend() { S.ap--; S.used++; }
+function spend() { S.ap--; S.used++; updateTime(); }
 const costOf = a => a.cost && S.age >= 18 ? a.cost : 0;
+// 지금 있는 장소에서 할 수 있는 행동 (수감 중엔 교도소 행동)
 function actionList() {
   if (jailed()) return D.jailActions;
-  return D.actions.filter(a => S.age >= a.minAge && meets(a.req) && !(a.id === 'parttime' && (S.flags.inArmy)));
+  const pl = PLACES[S.place];
+  if (!pl) return [];
+  return pl.actions.map(id => ACTIONS[id]).filter(a => a && S.age >= a.minAge && meets(a.req) && !(a.id === 'parttime' && S.flags.inArmy));
 }
 function canDo(a) { return !busy() && S.ap > 0 && (!costOf(a) || S.money >= costOf(a)); }
 const needsSubject = a => a.id === 'study' && inSchool();
@@ -689,63 +738,178 @@ function doAction(id, subj) {
     }
     if (S.flags.student) S.school.studyYear++;
     log(fill(textOf(a.text)), { deltas });
-    maybeRandom(a.id); tickSeason(); after(); return;
+    maybeRandom([a.id, S.place]); tickSeason(); after(); return;
   }
-  if (a.work) S.perf = clamp(S.perf + rand(6, 12) + gIdx(S.stats.smart), 0, 100);
+  if (a.work) S.perf = clamp(S.perf + val(a.perf || [6, 12]) + gIdx(S.stats.smart), 0, 100);
   if (a.escape) {
     const ok = S.stats.health + S.stats.smart + rand(-30, 30) >= 120;
     if (ok) { escape(true); log('한밤중에 담을 넘었다. 이제 쫓기는 몸이다.', { memory: true }); addKarma(-10); }
     else { escape(false); log('탈옥하다 붙잡혔다. 형기가 2년 늘었다.'); }
     tickSeason(); after(); return;
   }
-  if (a.meet) {
-    addPerson();
-    log(fill(textOf(a.text)));
-  } else {
-    const deltas = applyEffect(a.effect);
-    const c = costOf(a);
-    if (c) deltas.push(...applyEffect({ money: -c }));
-    addKarma(a.karma);
-    log(fill(textOf(a.text)), { deltas, memory: a.memoryChance ? Math.random() < a.memoryChance : false });
-  }
-  maybeRandom(a.id);
+  const deltas = applyEffect(a.effect);
+  const c = costOf(a);
+  if (c) deltas.push(...applyEffect({ money: -c }));
+  if (a.subjAll && inSchool()) SUBJ.forEach(k => { const g = subjGain(k, val(a.subjAll)); deltas.push([D.subjects.find(x => x.id === k).label, g]); });
+  addKarma(a.karma);
+  log(fill(textOf(a.text)), { deltas, memory: a.memoryChance ? Math.random() < a.memoryChance : false });
+  maybeRandom([a.id, S.place]);
   tickSeason();
   after();
 }
 
+/* ═════════ 장소 ═════════ */
+const ageFits = (pl, age) => !!pl && age >= (pl.minAge || 0) && (pl.maxAge == null || age <= pl.maxAge);
+function pickHangout(hobby, age) {
+  if (age < 13) return Math.random() < .6 ? (age >= 4 ? pick(['playground', 'park']) : null) : null;
+  const list = (D.hangoutByHobby[hobby] || []).filter(id => ageFits(PLACES[id], age) && !PLACES[id].night);
+  return list.length && Math.random() < .75 ? pick(list) : null;
+}
+function placeOpen(pl) {
+  if (jailed() || !ageFits(pl, S.age)) return false;
+  if (pl.night && S.time !== 2) return false;
+  return !pl.open || !!pl.open(S, api);
+}
+function closedWhy(pl) {
+  if (pl.night && S.time !== 2) return '저녁에만';
+  if (pl.open && !pl.open(S, api)) return pl.closed || '지금은 못 감';
+  return '';
+}
+// 장소 목록 (나이에 맞는 곳만). ok: 지금 갈 수 있는지
+function placeList() {
+  if (jailed()) return [];
+  return D.places.filter(pl => ageFits(pl, S.age)).map(pl => ({
+    id: pl.id, label: pl.label, icon: pl.icon, why: closedWhy(pl), regular: !!S.regular[pl.id],
+    ok: !busy() && S.ap > 0 && placeOpen(pl),
+  }));
+}
+// 처음 보는 사람의 나이대
+function crowdRange(type) {
+  const a = S.age;
+  if (type === 'kid') return [Math.max(4, a - 2), Math.min(12, a + 2)];
+  if (type === 'peer') return a < 19 ? [Math.max(4, a - 1), a + 1] : [Math.max(19, a - 5), a + 6];
+  if (type === 'adult') return a < 19 ? [22, 50] : [Math.max(19, a - 8), Math.min(65, a + 12)];
+  const r = Math.random();   // mixed: 또래, 어른, 아무나
+  if (a < 13) return r < .6 ? crowdRange('kid') : [30, 75];
+  return r < .4 ? crowdRange('peer') : r < .7 ? [Math.max(30, a + 15), Math.max(60, a + 40)] : [Math.max(8, a - 12), a + 12];
+}
+function makeStranger(pl, night) {
+  let type = (night && pl.nightCrowd) || pl.crowd;
+  if (Array.isArray(type)) type = pick(type);
+  const p = makePerson({
+    kind: pl.kind || 'friend', ageRange: crowdRange(type), hangout: pl.id,
+    hobby: pl.hobby && Math.random() < .6 ? pl.hobby : undefined,
+    close: rand(4, 10), trust: rand(4, 10),
+  });
+  p.id = 'x' + (++S.xseq);
+  p.stranger = true;
+  return p;
+}
+function doingFor(pl, p, night, taken) {
+  let list = (night && pl.nightDoing) || pl.doing;
+  if (typeof list === 'function') list = list(S, p, api);
+  const fresh = list.filter(t => !taken.includes(t));
+  return pick(fresh.length ? fresh : list);
+}
+// 장소에 도착하면: 아는 사람 몇 명(단골이면 더 잘 나옴) + 처음 보는 사람 0~n명
+function fillHere(pl, bring, night) {
+  const here = [], taken = [];
+  const add = (p, x) => { const d = doingFor(pl, p, night, taken); taken.push(d); here.push({ key: p.id, x: x ? p : undefined, doing: d, used: false }); };
+  if (bring) add(bring);
+  const kinds = pl.regulars || [];
+  const base = typeof kinds === 'function' ? kinds(S, api) : alive().filter(p => kinds.includes(p.kind));
+  const cands = [...new Set(base.concat(alive().filter(p => p.hangout === pl.id)))]
+    .filter(p => p !== bring && ageFits(pl, npcAge(p)) && (typeof kinds === 'function' || p.kind !== 'child'));
+  const pool = cands.map(p => ({ p, w: p.hangout === pl.id ? 4 : 1 }));
+  const [lo, hi] = pl.regularsN || [1, 2];
+  for (let n = rand(lo, hi); n > 0 && pool.length; n--) { const x = weighted(pool, y => y.w); pool.splice(pool.indexOf(x), 1); add(x.p); }
+  if (pl.crowd) { const [clo, chi] = pl.crowdN || [0, 2]; for (let n = rand(clo, chi); n > 0; n--) add(makeStranger(pl, night), true); }
+  return here;
+}
+function enterPlace(pl, bring, night = S.time === 2) {
+  S.place = pl.id; S.placeNight = night;
+  S.here = fillHere(pl, bring, night);
+  S.vars.placeLabel = pl.label;
+}
+// 장소에 가기 (행동 1). 거기 있는 사람에겐 행동 없이 한 번씩 말을 걸 수 있음
+function goPlace(id) {
+  const pl = PLACES[id];
+  if (!pl || busy() || S.ap <= 0 || !placeOpen(pl)) return;
+  const night = S.time === 2;   // 사람은 도착한 때(행동 쓰기 전) 기준으로 채움
+  spend();
+  enterPlace(pl, null, night);
+  log(`${pl.icon} ` + fill(textOf(pl.arrive) || `${josa(pl.label, '으로')} 갔다.`), { t: 'place' });
+  if (!pl.routine) {
+    S.visits[id] = (S.visits[id] || 0) + 1;
+    if (S.visits[id] >= D.regularVisits && !S.regular[id]) { S.regular[id] = true; log(`이제 ${pl.label} 단골이다. 얼굴을 알아보는 사람이 생겼다.`, { t: 'info' }); }
+  }
+  maybeRandom([id], C.placeEventChance);
+  tickSeason();
+  after();
+}
+function leavePlace() {
+  if (!S.place || S.ended) return;
+  S.place = null; S.here = [];
+  save(); emit();
+}
+// 여기 있는 사람들 (화면용)
+function hereList() {
+  if (!S.place) return [];
+  return S.here.map(h => ({ key: h.key, stranger: !!h.x, p: h.x || person(h.key), doing: h.doing, used: h.used })).filter(h => h.p);
+}
+const hereEntry = pid => S.place ? S.here.find(h => h.key === pid && !h.x) : null;
+// 처음 보는 사람에게 말 걸기 (행동 안 씀). 잘 되면 관계 목록에 들어감
+function talkTo(key) {
+  const h = S.place && S.here.find(x => x.key === key && x.x);
+  if (!h || h.used || busy()) return null;
+  h.used = true;
+  const x = h.x, pt = personality(x);
+  const odds = clamp(.45 + gIdx(S.stats.charm) * .05 + gIdx(S.stats.looks) * .03 + (pt.open || 0) + (x.hobby === S.hobby ? .1 : 0) + (trait().relMult ? .1 : 0), .15, .95);
+  if (Math.random() >= odds) {
+    log(fill('처음 보는 사람에게 말을 걸었다. ' + pt.snub), { deltas: applyEffect({ happy: -1 }) });
+    after();
+    return null;
+  }
+  delete h.x;
+  const p = enlist(x);
+  h.key = p.id;
+  const deltas = applyP(p, { close: [6, 12], trust: [3, 7], heart: [0, 3] });
+  const hello = S.age < 13 ? pick(D.kidHello) : pt.hello;
+  log('처음 보는 사람에게 말을 걸었다. ' + fill(hello, { p: pname(p) }), { deltas });
+  after();
+  return p.id;
+}
+
 /* ═════════ 사람과 상호작용 ═════════ */
+// 관계 창에서는 행동 1. 지금 장소에 같이 있는 사람이면 한 번은 행동 없이 (noFree면 늘 행동 1)
 const socialCost = (it, p) => it.cost ? (resolve(it.cost) || 0) : 0;
 function interactions(pid) {
   const p = person(pid);
   if (!p) return [];
+  const h = hereEntry(pid), here = !!h && !h.used;
   return D.social.filter(it => it.if(S, p, api)).map(it => {
-    const cost = socialCost(it, p);
-    return { id: it.id, label: it.label, icon: it.icon, cost, ok: !busy() && S.ap > 0 && S.money >= cost };
+    const cost = socialCost(it, p), free = here && !it.noFree;
+    return { id: it.id, label: it.label, icon: it.icon, cost, free, ok: !busy() && (free || S.ap > 0) && (!cost || S.money >= cost) };
   });
 }
 function interact(pid, iid) {
   const p = person(pid), it = D.social.find(x => x.id === iid);
   if (!p || !it || !it.if(S, p, api)) return;
   const cost = socialCost(it, p);
-  if (busy() || S.ap <= 0 || S.money < cost) return;
-  spend();
+  const h = hereEntry(pid), free = !!h && !h.used && !it.noFree;
+  if (busy() || (!free && S.ap <= 0) || (cost && S.money < cost)) return;
+  if (!free) spend();
+  if (h) h.used = true;
   const o = it.run(S, p, api) || {};
   const pm = personality(p).mod[iid] || 1, mm = personality(S).mod[iid] || 1;
   const hm = sharedHobby(p) && (iid === 'hang' || iid === 'gift') ? 1.3 : 1;
   const vm = p.value === S.value ? 1.2 : valueClash(p) ? .8 : 1;
   o.mult = { close: pm * mm * hm, trust: pm * mm * vm, heart: pm * mm * vm, grudge: (personality(p).mod.argue || 1) * (valueClash(p) ? 1.3 : 1) };
   if (cost) { const eff = Object.assign({}, resolve(o.effect)); eff.money = val(eff.money) - cost; o.effect = eff; }
+  S.vars.fp = p.id;
   applyOutcome(o, p);
-  // 얽힌 사이: 들키지 않으면 괜찮지만…
-  const secrets = alive().filter(x => x.secret).length;
-  const m = mainPartner();
-  if (o.risk && m && m !== p && Math.random() < o.risk + .05 * secrets) {
-    S.vars.mainId = m.id; S.vars.mainName = pname(m); S.vars.loverId = p.id; S.vars.lover = pname(p);
-    trigger('affairCaught');
-  } else if (o.riskTaken && p.taken && Math.random() < o.riskTaken) {
-    S.vars.fp = p.id;
-    trigger('rivalFound');
-  }
+  // 다른 장소로 같이 이동 (예: 술집에서 집으로)
+  if (o.moveTo && PLACES[o.moveTo] && !jailed()) { enterPlace(PLACES[o.moveTo], p.gone ? null : p); }
   tickSeason();
   after();
 }
@@ -859,7 +1023,10 @@ const api = {
   rand, pick, josa, money: fmtMoney,
   givenName: g => pick(g === 'm' ? D.namesM : g === 'f' ? D.namesF : D.namesM.concat(D.namesF)),
   meet: spec => addPerson(spec),
-  person, npcAge, canRomance, jailed,
+  person, npcAge, canRomance, heartOk, jailed,
+  place: () => S.place, isHere: p => !!p && !!S.place && S.here.some(h => h.key === p.id),
+  here: () => S.here.filter(h => !h.x).map(h => person(h.key)).filter(Boolean),
+  regular: id => !!S.regular[id],
   find: fn => alive().filter(p => p.kind !== undefined && fn(p)),
   main: mainPartner,
   focus: p => { S.vars.fp = p ? p.id : null; },
@@ -881,7 +1048,7 @@ function newLife(opt = {}) {
   const name = (opt.name || '').trim().slice(0, 6) || pick(D.surnames) + pick(gender === 'm' ? D.namesM : D.namesF);
   const sib = D.siblings.find(x => x.id === opt.sibling) || (Math.random() < .35 ? D.siblings[0] : pick(D.siblings.slice(1)));
   S = {
-    v: 3, id: Date.now(), seq: 0, pseq: 0,
+    v: 4, id: Date.now(), seq: 0, pseq: 0, xseq: 0,
     name, gender, age: 0, money: 0, ap: C.apPerYear, used: 0, seasonIdx: -1, trait: tr.id,
     personality: opt.personality || pick(D.personalities).id,
     hobby: opt.hobby || pick(D.hobbies).id,
@@ -895,7 +1062,8 @@ function newLife(opt = {}) {
     karma: 0, heat: 0, record: 0, crimes: 0, jail: 0, rank: 0, perf: 0,
     flags: {}, vars: {}, done: {}, last: {},
     people: [], job: null, salary: 0, log: [], memories: [], pending: [], ended: null,
-    weather: 'sunny', time: 1,
+    weather: 'sunny', time: 0,
+    place: null, here: [], visits: {}, regular: {},
   };
   if (tr.start) for (const k in tr.start) S.stats[k] = COND.includes(k) ? clamp(S.stats[k] + tr.start[k], 0, 100) : S.stats[k] + tr.start[k];
   const w = D.wealth.find(x => x.id === S.wealth);
@@ -921,8 +1089,19 @@ function newLife(opt = {}) {
 }
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* 저장 불가 환경이면 넘어감 */ } }
 function load() {
-  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s && s.v === 3 ? s : null; }
-  catch (e) { return null; }
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s && s.v === 4) return s;
+    const old = JSON.parse(localStorage.getItem(OLD_SAVE_KEY));
+    return old && old.v === 3 ? migrate(old) : null;
+  } catch (e) { return null; }
+}
+// v3 저장 → v4 (장소, 단골 장소)
+function migrate(s) {
+  S = s;
+  Object.assign(s, { v: 4, xseq: 0, place: null, here: [], visits: {}, regular: {} });
+  for (const p of s.people) if (p.hangout === undefined) p.hangout = pickHangout(p.hobby, npcAge(p));
+  return s;
 }
 function init() { S = load(); if (S) { emit(); return true; } return false; }
 
@@ -930,6 +1109,7 @@ window.Game = {
   init, subscribe: f => subs.push(f), state: () => S,
   newLife, ageUp, choose, currentEvent,
   actionList, canDo, costOf, doAction, needsSubject,
+  places: placeList, goPlace, leavePlace, here: hereList, talkTo, place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   people: () => alive(), person, interactions, interact, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,
   crimes: () => D.crimes.filter(c => S.age >= c.minAge && meets(c.req)), canCrime, crimeOdds, commitCrime,
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,
