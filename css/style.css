@@ -268,11 +268,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .phase1 .sym .m-sym{animation:symT1 .6s ease-in-out infinite}
 .phase2 .sym .m-sym{animation:symT2 .35s ease-in-out infinite}
 .phase3 .sym .m-sym{animation:symT3 .18s ease-in-out infinite}
-.phase-climax .sym .m-sym{animation:none;transform:translateX(6px)}
-.phase-end .sym .m-sym{animation:none;transform:translateX(6px)}
-@keyframes symT1{0%,100%{transform:translateX(-8px)}50%{transform:translateX(8px)}}
-@keyframes symT2{0%,100%{transform:translateX(-6px)}50%{transform:translateX(6px)}}
-@keyframes symT3{0%,100%{transform:translateX(-4px)}50%{transform:translateX(4px)}}
+.phase-climax .sym .m-sym{animation:none;transform:translateX(10px)}
+.phase-end .sym .m-sym{animation:none;transform:translateX(10px)}
+@keyframes symT1{0%,100%{transform:translateX(-6px)}50%{transform:translateX(10px)}}
+@keyframes symT2{0%,100%{transform:translateX(-4px)}50%{transform:translateX(10px)}}
+@keyframes symT3{0%,100%{transform:translateX(-2px)}50%{transform:translateX(10px)}}
 @keyframes flash{0%{opacity:.9}100%{opacity:0}}
 @keyframes swDrop{0%{opacity:.7;transform:translateY(0)}100%{opacity:0;transform:translateY(40px)}}
 @keyframes pDrift{0%{opacity:.85;transform:translate(0,0)}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}

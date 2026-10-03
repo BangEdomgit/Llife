@@ -205,43 +205,69 @@ function morningCard(sc, p) {
     <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
 function blanketSVG(shape, build) {
-  const bm = build === 'slim' ? .85 : build === 'chubby' ? 1.2 : 1;
-  const bed = '<rect x="2" y="72" width="156" height="28" rx="3" fill="#1a1616" opacity=".6"/><rect x="0" y="68" width="10" height="32" rx="2" fill="#2a2420" opacity=".7"/><rect x="150" y="68" width="10" height="32" rx="2" fill="#2a2420" opacity=".7"/>';
-  const pillow = '<ellipse cx="24" cy="58" rx="18" ry="10" fill="#d8d0c4" opacity=".7"/><path d="M10,56 Q24,50 38,56" fill="none" stroke="#c0b8a8" stroke-width="1" opacity=".5"/>';
-  const bHead = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#3a3430" opacity=".75"/>`;
-  const mw = 7 * bm, fw = 5.5 * bm;
+  const bm = build === 'slim' ? .85 : build === 'chubby' ? 1.15 : 1;
+  const sk = '#c4a882', skD = '#a88a6a', skL = '#d4bb9a', hair = '#3a3430';
+  const bed = `<rect x="0" y="108" width="220" height="8" rx="2" fill="#2a2018"/><rect x="4" y="82" width="212" height="28" rx="4" fill="#1e1814" opacity=".7"/><rect x="4" y="82" width="212" height="28" rx="4" fill="none" stroke="#2a2420" stroke-width="1"/>
+    <rect x="-2" y="78" width="10" height="42" rx="3" fill="#2a2018"/><rect x="212" y="78" width="10" height="42" rx="3" fill="#2a2018"/>`;
+  const pillow = `<ellipse cx="32" cy="68" rx="22" ry="12" fill="#d8d0c4" opacity=".8"/><path d="M14,66 Q32,58 50,66" fill="none" stroke="#c0b8a8" stroke-width="1" opacity=".5"/>
+    <ellipse cx="32" cy="68" rx="18" ry="8" fill="#e2dbd0" opacity=".3"/>`;
   let bodies = '';
   if (shape === 'A') {
-    bodies += `<g class="bed-body">${bHead(28, 50, 8)}`;
-    bodies += `<path d="M36,52 C42,54 48,58 52,64 L52,72 L20,72 L20,56 C20,52 24,50 28,50 Z" fill="#3a3430" opacity=".5"/>`;
-    bodies += `<path d="M52,64 C62,62 72,60 82,58 C88,56 94,54 100,54 L100,72 L52,72 Z" fill="#3a3430" opacity=".45"/>`;
-    bodies += bHead(106, 48, 7);
-    bodies += `<path d="M100,54 C104,52 108,50 112,50 L116,72 L96,72 L100,54 Z" fill="#3a3430" opacity=".45"/>`;
-    bodies += '</g>';
+    bodies += `<g class="bed-body">`;
+    bodies += `<circle cx="34" cy="56" r="9" fill="${sk}"/><ellipse cx="34" cy="52" rx="10" ry="7" fill="${hair}" opacity=".85"/>`;
+    bodies += `<path d="M43,58 C46,60 48,64 48,68 L48,82 Q46,86 42,88 L38,108 L28,108 L30,88 Q24,86 22,82 L22,68 C22,64 24,60 27,58" fill="${sk}" opacity=".85"/>`;
+    bodies += `<path d="M48,68 Q52,66 56,68 C58,70 56,76 52,78 L48,78 Z" fill="${sk}" opacity=".7"/>`;
+    bodies += `<path d="M42,88 Q48,92 50,100 L48,108 L38,108 Z" fill="${sk}" opacity=".75"/>`;
+    bodies += `<path d="M30,88 Q24,92 22,100 L24,108 L34,108 Z" fill="${sk}" opacity=".75"/>`;
+    bodies += `<ellipse cx="36" cy="72" rx="${4.5 * bm}" ry="${3.5 * bm}" fill="${skL}" opacity=".5"/>`;
+    bodies += `<path d="M36,82 L36,88" stroke="${skD}" stroke-width="1" opacity=".3"/>`;
+    bodies += `<circle cx="148" cy="52" r="8" fill="${sk}"/><ellipse cx="148" cy="48" rx="9" ry="6.5" fill="${hair}" opacity=".85"/>`;
+    bodies += `<path d="M156,54 C160,56 164,60 164,66 L164,80 Q160,84 156,86 L152,108 L142,108 L144,86 Q140,84 138,80 L138,66 C138,60 140,56 144,54" fill="${sk}" opacity=".75"/>`;
+    bodies += `<path d="M164,66 Q168,62 172,64 C176,66 176,72 172,76 L164,78 Z" fill="${sk}" opacity=".6"/>`;
+    bodies += `<path d="M156,86 Q162,90 164,100 L160,108 L150,108 Z" fill="${sk}" opacity=".65"/>`;
+    bodies += `<path d="M144,86 Q138,90 136,100 L138,108 L148,108 Z" fill="${sk}" opacity=".65"/>`;
+    bodies += `<path d="M58,74 C70,68 84,62 100,58 C116,54 132,52 140,54" fill="none" stroke="${skD}" stroke-width="1.5" opacity=".3"/>`;
+    bodies += `</g>`;
   } else if (shape === 'B') {
-    bodies += `<g class="bed-body">${bHead(26, 48, 8)}`;
-    bodies += `<path d="M34,50 C42,52 50,56 56,62 C58,64 58,68 56,72 L18,72 L18,54 C18,50 22,48 26,48 Z" fill="#3a3430" opacity=".5"/>`;
-    bodies += `<path d="M56,62 C66,58 78,54 90,52 L100,52 L108,72 L52,72 Z" fill="#3a3430" opacity=".45"/>`;
-    bodies += bHead(98, 44, 7);
-    bodies += `<path d="M94,50 Q98,48 102,50 L108,72 L88,72 Z" fill="#3a3430" opacity=".45"/>`;
-    bodies += `<path d="M108,68 C114,64 120,62 126,64 L130,72 L108,72 Z" fill="#3a3430" opacity=".4"/>`;
-    bodies += '</g>';
+    bodies += `<g class="bed-body">`;
+    bodies += `<circle cx="32" cy="54" r="9" fill="${sk}"/><ellipse cx="32" cy="50" rx="10" ry="7" fill="${hair}" opacity=".85"/>`;
+    bodies += `<path d="M41,56 C44,58 46,62 46,66 L46,78 Q44,82 40,84 L36,108 L26,108 L28,84 Q22,82 20,78 L20,66 C20,62 22,58 25,56" fill="${sk}" opacity=".85"/>`;
+    bodies += `<ellipse cx="34" cy="70" rx="${4.5 * bm}" ry="${3.5 * bm}" fill="${skL}" opacity=".5"/>`;
+    bodies += `<path d="M40,84 Q46,90 48,100 L46,108 L36,108 Z" fill="${sk}" opacity=".75"/>`;
+    bodies += `<path d="M28,84 Q22,88 20,96 L18,108 L30,108 Z" fill="${sk}" opacity=".75"/>`;
+    bodies += `<path d="M46,66 Q52,62 58,66 C60,68 58,74 54,76 L46,76 Z" fill="${sk}" opacity=".7"/>`;
+    bodies += `<circle cx="142" cy="48" r="8" fill="${sk}"/><ellipse cx="142" cy="44" rx="9" ry="6.5" fill="${hair}" opacity=".85"/>`;
+    bodies += `<path d="M150,50 C154,52 158,56 160,62 L162,76 Q158,80 154,82 L150,108 L140,108 L142,82 Q138,80 136,76 L134,62 C134,56 136,52 140,50" fill="${sk}" opacity=".75"/>`;
+    bodies += `<path d="M162,64 Q168,60 174,62 C178,64 178,72 174,76 L162,76 Z" fill="${sk}" opacity=".6"/>`;
+    bodies += `<path d="M154,82 Q160,86 164,96 L162,108 L150,108 Z" fill="${sk}" opacity=".65"/>`;
+    bodies += `<path d="M142,82 Q136,86 132,96 L134,108 L144,108 Z" fill="${sk}" opacity=".65"/>`;
+    bodies += `<path d="M56,72 C72,66 90,58 110,54 C126,50 136,50 142,52" fill="none" stroke="${skD}" stroke-width="1.5" opacity=".3"/>`;
+    bodies += `</g>`;
   } else {
-    bodies += `<g class="bed-body">${bHead(24, 46, 8)}`;
-    bodies += `<path d="M32,48 C40,50 50,54 58,60 C62,64 60,70 56,72 L16,72 L16,52 C16,48 20,46 24,46 Z" fill="#3a3430" opacity=".5"/>`;
-    bodies += `<path d="M58,60 C68,54 82,48 96,46 L106,48 L114,72 L52,72 Z" fill="#3a3430" opacity=".45"/>`;
-    bodies += bHead(102, 40, 7);
-    bodies += `<path d="M96,46 Q102,42 108,46 L114,72 L90,72 Z" fill="#3a3430" opacity=".45"/>`;
-    bodies += `<path d="M114,64 C122,56 132,52 138,56 L140,72 L114,72 Z" fill="#3a3430" opacity=".4"/>`;
-    bodies += '</g>';
+    bodies += `<g class="bed-body">`;
+    bodies += `<circle cx="30" cy="50" r="9" fill="${sk}"/><ellipse cx="30" cy="46" rx="10" ry="7" fill="${hair}" opacity=".85"/>`;
+    bodies += `<path d="M39,52 C42,54 44,58 44,62 L44,74 Q42,78 38,80 L34,108 L24,108 L26,80 Q20,78 18,74 L18,62 C18,58 20,54 23,52" fill="${sk}" opacity=".85"/>`;
+    bodies += `<ellipse cx="32" cy="66" rx="${4.5 * bm}" ry="${3.5 * bm}" fill="${skL}" opacity=".5"/>`;
+    bodies += `<path d="M38,80 Q44,86 46,96 L44,108 L34,108 Z" fill="${sk}" opacity=".75"/>`;
+    bodies += `<path d="M26,80 Q20,86 18,96 L20,108 L28,108 Z" fill="${sk}" opacity=".75"/>`;
+    bodies += `<path d="M44,62 Q50,58 56,60 C60,62 60,70 56,74 L44,74 Z" fill="${sk}" opacity=".7"/>`;
+    bodies += `<circle cx="136" cy="44" r="8" fill="${sk}"/><ellipse cx="136" cy="40" rx="9" ry="6.5" fill="${hair}" opacity=".85"/>`;
+    bodies += `<path d="M144,46 C148,48 152,52 154,58 L156,72 Q152,76 148,78 L144,108 L134,108 L136,78 Q132,76 130,72 L128,58 C128,52 130,48 134,46" fill="${sk}" opacity=".75"/>`;
+    bodies += `<path d="M156,60 Q162,56 168,58 C172,60 172,68 168,72 L156,72 Z" fill="${sk}" opacity=".6"/>`;
+    bodies += `<path d="M148,78 Q156,84 160,94 L158,108 L144,108 Z" fill="${sk}" opacity=".65"/>`;
+    bodies += `<path d="M136,78 Q130,84 126,94 L128,108 L138,108 Z" fill="${sk}" opacity=".65"/>`;
+    bodies += `<path d="M54,68 C72,60 92,52 112,48 C128,44 134,46 140,48" fill="none" stroke="${skD}" stroke-width="1.5" opacity=".3"/>`;
+    bodies += `</g>`;
   }
-  const blanketY = shape === 'C' ? 40 : shape === 'B' ? 44 : 48;
-  const blanket = `M0,${blanketY} Q20,${blanketY - 6} 40,${blanketY - 2} Q60,${blanketY + 4} 80,${blanketY - 4} Q100,${blanketY - 10} 120,${blanketY - 2} Q140,${blanketY + 6} 160,${blanketY} L160,76 L0,76 Z`;
-  const wy = blanketY + 6;
-  return `<svg class="blanket-svg" viewBox="0 0 160 100">${bed}${pillow}${bodies}
-    <path d="${blanket}" fill="#ece6da" opacity=".88"/>
+  const by = shape === 'C' ? 44 : shape === 'B' ? 48 : 52;
+  const blanket = `M-2,${by} Q25,${by - 8} 50,${by - 3} Q75,${by + 5} 100,${by - 5} Q130,${by - 12} 160,${by - 2} Q190,${by + 8} 222,${by} L222,90 L-2,90 Z`;
+  const wy = by + 8;
+  const folds = `<path d="M15,${wy} Q50,${wy + 4} 85,${wy} M115,${wy - 2} Q150,${wy + 3} 195,${wy - 1}" fill="none" stroke="#cfc6b6" stroke-width="1" stroke-linecap="round" opacity=".4"/>
+    <path d="M40,${wy + 6} Q80,${wy + 9} 120,${wy + 5} Q160,${wy + 8} 200,${wy + 5}" fill="none" stroke="#cfc6b6" stroke-width=".8" stroke-linecap="round" opacity=".25"/>`;
+  return `<svg class="blanket-svg" viewBox="0 0 220 120">${bed}${pillow}${bodies}
+    <path d="${blanket}" fill="#ece6da" opacity=".85"/>
     <path d="${blanket}" fill="none" stroke="#cfc6b6" stroke-width="1.2"/>
-    <path d="M12,${wy} Q40,${wy + 3} 70,${wy} M90,${wy - 2} Q120,${wy + 2} 148,${wy - 1}" fill="none" stroke="#cfc6b6" stroke-width="1.2" stroke-linecap="round" opacity=".45"/></svg>`;
+    ${folds}</svg>`;
 }
 function phaseCard(sc, p, phase, shape, icon) {
   const look = G.look(p), age = G.npcAge(p);
@@ -253,7 +279,7 @@ function phaseCard(sc, p, phase, shape, icon) {
     return `<div class="sc-particle" style="left:${20 + Math.random() * 60}%;top:${30 + Math.random() * 40}%;--dx:${dx};--dy:${dy};animation-delay:${i * .15}s"></div>`;
   }).join('') : '';
   const cls = typeof phase === 'number' ? `phase${phase + 1}` : phase === 'climax' ? 'phase-climax' : 'phase-end';
-  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><svg viewBox="0 0 90 76" aria-hidden="true"><g class="f-sym"><circle cx="50" cy="40" r="12" fill="none" stroke="#ff69b4" stroke-width="2.5"/><line x1="50" y1="52" x2="50" y2="68" stroke="#ff69b4" stroke-width="2.5"/><line x1="43" y1="60" x2="57" y2="60" stroke="#ff69b4" stroke-width="2.5"/></g><g class="m-sym"><circle cx="35" cy="40" r="12" fill="none" stroke="#4da6ff" stroke-width="2.5"/><line x1="44" y1="31" x2="58" y2="17" stroke="#4da6ff" stroke-width="2.5"/><polyline points="51,17 58,17 58,24" fill="none" stroke="#4da6ff" stroke-width="2.5"/></g></svg></div>${blanketSVG(shape, p.body && p.body.build)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
+  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><svg viewBox="0 0 100 56" aria-hidden="true"><g class="f-sym"><circle cx="58" cy="28" r="11" fill="none" stroke="#ff69b4" stroke-width="2.4"/><line x1="58" y1="39" x2="58" y2="52" stroke="#ff69b4" stroke-width="2.4"/><line x1="52" y1="46" x2="64" y2="46" stroke="#ff69b4" stroke-width="2.4"/></g><g class="m-sym"><circle cx="28" cy="28" r="11" fill="none" stroke="#4da6ff" stroke-width="2.4"/><line x1="39" y1="28" x2="66" y2="28" stroke="#4da6ff" stroke-width="2.4"/><polyline points="60,22 66,28 60,34" fill="none" stroke="#4da6ff" stroke-width="2.4"/></g></svg></div>${blanketSVG(shape, p.body && p.body.build)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
 }
 function foreplayCard(sc, p) {
   const fl = p.gender === 'f';
