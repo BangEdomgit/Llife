@@ -1,7 +1,8 @@
 // NPC 상반신 아바타 — 파츠(얼굴·머리·눈·입·옷…)를 조합해 SVG 문자열로 그림. 외부 이미지 없음
 // Avatar.make(seed, gender, opt)    → appearance (파츠 번호 묶음). 같은 seed면 늘 같은 얼굴
-// Avatar.render(appearance, size, state) → SVG 문자열 (가로 size, 세로 size×4/3)
-//   state: 나이(숫자) 또는 { age, after: { sat, personality, lipstick } }
+// Avatar.render(appearance, size, state) → SVG 문자열 (가로 size, 세로 size×4/3, 전신이면 size×7/3)
+//   state: 나이(숫자) 또는 { age, after: { sat, personality, lipstick }, full: true | { height, waist, hip } }
+//   full: 옷 입은 전신 (viewBox 0 0 120 280) — 허리·골반·다리 길이가 수치에 따라 달라짐
 //   나이는 그릴 때 반영: 어린이는 머리 스타일이 단순해지고, 10대는 교복, 40대부터 흰머리가 늘어남
 //   체형(appearance.body)은 20살부터 옷 위 실루엣으로 드러남 (어깨 너비, 체격, 가슴선)
 (function () {
@@ -157,9 +158,15 @@ function shapeLines(a, top, color) {
   if (b.build === 'fit' || b.shoulder === 'wide') return `<path d="M43,135 Q51,140 59,136 M61,136 Q69,140 77,135" ${st}/>`;
   return '';
 }
-function clothes(a, top, kid, skin, hw, adult) {
+// 전신 몸통: 어깨 → 겨드랑이 → 허리(ww) → 골반(hp)까지. 옷 밑단은 y=204
+function torso(kid, hw, ww, hp) {
+  const sh = kid ? 4 : 0;
+  return `M${60 - hw},142 C${60 - hw},${133 + sh} ${77 - hw},${119 + sh} 49,${115 + sh} L71,${115 + sh} C${43 + hw},${119 + sh} ${60 + hw},${133 + sh} ${60 + hw},142
+    L${69 + hw - 18},152 Q${60 + ww + 2},170 ${60 + ww},184 Q${60 + hp},194 ${60 + hp - 1},204 L${61 - hp},204 Q${60 - hp},194 ${60 - ww},184 Q${58 - ww},170 ${51 - hw + 18},152 Z`;
+}
+function clothes(a, top, kid, skin, hw, adult, fb) {
   const sh = kid ? 4 : 0;   // 어린이는 어깨선이 조금 아래
-  const body_ = () => body(kid, hw);
+  const body_ = () => fb ? torso(kid, hw, fb.ww, fb.hp) : body(kid, hw);
   if (top === 4) {   // 교복 — 블레이저 + 셔츠 + 넥타이(남) / 리본(여)
     const tie = UNIFORM.tie[a.tie];
     return `<path d="${body_()}" fill="${UNIFORM.blazer}"/>
@@ -174,15 +181,70 @@ function clothes(a, top, kid, skin, hw, adult) {
   if (top === 0) out += `<path d="M49,${115 + sh} Q60,${126 + sh} 71,${115 + sh}" fill="${skin}" stroke="${dark}" stroke-width="3"/>`;   // 티셔츠
   else if (top === 1) out += `<path d="M52,${115 + sh} L60,${128 + sh} L68,${115 + sh} Z" fill="${skin}"/>
       <path d="M50,${114 + sh} L60,${128 + sh} L52,${132 + sh} L45,${119 + sh} Z M70,${114 + sh} L60,${128 + sh} L68,${132 + sh} L75,${119 + sh} Z" fill="${shade(c, 1.35)}" stroke="${dark}" stroke-width="1"/>
-      <path d="M60,${130 + sh} L60,160" stroke="${dark}" stroke-width="1.2"/><circle cx="60" cy="${140 + sh}" r="1.3" fill="${dark}"/><circle cx="60" cy="${151 + sh}" r="1.3" fill="${dark}"/>`;   // 셔츠
+      <path d="M60,${130 + sh} L60,${fb ? 204 : 160}" stroke="${dark}" stroke-width="1.2"/><circle cx="60" cy="${140 + sh}" r="1.3" fill="${dark}"/><circle cx="60" cy="${151 + sh}" r="1.3" fill="${dark}"/>${fb ? `<circle cx="60" cy="166" r="1.3" fill="${dark}"/><circle cx="60" cy="182" r="1.3" fill="${dark}"/>` : ''}`;   // 셔츠
   else if (top === 2) out += `<path d="M38,${121 + sh} C40,${108 + sh} 80,${108 + sh} 82,${121 + sh} C72,${130 + sh} 48,${130 + sh} 38,${121 + sh} Z" fill="${dark}"/>
       <path d="M49,${115 + sh} Q60,${124 + sh} 71,${115 + sh}" fill="${skin}"/>
       <path d="M55,${124 + sh} L54,${140 + sh} M65,${124 + sh} L66,${140 + sh}" stroke="${shade(c, 1.5)}" stroke-width="1.6" stroke-linecap="round"/>`;   // 후디
   else out += `<path d="M48,${114 + sh} Q60,${122 + sh} 72,${114 + sh} L72,${119 + sh} Q60,${128 + sh} 48,${119 + sh} Z" fill="${dark}"/>
       <path d="M50,${114 + sh} Q60,${120 + sh} 70,${114 + sh}" fill="${skin}"/>
-      <path d="M30,154 L30,160 M38,154 L38,160 M46,154 L46,160 M54,154 L54,160 M62,154 L62,160 M70,154 L70,160 M78,154 L78,160 M86,154 L86,160" stroke="${dark}" stroke-width="1.4"/>`;   // 니트
+      ${fb ? `<path d="${Array.from({ length: 7 }, (_, i) => { const x = 60 - fb.hp + 4 + i * (fb.hp * 2 - 8) / 6; return `M${x.toFixed(1)},197 L${x.toFixed(1)},204`; }).join(' ')}" stroke="${dark}" stroke-width="1.4"/>`
+        : `<path d="M30,154 L30,160 M38,154 L38,160 M46,154 L46,160 M54,154 L54,160 M62,154 L62,160 M70,154 L70,160 M78,154 L78,160 M86,154 L86,160" stroke="${dark}" stroke-width="1.4"/>`}`;   // 니트
   if (adult) out += shapeLines(a, top, c);
   return out;
+}
+
+/* ---------- 전신 (초상화를 누르면) ---------- */
+// fig: 게임이 넘겨주는 수치 { height, waist, hip } (없으면 체형 구간으로). 어린이·10대는 체형 곡선 없이 평균 몸
+function fullFrame(a, age, fig) {
+  const kid = age <= 12, teen = age >= 13 && age <= 19, b = a.body || {}, f = a.g === 'f';
+  const s = kid ? 1 : .8;   // 전신에선 어깨를 조금 좁혀 화면 안에 들어오게
+  let hw = Math.round(halfWidth(a, kid, !kid && !teen) * s), ww, hp;
+  if (kid) { hw = 30; ww = 24; hp = 25; }
+  else if (teen || !fig) { ww = f ? 20 : hw - 10; hp = f ? 27 : ww + 2; }
+  else {
+    ww = f ? 15 + (fig.waist - 56) * .35 : hw - 10 + (fig.waist - 76) * .3;
+    hp = f ? 22 + (fig.hip - 80) * .45 : ww + 2;
+  }
+  const hcm = fig && fig.height ? fig.height : (f ? 162 : 173) + ({ short: -8, tall: 8 }[b.height] || 0);
+  const leg = kid ? 30 : teen ? 40 : Math.round(clamp(40 + (hcm - (f ? 160 : 170)) * .8, 26, 64));
+  const thigh = { slim: 8, avg: 9.5, fit: 10.5, chubby: 12.5 }[!kid && !teen ? b.build : 'avg'] || 9.5;
+  return { hw, ww: Math.round(ww), hp: Math.round(hp), leg, thigh, ankle: 222 + leg, dy: 274 - (222 + leg + 6) };   // 발이 늘 바닥에 닿게 (작으면 머리 위가 비고, 크면 꽉 참)
+}
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// 하의: 어린이 반바지·치마 / 10대 교복 / 어른은 청바지·슬랙스·치마 (seed로 고정)
+function bottoms(a, age, fb, skin) {
+  const kid = age <= 12, teen = age >= 13 && age <= 18, f = a.g === 'f', { ww, hp, ankle, thigh } = fb;
+  const skirt = f && (teen || (a.tc + a.top) % 3 !== 0);
+  const color = teen ? (f ? '#3b4766' : UNIFORM.blazer) : kid ? ['#4a5f86', '#c25a6b', '#5f8f6a'][a.tc % 3] : skirt ? ['#2e2e36', '#8a6f5a', '#5b4a78', '#7d2f3d'][a.tc % 4] : ['#4a5f86', '#3b3e48', '#a08a63'][a.tc % 3];
+  const lx = Math.max(7, hp * .42), shoe = '#2b2724';
+  // 맨다리: 허벅지(체격)에서 발목으로 좁아짐
+  const legs = y0 => [-1, 1].map(d => { const x = 60 + d * lx, t = thigh / 2, k = y0 + (ankle - y0) * .55;
+    return `<path d="M${x - t},${y0} L${x + t},${y0} Q${x + t * .8},${k} ${x + 2.4},${ankle} L${x - 2.4},${ankle} Q${x - t * .8},${k} ${x - t},${y0} Z" fill="${skin}"/>`; }).join('');
+  const shoes = `<ellipse cx="${60 - lx}" cy="${ankle + 3}" rx="7" ry="3.6" fill="${shoe}"/><ellipse cx="${60 + lx}" cy="${ankle + 3}" rx="7" ry="3.6" fill="${shoe}"/>`;
+  if (skirt || (kid && f)) {
+    const hem = kid ? 226 : teen ? 236 : 238 + (a.tie % 2) * 10;
+    return legs(214) + `<path d="M${60 - ww},188 L${60 + ww},188 Q${60 + hp + 2},200 ${60 + hp + 6},${hem} L${54 - hp},${hem} Q${58 - hp},200 ${60 - ww},188 Z" fill="${color}"/>
+      ${teen ? `<path d="M${62 - hp},${hem - 14} L${58 + hp},${hem - 14} M${62 - hp},${hem - 6} L${58 + hp},${hem - 6}" stroke="${shade(color, 1.35)}" stroke-width="1" opacity=".6"/>` : ''}` + shoes;
+  }
+  if (kid) {   // 반바지
+    return legs(214) + `<path d="M${60 - ww},188 L${60 + ww},188 L${60 + hp + 1},226 L62,226 L60,214 L58,226 L${59 - hp},226 Z" fill="${color}"/>` + shoes;
+  }
+  const t = thigh / 2;
+  return `<path d="M${60 - ww},188 L${60 + ww},188 Q${60 + hp},196 ${60 + hp},206 L${60 + lx + t},${ankle} L${60 + lx - t - 1},${ankle} L60,222 L${60 - lx + t + 1},${ankle} L${60 - lx - t},${ankle} L${60 - hp},206 Q${60 - hp},196 ${60 - ww},188 Z" fill="${color}"/>
+    <path d="M60,206 L60,222" stroke="${shade(color, .75)}" stroke-width="1"/>` + shoes;
+}
+// 팔: 어깨에서 손목까지 (반팔 티셔츠면 팔뚝이 보임)
+function arms(a, top, kid, fb, skin) {
+  const sh = kid ? 4 : 0, c = top === 4 ? UNIFORM.blazer : TOP_COLORS[a.tc], w = a.g === 'm' && !kid ? 10.5 : 9;
+  const one = d => {
+    const x0 = 60 + d * (fb.hw - 4), x1 = 60 + d * (fb.hw + 2), y0 = 130 + sh, y1 = 198;
+    const short = top === 0, ym = short ? 156 : y1, xm = x0 + (x1 - x0) * (ym - y0) / (y1 - y0);
+    return (short ? `<path d="M${xm},${ym} L${x1},${y1}" stroke="${skin}" stroke-width="${w - 1.5}" stroke-linecap="round"/>` : '') +
+      `<path d="M${x0},${y0} L${xm},${ym}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>` +
+      `<path d="M${x0 + d * 3},${y0 + 8} L${xm + d * 3},${ym - 4}" stroke="${shade(c, .75)}" stroke-width="1" opacity=".5"/>` +
+      `<circle cx="${x1 + d * .5}" cy="${y1 + 4}" r="4.6" fill="${skin}"/>`;
+  };
+  return one(-1) + one(1);
 }
 
 /* ---------- 함께 밤을 보낸 다음 날 아침 (어른만) ---------- */
@@ -207,11 +269,13 @@ function messyHair(hc, n) {
 function render(a, size = 48, state = 25) {
   const st = typeof state === 'object' && state ? state : { age: state };
   const age = st.age ?? 25;
-  const w = Math.round(size), h = Math.round(size * 4 / 3);
-  if (!a) return `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/></svg>`;
+  const full = !!st.full && !(st.after && age >= 20), VH = full ? 280 : 160;
+  const w = Math.round(size), h = Math.round(size * VH / 120);
+  if (!a) return `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 ${VH}" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="${VH - 1}" rx="10"/></svg>`;
   const kid = age <= 12, teen = age >= 13 && age <= 18, adult = age >= 20;
-  const af = adult && st.after ? st.after : null, tier = af ? tierOf(af.sat ?? 50) : -1;
-  const hw = halfWidth(a, kid, adult);
+  const af = adult && !full && st.after ? st.after : null, tier = af ? tierOf(af.sat ?? 50) : -1;
+  const fb = full ? fullFrame(a, age, typeof st.full === 'object' ? st.full : null) : null;
+  const hw = fb ? fb.hw : halfWidth(a, kid, adult);
   const skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86);
   const old = age >= 40 && a.gray < (age - 38) / 22;   // 40대부터 흰머리 확률 증가
   const hc = HAIR[old ? GRAY : (kid || teen) && a.hc >= 4 ? a.hc - 3 : a.hc] || HAIR[0];   // 어린이·10대는 염색 안 함
@@ -221,15 +285,18 @@ function render(a, size = 48, state = 25) {
   const neckTop = kid ? 96 : 94, neckBot = kid ? 121 : 118;
   const browC = shade(hc, .72), browW = a.thick ? 3.6 : 2.3;
 
-  let o = `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true">`;
-  o += `<rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/>`;
+  let o = `<svg class="av${full ? ' av-full' : ''}" width="${w}" height="${h}" viewBox="0 0 120 ${VH}" aria-hidden="true">`;
+  o += `<rect class="av-bg" x=".5" y=".5" width="119" height="${VH - 1}" rx="10"/>`;
+  if (fb) o += `<g transform="translate(0,${fb.dy})">`;
   // 머리 뒤쪽 (긴 머리)
   if (style.back) o += `<path d="${style.back}" fill="${shade(hc, .85)}"/>`;
   if (style.tail) o += `<path d="${style.tail}" fill="${shade(hc, .9)}"/>`;
   if (style.bun) o += `<circle cx="${style.bun[0]}" cy="${style.bun[1]}" r="${style.bun[2]}" fill="${shade(hc, .9)}"/>`;
   // 목, 몸
   o += `<path d="M51,${neckTop} L69,${neckTop} L69,${neckBot} L51,${neckBot} Z" fill="${skinD}"/>`;
-  o += af ? morningBody(a, skin, skinD, hw) : clothes(a, top, kid, skinD, hw, adult);
+  if (fb) o += bottoms(a, age, fb, skinD);
+  o += af ? morningBody(a, skin, skinD, hw) : clothes(a, top, kid, skinD, hw, adult, fb);
+  if (fb) o += arms(a, top, kid, fb, skinD);
   if (a.buds) o += `<path d="M34,78 C30,96 40,112 47,130" fill="none" stroke="#f4f4f4" stroke-width="1.3"/>`;
   // 귀, 얼굴
   o += `<ellipse cx="33.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/><ellipse cx="86.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
@@ -262,7 +329,7 @@ function render(a, size = 48, state = 25) {
   // 안경
   if (a.glasses === 1) o += `<g fill="none" stroke="${LINE}" stroke-width="1.7"><circle cx="48" cy="72" r="7.5"/><circle cx="72" cy="72" r="7.5"/><path d="M55.5,71 Q60,68.5 64.5,71 M40.5,71 L35,69 M79.5,71 L85,69"/></g>`;
   if (a.glasses === 2) o += `<g fill="none" stroke="${LINE}" stroke-width="1.7"><rect x="39.5" y="66" width="17" height="12" rx="2.5"/><rect x="63.5" y="66" width="17" height="12" rx="2.5"/><path d="M56.5,71 L63.5,71 M39.5,70 L35,69 M80.5,70 L85,69"/></g>`;
-  return o + '</svg>';
+  return o + (fb ? '</g>' : '') + '</svg>';
 }
 
 const topColor = a => TOP_COLORS[(a && a.tc) || 0];

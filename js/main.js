@@ -12,6 +12,7 @@ const app = $('#app'), logBox = $('#log'), modal = $('#modal'), mBody = $('#mBod
 let bg = { w: null, t: null };
 let logState = { id: null, n: 0 };
 let modalMode = null, modalArg = null, lastFocus = null, endingFor = null, personFrom = 'people';
+let fullView = null;   // 초상화를 눌러 전신으로 펼친 사람 id ('me' = 나)
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const bar = v => { const n = Math.round(v / 10); return '■'.repeat(n) + '□'.repeat(10 - n); };
@@ -22,6 +23,9 @@ const isMoney = k => k === 'money';
 const pbar = p => { const n = Math.round(p * 5); return '▰'.repeat(n) + '▱'.repeat(5 - n); };
 // 아바타 크기: 관계 목록 32×42 / 장소 48×64 / 상세·이벤트 60×80
 const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, G.npcAge(p)) : '';
+// 누르면 전신으로 펼쳐지는 초상화 (20살부터 키·허리·골반 수치가 실루엣에 반영)
+const avBtn = (key, html) => `<button type="button" class="av-btn" data-full="${key}" aria-label="${fullView === key ? '접기' : '전신 보기'}" title="${fullView === key ? '접기' : '전신 보기'}">${html}</button>`;
+const fullAv = (look, age, fig) => window.Avatar ? `<div class="p-full">${Avatar.render(look, 132, { age, full: age >= 20 && fig ? fig : true })}</div>` : '';
 function abHTML(k, v) {
   const g = G.gradeInfo(v);
   return `<span class="ab" title="${v}"><span>${G.LABEL[k]}</span><span class="g g-${g.letter}">${g.letter}</span><span class="pb">${pbar(g.pct)}</span></span>`;
@@ -307,7 +311,8 @@ function openPerson(id) {
   const acts = its.map(it =>
     `<button type="button" data-i="${it.id}"${it.ok ? '' : ' disabled'}>${it.icon} ${it.label}${it.cost ? ` <small>${G.fmtMoney(it.cost)}</small>` : ''}${anyFree && !it.free ? ' <small>행동 1</small>' : ''}</button>`).join('');
   showModal('person', `${G.pname(p)}`, `
-    <div class="p-top">${av(p, 60)}<div class="p-who"><b>${esc(G.pname(p))}</b><span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}, ${esc(G.relLabel(p))}</span></div></div>
+    <div class="p-top">${avBtn(id, av(p, 60))}<div class="p-who"><b>${esc(G.pname(p))}</b><span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}, ${esc(G.relLabel(p))}</span></div></div>
+    ${fullView === id ? fullAv(G.look(p), G.npcAge(p), G.figure(p)) : ''}
     <div class="stats">${stats}</div>
     ${imHTML}
     ${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}
@@ -403,9 +408,10 @@ function openMe() {
     if (G.univLabel()) lines.push(`${G.univLabel()} ${G.majorLabel() || ''}${sc.gpaN ? `, 학점 ${sc.gpa.toFixed(2)}` : ''}${sc.degree ? ' 졸업' : ''}`);
     school = `<p class="sec-t">성적표</p>${S.age <= 18 && !sc.sat ? `<div class="subj">${subj}</div>` : ''}${lines.map(l => `<p class="dim" style="font-size:13px">${esc(l)}</p>`).join('')}`;
   }
-  const me = G.myLook() && window.Avatar ? Avatar.render(G.myLook(), 60, S.age) : '';
+  const me = G.myLook() && window.Avatar ? avBtn('me', Avatar.render(G.myLook(), 60, S.age)) : '';
   showModal('me', `📋 ${S.name}`, `
     <div class="me-top">${me}<dl class="prof">${prof}</dl></div>
+    ${fullView === 'me' && G.myLook() ? fullAv(G.myLook(), S.age, G.figure(null)) : ''}
     ${S.preg && S.preg.mode ? `<p class="dim" style="font-size:13px">${S.gender === 'f' ? '임신 중' : '곧 아이가 태어난다'} — ${S.preg.due > S.age ? '내년' : '올해'} 출산 예정</p>` : ''}
     <p class="sec-t">능력치</p>
     <div class="stats">${ab}</div>
@@ -533,6 +539,7 @@ mBody.addEventListener('click', e => {
   if (modalMode === 'create') { createClick(b); return; }
   if (d.s) { G.doAction('study', d.s === 'all' ? null : d.s); return; }
   if (d.c != null) G.choose(+d.c);
+  else if (d.full) { fullView = fullView === d.full ? null : d.full; if (d.full === 'me') openMe(); else openPerson(d.full); }
   else if (d.pv) { personFrom = 'people'; openPerson(d.pv); }
   else if (d.i) G.interact(modalArg, d.i);
   else if (d.talk) { const id = G.talkTo(d.talk); if (id && !G.state().pending.length) { personFrom = 'here'; openPerson(id); } }

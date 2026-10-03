@@ -191,6 +191,10 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .prow .av{grid-row:1/3}
 .prow .pm{grid-column:2/-1}
 .p-top{display:flex;gap:12px;align-items:center}
+.av-btn{padding:0;border:0;background:none;border-radius:10px;cursor:zoom-in;flex:none}
+.av-btn:hover:not(:disabled){background:none}
+.p-full{display:flex;justify-content:center;margin:2px 0}
+.p-full .av{animation:scFade .35s ease-out}
 .p-top .p-who{display:grid;gap:2px}
 .ev-who{display:flex;gap:10px;align-items:center;font-size:13.5px}
 .me-top{display:flex;gap:12px;align-items:center}

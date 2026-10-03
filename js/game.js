@@ -159,7 +159,7 @@ function makePerson(spec) {
     bodyPlus: Math.random() < .4,
     libido: age >= C.sexMinAge ? rand(10, 50) : 0,
     size: gender === 'm' ? pickKey(D.sizeWeights) : null,   // 함께 밤을 보낸 뒤에만 보임
-    pref: age >= 19 && Math.random() < .6 ? randomPref() : null,   // 좋아하는 체형 (null이면 상관없음)
+    pref: age >= 19 && Math.random() < .6 ? randomPref(gender) : null,   // 좋아하는 체형 (null이면 상관없음)
   };
   if (p.kind === 'child') p.role = '아이';
   // 기혼 NPC — 친밀 20이면 반지가 보이고, 40이면 결혼한 걸 알게 됨. 늘 몰래 만나는 사이로만 시작
@@ -170,9 +170,13 @@ function npcStyle(hobby, age) {
   if (age < 13) return rand(0, 1);
   return clamp(rand(1, 3) + (hobby === 'fashion' ? 2 : 0) + (age >= 40 ? -1 : 0), 0, 6);
 }
-function randomPref() {
+// 좋아하는 타입: 키·체격 + 남자는 가슴(컵 등급)·골반 등급, 여자는 어깨 등급 (그 등급 이상이면 좋아함)
+function randomPref(gender) {
   const pr = { height: Math.random() < .5 ? pick(['short', 'avg', 'tall', 'tall']) : null, build: Math.random() < .6 ? pick(['slim', 'avg', 'fit', 'fit', 'chubby']) : null };
-  return pr.height || pr.build ? pr : null;
+  if (gender === 'm') { if (Math.random() < .35) pr.cup = rand(3, 5); if (Math.random() < .25) pr.hip = rand(3, 5); }
+  else if (Math.random() < .35) pr.shoulder = rand(2, 4);
+  for (const k in pr) if (pr[k] == null) delete pr[k];
+  return Object.keys(pr).length ? pr : null;
 }
 // NPC 몸 등급 (체격 기준, 40대부터 하나 내려감)
 function bodyIdx(p) {
@@ -309,11 +313,22 @@ function nearby(p) {
 // 꼬심 — 외모(생김새·몸·꾸밈) + 인간(매력·감성) + 관계(설렘·친밀) + 보정. 상황마다 가중치가 다름
 const g100 = v => Math.min(100, (gIdx(v) + gradeInfo(v).pct) * 100 / 6);
 const ALLURE_W = { first: [.30, .10, .25, .10, .02], known: [.15, .15, .10, .25, .10], close: [.08, .12, .05, .30, .15], bed: [.05, .15, .03, .10, .05] };
-function prefMatch(p) {
-  if (!p.pref) return false;
-  const b = (S.look && S.look.body) || {};
-  return (!p.pref.height || p.pref.height === b.height) && (!p.pref.build || p.pref.build === myBuild());
+// 선호에 맞으면 꼬심 +10~15, 등급 선호보다 2등급 이상 높으면 +20. 하나라도 안 맞으면 0
+function prefBonus(p) {
+  const pr = p.pref;
+  if (!pr) return 0;
+  const b = (S.look && S.look.body) || {}, fg = figure(null);
+  if (pr.height && pr.height !== b.height) return 0;
+  if (pr.build && pr.build !== myBuild()) return 0;
+  let over = false;
+  for (const [k, mine] of [['cup', fg.cGrade], ['hip', fg.hipGrade], ['shoulder', fg.sGrade]]) {
+    if (!pr[k]) continue;
+    if (!mine || mine[0] < pr[k]) return 0;
+    if (mine[0] >= pr[k] + 2) over = true;
+  }
+  return over ? 20 : rand(10, 15);
 }
+const prefMatch = p => prefBonus(p) > 0;
 function allure(p, sit) {
   sit = sit || (p.close >= 60 ? 'close' : p.close >= 30 ? 'known' : 'first');
   const [wf, wb, ws, wc, wa] = ALLURE_W[sit], d = S.drunk || 0, st = S.stats;
@@ -321,7 +336,7 @@ function allure(p, sit) {
   const human = (g100(st.charm) + [0, 3, 6, -5][d]) * wc + g100(st.art) * wa;
   const rel = sit === 'first' ? 0 : p.heart * .5 + p.close * .15;
   let m = personality(p).allure || 0;
-  if (prefMatch(p)) m += rand(10, 15);
+  m += prefBonus(p);
   if (p.hobby === S.hobby) m += rand(5, 8);
   if (p.value === S.value) m += rand(5, 8); else if (valueClash(p)) m -= rand(5, 8);
   if (S.place === 'bar') m += rand(10, 15); else if (S.place === 'station') m += rand(8, 10);
@@ -1275,28 +1290,70 @@ function known(p, field) {
   if (p.kind === 'family' || p.kind === 'child') return true;
   return Math.max(p.close, p.trust) >= (D.revealAt[field] || 0);
 }
-// 쓰리 사이즈 — 체형에서 정해지고 사람마다 고정 (id 기준)
-function threeSizes(p) {
-  const b = (lookOf(p) || {}).body || {};
-  let h = 7; for (const ch of String(S.id) + p.id) h = (h * 31 + ch.charCodeAt(0)) % 2147483647;
-  const r = (lo, hi) => { h = (h * 16807) % 2147483647; return lo + (h % (hi - lo + 1)); };
-  if (p.gender === 'f') return [r(...{ small: [76, 81], avg: [82, 88], large: [89, 97] }[b.chest] || [82, 88]),
-    r(...{ slim: [57, 61], avg: [62, 66], fit: [61, 65], chubby: [70, 77] }[b.build] || [62, 66]), r(...{ slim: [83, 87], avg: [88, 92], fit: [88, 93], chubby: [95, 101] }[b.build] || [88, 92])];
-  return [r(...{ narrow: [86, 90], avg: [92, 97], wide: [99, 105] }[b.shoulder] || [92, 97]) + (b.build === 'fit' ? 3 : b.build === 'chubby' ? 6 : 0),
-    r(...{ slim: [69, 73], avg: [76, 81], fit: [74, 78], chubby: [86, 94] }[b.build] || [76, 81]), r(...[89, 97])];
+// 신체 수치 — 아바타 체형(키·체격·가슴·어깨)에서 정해지고 사람마다 고정 (id 기준). p 없으면 나
+// 키는 정규분포(남 173±6, 여 162±5)에서 체형의 키 구간에 맞는 쪽을 씀. 등급 1~6과 라벨이 같이 나옴
+const gradeBy = (table, v) => { const i = table.findIndex(([max]) => v <= max); return [i + 1, table[i][1]]; };
+const invNorm = u => {   // 표준정규 역함수 근사 (0<u<1)
+  const t = Math.sqrt(-2 * Math.log(u < .5 ? u : 1 - u));
+  const z = t - (2.515517 + .802853 * t + .010328 * t * t) / (1 + 1.432788 * t + .189269 * t * t + .001308 * t * t * t);
+  return u < .5 ? -z : z;
+};
+function figure(p) {
+  const look = p ? lookOf(p) : S.look, g = p ? p.gender : S.gender;
+  const b = (look || {}).body || {}, BG = D.bodyGrades;
+  let h = 7; for (const ch of String(S.id) + (p ? p.id : 'me')) h = (h * 31 + ch.charCodeAt(0)) % 2147483647;
+  const u = () => { h = (h * 16807) % 2147483647; return (h % 100000) / 100000; };
+  const r = (lo, hi) => lo + Math.floor(u() * (hi - lo + 1));
+  const [lo, hi] = { short: [.02, .27], tall: [.73, .995] }[b.height] || [.27, .73];
+  const height = Math.round((g === 'm' ? 173 : 162) + invNorm(lo + u() * (hi - lo)) * (g === 'm' ? 6 : 5));
+  const f = { height, hGrade: gradeBy(BG.height[g], height) };
+  if (g === 'f') {
+    const cups = Object.keys(BG.cup);
+    let cup = (() => { const w = BG.cupBy[b.chest] || BG.cupBy.avg; let t = u() * Object.values(w).reduce((x, y) => x + y, 0); for (const k in w) { t -= w[k]; if (t <= 0) return k; } return 'B'; })();
+    if (b.build === 'chubby') cup = cups[Math.min(cups.length - 1, cups.indexOf(cup) + 1)];
+    const under = { slim: [65, 70], avg: [70, 75], fit: [70, 75], chubby: [80, 85] }[b.build] || [70, 75];
+    f.under = under[u() < .5 ? 0 : 1];
+    f.cup = cup; f.cGrade = BG.cup[cup];
+    f.bust = f.under + 7 + cups.indexOf(cup) * 2.5 + r(0, 2) | 0;
+    f.waist = r(...{ slim: [56, 61], avg: [61, 66], fit: [59, 64], chubby: [68, 78] }[b.build] || [61, 66]);
+    f.hip = r(...{ slim: [80, 90], avg: [85, 96], fit: [86, 97], chubby: [93, 105] }[b.build] || [85, 96]);
+    f.hipGrade = gradeBy(BG.hip, f.hip);
+  } else {
+    f.shoulder = r(...{ narrow: [38, 41], avg: [41, 46], wide: [46, 50] }[b.shoulder] || [41, 46]) + (b.build === 'fit' && u() < .5 ? 1 : 0) + (b.shoulder === 'wide' && u() < .12 ? 2 : 0);
+    f.sGrade = gradeBy(BG.shoulder, f.shoulder);
+    f.bust = r(...{ narrow: [86, 90], avg: [92, 97], wide: [99, 105] }[b.shoulder] || [92, 97]) + (b.build === 'fit' ? 3 : b.build === 'chubby' ? 6 : 0);
+    f.waist = r(...{ slim: [69, 73], avg: [76, 81], fit: [74, 78], chubby: [86, 94] }[b.build] || [76, 81]);
+    f.hip = r(89, 97);
+  }
+  return f;
 }
-// 몸에 대해 보이는 것: 처음엔 키·대략적 체형 / 친밀 30 인상 / 친밀 60 쓰리 사이즈 / 함께 밤을 보낸 뒤 전부 (20살 이상만)
+const cm = (v, gr) => `${v}cm(${gr[1]})`;
+// 몸에 대해 보이는 것: 처음엔 키·대략적 체형 / 친밀 30 인상 / 친밀 60 쓰리 사이즈·컵·골반·어깨 / 함께 밤을 보낸 뒤 전부 (20살 이상만)
 function bodyInfo(p) {
   const age = npcAge(p), b = (lookOf(p) || {}).body || {}, BL = D.bodyLabel;
   if (age < 13 || p.kind === 'family' || p.kind === 'child') return [];
   const deep = Math.max(p.close, p.trust), slept = (p.nights || 0) > 0, adult = age >= 20 && S.age >= 20;
-  const out = [{ label: '체형', value: `${BL.height[b.height] || ''}, ${BL.build[b.build] || ''} (몸 ${LETTERS[bodyIdx(p)]})` }];
+  const fg = figure(p);
+  const out = [{ label: '체형', value: `${age >= 19 ? `키 ${cm(fg.height, fg.hGrade)}` : BL.height[b.height] || ''}, ${BL.build[b.build] || ''} (몸 ${LETTERS[bodyIdx(p)]})` }];
   if (!adult) return out;
-  out.push({ label: '인상', value: deep >= 30 || slept ? D.bodyImpression[p.gender][b.build] : null });
-  out.push({ label: '사이즈', value: deep >= 60 || slept ? threeSizes(p).join('-') : null });
-  if (slept) out.push({ label: '몸', value: [p.gender === 'f' ? BL.chest[b.chest] : BL.shoulder[b.shoulder], p.size ? `크기 ${BL.size[p.size]}` : ''].filter(Boolean).join(', ') });
-  if (p.pref) out.push({ label: '좋아하는 타입', value: deep >= 50 || slept ? [BL.height[p.pref.height], BL.build[p.pref.build]].filter(Boolean).join(', ') : null });
+  const X = D.bodyImpression.extra;
+  const extra = [fg.cGrade && fg.cGrade[0] >= 5 && X.cup, fg.hipGrade && fg.hipGrade[0] >= 4 && X.hip, fg.sGrade && fg.sGrade[0] >= 4 && X.shoulder, fg.hGrade[0] >= 5 && X.height].filter(Boolean);
+  out.push({ label: '인상', value: deep >= 30 || slept ? [D.bodyImpression[p.gender][b.build], ...extra].join(', ') : null });
+  out.push({ label: '사이즈', value: deep >= 60 || slept ? [fg.bust, fg.waist, fg.hip].join('-') : null });
+  if (p.gender === 'f') {
+    out.push({ label: '가슴', value: deep >= 60 || slept ? `${fg.under}${fg.cup}(${fg.cGrade[1]})` : null });
+    out.push({ label: '골반', value: deep >= 60 || slept ? cm(fg.hip, fg.hipGrade) : null });
+  } else out.push({ label: '어깨', value: deep >= 60 || slept ? cm(fg.shoulder, fg.sGrade) : null });
+  if (slept && p.size) out.push({ label: '크기', value: BL.size[p.size] });
+  if (p.pref) out.push({ label: '좋아하는 타입', value: deep >= 50 || slept ? prefText(p.pref) : null });
   return out;
+}
+function prefText(pr) {
+  const BL = D.bodyLabel, G = D.bodyGrades;
+  const lab = (tbl, n) => tbl[Math.min(n, tbl.length) - 1][1];
+  return [BL.height[pr.height], BL.build[pr.build],
+    pr.cup && `가슴 ${Object.keys(G.cup).find(k => G.cup[k][0] === pr.cup) || ''}컵 이상`,
+    pr.hip && `골반 ${lab(G.hip, pr.hip)} 이상`, pr.shoulder && `어깨 ${lab(G.shoulder, pr.shoulder)} 이상`].filter(Boolean).join(', ');
 }
 function profile(p) {
   const L = (list, id) => (list.find(x => x.id === id) || {}).label;
@@ -1316,10 +1373,14 @@ function profile(p) {
 }
 function myProfile() {
   const L = (list, id) => (list.find(x => x.id === id) || {}).label;
-  const b = (S.look && S.look.body) || {}, BL = D.bodyLabel;
+  const b = (S.look && S.look.body) || {}, BL = D.bodyLabel, fg = figure(null);
+  const shape = S.age < C.sexMinAge ? [] : S.gender === 'f'
+    ? [['가슴', `${fg.under}${fg.cup}(${fg.cGrade[1]})`], ['골반', cm(fg.hip, fg.hipGrade)], ['사이즈', [fg.bust, fg.waist, fg.hip].join('-')]]
+    : [['어깨', cm(fg.shoulder, fg.sGrade)]];
   return [
     ['소질', trait().label], ['성격', L(D.personalities, S.personality)], ['취미', L(D.hobbies, S.hobby)],
-    ['체형', [BL.height[b.height], BL.build[b.build]].filter(Boolean).join(', ') + ` (몸 ${gradeOf(S.stats.fit)})`],
+    ['체형', [S.age >= 19 ? `키 ${cm(fg.height, fg.hGrade)}` : BL.height[b.height], BL.build[b.build]].filter(Boolean).join(', ') + ` (몸 ${gradeOf(S.stats.fit)})`],
+    ...shape,
     ...(S.flags.unnatural ? [['특징', '어딘가 부자연스럽다']] : []),
     ...(S.age >= C.sexMinAge && S.size ? [['크기', D.bodyLabel.size[S.size]]] : []),
     ...(S.flags.hadSex ? [['밤의 기술', gradeOf(S.sexSkill)]] : []),
@@ -1457,7 +1518,7 @@ window.Game = {
   places: placeList, goPlace, leavePlace, here: hereList, talkTo, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
   intimacy: p => canSex(p) && (p.nights || lover(p)) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
-  people: () => alive(), person, interactions, interact, canSex, clearScene: () => { if (S.scene) { S.scene = null; save(); } }, look: lookOf, myLook: () => S.look, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,
+  people: () => alive(), person, interactions, interact, canSex, clearScene: () => { if (S.scene) { S.scene = null; save(); } }, look: lookOf, myLook: () => S.look, figure, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,
   crimes: () => D.crimes.filter(c => S.age >= c.minAge && meets(c.req)), canCrime, crimeOdds, commitCrime,
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,
   roleText, karmaLabel, trait, job, mainPartner, season, fmtMoney, josa,
