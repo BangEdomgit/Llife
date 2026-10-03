@@ -647,7 +647,7 @@ GAME_DATA.events = [
     when: (s, a) => { const m = a.main(); return m && m.heart >= 60 && a.canSex(m); },
     onStart: (s, a) => a.focus(a.main()),
     text: '여행지 숙소에서 {fp|와} 단둘이. 파도 소리 말고는 아무것도 들리지 않았다.',
-    intimate: true, mood: 25, pregnant: (s, a) => a.focused().spouse ? .12 : .06,
+    intimate: true, away: true, mood: 25, pregnant: (s, a) => a.focused().spouse ? .12 : .06,
     p: { heart: [6, 12], close: [5, 8] }, effect: { happy: [5, 8] }, memory: true },
   // 술자리 뒤
   { id: 'drunkNight', type: 'random', on: ['bar', 'drink'], age: [20, 49], once: false, cooldown: 3,
@@ -782,6 +782,43 @@ GAME_DATA.events = [
       { label: '계속 조른다', p: { trust: [-20, -15], heart: -10, grudge: [8, 12] }, karma: -3,
         text: '"싫다고 했잖아." {fp|이} 베개를 들고 방을 나갔다. 며칠 동안 눈을 마주치지 않았다.' },
     ] },
+  // 전 상대보다 못하다는 말을 두 번 들음 → 기술을 올리고 싶어짐
+  { id: 'skillMotivate', type: 'fixed', age: [20, 49], once: false, cooldown: 3,
+    when: s => (s.vars.worseN || 0) >= 2,
+    text: '자존심이 상했다. 이대로는 안 되겠다.',
+    choices: [
+      { label: '연애 칼럼을 몰래 찾아 읽는다', do: s => { s.sexSkill = (s.sexSkill || 0) + 8; s.vars.worseN = 0; }, effect: { smart: [0, 1] },
+        text: '밤새 스크롤을 내렸다. 아는 게 하나도 없었다는 걸 알았다.' },
+      { label: '{partner}에게 솔직하게 물어본다', if: (s, a) => !!a.main() && a.canSex(a.main()),
+        do: (s, a) => { s.sexSkill = (s.sexSkill || 0) + 6; s.vars.worseN = 0; const m = a.main(); m.compat = Math.min(100, (m.compat || 30) + 10); },
+        p: { trust: [4, 8] }, text: '"뭘 좋아해?" 한참 웃다가, 진지하게 대답해줬다.' },
+      { label: '신경 안 쓴다', do: s => { s.vars.worseN = 0; }, effect: { happy: -1 }, text: '그런 말 하나에 흔들리지 않기로 했다. …조금은 흔들렸다.' },
+    ] },
+
+  /* ═════ 권태 · 화해 ═════ */
+  // 같은 사람과 같은 패턴이 반복됨 (같은 상대와 8번 넘게, 새로운 게 없을 때)
+  { id: 'bedroomBored', type: 'fixed', age: [20, 49], once: false, cooldown: 3,
+    when: mainIs((m, s, a) => (m.partner || m.spouse) && a.canSex(m) && (m.routine || 0) >= 8 && m.heart >= 40), onStart: focusMain,
+    text: '요즘 {fp|와} 같은 패턴이 반복되는 느낌이다.',
+    choices: [
+      { label: '장소를 바꿔보자', if: s => s.money >= 20, effect: { happy: 3, money: -20 },
+        do: (s, a) => { a.focused().freshBonus = true; }, text: '"이번 주말엔 어디 좀 가자." {fp}의 눈이 반짝였다. 근교 호텔을 예약했다.' },
+      { label: '대화를 해본다', p: { trust: [4, 8], close: [3, 6] }, do: (s, a) => { const p = a.focused(); p.routine = Math.max(0, (p.routine || 0) - 3); },
+        text: '"우리 좀 달라져 볼까?" 어색했지만 필요한 대화였다.' },
+      { label: '그냥 넘어간다', text: '또 같은 밤이 반복됐다.' },
+    ] },
+  // 싸운 뒤 (6턴 안), 설렘이 아직 30 넘게 남아 있을 때
+  { id: 'makeupSex', type: 'random', on: ['home'], age: [20, 49], once: false, cooldown: 1, weight: 3,
+    when: mainIs((m, s, a) => (m.partner || m.spouse) && a.canSex(m) && m.fought != null && a.turn() - m.fought <= 6 && m.heart >= 30), onStart: focusMain,
+    text: '싸운 뒤 냉전이 이어졌다. {fp|이} 먼저 내 방문을 열었다.',
+    choices: [
+      { label: '끌어안는다', intimate: true, satBonus: 15, memory: true, pregnant: (s, a) => a.focused().spouse ? .12 : .06,
+        p: { heart: [10, 15], trust: [8, 12], grudge: [-12, -8] }, effect: { happy: [6, 10] },
+        do: (s, a) => { a.focused().fought = null; },
+        text: '아무 말 없이 끌어안았다. 그날 밤은 평소보다 뜨거웠다. 아침엔 둘 다 무엇 때문에 싸웠는지 잊어버렸다.' },
+      { label: '"아직 화 안 풀렸어"', p: { heart: -5 }, text: '{fp|이} 문을 닫고 나갔다.' },
+    ] },
+
   // 크기 — 기술이 결국 이김 / 크기만 믿으면 안 됨 (내가 남자일 때)
   { id: 'skillOverSize', type: 'fixed', age: [20, 49], req: { flags: ['hadSex'] },
     when: (s, a) => s.gender === 'm' && s.size === 'small' && (s.sexSkill || 0) >= a.gradeMin('B'),
@@ -1670,9 +1707,9 @@ GAME_DATA.events = [
   { id: 'honeymoon', type: 'fixed', weight: 4, when: mainIs((m, s) => m.spouse && s.age - (s.vars.marriedAt ?? -9) <= 1 && s.age >= 20), onStart: focusMain,
     text: '신혼여행을 떠났다.',
     choices: [
-      { label: '바다로', memory: true, effect: { happy: 8, money: -300 }, p: { heart: [6, 10] }, intimate: true, mood: 25, pregnant: .1,
+      { label: '바다로', memory: true, effect: { happy: 8, money: -300 }, p: { heart: [6, 10] }, intimate: true, away: true, mood: 25, pregnant: .1,
         text: '매일 저녁 {fp|와} 해변에 앉아 노을이 질 때까지 있었다.' },
-      { label: '낯선 도시로', memory: true, effect: { happy: 7, money: -400, art: [1, 3] }, p: { heart: [5, 9] }, intimate: true, mood: 25, pregnant: .1,
+      { label: '낯선 도시로', memory: true, effect: { happy: 7, money: -400, art: [1, 3] }, p: { heart: [5, 9] }, intimate: true, away: true, mood: 25, pregnant: .1,
         text: '말도 안 통하는 도시에서 {fp|와} 길을 잃고 또 잃었다. 다 좋았다.' },
       { label: '집에서 쉰다', effect: { happy: 3 }, p: { close: [3, 5] }, text: '돈을 아끼기로 했다. 집에서 배달 음식을 시켜 먹으며 영화를 봤다.' },
     ] },

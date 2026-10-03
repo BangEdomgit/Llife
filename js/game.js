@@ -405,6 +405,21 @@ function sexScene(p, o) {
   let adj = cm.sat && gIdx(S.sexSkill || 0) >= gIdx(gradeMin('B')) ? Math.round(cm.sat / 2) : cm.sat;   // 콘돔은 익숙해지면 덜 깎임
   adj += resolve(o.satBonus) || 0;
   const awkward = gIdx(S.sexSkill || 0) === 0;   // 밤의 기술 F — 어색한 순간이 끼어듦
+  // 권태와 신선함: 같은 상대와 4번째부터 3씩 깎임(최대 -24). 새 장소 +8~12, 오랜만(5턴 이상) +5~10, 새 상대 +10~15, 여행지 +8
+  const t = turnNo(), spot = o.away ? 'travel' : o.moveTo || S.place || 'home';
+  p.spots = p.spots || [];
+  let fresh = 0;
+  if (firstWith) { if (S.flags.hadSex) fresh += rand(10, 15); }
+  else {
+    if (!p.spots.includes(spot)) { fresh += rand(8, 12); p.routine = Math.max(0, (p.routine || 0) - 4); }
+    if (p.lastNightT != null && t - p.lastNightT >= 5) { fresh += rand(5, 10); p.routine = Math.max(0, (p.routine || 0) - 3); }
+  }
+  if (o.away) fresh += 8;
+  if (p.freshBonus) { fresh += 10; p.routine = 0; delete p.freshBonus; }
+  const bored = Math.min(24, Math.max(0, ((p.routine || 0) - 3) * 3));
+  adj += fresh - bored;
+  p.routine = (p.routine || 0) + 1; p.lastNightT = t;
+  if (!p.spots.includes(spot)) p.spots.push(spot);
   let sat = satisfaction(p, resolve(o.mood), adj);
   // 크기: 작은 편이면 상한 90, 큰 편 이상이면 바닥 25~30. 아주 큰 편인데 여자 쪽이 마른 체형이면 오히려 아픔
   const sz = S.gender === 'm' ? S.size : p.size, herBuild = S.gender === 'm' ? ((lookOf(p) || {}).body || {}).build : myBuild();
@@ -596,9 +611,36 @@ function afterSex(p, sx, ctx) {
   // 그 사람과 처음 보낸 밤, 내 크기에 대한 반응 (내가 남자일 때, 아주 큰 편 / 작은 편)
   const sr = sx.firstWith && S.gender === 'm' && (S.size === 'xlarge' ? D.sizeReaction.big : S.size === 'small' ? D.sizeReaction.small : null);
   if (sr && sr[p.personality]) log(fill(sr[p.personality], c), { t: 'info' });
+  compareEx(p, sx, c);
   if (sx.first && sx.tier <= 1) { log(fill(pick(L.firstLow), c), { t: 'info' }); return; }
   const line = pick(L[sx.tier] || []);
   if (line) log(fill(line, c), { t: sx.tier >= 3 ? 'text' : 'info', memory: sx.legend });
+  pillowTalk(p, sx, c);
+}
+// 필로우 토크: 만족감 50+·친밀 40+면 60%, 만족감 80+면 90% (소심형·예민형 +10%). 같은 사람과는 4턴에 한 번까지
+// 신뢰 +5~10, 친밀 +3~6, 가끔 속마음을 털어놓아 아직 모르던 프로필이 열림
+function pillowTalk(p, sx, c) {
+  let ch = sx.sat >= 80 ? .9 : sx.sat >= 50 && p.close >= 40 ? .6 : 0;
+  if (ch && ['shy', 'sensitive'].includes(p.personality)) ch += .1;
+  if (!ch || (p.pillowT != null && turnNo() - p.pillowT < 4) || Math.random() >= ch) return;
+  p.pillowT = turnNo();
+  let text = pick(D.pillowTalk[p.personality] || D.pillowTalk.warm);
+  const hidden = ['personality', 'hobby', 'dream', 'value', 'wealth'].filter(f => !known(p, f));
+  if (hidden.length && Math.random() < .35) { const f = hidden[0]; p.told = (p.told || []).concat(f); text += ' ' + D.pillowReveal[f]; }
+  log(fill(text, c), { memory: sx.tier >= 4 && Math.random() < .3, deltas: applyP(p, { trust: [5, 10], close: [3, 6] }) });
+}
+// 전 상대와의 비교: 처음 두 밤 안에 한 번, 직진형·냉철형이거나 내 기술과 그 사람 전 상대의 차이가 30 넘게 날 때 (40%)
+// 내가 낫다 → 설렘 +5~10 / 못하다 → 설렘 -3~5, 행복 -3 (두 번 쌓이면 기술을 올리고 싶어지는 이벤트)
+function compareEx(p, sx, c) {
+  if (p.exSkill == null) p.exSkill = rand(10, 90);   // 이 사람의 전 상대 (숨은 값)
+  if (p.compared || (p.nights || 0) > 2) return;
+  const diff = g100(S.sexSkill || 0) - p.exSkill;
+  if (!(['bold', 'sharp'].includes(p.personality) || Math.abs(diff) >= 30) || Math.abs(diff) < 10 || Math.random() >= .4) return;
+  p.compared = true;
+  const better = diff > 0, L = D.compareLines[better ? 'better' : 'worse'];
+  const text = fill(L[p.personality] || L._, Object.assign({ ex: S.gender === 'm' ? '전 남자친구' : '전 여자친구' }, c));
+  if (better) log(text, { deltas: applyP(p, { heart: [5, 10] }) });
+  else { S.vars.worseN = (S.vars.worseN || 0) + 1; log(text, { t: 'info', deltas: applyP(p, { heart: [-5, -3] }).concat(applyEffect({ happy: -3 })) }); }
 }
 // 얽힌 사이: 들키지 않으면 괜찮지만… (risk: 내 애인에게 / riskTaken: 상대 애인에게)
 function riskCheck(o, p) {
@@ -1369,6 +1411,7 @@ const valueClash = p => D.valueClash.some(([a, b]) => (a === p.value && b === S.
 const valueLabel = id => (D.values.find(v => v.id === id) || {}).label || '';
 function known(p, field) {
   if (p.kind === 'family' || p.kind === 'child') return true;
+  if (p.told && p.told.includes(field)) return true;   // 필로우 토크에서 털어놓음
   return Math.max(p.close, p.trust) >= (D.revealAt[field] || 0);
 }
 // 신체 수치 — 아바타 체형(키·체격·가슴·어깨)에서 정해지고 사람마다 고정 (id 기준). p 없으면 나
@@ -1487,7 +1530,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, onPill, fertile, refusal, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, refusal, turn: () => turnNo(), allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,
