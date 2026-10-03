@@ -162,6 +162,8 @@ function makePerson(spec) {
     pref: age >= 19 && Math.random() < .6 ? randomPref() : null,   // 좋아하는 체형 (null이면 상관없음)
   };
   if (p.kind === 'child') p.role = '아이';
+  // 기혼 NPC — 친밀 20이면 반지가 보이고, 40이면 결혼한 걸 알게 됨. 늘 몰래 만나는 사이로만 시작
+  if (spec.married ?? (age >= 26 && !['family', 'child'].includes(p.kind) && spec.taken !== false && Math.random() < (age >= 35 ? .5 : age >= 30 ? .35 : .15))) { p.married = true; p.taken = true; }
   return p;
 }
 function npcStyle(hobby, age) {
@@ -232,7 +234,7 @@ function endMain(grudge) {
   if (m.spouse) { divorce(m); m.grudge = clamp(m.grudge + grudge, 0, 100); } else breakUp(m, grudge);
 }
 function startRelation(p, sneaky) {
-  if (sneaky) p.secret = true; else p.partner = true;
+  if (sneaky || p.married) p.secret = true; else p.partner = true;   // 기혼인 상대와는 공개 연애가 안 됨
   p.taken = false; p.ex = false; p.fling = false; p.fwb = false;
   p.since = S.age;
 }
@@ -272,6 +274,16 @@ function marry(p) {
   S.vars.marriedAt = S.age;
 }
 
+/* ═════════ 술 ═════════ */
+// 0 맨정신 / 1 한잔 / 2 적당히 취함 / 3 만취. 술집을 떠나면 깨고, 적당히 넘게 마셨으면 다음 날 숙취
+const DRUNK = ['맨정신', '한잔', '적당히 취함', '만취'];
+function drinkUp(n) { S.drunk = clamp((S.drunk || 0) + n, 0, 3); }
+function soberUp(silent) {
+  const d = S.drunk || 0;
+  S.drunk = 0;
+  if (d >= 2 && !silent) log(pick(D.hangoverLines), { t: 'info', deltas: applyEffect({ health: -rand(3, 8), happy: -rand(2, 4) }) });
+}
+
 /* ═════════ 성욕 · 섹스 스탯 · 꼬심 ═════════ */
 // 성적인 것은 둘 다 20살 이상, 이성, 가족 아님. 이미 사귀는 사이면 상대가 50살을 넘어도 됨
 const lover = p => !!(p.partner || p.spouse || p.secret);
@@ -280,13 +292,13 @@ function canSex(p) {
   if (S.age < C.sexMinAge || npcAge(p) < C.sexMinAge) return false;
   return lover(p) || canRomance(p);
 }
-// 행동 1회마다 성욕이 오름 (20대 3~4 / 30대 2~3 / 40대 1~2, 건강 50 이하면 절반). 60 넘으면 행복이 조금씩 깎임
+// 행동 1회마다 성욕이 오름 (20대 3~4 / 30대 2~3 / 40대 1~2, 건강 50 이하면 절반). 60 넘으면 행복이 조금씩 깎임 (30 아래로는 안 깎음)
 function libidoTick() {
   if (S.age < C.sexMinAge) return;
   let v = S.age < 30 ? rand(3, 4) : S.age < 40 ? rand(2, 3) : rand(1, 2);
   if (S.stats.health <= 50) v = Math.max(1, Math.round(v / 2));
   S.stats.libido = clamp(S.stats.libido + v, 0, 100);
-  if (S.stats.libido >= 60) S.stats.happy = clamp(S.stats.happy - 1, 0, 100);
+  if (S.stats.libido >= 60 && S.stats.happy > 30) S.stats.happy--;
 }
 // 같이 있으면 서로 자극됨: 상대 성욕은 내 몸 등급만큼, 내 성욕은 상대 몸 등급만큼 빨리 오름
 function nearby(p) {
@@ -486,6 +498,8 @@ function applyOutcome(o, target) {
   if (sx) { pd = scaleBySat(pd, sx); deltas.push(['sat', sx.sat]); }
   if (pd && tp) deltas.push(...applyP(tp, pd, o.mult));
   if (o.libido) S.stats.libido = clamp(S.stats.libido + val(o.libido), 0, 100);
+  if (o.drunk) drinkUp(val(o.drunk));
+  if (o.sober) soberUp(true);
   addKarma(o.karma);
   if (o.heat) S.heat = clamp(S.heat + val(o.heat), 0, 100);
   const ctx = target ? { p: pname(target) } : {};
@@ -494,6 +508,8 @@ function applyOutcome(o, target) {
   else if (deltas.length) log('', { t: 'info', deltas });
   if (sx) { afterSex(tp, sx, ctx); guiltCheck(tp, sx, ctx); }
   if (o.pregnant && tp && (!o.intimate || sx) && conceive(tp, resolve(o.pregnant)) && S.scene) S.scene.preg = true;
+  // 다른 장소로 이동 (예: 술집에서 집으로 같이, 정신 차려보니 공원)
+  if (o.moveTo && PLACES[o.moveTo] && !jailed()) enterPlace(PLACES[o.moveTo], o.bring && tp && !tp.gone ? tp : null);
   riskCheck(o, tp);
   if (o.then) { const t = resolve(o.then); if (t) trigger(t); }
 }
@@ -771,7 +787,7 @@ function arrest(sev, late) {
 }
 function goJail(years) {
   S.jail = years; S.flags.inJail = true;
-  S.place = null; S.here = [];
+  S.place = null; S.here = []; S.drunk = 0;
   if (S.job) { log(`${job(S.job).label} 일자리를 잃었다.`, { t: 'info' }); S.job = null; S.salary = 0; }
   delete S.flags.student;
   const m = mainPartner(); if (m) applyP(m, { trust: -30, heart: -15 });
@@ -887,7 +903,7 @@ function yearly() {
     p.close = clamp(p.close - (mine ? 2 : 3), 0, 100);
     p.heart = clamp(p.heart - (mine ? 3 : 2), 0, 100);
     p.grudge = clamp(p.grudge - 3, 0, 100);
-    if (!mine && npcAge(p) >= 24 && Math.random() < .05) p.taken = !p.taken;
+    if (!mine && !p.married && npcAge(p) >= 24 && Math.random() < .05) p.taken = !p.taken;
     if (!mine && !p.debt && p.close <= 0 && p.grudge <= 0) { p.gone = true; log(`${josa(pname(p), '와')}는 연락이 끊겼다.`, { t: 'info' }); }
     else if (p.fwb && (p.close <= 20 || ((p.lastSat ?? 50) < 40 && Math.random() < .5))) { p.fwb = false; p.fling = false; log(`${josa(pname(p), '와')}의 관계는 흐지부지 끝났다.`, { t: 'info' }); }
   }
@@ -939,6 +955,7 @@ function yearly() {
 }
 
 function after() {
+  for (const p of alive()) if (p.married && !p.marriedKnown && p.close >= 40) { p.marriedKnown = true; log(`알고 보니 ${josa(pname(p), '은')} 결혼한 사람이었다.`, { t: 'info' }); }
   if (!S.ended) {
     if (S.stats.health <= 0) { S.ended = 'death'; S.pending = []; }
     else if (S.age >= C.endAge && !S.pending.length) S.ended = 'fifty';
@@ -948,7 +965,7 @@ function after() {
 function advanceYear() {
   S.age++;
   S.ap = C.apPerYear; S.used = 0; S.seasonIdx = -1;
-  S.place = null; S.here = [];
+  S.place = null; S.here = []; S.drunk = 0;
   S.log.push({ n: ++S.seq, t: 'year', age: S.age });
   yearly();
   if (S.age >= C.endAge) return;
@@ -1001,6 +1018,7 @@ function doAction(id, subj) {
   }
   if (a.id === 'exercise' || a.id === 'play') S.vars.exN = (S.vars.exN || 0) + 1;
   if (a.libido) S.stats.libido = clamp(S.stats.libido + val(a.libido), 0, 100);
+  if (a.drunk) drinkUp(a.drunk);
   const deltas = applyEffect(a.effect);
   const c = costOf(a);
   if (c) deltas.push(...applyEffect({ money: -c }));
@@ -1091,6 +1109,7 @@ function goPlace(id) {
   const pl = PLACES[id];
   if (!pl || busy() || S.ap <= 0 || !placeOpen(pl)) return;
   const night = S.time === 2;   // 사람은 도착한 때(행동 쓰기 전) 기준으로 채움
+  if (S.drunk) soberUp();
   spend();
   enterPlace(pl, null, night);
   log(`${pl.icon} ` + fill(textOf(pl.arrive) || `${josa(pl.label, '으로')} 갔다.`), { t: 'place' });
@@ -1104,6 +1123,7 @@ function goPlace(id) {
 }
 function leavePlace() {
   if (!S.place || S.ended) return;
+  if (S.drunk) soberUp();
   S.place = null; S.here = [];
   save(); emit();
 }
@@ -1167,8 +1187,6 @@ function interact(pid, iid) {
   if (cost) { const eff = Object.assign({}, resolve(o.effect)); eff.money = val(eff.money) - cost; o.effect = eff; }
   S.vars.fp = p.id;
   applyOutcome(o, p);
-  // 다른 장소로 같이 이동 (예: 술집에서 집으로)
-  if (o.moveTo && PLACES[o.moveTo] && !jailed()) { enterPlace(PLACES[o.moveTo], p.gone ? null : p); }
   tickSeason();
   after();
 }
@@ -1324,6 +1342,7 @@ const api = {
   focused: () => person(S.vars.fp),
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
+  drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
   canSex, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
@@ -1433,7 +1452,7 @@ window.Game = {
   init, subscribe: f => subs.push(f), state: () => S,
   newLife, ageUp, choose, currentEvent,
   actionList, canDo, costOf, doAction, needsSubject,
-  places: placeList, goPlace, leavePlace, here: hereList, talkTo, place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
+  places: placeList, goPlace, leavePlace, here: hereList, talkTo, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
   intimacy: p => canSex(p) && (p.nights || lover(p)) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
   people: () => alive(), person, interactions, interact, canSex, clearScene: () => { if (S.scene) { S.scene = null; save(); } }, look: lookOf, myLook: () => S.look, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,

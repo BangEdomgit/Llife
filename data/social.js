@@ -126,6 +126,15 @@ GAME_DATA.social = [
       ? { do: () => a.marry(p), memory: true, effect: { happy: 12, money: -1500 }, text: '{p|이} 고개를 끄덕였다. 결혼식을 올렸다!' }
       : { p: { heart: -10 }, effect: { happy: -5 }, text: '{p|은} 아직은 아니라고 했다.' } },
 
+  /* ── 술집 ── */
+  { id: 'drinkWith', label: '같이 한잔', icon: '🍻',
+    if: (s, p, a) => s.place === 'bar' && a.isHere(p) && s.age >= 19 && a.npcAge(p) >= 19 && !a.jailed(),
+    cost: () => 20,
+    run: (s, p, a) => ({ drunk: 1, p: { close: [4, 7], heart: [1, 4] }, effect: { happy: [2, 4] },
+      text: () => [, ['{p|와} 잔을 부딪쳤다. 첫 잔이 목을 타고 내려갔다.', '{p|와} 건배를 했다. 말이 술술 나왔다.'],
+        ['{p|와} 볼이 빨개진 얼굴로 서로 웃었다. 말이 점점 대담해졌다.', '{p|이} 내 잔이 비기 무섭게 채워줬다.'],
+        ['{p|와} 무슨 얘기를 했는지 기억이 잘 안 난다. 계속 웃었던 것만 기억난다.', '{p|이} "너 취했어"라며 내 볼을 꼬집었다.']][a.drunk()] }) },
+
   /* ── 친밀한 관계 (집에서만) ── */
   { id: 'intimate', label: '함께 밤을 보내다', icon: '♂♀',
     if: (s, p, a) => adultPair(s, p, a) && lover(p) && p.heart >= 60 && p.trust >= 40 && s.place === 'home' && !a.jailed(),
@@ -142,6 +151,7 @@ GAME_DATA.social = [
         memory: first,                                  // 이 사람과 처음 보낸 밤은 추억으로 (날씨와 함께 앨범에)
         pregnant: s.flags.married || p.spouse ? .15 : .08,   // 엔진이 30살부터 확률을 줄이고, 45살부터는 0
         risk: p.secret ? (m && a.isHere(m) ? .6 : .2) : 0,  // 몰래 만나는 사이면 들킬 위험 (배우자가 집에 있으면 훨씬 큼)
+        riskTaken: p.married ? .12 : 0,                  // 상대가 기혼이면 상대 배우자에게 들킬 위험
         text: () => a.pick(GAME_DATA.nightLines.intro) + ' ' + pickLine(a, 'lover', p),
       };
     } },
@@ -167,7 +177,7 @@ GAME_DATA.social = [
   { id: 'takeHome', label: '집으로 데려가기', icon: '🏠', noFree: true,
     if: (s, p, a) => ['bar', 'concert'].includes(s.place) && a.isHere(p) && !s.flags.married && adultPair(s, p, a) && p.heart >= 45 && p.close >= 30 && !a.jailed(),
     run: (s, p, a) => a.charmed(p, 'bed', a.need('takeHome')) ? {
-      moveTo: 'home', p: { heart: [2, 4] },
+      moveTo: 'home', bring: true, p: { heart: [2, 4] },
       risk: a.main() && a.main() !== p ? .1 : 0,
       text: !s.flags.ownPlace ? '부모님이 주무시는 걸 확인하고 {p|와} 조용히 현관문을 열었다.'
         : ['택시 창밖으로 불빛이 길게 번졌다. {p|와} 우리 집 앞에서 내렸다.', '{p|와} 말없이 걸었다. 어느새 우리 집 골목이었다.'],

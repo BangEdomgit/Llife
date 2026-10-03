@@ -146,7 +146,7 @@ function renderWhere(S) {
   }
   const here = G.here(), acts = G.actionList();
   box.innerHTML = `
-    <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}</span><button type="button" data-leave>← 돌아가기</button></div>
+    <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}${S.drunk ? ` <small class="drunk d${S.drunk}">🍺 ${G.drunkLabel()}</small>` : ''}</span><button type="button" data-leave>← 돌아가기</button></div>
     <p class="sec-t">여기 있는 사람들 <span class="dim">· 말 걸기는 행동을 안 씀</span></p>
     <div class="here">${here.map(hereRow).join('') || '<p class="empty">아무도 없다.</p>'}</div>
     <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· 행동 1</span></p>
@@ -224,7 +224,10 @@ function openPerson(id) {
       <span>만족감</span><span class="bar">${bar(im.sat || 0)}</span><span class="num">${im.sat ?? '—'}</span>` : ''}</div>` : '';
   const tags = [];
   const mine = p.partner || p.spouse || p.secret;
-  if (p.taken && !mine && p.kind !== 'family' && p.kind !== 'child') tags.push('<span class="tag">애인 있음</span>');
+  if (p.married && p.marriedKnown) tags.push('<span class="tag warn">기혼</span>');
+  else if (p.married && p.close >= 20) tags.push('<span class="tag">반지를 끼고 있다</span>');
+  else if (p.taken && !mine && p.kind !== 'family' && p.kind !== 'child') tags.push('<span class="tag">애인 있음</span>');
+  if (p.fwb) tags.push('<span class="tag">섹파</span>');
   if (p.secret) tags.push('<span class="tag warn">들키면 안 됨</span>');
   if (p.debt) tags.push(`<span class="tag warn">빌린 돈 ${G.fmtMoney(p.debt)}</span>`);
   if (p.ex) tags.push('<span class="tag">예전에 사귐</span>');
