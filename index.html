@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Llife</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+
+<!-- 순서 중요: 데이터 → 엔진·배경 → 화면 -->
+<script defer src="data/weather.js"></script>
+<script defer src="data/life.js"></script>
+<script defer src="data/school.js"></script>
+<script defer src="data/jobs.js"></script>
+<script defer src="data/social.js"></script>
+<script defer src="data/crime.js"></script>
+<script defer src="data/events.js"></script>
+<script defer src="js/weather.js"></script>
+<script defer src="js/game.js"></script>
+<script defer src="js/main.js"></script>
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<main class="app" id="app">
+  <header class="hud panel">
+    <div class="rule" aria-hidden="true">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+    <div class="who">
+      <span id="name"></span><span id="age"></span><span id="gender" class="dim"></span>
+      <span class="tools">
+        <button type="button" id="restart" aria-label="새 인생">↻</button>
+        <button type="button" id="hide" aria-label="배경만 보기">👁</button>
+      </span>
+    </div>
+    <div class="sub"><span id="role"></span><span id="trait"></span><span id="money"></span></div>
+    <div class="rule" aria-hidden="true">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+    <div class="conds" id="conds"></div>
+    <div class="abils" id="abils"></div>
+  </header>
+
+  <section class="log panel" id="log" aria-label="인생 기록"></section>
+
+  <section class="controls panel" aria-label="행동">
+    <div class="season-row"><span id="season"></span><span class="dots" id="ap" aria-hidden="true"></span><span class="dim" id="apNum"></span></div>
+    <div class="menu-row">
+      <button type="button" id="meBtn">📋 나</button>
+      <button type="button" id="peopleBtn">👥 관계</button>
+      <button type="button" id="jobBtn">💼 직업</button>
+      <button type="button" id="crimeBtn">🕶 범죄</button>
+    </div>
+    <div class="acts" id="acts"></div>
+    <button type="button" class="age-btn" id="ageUp">＋ 1살 먹기</button>
+  </section>
+</main>
+
+<div class="modal-wrap" id="modal" hidden>
+  <div class="modal panel" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="m-head"><span id="mTitle"></span><button type="button" id="mClose" aria-label="닫기">✕</button></div>
+    <div class="m-body" id="mBody"></div>
+  </div>
+</div>
+
+<div class="show-wrap" id="showWrap" hidden>
+  <button type="button" class="show-btn" id="show" aria-label="화면 다시 보기">👁</button>
+</div>
+</body>
+</html>

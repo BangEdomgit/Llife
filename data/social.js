@@ -1,0 +1,140 @@
+// 사람과의 상호작용 — 관계 창에서 사람을 눌렀을 때 나오는 버튼들 (행동 1 사용)
+//
+// 호감도 4종 (사람마다 따로)
+//   close 친밀 / trust 신뢰 / heart 설렘 / grudge 원한
+//   설렘은 연애 가능한 상대만 움직임: 둘 다 19살 이상, 상대 50살 미만, 이성, 가족 아님
+//   엔진이 추가로 곱해주는 것: 성격 궁합(mod), 같은 취미(같이 놀기·선물 1.3배), 가치관(같으면 1.2배, 부딪히면 0.8배)
+//
+// if(s, p, a)  → 이 버튼이 보이는 조건
+// cost(s, p)   → 드는 돈 (만원)
+// run(s, p, a) → 결과. p: 상대 호감도 변화 / effect: 내 스탯 / risk: 애인에게 들킬 확률 / riskTaken: 상대 애인에게 들킬 확률
+// 문장의 {p}는 상대 이름 (조사는 {p|와} 처럼)
+window.GAME_DATA = window.GAME_DATA || {};
+
+(function () {
+const notKin = p => p.kind !== 'family' && p.kind !== 'child';
+const lover = p => p.partner || p.spouse || p.secret;
+
+GAME_DATA.social = [
+  { id: 'talk', label: '대화하기', icon: '💬',
+    if: (s, p, a) => s.age >= 3 && !a.jailed(),
+    run: () => ({ p: { close: [3, 6], trust: [0, 2] },
+      text: ['{p|와} 이런저런 얘기를 나눴다.', '{p|와} 수다를 떨다 시간 가는 줄 몰랐다.', '{p|와} 별것 아닌 일로 한참 웃었다.'] }) },
+
+  { id: 'family', label: '함께 시간 보내기', icon: '🏠',
+    if: (s, p, a) => p.kind === 'family' && s.age >= 4 && !a.jailed(),
+    run: (s, p, a) => ({ p: { close: [5, 9] }, effect: { happy: [1, 3] }, text: GAME_DATA.familyText[p.role] || GAME_DATA.familyText._sib }) },
+
+  { id: 'hang', label: '같이 놀기', icon: '🎈',
+    if: (s, p, a) => s.age >= 4 && notKin(p) && !a.jailed(),
+    cost: s => s.age >= 18 ? 10 : 0,
+    run: (s, p, a) => {
+      const h = a.sharedHobby(p);   // 같은 취미면 그 취미로 놂 (엔진이 효과도 더 줌)
+      return { p: { close: [5, 9], heart: [0, 2] }, effect: { happy: [2, 4], charm: [0, 1] },
+        text: h ? h.act.map(t => '{p|와} ' + t)
+          : s.age < 13 ? ['{p|와} 놀이터에서 해 질 때까지 놀았다.', '{p|와} 딱지치기를 했다.']
+          : s.age < 19 ? ['{p|와} 노래방에 갔다.', '{p|와} 떡볶이를 먹으러 갔다.', '{p|와} PC방에서 밤을 새웠다.']
+          : ['{p|와} 저녁을 먹었다.', '{p|와} 늦게까지 이야기를 나눴다.', '{p|와} 영화를 봤다.'] };
+    } },
+
+  { id: 'listen', label: '고민 들어주기', icon: '👂',
+    if: (s, p, a) => s.age >= 10 && p.close >= 30 && p.kind !== 'child' && !a.jailed(),
+    run: () => ({ p: { trust: [4, 8], close: [2, 4] }, text: ['{p}의 고민을 끝까지 들어줬다.', '{p|이} 말하기 힘든 이야기를 털어놨다.'] }) },
+
+  { id: 'gift', label: '선물하기', icon: '🎁',
+    if: (s, p, a) => s.age >= 6 && !a.jailed(),
+    cost: s => s.age >= 18 ? 20 : 0,
+    run: s => ({ p: { close: [4, 8], heart: [3, 6] }, effect: { happy: [0, 1] },
+      text: s.age < 18 ? ['{p}에게 직접 만든 카드를 줬다.', '{p}에게 아끼던 스티커를 나눠줬다.'] : ['{p}에게 작은 선물을 했다.', '{p|이} 갖고 싶다던 걸 기억해뒀다가 선물했다.'] }) },
+
+  /* ── 연애 (조건은 엔진에서도 한 번 더 확인) ── */
+  { id: 'flirt', label: '플러팅', icon: '😉',
+    if: (s, p, a) => a.canRomance(p) && !p.partner && !p.spouse && !a.jailed(),
+    run: (s, p, a) => {
+      const ok = (s.stats.looks + s.stats.charm) / 5 + p.close / 2 + 20 + a.rand(-15, 15) >= 55;   // 외모·매력·친밀이 높을수록 잘 먹힘
+      const risk = a.main() && a.main() !== p ? .2 : 0;
+      return ok
+        ? { p: { heart: [8, 14], close: [1, 3] }, risk, riskTaken: p.taken ? .15 : 0,
+            text: ['{p|이} 내 농담에 오래 웃었다.', '{p|와} 눈이 마주쳤다. 둘 다 먼저 피하지 않았다.', '{p|이} 다음에 또 보자고 했다.'] }
+        : { p: { close: [-3, -1] }, effect: { happy: -2 }, risk, riskTaken: p.taken ? .1 : 0,
+            text: ['분위기가 어색해졌다.', '{p|이} 못 들은 척했다.'] };
+    } },
+
+  { id: 'confess', label: '고백하기', icon: '💌',
+    if: (s, p, a) => a.canRomance(p) && p.heart >= 40 && !lover(p) && !a.jailed(),
+    run: (s, p, a) => {
+      const ok = p.heart + p.close / 4 + a.rand(-15, 15) - (p.taken ? 15 : 0) >= 55;
+      if (!ok) return { p: { heart: [-18, -12], close: [-8, -4] }, effect: { happy: [-8, -4] },
+        text: ['{p|이} 미안하다고 했다.', '{p|은} 친구로 지내고 싶다고 했다.'] };
+      const sneaky = !!a.main();
+      return { do: () => a.startRelation(p, sneaky), memory: true, effect: { happy: [6, 10] }, risk: sneaky ? .15 : 0,
+        text: sneaky ? '{p|와} 몰래 만나기 시작했다. 아무도 몰라야 한다.'
+          : p.taken ? '{p|은} 만나던 사람과 정리하고 내 손을 잡았다.' : '{p|와} 사귀게 됐다!' };
+    } },
+
+  { id: 'date', label: '데이트', icon: '💕',
+    if: (s, p, a) => lover(p) && s.age >= 19 && !a.jailed(),
+    cost: () => 10,
+    run: (s, p) => ({ p: { heart: [5, 10], close: [3, 5] }, effect: { happy: [2, 4] }, risk: p.secret ? .18 : 0,
+      text: ['{p|와} 처음 가보는 동네를 걸었다.', '{p|와} 늦게까지 이야기를 나눴다.', '{p|와} 바다를 보러 갔다.', '{p|와} 집에서 영화를 봤다.'] }) },
+
+  { id: 'propose', label: '청혼하기', icon: '💍',
+    if: (s, p, a) => p.partner && p.heart >= 65 && p.trust >= 50 && s.age >= 22 && !a.jailed(),
+    run: (s, p, a) => p.heart + p.trust / 2 + a.rand(-10, 10) >= 95
+      ? { do: () => a.marry(p), memory: true, effect: { happy: 12, money: -1500 }, text: '{p|이} 고개를 끄덕였다. 결혼식을 올렸다!' }
+      : { p: { heart: -10 }, effect: { happy: -5 }, text: '{p|은} 아직은 아니라고 했다.' } },
+
+  { id: 'breakup', label: '헤어지기', icon: '💔',
+    if: (s, p, a) => (p.partner || p.secret) && !a.jailed(),
+    run: (s, p, a) => ({ do: () => a.breakUp(p, 20), memory: true, effect: { happy: [-6, -3] }, text: '{p|와} 헤어졌다.' }) },
+
+  { id: 'divorce', label: '이혼하기', icon: '📄',
+    if: (s, p, a) => p.spouse && !a.jailed(),
+    run: (s, p, a) => ({ do: () => a.divorce(p), memory: true, effect: { happy: -8 }, text: '{p|와} 이혼했다. 재산을 반으로 나눴다.' }) },
+
+  /* ── 갈등 ── */
+  { id: 'argue', label: '다투기', icon: '💢',
+    if: (s, p, a) => s.age >= 6 && !a.jailed(),
+    run: () => ({ p: { grudge: [12, 20], close: [-12, -8], trust: [-4, -2] }, effect: { happy: [0, 2] }, karma: -2,
+      text: ['{p|와} 크게 다퉜다.', '{p}에게 해서는 안 될 말을 했다.', '{p|와} 언성을 높였다.'] }) },
+
+  { id: 'apologize', label: '사과하기', icon: '🙇',
+    if: (s, p, a) => p.grudge >= 10 && !a.jailed(),
+    run: (s, p, a) => p.trust + a.rand(-20, 20) >= 30
+      ? { p: { grudge: [-20, -12], close: [2, 4] }, karma: 2, text: '{p}에게 진심으로 사과했다. 조금은 풀린 눈치다.' }
+      : { p: { grudge: [-5, -2] }, text: '{p|은} 아직 화가 덜 풀렸다.' } },
+
+  /* ── 돈 ── */
+  { id: 'borrow', label: '돈 빌리기', icon: '💸',
+    if: (s, p, a) => s.age >= 19 && p.close >= 50 && !p.debt && p.kind !== 'child' && !a.jailed(),
+    run: (s, p, a) => { const amt = a.rand(5, 30) * 10;
+      return { effect: { money: amt }, do: () => { p.debt = amt; }, p: { trust: [-8, -4] }, text: `{p}에게 ${a.money(amt)}을 빌렸다.` }; } },
+
+  { id: 'repay', label: '빚 갚기', icon: '🧾',
+    if: (s, p) => p.debt > 0 && s.money >= p.debt,
+    run: (s, p) => ({ effect: { money: -p.debt }, do: () => { p.debt = 0; }, p: { trust: [6, 10] }, text: '{p}에게 빌린 돈을 갚았다.' }) },
+
+  /* ── 가족 ── */
+  { id: 'allowance', label: '용돈 조르기', icon: '🪙',
+    if: (s, p, a) => p.kind === 'family' && s.age >= 6 && s.age <= 18 && !a.jailed(),
+    run: () => ({ effect: { money: [1, 5] }, p: { close: [-2, 0] }, text: ['{p|이} 못 이기는 척 용돈을 줬다.', '{p|이} 이번 한 번만이라며 지갑을 열었다.'] }) },
+
+  { id: 'filial', label: '효도하기', icon: '🧧',
+    if: (s, p, a) => p.kind === 'family' && s.age >= 25 && !a.jailed(),
+    cost: () => 50,
+    run: () => ({ p: { close: [6, 10], trust: [2, 4] }, effect: { happy: [2, 4] }, text: ['{p}에게 용돈을 드렸다. 괜히 쑥스러웠다.', '{p|와} 근사한 식당에 갔다.'] }) },
+
+  { id: 'play', label: '놀아주기', icon: '🧸',
+    if: (s, p, a) => p.kind === 'child' && a.npcAge(p) <= 15 && !a.jailed(),
+    run: () => ({ p: { close: [6, 10] }, effect: { happy: [3, 5] }, text: ['{p|와} 놀이터에 갔다.', '{p|이} 그린 그림을 냉장고에 붙였다.', '{p|와} 같이 숙제를 했다.'] }) },
+
+  /* ── 수감 중 ── */
+  { id: 'letter', label: '편지 쓰기', icon: '✉️',
+    if: (s, p, a) => a.jailed(),
+    run: () => ({ p: { close: [4, 7], trust: [1, 3] }, text: '{p}에게 긴 편지를 썼다.' }) },
+
+  { id: 'cutoff', label: '연락 끊기', icon: '✂️',
+    if: (s, p, a) => notKin(p) && !p.spouse && !a.jailed(),
+    run: (s, p, a) => ({ do: () => { if (p.partner || p.secret) a.breakUp(p, 10); p.gone = true; }, text: '{p|와} 연락을 끊었다.' }) },
+];
+})();
