@@ -790,7 +790,7 @@ function guidesSVG(A) {
 
 /* ---------- 함께 밤을 보낸 다음 날 아침 (어른만, 상반신) ---------- */
 const tierOf = v => v >= 90 ? 4 : v >= 70 ? 3 : v >= 50 ? 2 : v >= 30 ? 1 : 0;
-function morningBody(a, skin, skinD, hw, tier, fig) {
+function morningBody(a, skin, skinD, hw, tier, fig, lipstick) {
   tier = tier || 0;
   const female = a.g === 'f', b = a.body || {};
   const blanketY = female ? [120, 124, 128, 133, 137][tier] : [128, 132, 136, 140, 144][tier];
@@ -805,16 +805,18 @@ function morningBody(a, skin, skinD, hw, tier, fig) {
   } else {
     o += `<path d="M42,126 Q50,131 58,127 M62,127 Q70,131 78,126" fill="none" stroke="${shade(skin, .68)}" stroke-width="1.2" opacity=".4"/>`;
   }
+  if (tier >= 2) o += `<ellipse cx="46" cy="116" rx="1.3" ry="1.8" fill="#87ceeb" opacity=".45"/>`;
   if (tier >= 3) {
-    o += `<path d="M72,108 q2,-2.5 4,0 q2,-2.5 4,0 q-2,3.5 -4,3.5 q-2,0 -4,-3.5 Z" fill="#c43c4f" opacity=".6" transform="rotate(-8 75 109)"/>`;
-    if (tier >= 4) {
-      o += `<path d="M40,116 q2,-2 3.5,0 q2,-2 3.5,0 q-2,3 -3.5,3 q-2,0 -3.5,-3 Z" fill="#c43c4f" opacity=".55" transform="rotate(15 43 117)"/>`;
-      o += `<path d="M80,114 q1.5,-2 3,0 q1.5,-2 3,0 q-1.5,3 -3,3 q-1.5,0 -3,-3 Z" fill="#c43c4f" opacity=".5" transform="rotate(-20 82 115)"/>`;
+    o += `<ellipse cx="74" cy="114" rx="1.1" ry="1.6" fill="#87ceeb" opacity=".4"/>`;
+    if (lipstick) {
+      o += `<path d="M72,108 q2,-2.5 4,0 q2,-2.5 4,0 q-2,3.5 -4,3.5 q-2,0 -4,-3.5 Z" fill="#c43c4f" opacity=".6" transform="rotate(-8 75 109)"/>`;
+      o += `<path d="M44,104 q2,-2 3.5,0 q2,-2 3.5,0 q-2,3 -3.5,3 q-2,0 -3.5,-3 Z" fill="#c43c4f" opacity=".5" transform="rotate(12 47 105)"/>`;
     }
-  }
-  if (tier >= 4) {
-    o += `<path d="M35,118 q5,-3 10,0" fill="none" stroke="#c86070" stroke-width="1.4" opacity=".55"/>`;
-    o += `<path d="M36,120 q4,2.5 8,0" fill="none" stroke="#c86070" stroke-width="1.2" opacity=".45"/>`;
+    if (tier >= 4) {
+      o += `<path d="M80,116 q1.5,-2 3,0 q1.5,-2 3,0 q-1.5,3 -3,3 q-1.5,0 -3,-3 Z" fill="#c43c4f" opacity=".55" transform="rotate(-15 82 117)"/>`;
+      o += `<path d="M35,118 q5,-3 10,0" fill="none" stroke="#c86070" stroke-width="1.4" opacity=".55"/>`;
+      o += `<path d="M36,120 q4,2.5 8,0" fill="none" stroke="#c86070" stroke-width="1.2" opacity=".45"/>`;
+    }
   }
   o += `<path d="M0,${blanketY + 6} C20,${blanketY - 4} 40,${blanketY + 4} 60,${blanketY} C80,${blanketY - 4} 100,${blanketY + 5} 120,${blanketY - 2} L120,160 L0,160 Z" fill="#ece6da"/>`;
   o += `<path d="M18,${blanketY + 12} Q34,${blanketY + 22} 30,160 M84,${blanketY + 10} Q76,${blanketY + 24} 88,160 M52,${blanketY + 8} Q58,${blanketY + 18} 54,${blanketY + 30}" fill="none" stroke="#cfc6b6" stroke-width="1.6" stroke-linecap="round"/>`;
@@ -1130,13 +1132,26 @@ function headSVG(a, X, age, st, g) {
   if (st.aroused && adult) o += arousalFX(st.aroused);
   if (a.freckles) o += [[43, 80], [46, 82], [49, 80], [71, 80], [74, 82], [77, 80]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".9" fill="${shade(skin, .62)}"/>`).join('');
   if (age >= 45) o += `<path d="M41,77 Q44,79 47,78 M73,78 Q76,79 79,77" fill="none" stroke="${shade(skin, .75)}" stroke-width="1"/>`;
-  // 눈: 흰자 + 홍채 + 하이라이트 + 속눈썹 (어린이는 조금 크게) / 다음 날 아침엔 감은 눈
+  // 눈: 흰자 + 홍채 + 하이라이트 + 속눈썹 (어린이는 조금 크게) / 다음 날 아침엔 감은 눈 / 흥분 시 반쯤 감김
   const nLash = female ? (age >= 18 ? 3 : 2) : kid ? 1 : 0;
+  const aro = adult && st.aroused || 0;
   o += ex.map((x, i) => {
     const s = i ? 1 : -1;
-    if (af && tier >= 3 && af.personality === 'playful' && i === 1) return HAPPY(x, ey);   // 장난형: 윙크
+    if (af && tier >= 3 && af.personality === 'playful' && i === 1) return HAPPY(x, ey);
     if (af && tier === 4) return HAPPY(x, ey);
     if (af && tier === 3) return SLEEPY(x, ey, s, nLash);
+    if (aro >= 86) return SLEEPY(x, ey, s, nLash);
+    if (aro >= 71) {
+      const e = eyeShape(a.eyes, x, ey, s), id = `av${UID}ar${s > 0 ? 'r' : 'l'}`;
+      const gap = 1.2, midU = [(e.i[0] + e.o[0]) / 2, Math.min(e.i[1], e.o[1]) + gap];
+      const shape = `M${P(...e.i)} Q${P(...midU)} ${P(...e.o)} Q${P(...e.l)} ${P(...e.i)} Z`, irC = IRIS[X.iris], gx = x - 2.5, gy = ey + 1.5;
+      return `<clipPath id="${id}"><path d="${shape}"/></clipPath><path d="${shape}" fill="${WHITE}"/>
+        <g clip-path="url(#${id})"><ellipse cx="${f1(gx)}" cy="${f1(gy)}" rx="${e.ir[0]}" ry="${f1(e.ir[1] * .7)}" fill="${irC}"/>
+        <ellipse cx="${f1(gx)}" cy="${f1(gy + .3)}" rx="${f1(e.ir[0] * .5)}" ry="${f1(e.ir[1] * .4)}" fill="${PUPIL}"/>
+        <circle cx="${f1(gx + 1)}" cy="${f1(gy - .8)}" r="1.2" fill="#fff" opacity=".5"/></g>
+        <path d="M${P(...e.i)} Q${P(...midU)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M${P(...e.i)} Q${P(...e.l)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width=".8" opacity=".3"/>${nLash ? lashes(e, s, nLash) : ''}`;
+    }
     const e = openEye(a, X, x, ey, s, nLash);
     return kid ? `<g transform="translate(${x},${ey}) scale(1.1) translate(${-x},${-ey})">${e}</g>` : e;
   }).join('');
@@ -1149,8 +1164,9 @@ function headSVG(a, X, age, st, g) {
   o += `<ellipse cx="60.6" cy="84.6" rx="3" ry="1" fill="${shade(skin, .62)}" opacity=".16"/>`;
   // 입 (어른 여자는 립 색, 여자아이는 연분홍, 남자는 자연스러운 입술색)
   const lip = { c: female && age >= 18 ? LIPS[X.lip] : female ? '#e39aa0' : NATURAL_LIP[a.skin] || NATURAL_LIP[1], teeth: X.teeth };
-  o += af ? (tier === 0 ? FROWN : tier === 1 ? mouthSVG(2, lip, female) : tier >= 3 && af.personality !== 'cool' ? mouthSVG(1, lip, female) : mouthSVG(0, lip, female)) : mouthSVG(a.mouth, lip, female);
-  if (af && af.lipstick && tier >= 3) o += `<path d="M75,90 q2.5,-3 5,0 q2.5,-3 5,0 q-2.5,4 -5,4 q-2.5,0 -5,-4 Z" fill="#c43c4f" opacity=".75" transform="rotate(-12 80 90)"/>`;   // 볼에 립스틱 자국
+  o += af ? (tier === 0 ? FROWN : tier === 1 ? mouthSVG(2, lip, female) : tier >= 3 && af.personality !== 'cool' ? mouthSVG(1, lip, female) : mouthSVG(0, lip, female))
+    : aro >= 71 ? mouthSVG(1, lip, female) : aro >= 51 ? mouthSVG(3, lip, female) : mouthSVG(a.mouth, lip, female);
+  // 립스틱 자국은 morningBody에서 목·쇄골에 표시
   if (af && tier >= 4 && female) {
     o += `<path d="M42,74 Q38,78 36,82" fill="none" stroke="#555" stroke-width="1.2" opacity=".25" stroke-linecap="round"/>`;
     o += `<path d="M78,74 Q82,78 84,82" fill="none" stroke="#555" stroke-width="1.2" opacity=".25" stroke-linecap="round"/>`;
@@ -1206,7 +1222,7 @@ function render(a, size = 48, state = 25) {
   let o = `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/>`;
   o += hp.back;
   o += `<path d="M${f1(60 - nh)},94 L${f1(60 + nh)},94 L${f1(60 + nh)},${f1(neckBot)} L${f1(60 - nh)},${f1(neckBot)} Z" fill="${skinD}"/>`;
-  o += af ? morningBody(a, skin, skinD, hw, tier, st.after && st.after.fig) : clothes(a, top, kid, skinD, hw, adult);
+  o += af ? morningBody(a, skin, skinD, hw, tier, st.after && st.after.fig, af.lipstick) : clothes(a, top, kid, skinD, hw, adult);
   o += headSVG(a, X, age, st, { skin, hc, hp, nh, neckBot, af, tier });
   return o + '</svg>';
 }

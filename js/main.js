@@ -204,14 +204,15 @@ function morningCard(sc, p) {
   return `<p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
     <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
-function blanketSVG(shape) {
-  const cleg = (x, y0, y1, tw) => {
+function blanketSVG(shape, build) {
+  const bm = build === 'slim' ? .8 : build === 'chubby' ? 1.3 : 1;
+  const cleg = (x, y0, y1, tw) => { tw *= bm;
     const kw = tw * .68, cw = tw * .82, aw = tw * .48;
     const ky = y0 + (y1 - y0) * .47, cy = y0 + (y1 - y0) * .72;
     return `M${x - tw},${y0} C${x - tw},${ky - 4} ${x - kw - .5},${ky - 1} ${x - kw},${ky} C${x - kw + .3},${ky + 4} ${x - cw - .2},${cy - 2} ${x - cw},${cy} C${x - cw + .2},${cy + 4} ${x - aw - .3},${y1 - 3} ${x - aw},${y1} L${x + aw},${y1} C${x + aw + .3},${y1 - 3} ${x + cw - .2},${cy + 4} ${x + cw},${cy} C${x + cw + .2},${cy - 2} ${x + kw - .3},${ky + 4} ${x + kw},${ky} C${x + kw + .5},${ky - 1} ${x + tw},${ky - 4} ${x + tw},${y0} Z`;
   };
   const ft = (x, s) => `<ellipse cx="${x + s * 3.5}" cy="99" rx="4.2" ry="2" fill="#3a3430" opacity=".5"/>`;
-  const bentLeg = (x, y0) => `M${x - 5},${y0} C${x - 3},${y0 - 8} ${x + 1},${y0 - 14} ${x + 4},${y0 - 16} C${x + 7},${y0 - 18} ${x + 9},${y0 - 14} ${x + 8},${y0 - 8} C${x + 7},${y0 - 2} ${x + 3},${y0 + 6} ${x - 1},${y0 + 10} L${x - 5},${y0 + 6} C${x - 4},${y0 + 2} ${x - 5},${y0 - 2} ${x - 5},${y0} Z`;
+  const bentLeg = (x, y0) => { const w = 5 * bm; return `M${x - w},${y0} C${x - w + 2},${y0 - 8} ${x + 1},${y0 - 14} ${x + 4},${y0 - 16} C${x + 4 + 3 * bm},${y0 - 18} ${x + 4 + 5 * bm},${y0 - 14} ${x + 3 + 5 * bm},${y0 - 8} C${x + 2 + 5 * bm},${y0 - 2} ${x + 3},${y0 + 6} ${x - 1},${y0 + 10} L${x - w},${y0 + 6} C${x - w + 1},${y0 + 2} ${x - w},${y0 - 2} ${x - w},${y0} Z`; };
   let legs = '';
   if (shape === 'B') {
     legs = `<path d="${cleg(32, 52, 98, 5)} ${cleg(50, 52, 98, 4.5)}" fill="#3a3430" opacity=".6"/>${ft(32, -1)}${ft(50, -1)}`;
@@ -242,19 +243,19 @@ function phaseCard(sc, p, phase, shape, icon) {
     return `<div class="sc-particle" style="left:${20 + Math.random() * 60}%;top:${30 + Math.random() * 40}%;--dx:${dx};--dy:${dy};animation-delay:${i * .15}s"></div>`;
   }).join('') : '';
   const cls = typeof phase === 'number' ? `phase${phase + 1}` : phase === 'climax' ? 'phase-climax' : 'phase-end';
-  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><svg viewBox="0 0 90 76" aria-hidden="true"><g class="f-sym"><circle cx="52" cy="30" r="11" fill="none" stroke="#ff69b4" stroke-width="2.5"/><line x1="52" y1="41" x2="52" y2="58" stroke="#ff69b4" stroke-width="2.5"/><line x1="45" y1="50" x2="59" y2="50" stroke="#ff69b4" stroke-width="2.5"/></g><g class="m-sym"><circle cx="34" cy="30" r="11" fill="none" stroke="#4da6ff" stroke-width="2.5"/><line x1="41" y1="23" x2="49" y2="15" stroke="#4da6ff" stroke-width="2.5"/><polyline points="44,15 49,15 49,20" fill="none" stroke="#4da6ff" stroke-width="2.5"/></g></svg></div>${blanketSVG(shape)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
+  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><svg viewBox="0 0 90 76" aria-hidden="true"><g class="f-sym"><circle cx="55" cy="40" r="12" fill="none" stroke="#ff69b4" stroke-width="2.5"/><line x1="55" y1="52" x2="55" y2="68" stroke="#ff69b4" stroke-width="2.5"/><line x1="48" y1="60" x2="62" y2="60" stroke="#ff69b4" stroke-width="2.5"/></g><g class="m-sym"><circle cx="35" cy="40" r="12" fill="none" stroke="#4da6ff" stroke-width="2.5"/><line x1="43" y1="32" x2="52" y2="23" stroke="#4da6ff" stroke-width="2.5"/><polyline points="46,23 52,23 52,29" fill="none" stroke="#4da6ff" stroke-width="2.5"/></g></svg></div>${blanketSVG(shape, p.body && p.body.build)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
 }
 function foreplayCard(sc, p) {
-  const fl = p.gender === 'f', ml = !fl;
-  const lH = fl ? 28 : 32, rH = ml ? 28 : 32;
-  const lBody = fl
-    ? '<path d="M64,46 C58,48 54,56 53,66 C52,72 54,78 56,84 C52,90 50,100 50,112 C50,124 52,136 54,150 L66,150 L68,112 L72,150 L84,150 C86,136 88,124 88,112 C88,100 86,90 82,84 C84,78 86,72 85,66 C84,56 80,48 74,46 Z" class="fp-fill"/>'
-    : '<path d="M62,48 C56,50 50,58 49,68 C48,76 50,82 52,88 C48,94 46,104 46,116 C46,128 48,138 50,150 L62,150 L64,114 L68,150 L80,150 C82,138 84,128 84,116 C84,104 82,94 78,88 C80,82 82,76 81,68 C80,58 74,50 68,48 Z" class="fp-fill"/>';
-  const rBody = ml
-    ? '<path d="M120,46 C114,48 110,56 109,66 C108,72 110,78 112,84 C108,90 106,100 106,112 C106,124 108,136 110,150 L122,150 L124,112 L128,150 L140,150 C142,136 144,124 144,112 C144,100 142,90 138,84 C140,78 142,72 141,66 C140,56 136,48 130,46 Z" class="fp-fill"/>'
-    : '<path d="M118,48 C112,50 108,58 107,68 C106,76 108,82 110,88 C106,94 104,104 104,116 C104,128 106,138 108,150 L120,150 L122,114 L126,150 L138,150 C140,138 142,128 142,116 C142,104 140,94 136,88 C138,82 140,76 139,68 C138,58 132,50 126,48 Z" class="fp-fill"/>';
-  const arm = '<path d="M84,70 Q96,62 110,68 Q114,74 110,78 Q98,70 86,76 Z" class="fp-fill"/>';
-  return `<div class="sc-foreplay"><svg viewBox="0 0 200 160"><circle cx="69" cy="${lH}" r="14" class="fp-fill"/><path d="M63,${lH + 8} Q69,${lH + 14} 75,${lH + 8}" class="fp-stroke"/>${lBody}<circle cx="125" cy="${rH}" r="14" class="fp-fill"/><path d="M119,${rH + 8} Q125,${rH + 14} 131,${rH + 8}" class="fp-stroke"/>${rBody}${arm}</svg></div>`;
+  const fl = p.gender === 'f';
+  const head = (cx, cy) => `<path d="M${cx},${cy - 13} C${cx - 12},${cy - 13} ${cx - 14},${cy - 4} ${cx - 13},${cy + 2} C${cx - 12},${cy + 8} ${cx - 8},${cy + 13} ${cx - 3},${cy + 15} L${cx + 3},${cy + 15} C${cx + 8},${cy + 13} ${cx + 12},${cy + 8} ${cx + 13},${cy + 2} C${cx + 14},${cy - 4} ${cx + 12},${cy - 13} ${cx},${cy - 13} Z" class="fp-fill"/>`;
+  const fBodyL = '<path d="M64,46 C56,48 52,56 51,64 C50,70 52,76 55,82 C51,88 49,98 49,110 C49,122 50,134 52,150 L62,150 L64,116 L68,150 L78,150 C80,134 82,122 82,110 C82,98 80,88 76,82 C79,76 80,70 79,64 C78,56 74,48 66,46 Z" class="fp-fill"/>';
+  const fBodyR = '<path d="M128,46 C120,48 116,56 115,64 C114,70 116,76 119,82 C115,88 113,98 113,110 C113,122 114,134 116,150 L126,150 L128,116 L132,150 L142,150 C144,134 146,122 146,110 C146,98 144,88 140,82 C143,76 144,70 143,64 C142,56 138,48 130,46 Z" class="fp-fill"/>';
+  const mBodyL = '<path d="M62,46 C54,48 48,54 47,64 C46,72 48,80 52,86 C48,92 46,102 46,114 C46,126 48,138 50,150 L62,150 L64,116 L68,150 L80,150 C82,138 84,126 84,114 C84,102 82,92 78,86 C82,80 84,72 83,64 C82,54 76,48 68,46 Z" class="fp-fill"/>';
+  const mBodyR = '<path d="M126,46 C118,48 112,54 111,64 C110,72 112,80 116,86 C112,92 110,102 110,114 C110,126 112,138 114,150 L126,150 L128,116 L132,150 L144,150 C146,138 148,126 148,114 C148,102 146,92 142,86 C146,80 148,72 147,64 C146,54 140,48 132,46 Z" class="fp-fill"/>';
+  const lBody = fl ? fBodyL : mBodyL, rBody = fl ? mBodyR : fBodyR;
+  const lH = fl ? 28 : 30, rH = fl ? 30 : 28;
+  const arm = '<path d="M78,68 Q92,60 110,66 Q114,72 110,76 Q94,66 80,74 Z" class="fp-fill"/>';
+  return `<div class="sc-foreplay"><svg viewBox="0 0 200 160">${head(64, lH)}${lBody}${head(128, rH)}${rBody}${arm}</svg></div>`;
 }
 function uterusSVG(preg) {
   const anim = preg ? 'G' : 'B';
