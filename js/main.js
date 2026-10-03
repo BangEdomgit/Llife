@@ -205,61 +205,61 @@ function morningCard(sc, p) {
     <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
 function blanketSVG(shape, build) {
-  const bm = build === 'slim' ? .85 : build === 'chubby' ? 1.15 : 1;
-  const sk = '#c4a882', skD = '#a88a6a', skL = '#d4bb9a', hr = '#3a3430';
-  const mattress = `<rect x="0" y="90" width="200" height="12" rx="3" fill="#1e1814" opacity=".6"/><rect x="0" y="102" width="200" height="6" rx="2" fill="#2a2018"/>`;
-  const pillow = `<ellipse cx="28" cy="80" rx="20" ry="9" fill="#d8d0c4" opacity=".7"/>`;
+  const bm = build === 'slim' ? .88 : build === 'chubby' ? 1.12 : 1;
+  const sk = '#c4a882', skD = '#a08060', skL = '#d4bb9a', hr = '#3a3430';
+  const mattress = `<rect x="0" y="92" width="200" height="10" rx="3" fill="#1e1814" opacity=".55"/><rect x="0" y="102" width="200" height="6" rx="2" fill="#261e18"/>`;
+  const pillow = `<ellipse cx="30" cy="80" rx="20" ry="9" fill="#d8d0c4" opacity=".65"/>`;
   let base = '', active = '';
   if (shape === 'A') {
     base = `<g class="pose-base">${pillow}
-      <circle cx="30" cy="70" r="8.5" fill="${sk}"/><ellipse cx="30" cy="66" rx="9.5" ry="7" fill="${hr}" opacity=".85"/>
-      <path d="M38,72 C46,70 56,68 68,70 Q78,72 86,76 L86,90 L36,90 L36,78 Z" fill="${sk}" opacity=".85"/>
-      <ellipse cx="50" cy="69" rx="${4.5 * bm}" ry="${3 * bm}" fill="${skL}" opacity=".45"/>
-      <path d="M50,76 Q46,80 44,86" fill="none" stroke="${skD}" stroke-width="1" opacity=".25"/>
-      <path d="M82,72 Q96,58 110,54 L112,58 Q100,66 92,78 Z" fill="${sk}" opacity=".75"/>
-      <path d="M84,82 Q100,84 114,88 L114,92 L82,90 Z" fill="${sk}" opacity=".7"/>
-      <path d="M44,76 Q40,82 38,90" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".6"/>
+      <circle cx="32" cy="72" r="8" fill="${sk}"/><path d="M24,66 Q32,60 40,66 Q42,72 40,76 Q36,80 28,78 Q22,76 22,72 Z" fill="${hr}" opacity=".8"/>
+      <path d="M40,74 L42,78 L46,76 C54,74 64,73 74,74 Q80,76 86,80 L86,92 L38,92 L38,80 Z" fill="${sk}" opacity=".85"/>
+      <ellipse cx="52" cy="74" rx="${4.2 * bm}" ry="${2.6 * bm}" fill="${skL}" opacity=".4"/>
+      <path d="M82,76 C86,72 92,66 100,60 Q106,56 110,58 Q108,62 102,68 C96,74 92,78 88,82 Z" fill="${sk}" opacity=".78"/>
+      <path d="M84,84 C90,86 100,88 110,90 L110,94 L82,92 Z" fill="${sk}" opacity=".72"/>
+      <path d="M46,78 C44,82 42,86 40,92" fill="none" stroke="${skD}" stroke-width="4" stroke-linecap="round" opacity=".5"/>
+      <path d="M56,80 Q62,86 66,92" fill="none" stroke="${skD}" stroke-width="3.5" stroke-linecap="round" opacity=".35"/>
     </g>`;
     active = `<g class="pose-active">
-      <circle cx="82" cy="38" r="7.5" fill="${sk}"/><ellipse cx="82" cy="34" rx="8.5" ry="6" fill="${hr}" opacity=".85"/>
-      <path d="M77,46 C79,54 82,62 86,72 L94,76 L97,68 C94,58 90,50 88,44 Z" fill="${sk}" opacity=".82"/>
-      <path d="M79,50 Q68,60 62,74" fill="none" stroke="${sk}" stroke-width="3.5" stroke-linecap="round" opacity=".6"/>
-      <path d="M88,48 Q98,56 102,66" fill="none" stroke="${sk}" stroke-width="3.5" stroke-linecap="round" opacity=".6"/>
-      <path d="M86,72 L94,76 L98,84 Q98,90 94,92 L86,90 L83,80 Z" fill="${sk}" opacity=".75"/>
-      <path d="M98,84 Q112,86 122,90 L122,94 L96,92 Z" fill="${sk}" opacity=".7"/>
+      <circle cx="78" cy="42" r="7" fill="${sk}"/><path d="M71,36 Q78,30 85,36 Q87,42 84,46 Q80,48 74,46 Q70,44 70,40 Z" fill="${hr}" opacity=".82"/>
+      <path d="M74,48 L72,52 C72,58 76,66 80,74 Q82,78 86,80 L92,78 Q94,74 92,70 C90,64 88,56 86,50 L84,46 Z" fill="${sk}" opacity=".84"/>
+      <path d="M72,54 C68,58 64,64 60,72 L56,78" fill="none" stroke="${skD}" stroke-width="5" stroke-linecap="round" opacity=".55"/>
+      <path d="M86,52 C90,56 94,62 98,70 L100,76" fill="none" stroke="${skD}" stroke-width="5" stroke-linecap="round" opacity=".5"/>
+      <path d="M86,80 L92,78 L96,84 Q96,90 92,92 L86,92 L82,86 Z" fill="${sk}" opacity=".78"/>
+      <path d="M96,86 C104,88 114,90 122,92 L122,96 L94,94 Z" fill="${sk}" opacity=".7"/>
     </g>`;
   } else if (shape === 'B') {
     base = `<g class="pose-base">${pillow}
-      <circle cx="30" cy="68" r="8" fill="${sk}"/><ellipse cx="30" cy="64" rx="9" ry="6.5" fill="${hr}" opacity=".85"/>
-      <path d="M38,70 C46,68 58,67 72,68 Q82,70 90,74 L90,90 L36,90 L36,76 Z" fill="${sk}" opacity=".8"/>
-      <path d="M86,76 Q102,80 114,86 L114,92 L84,90 Z" fill="${sk}" opacity=".7"/>
-      <path d="M42,74 Q38,80 36,90" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+      <circle cx="32" cy="70" r="7.5" fill="${sk}"/><path d="M25,64 Q32,58 39,64 Q41,70 38,74 Q34,76 28,74 Q24,72 24,68 Z" fill="${hr}" opacity=".8"/>
+      <path d="M39,72 L42,76 C50,74 62,72 74,74 Q82,76 88,80 L88,92 L38,92 L38,78 Z" fill="${sk}" opacity=".8"/>
+      <path d="M84,82 C92,84 104,88 114,92 L114,96 L82,92 Z" fill="${sk}" opacity=".68"/>
+      <path d="M44,76 C42,80 40,86 38,92" fill="none" stroke="${skD}" stroke-width="4" stroke-linecap="round" opacity=".45"/>
     </g>`;
     active = `<g class="pose-active">
-      <circle cx="88" cy="26" r="7.5" fill="${sk}"/><ellipse cx="88" cy="22" rx="8.5" ry="6" fill="${hr}" opacity=".85"/>
-      <path d="M82,34 L80,48 Q78,56 80,62 L86,72 L94,72 L98,62 Q100,56 98,48 L96,34 Z" fill="${sk}" opacity=".82"/>
-      <ellipse cx="86" cy="42" rx="${4 * bm}" ry="${3 * bm}" fill="${skL}" opacity=".4"/>
-      <path d="M86,72 Q80,78 76,86 L74,92 L84,90 Z" fill="${sk}" opacity=".75"/>
-      <path d="M94,72 Q100,78 104,86 L106,92 L96,90 Z" fill="${sk}" opacity=".75"/>
-      <path d="M82,40 Q74,48 70,58" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".55"/>
-      <path d="M96,40 Q104,48 108,58" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+      <circle cx="82" cy="28" r="7" fill="${sk}"/><path d="M75,22 Q82,16 89,22 Q91,28 88,32 Q84,34 78,32 Q74,30 74,26 Z" fill="${hr}" opacity=".82"/>
+      <path d="M78,34 L76,38 Q74,44 76,52 L78,58 Q80,62 82,66 L86,72 L94,72 L96,66 Q98,62 98,58 L100,52 Q102,44 100,38 L98,34 Z" fill="${sk}" opacity=".84"/>
+      <ellipse cx="84" cy="44" rx="${3.8 * bm}" ry="${2.6 * bm}" fill="${skL}" opacity=".38"/>
+      <path d="M86,72 Q82,76 78,82 L74,88 L72,92 L82,92 Z" fill="${sk}" opacity=".78"/>
+      <path d="M94,72 Q98,76 102,82 L106,88 L108,92 L98,92 Z" fill="${sk}" opacity=".78"/>
+      <path d="M78,38 C74,44 70,52 66,60" fill="none" stroke="${skD}" stroke-width="4.5" stroke-linecap="round" opacity=".48"/>
+      <path d="M98,38 C102,44 106,52 110,60" fill="none" stroke="${skD}" stroke-width="4.5" stroke-linecap="round" opacity=".48"/>
     </g>`;
   } else {
     base = `<g class="pose-base">
-      <circle cx="34" cy="54" r="8" fill="${sk}"/><ellipse cx="34" cy="50" rx="9" ry="6.5" fill="${hr}" opacity=".85"/>
-      <path d="M34,62 Q30,68 28,76 L26,90 L34,90 Z" fill="${sk}" opacity=".7"/>
-      <path d="M42,56 C48,54 56,52 66,52 Q74,54 80,58 L84,66 L84,78 Q82,82 78,84 L76,90 L42,90 L42,62 Z" fill="${sk}" opacity=".82"/>
-      <ellipse cx="56" cy="54" rx="${4 * bm}" ry="${2.8 * bm}" fill="${skL}" opacity=".4"/>
-      <path d="M78,84 Q84,88 88,92 L82,92 Z" fill="${sk}" opacity=".7"/>
-      <path d="M34,62 Q28,58 24,62 L22,76" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+      <circle cx="30" cy="56" r="7.5" fill="${sk}"/><path d="M23,50 Q30,44 37,50 Q39,56 36,60 Q32,62 26,60 Q22,58 22,54 Z" fill="${hr}" opacity=".8"/>
+      <path d="M37,58 L40,62 C44,60 52,56 62,54 Q70,54 76,56 L80,60 C82,64 84,70 84,76 L84,82 Q82,86 78,88 L76,92 L40,92 L38,66 Z" fill="${sk}" opacity=".84"/>
+      <ellipse cx="54" cy="56" rx="${3.8 * bm}" ry="${2.4 * bm}" fill="${skL}" opacity=".38"/>
+      <path d="M78,88 Q82,90 86,92 L80,92 Z" fill="${sk}" opacity=".68"/>
+      <path d="M37,60 C32,58 28,62 26,68 L24,80" fill="none" stroke="${skD}" stroke-width="4.5" stroke-linecap="round" opacity=".5"/>
+      <path d="M40,68 Q38,76 36,84 L34,92" fill="none" stroke="${skD}" stroke-width="3.5" stroke-linecap="round" opacity=".35"/>
     </g>`;
     active = `<g class="pose-active">
-      <circle cx="120" cy="36" r="7.5" fill="${sk}"/><ellipse cx="120" cy="32" rx="8.5" ry="6" fill="${hr}" opacity=".85"/>
-      <path d="M116,44 C114,50 108,58 100,66 L96,72 L88,68 L92,62 C98,56 104,48 108,42 Z" fill="${sk}" opacity=".8"/>
-      <path d="M96,72 Q94,80 92,90 L84,90 L88,68 Z" fill="${sk}" opacity=".75"/>
-      <path d="M116,44 Q124,52 130,62" fill="none" stroke="${sk}" stroke-width="3.5" stroke-linecap="round" opacity=".55"/>
-      <path d="M100,66 L104,78 Q106,84 108,90 L120,90 L118,80 L114,72 Z" fill="${sk}" opacity=".75"/>
-      <path d="M118,80 Q128,84 136,88 L136,92 L116,90 Z" fill="${sk}" opacity=".7"/>
+      <circle cx="116" cy="36" r="7" fill="${sk}"/><path d="M109,30 Q116,24 123,30 Q125,36 122,40 Q118,42 112,40 Q108,38 108,34 Z" fill="${hr}" opacity=".82"/>
+      <path d="M112,42 L110,46 C108,52 104,60 98,68 L94,74 L88,70 Q86,66 88,64 C94,58 100,50 104,44 L108,40 Z" fill="${sk}" opacity=".82"/>
+      <path d="M94,74 Q92,80 90,86 L88,92 L82,92 L86,70 Z" fill="${sk}" opacity=".75"/>
+      <path d="M112,44 C116,48 120,54 124,62" fill="none" stroke="${skD}" stroke-width="5" stroke-linecap="round" opacity=".5"/>
+      <path d="M98,68 L102,76 Q104,82 106,88 L108,92 L118,92 L116,84 L112,74 Z" fill="${sk}" opacity=".78"/>
+      <path d="M116,86 C122,88 130,90 136,92 L136,96 L114,94 Z" fill="${sk}" opacity=".68"/>
     </g>`;
   }
   return `<svg class="blanket-svg" viewBox="0 0 200 110">${mattress}${base}${active}</svg>`;

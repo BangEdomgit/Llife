@@ -255,9 +255,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .sc-particle{position:absolute;width:6px;height:6px;background:#fff;border-radius:50%;opacity:0}
 .sc-phase.phase-climax .sc-particle{animation:pDrift 1.2s ease-out forwards}
 @keyframes portrait-shake{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-.phase1 .portrait{animation:portrait-shake .6s ease-in-out infinite}
-.phase2 .portrait{animation:portrait-shake .35s ease-in-out infinite}
-.phase3 .portrait{animation:portrait-shake .18s ease-in-out infinite}
+.phase1 .portrait{animation:portrait-shake .7s ease-in-out infinite}
+.phase2 .portrait{animation:portrait-shake .42s ease-in-out infinite}
+.phase3 .portrait{animation:portrait-shake .22s ease-in-out infinite}
 .phase-climax .portrait{animation:none}
 .phase-end .portrait{animation:none}
 /* pose thrust — elastic snap forward, settle, slow pull back */
