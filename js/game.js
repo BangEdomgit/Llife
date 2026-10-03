@@ -194,6 +194,7 @@ function endMain(grudge) {
 function startRelation(p, sneaky) {
   if (sneaky) p.secret = true; else p.partner = true;
   p.taken = false; p.ex = false; p.fling = false;
+  p.since = S.age;
 }
 /* ═════════ 친밀한 관계와 아이 ═════════ */
 // 함께 밤을 보냄 (fling: 사귀지 않는 사이 → '썸' 또는 '복잡한 사이')
@@ -228,6 +229,7 @@ function marry(p) {
   if (!p) return;
   p.partner = false; p.spouse = true;
   S.flags.married = true; S.flags.ownPlace = true;
+  S.vars.marriedAt = S.age;
 }
 
 /* ═════════ 도우미 ═════════ */
@@ -1172,5 +1174,7 @@ window.Game = {
   gradeInfo, abilities: ABIL, conds: COND, subjects: D.subjects, naesinAvg, univLabel, majorLabel,
   creation: { traits: D.traits, personalities: D.personalities, wealth: D.wealth, hobbies: D.hobbies, values: D.values, dreams: D.dreams, siblings: D.siblings },
   LABEL, config: C, seasons: SEASONS,
+  // 개발·테스트용 (브라우저 콘솔이나 헤드리스 검사에서 이벤트를 직접 터뜨려볼 때)
+  dev: { fire: id => { fire(EVENTS[id]); tickSeason(); after(); }, eligible: id => eligible(EVENTS[id]), meet: spec => addPerson(spec), api },
 };
 })();
