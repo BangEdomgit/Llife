@@ -588,18 +588,256 @@ function arms(top, F, skin, U, pose) {
 }
 
 /* ---------- 함께 밤을 보낸 다음 날 아침 (어른만, 상반신) ---------- */
-// 만족감 구간(0~4)마다 눈·입·볼, 머리 흐트러짐이 달라짐. 옷 대신 맨 어깨와 이불
 const tierOf = v => v >= 90 ? 4 : v >= 70 ? 3 : v >= 50 ? 2 : v >= 30 ? 1 : 0;
-function morningBody(a, skin, skinD, hw) {
-  const blanketY = a.g === 'f' ? 130 : 138;
-  return `<path d="${body(false, hw)}" fill="${skinD}"/>
-    <path d="M47,121 Q53,124 58,122 M62,122 Q67,124 73,121" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.3" stroke-linecap="round"/>
-    <path d="M0,${blanketY + 6} C20,${blanketY - 4} 40,${blanketY + 4} 60,${blanketY} C80,${blanketY - 4} 100,${blanketY + 5} 120,${blanketY - 2} L120,160 L0,160 Z" fill="#ece6da"/>
-    <path d="M18,${blanketY + 12} Q34,${blanketY + 22} 30,160 M84,${blanketY + 10} Q76,${blanketY + 24} 88,160 M52,${blanketY + 8} Q58,${blanketY + 18} 54,${blanketY + 30}" fill="none" stroke="#cfc6b6" stroke-width="1.6" stroke-linecap="round"/>`;
+function morningBody(a, skin, skinD, hw, tier, fig) {
+  tier = tier || 0;
+  const female = a.g === 'f', b = a.body || {};
+  const blanketY = female ? 128 : 136;
+  let o = `<path d="${body(false, hw)}" fill="${skinD}"/>`;
+  o += `<path d="M47,121 Q53,124 58,122 M62,122 Q67,124 73,121" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.3" stroke-linecap="round"/>`;
+  if (female) {
+    const cup = fig && fig.cup ? CUP_OUT[fig.cup] || 5.5 : ({ small: 2.5, large: 9.5 }[b.chest] ?? 5.5);
+    const bustW = 5 + cup * .45, clY = 125;
+    o += `<path d="M${60 - hw + 8},${clY - 6} Q${60 - bustW - 1},${clY - 1} ${59},${clY + 1} M${61},${clY + 1} Q${60 + bustW + 1},${clY - 1} ${60 + hw - 8},${clY - 6}" fill="none" stroke="${shade(skin, .68)}" stroke-width="1.3" opacity=".5" stroke-linecap="round"/>`;
+    o += `<path d="M59,${clY - 1} Q60,${clY + 5} 61,${clY - 1}" fill="none" stroke="${shade(skin, .55)}" stroke-width="1.2" opacity=".45"/>`;
+    o += `<path d="M${60 - hw + 3},${clY - 4} Q${60 - hw},${clY + 3} ${60 - hw + 4},${clY + 6} M${60 + hw - 3},${clY - 4} Q${60 + hw},${clY + 3} ${60 + hw - 4},${clY + 6}" fill="none" stroke="${shade(skin, .62)}" stroke-width="1" opacity=".3"/>`;
+  } else {
+    o += `<path d="M42,126 Q50,131 58,127 M62,127 Q70,131 78,126" fill="none" stroke="${shade(skin, .68)}" stroke-width="1.2" opacity=".4"/>`;
+  }
+  if (tier >= 3) {
+    o += `<path d="M72,108 q2,-2.5 4,0 q2,-2.5 4,0 q-2,3.5 -4,3.5 q-2,0 -4,-3.5 Z" fill="#c43c4f" opacity=".6" transform="rotate(-8 75 109)"/>`;
+    if (tier >= 4) {
+      o += `<path d="M40,116 q2,-2 3.5,0 q2,-2 3.5,0 q-2,3 -3.5,3 q-2,0 -3.5,-3 Z" fill="#c43c4f" opacity=".55" transform="rotate(15 43 117)"/>`;
+      o += `<path d="M80,114 q1.5,-2 3,0 q1.5,-2 3,0 q-1.5,3 -3,3 q-1.5,0 -3,-3 Z" fill="#c43c4f" opacity=".5" transform="rotate(-20 82 115)"/>`;
+    }
+  }
+  if (tier >= 4) {
+    o += `<path d="M35,118 q5,-3 10,0" fill="none" stroke="#c86070" stroke-width="1.4" opacity=".55"/>`;
+    o += `<path d="M36,120 q4,2.5 8,0" fill="none" stroke="#c86070" stroke-width="1.2" opacity=".45"/>`;
+  }
+  o += `<path d="M0,${blanketY + 6} C20,${blanketY - 4} 40,${blanketY + 4} 60,${blanketY} C80,${blanketY - 4} 100,${blanketY + 5} 120,${blanketY - 2} L120,160 L0,160 Z" fill="#ece6da"/>`;
+  o += `<path d="M18,${blanketY + 12} Q34,${blanketY + 22} 30,160 M84,${blanketY + 10} Q76,${blanketY + 24} 88,160 M52,${blanketY + 8} Q58,${blanketY + 18} 54,${blanketY + 30}" fill="none" stroke="#cfc6b6" stroke-width="1.6" stroke-linecap="round"/>`;
+  return o;
 }
 function messyHair(hc, n) {
   const list = ['M40,40 q-7,-4 -9,4', 'M78,36 q8,-5 11,3', 'M55,31 q-2,-9 6,-10', 'M34,58 q-7,1 -6,8', 'M86,56 q7,2 5,9'];
   return list.slice(0, n).map(d => `<path d="${d}" fill="none" stroke="${hc}" stroke-width="2.4" stroke-linecap="round"/>`).join('');
+}
+
+/* ---------- 알몸 전신 (preIntimate, 20살 이상만) ---------- */
+function nudeTorso(F, skin, skinD) {
+  const bust = F.bust || 0, sl = `fill="none" stroke="${shade(skin, .65)}" stroke-width="1" stroke-linecap="round"`;
+  const bustPeak = F.chest + 14 + bust * .35;
+  const segs = F.f ? [
+    { c: [F.sh - 1, F.sy + 6, F.sh + 1, F.sy + 12], p: [F.sh, F.sy + 16] },
+    { c: [F.sh + bust * .55, F.chest + 6, F.rib + bust * 1.05, bustPeak - 5], p: [F.rib + bust * .85, bustPeak] },
+    { c: [F.rib + bust * .4, bustPeak + 8, F.rib - .5, bustPeak + 12], p: [F.rib - 1.5, bustPeak + 10] },
+    { c: [F.rib - 2.5, F.waistY - 16, F.waist + .5, F.waistY - 6], p: [F.waist, F.waistY] },
+    { c: [F.waist + 1, F.waistY + 10, F.hip + .5, F.hipY - 8], p: [F.hip + 1.5, F.hipY] },
+    { c: [F.hip + 2, F.hipY + 10, F.hip, F.crotch - 6], p: [F.hip * .45, F.crotch] },
+    { p: [0, F.crotch + 2] },
+  ] : [
+    { c: [F.sh - 1, F.sy + 5, F.sh + 1, F.sy + 10], p: [F.sh, F.sy + 16] },
+    { c: [F.sh + 1, F.sy + 24, F.rib + 1, F.chest + 8], p: [F.rib, F.chest + 18] },
+    { c: [F.rib - 1, F.waistY - 16, F.waist + .5, F.waistY - 6], p: [F.waist, F.waistY] },
+    { c: [F.waist + .5, F.waistY + 8, F.hip + .5, F.hipY - 6], p: [F.hip + 1, F.hipY] },
+    { c: [F.hip + 1.5, F.hipY + 8, F.hip - .5, F.crotch - 5], p: [F.hip * .4, F.crotch] },
+    { p: [0, F.crotch + 2] },
+  ];
+  let o = `<path d="${sym([F.nh + 1.5, F.sy - 2], segs)}" fill="${skin}"/>`;
+  if (F.f) {
+    o += `<path d="M${f1(60 - F.rib - bust * .3)},${f1(bustPeak + 4)} Q${f1(60 - F.rib * .5)},${f1(bustPeak + 8 + bust * .14)} 59,${f1(bustPeak + 5)} M61,${f1(bustPeak + 5)} Q${f1(60 + F.rib * .5)},${f1(bustPeak + 8 + bust * .14)} ${f1(60 + F.rib + bust * .3)},${f1(bustPeak + 4)}" ${sl} opacity=".4"/>`;
+    o += `<path d="M59,${f1(F.chest + 10)} Q60,${f1(bustPeak + 2)} 61,${f1(F.chest + 10)}" fill="none" stroke="${shade(skin, .55)}" stroke-width="1.2" opacity=".45"/>`;
+  } else {
+    o += `<path d="M${f1(60 - F.rib * .8)},${f1(F.chest + 6)} Q${f1(60 - F.rib * .3)},${f1(F.chest + 13)} 59,${f1(F.chest + 10)} M${f1(60 + F.rib * .8)},${f1(F.chest + 6)} Q${f1(60 + F.rib * .3)},${f1(F.chest + 13)} 61,${f1(F.chest + 10)}" ${sl} opacity=".35"/>`;
+  }
+  o += `<ellipse cx="60" cy="${f1(F.waistY + 5)}" rx="1.5" ry="2" fill="none" stroke="${shade(skin, .58)}" stroke-width="1" opacity=".5"/>`;
+  o += `<path d="M${f1(60 - F.hip * .3)},${f1(F.crotch - 8)} Q${f1(60 - 3)},${f1(F.crotch)} ${f1(60 - 1.5)},${f1(F.crotch + 6)} M${f1(60 + F.hip * .3)},${f1(F.crotch - 8)} Q${f1(60 + 3)},${f1(F.crotch)} ${f1(60 + 1.5)},${f1(F.crotch + 6)}" ${sl} opacity=".35"/>`;
+  o += `<path d="M${f1(60 - F.waist * .45)},${f1(F.waistY + 12)} Q60,${f1(F.waistY + 18)} ${f1(60 + F.waist * .45)},${f1(F.waistY + 12)}" ${sl} opacity=".25"/>`;
+  return o;
+}
+function coverArms(F, skin) {
+  const bust = F.bust || 0, bustPeak = F.chest + 14 + bust * .35, aw = F.arm * 2, fw = F.fore * 2;
+  let o = '';
+  if (F.f) {
+    const sx = 60 + F.sh - 2, sy = F.sy + 12, mx = 60 - F.rib * .2, my = bustPeak, ex = 60 - F.sh + 5, ey = bustPeak - 4;
+    o += limb(sx, sy, (sx + mx) / 2 + 3, (sy + my) / 2, mx, my, aw - 1, skin);
+    o += limb(mx, my, (mx + ex) / 2 - 1, (my + ey) / 2 + 2, ex, ey, fw - 1, skin);
+    o += mitt(ex - 2, ey, -1, skin, -40);
+  } else {
+    const sx = 60 + F.sh - 2, sy = F.sy + 14, mx = 60, my = F.chest + 20, ex = 60 - F.rib - 3, ey = F.chest + 14;
+    o += limb(sx, sy, (sx + mx) / 2 + 3, (sy + my) / 2, mx, my, aw, skin);
+    o += limb(mx, my, (mx + ex) / 2, (my + ey) / 2 + 2, ex, ey, fw, skin);
+    o += mitt(ex - 2, ey + 1, -1, skin, -30);
+  }
+  const gx = 60, gy = F.crotch - 6, elx = 60 - F.sh + 6, ely = F.waistY + 4;
+  const jsx = 60 - F.sh + 1, jsy = F.sy + 12;
+  o += limb(jsx, jsy, (jsx + elx) / 2 - 3, (jsy + ely) / 2, elx, ely, aw - 1, skin);
+  o += limb(elx, ely, (elx + gx) / 2, (ely + gy) / 2 + 4, gx, gy, fw - 1, skin);
+  o += mitt(gx, gy + 2, 1, skin, 85);
+  return o;
+}
+function renderPreIntimate(a, size, st) {
+  UID++;
+  const X = extras(a), age = st.age || 25, skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86);
+  const old = age >= 40 && a.gray < (age - 38) / 22;
+  const hc = HAIR[old ? GRAY : a.hc] || HAIR[0];
+  const female = a.g === 'f', fig = typeof st.preIntimate === 'object' ? st.preIntimate : null;
+  const F = frameOf(a, age, fig), personality = st.personality || 'warm';
+  const w = Math.round(size), h = Math.round(size * 7 / 3);
+  const bottom = F.ankle + 19, H = 103 + 15 + 348 * 1.12 + 19 - 10, W = H * 120 / 280;
+  const x0 = 60 - W / 2, y0 = bottom - H, u = W / 120;
+  let o = `<svg class="av av-full" width="${w}" height="${h}" viewBox="${f1(x0)} ${f1(y0)} ${f1(W)} ${f1(H)}" aria-hidden="true">`;
+  o += `<rect class="av-bg" x="${f1(x0 + .5 * u)}" y="${f1(y0 + .5 * u)}" width="${f1(W - u)}" height="${f1(H - u)}" rx="${f1(10 * u)}" style="stroke-width:${f1(1.5 * u)}"/>`;
+  const hp = hairPieces(a, X, age, hc, { sy: F.sy, chest: F.chest });
+  o += hp.back;
+  const nh = F.nh, neckBot = F.sy + 4;
+  o += `<path d="M${f1(60 - nh)},94 L${f1(60 + nh)},94 L${f1(60 + nh)},${f1(neckBot)} L${f1(60 - nh)},${f1(neckBot)} Z" fill="${skinD}"/>`;
+  const R = legPath(F, 1), Lg = legPath(F, -1);
+  o += `<path d="${Lg.d} ${R.d}" fill="${skin}"/>`;
+  o += nudeTorso(F, skin, skinD);
+  o += coverArms(F, skin);
+  o += clav(F.sy, F.sh * .35, skin);
+  o += `<ellipse cx="60" cy="101.5" rx="${f1(nh - .5)}" ry="6" fill="${shade(skin, .6)}" opacity=".26"/>`;
+  o += `<ellipse cx="33.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/><ellipse cx="86.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
+  o += `<path d="M33,70 q-2.4,3 0,7 M87,70 q2.4,3 0,7" fill="none" stroke="${shade(skin, .68)}" stroke-width="1" opacity=".5"/>`;
+  o += `<path d="${FACES[a.face] || FACES[0]}" fill="${skin}"/>`;
+  const blO = personality === 'shy' || personality === 'sensitive' ? .45 : .3;
+  o += `<ellipse cx="44" cy="84" rx="5.5" ry="3.3" fill="#e8857a" opacity="${blO}"/><ellipse cx="76" cy="84" rx="5.5" ry="3.3" fill="#e8857a" opacity="${blO}"/>`;
+  const nLash = female ? 3 : 0, ey = 72, exx = [48, 72];
+  if (personality === 'shy' || personality === 'sensitive') {
+    o += exx.map((x, i) => {
+      const s = i ? 1 : -1, e = eyeShape(a.eyes, x, ey, s), id = `av${UID}pe${s > 0 ? 'r' : 'l'}`;
+      const shape = `M${P(...e.i)} Q${P(...e.u)} ${P(...e.o)} Q${P(...e.l)} ${P(...e.i)} Z`, gx = x - 2.5, gy = ey + 1.5, irC = IRIS[X.iris];
+      return `<clipPath id="${id}"><path d="${shape}"/></clipPath><path d="${shape}" fill="${WHITE}"/>
+        <g clip-path="url(#${id})"><ellipse cx="${f1(gx)}" cy="${f1(gy)}" rx="${e.ir[0]}" ry="${e.ir[1]}" fill="${irC}"/>
+        <ellipse cx="${f1(gx)}" cy="${f1(gy + .3)}" rx="${f1(e.ir[0] * .5)}" ry="${f1(e.ir[1] * .5)}" fill="${PUPIL}"/>
+        <circle cx="${f1(gx + 1.3)}" cy="${f1(gy - 1.4)}" r="1.4" fill="#fff"/></g>
+        <path d="M${P(...e.i)} Q${P(...e.u)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M${P(...e.i)} Q${P(...e.l)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width=".8" opacity=".3"/>${nLash ? lashes(e, s, nLash) : ''}`;
+    }).join('');
+  } else o += exx.map((x, i) => openEye(a, X, x, ey, i ? 1 : -1, nLash)).join('');
+  const pExpr = (personality === 'shy' || personality === 'sensitive') ? 'sad' : null;
+  o += `<path d="${exx.map((x, i) => brow(a.brows, x, ey - 10, i ? 1 : -1, pExpr)).join(' ')}" fill="none" stroke="${shade(hc, .72)}" stroke-width="${a.thick ? 3.6 : female ? 2.2 : 2.8}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  o += `<path d="M61.2,76.4 L58.4,82.8 Q60.2,84.2 62.6,83.2" fill="none" stroke="${shade(skin, .66)}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  o += `<ellipse cx="60.6" cy="84.6" rx="3" ry="1" fill="${shade(skin, .62)}" opacity=".16"/>`;
+  const lip = { c: female ? LIPS[X.lip] : NATURAL_LIP[a.skin] || NATURAL_LIP[1], teeth: X.teeth };
+  o += mouthSVG(3, lip, female);
+  if (a.dimples) o += `<path d="M50,87 q-1.5,2 0,3.5 M70,87 q1.5,2 0,3.5" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.1" stroke-linecap="round"/>`;
+  o += hp.front;
+  if (a.glasses === 1) o += `<g fill="none" stroke="${LINE}" stroke-width="1.7"><circle cx="48" cy="72" r="7.8"/><circle cx="72" cy="72" r="7.8"/><path d="M55.8,71 Q60,68.5 64.2,71 M40.2,71 L35,69 M79.8,71 L85,69"/></g>`;
+  if (a.glasses === 2) o += `<g fill="none" stroke="${LINE}" stroke-width="1.7"><rect x="39.5" y="65.5" width="17" height="12.5" rx="2.5"/><rect x="63.5" y="65.5" width="17" height="12.5" rx="2.5"/><path d="M56.5,71 L63.5,71 M39.5,70 L35,69 M80.5,70 L85,69"/></g>`;
+  return o + '</svg>';
+}
+
+/* ---------- 진행 중 표정 클로즈업 (duringIntimate, 20살 이상만) ---------- */
+function duringEye(phase, x, y, s, nLash, X) {
+  const irC = IRIS[X.iris];
+  if (phase === 0) return `<path d="M${x - 4.8},${y + 1} Q${x},${y - 2.5} ${x + 4.8},${y + 1}" fill="${WHITE}" stroke="${LINE}" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="${f1(x + X.gaze * .6)}" cy="${f1(y + .8)}" rx="2.6" ry="1.6" fill="${irC}"/>
+    <circle cx="${f1(x + 1)}" cy="${f1(y - .2)}" r="1" fill="#fff"/>${nLash ? `<path d="M${f1(x + 4.4 * s)},${f1(y + .6)} l${f1(1.6 * s)},-1.2" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>` : ''}`;
+  if (phase <= 2) {
+    const sq = phase === 2 ? 1.4 : 0;
+    let o = `<path d="M${x - 5},${y + sq} Q${x},${y + 2.8 + sq} ${x + 5},${y + sq}" fill="none" stroke="${LINE}" stroke-width="2.4" stroke-linecap="round"/>`;
+    if (nLash) o += `<path d="M${f1(x + 4.2 * s)},${f1(y + .4 + sq)} l${f1(1.8 * s)},${f1(1.2 + sq * .4)} M${f1(x + 3 * s)},${f1(y + 1.4 + sq)} l${f1(1.2 * s)},${f1(1.4 + sq * .3)}" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>`;
+    if (phase === 2) o += `<ellipse cx="${f1(x + 3.8 * s)}" cy="${f1(y + 2)}" rx="1.8" ry="1" fill="#fff" opacity=".55"/>`;
+    return o;
+  }
+  if (phase === 3) {
+    const e = eyeShape(0, x, y, s), id = `av${UID}d${s > 0 ? 'r' : 'l'}`;
+    const shape = `M${P(...e.i)} Q${P(...e.u)} ${P(...e.o)} Q${P(...e.l)} ${P(...e.i)} Z`;
+    return `<clipPath id="${id}"><path d="${shape}"/></clipPath><path d="${shape}" fill="${WHITE}"/>
+      <g clip-path="url(#${id})"><ellipse cx="${f1(x)}" cy="${f1(y - 3.5)}" rx="3.2" ry="3.4" fill="${irC}"/>
+      <ellipse cx="${f1(x)}" cy="${f1(y - 3)}" rx="1.6" ry="1.8" fill="${PUPIL}"/></g>
+      <path d="M${P(...e.i)} Q${P(...e.u)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width="2.3" stroke-linecap="round"/>
+      ${nLash ? lashes(e, s, nLash) : ''}
+      <path d="M${f1(x + 4 * s)},${f1(y + 4)} Q${f1(x + 4.5 * s)},${f1(y + 10)} ${f1(x + 3 * s)},${f1(y + 14)}" fill="none" stroke="#87ceeb" stroke-width="1.4" opacity=".7" stroke-linecap="round"/>`;
+  }
+  return `<path d="M${x - 4.6},${y + .8} Q${x},${y - 1.5} ${x + 4.6},${y + .8}" fill="${WHITE}" stroke="${LINE}" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="${f1(x + .5)}" cy="${f1(y + 1)}" rx="2.4" ry="1.3" fill="${irC}" opacity=".7"/>
+    <circle cx="${f1(x + 1.5)}" cy="${y}" r=".8" fill="#fff" opacity=".4"/>
+    ${nLash ? `<path d="M${f1(x + 4.2 * s)},${f1(y + .4)} l${f1(1.4 * s)},-1" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>` : ''}`;
+}
+function duringMouth(phase, lip, female) {
+  if (phase === 0) return `<path d="M55.4,87.5 Q60,86 64.6,87.5 Q64,92 60,92.2 Q56,92 55.4,87.5 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>`;
+  if (phase === 1) return `<path d="M54.4,87 Q60,85.5 65.6,87 Q65,93.5 60,94 Q55,93.5 54.4,87 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>
+    <ellipse cx="60" cy="92.5" rx="3" ry="1.6" fill="#c96a6e" opacity=".85"/>`;
+  if (phase === 2) return `<path d="M53,86.5 Q60,84.5 67,86.5 Q66.5,95 60,95.6 Q53.5,95 53,86.5 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>
+    <ellipse cx="60" cy="93.6" rx="3.8" ry="2" fill="#c96a6e" opacity=".85"/>
+    <path d="M66.5,91 Q69,93 68,96" fill="none" stroke="${shade(lip.c, .7)}" stroke-width="1" opacity=".6" stroke-linecap="round"/>`;
+  if (phase === 3) return `<path d="M52,86 Q60,83.5 68,86 Q67.5,96 60,97 Q52.5,96 52,86 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.4"/>
+    <ellipse cx="60" cy="94" rx="4.2" ry="2.6" fill="#c96a6e" opacity=".9"/>
+    <path d="M67,91 Q70,94 69,98" fill="none" stroke="${shade(lip.c, .7)}" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>`;
+  return `<path d="M54.5,87.5 Q60,86 65.5,87.5 Q65,93 60,93.5 Q55,93 54.5,87.5 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>
+    <path d="M57,94 Q60,98 63,94" fill="none" stroke="#ddd" stroke-width="1" opacity=".4" stroke-linecap="round"/>`;
+}
+function sweatDrops(n) {
+  const spots = [[78, 62], [38, 66], [82, 78], [35, 74], [85, 55]];
+  return spots.slice(0, n).map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="1.6" ry="2.2" fill="#87ceeb" opacity=".55"/>`).join('');
+}
+function renderDuringIntimate(a, size, st) {
+  UID++;
+  const X = extras(a), age = st.age || 25, skin = SKIN[a.skin] || SKIN[1];
+  const old = age >= 40 && a.gray < (age - 38) / 22;
+  const hc = HAIR[old ? GRAY : a.hc] || HAIR[0];
+  const female = a.g === 'f', phase = st.duringIntimate, personality = st.personality || 'warm';
+  const nLash = female ? 3 : 0, ey = 72, exx = [48, 72];
+  const lip = { c: female ? LIPS[X.lip] : NATURAL_LIP[a.skin] || NATURAL_LIP[1], teeth: X.teeth };
+  const skinD = shade(skin, .86);
+  const w = Math.round(size), h = Math.round(size * 4 / 3);
+  let o = `<svg class="av av-during" width="${w}" height="${h}" viewBox="20 10 80 90" aria-hidden="true">`;
+  o += `<rect class="av-bg" x="20.5" y="10.5" width="79" height="89" rx="6"/>`;
+  o += `<ellipse cx="33.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
+  o += `<ellipse cx="86.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
+  o += `<path d="${FACES[a.face] || FACES[0]}" fill="${skin}"/>`;
+  const blO = f1(Math.min(.2 + phase * .12, .65) * 100) / 100;
+  o += `<ellipse cx="44" cy="84" rx="6.5" ry="4" fill="#e8857a" opacity="${blO}"/><ellipse cx="76" cy="84" rx="6.5" ry="4" fill="#e8857a" opacity="${blO}"/>`;
+  if (phase === 3 && personality === 'bold') o += HAPPY(48, ey) + HAPPY(72, ey);
+  else if (phase === 3 && personality === 'playful') { o += duringEye(3, 48, ey, -1, nLash, X); o += HAPPY(72, ey); }
+  else o += exx.map((x, i) => duringEye(phase, x, ey, i ? 1 : -1, nLash, X)).join('');
+  const bExpr = phase === 2 ? 'angry' : phase === 3 ? 'surprised' : null;
+  o += `<path d="${exx.map((x, i) => brow(phase >= 1 && phase <= 2 ? 1 : a.brows, x, ey - 10, i ? 1 : -1, bExpr)).join(' ')}" fill="none" stroke="${shade(hc, .72)}" stroke-width="${a.thick ? 3.6 : female ? 2.2 : 2.8}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  o += `<path d="M61.2,76.4 L58.4,82.8 Q60.2,84.2 62.6,83.2" fill="none" stroke="${shade(skin, .66)}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  o += `<ellipse cx="60.6" cy="84.6" rx="3" ry="1" fill="${shade(skin, .62)}" opacity=".16"/>`;
+  o += duringMouth(phase, lip, female);
+  if (phase >= 1) o += sweatDrops(phase === 1 ? 1 : phase === 2 ? 3 : phase >= 3 ? 2 : 1);
+  if (phase >= 2 && phase <= 4) {
+    o += `<path d="M${f1(48 - 4.5)},${ey + 4} Q${f1(48 - 5)},${ey + 10} ${f1(48 - 3.5)},${ey + 14}" fill="none" stroke="#87ceeb" stroke-width="1.4" opacity=".65" stroke-linecap="round"/>`;
+    if (phase >= 3 || personality === 'sensitive') o += `<path d="M${f1(72 + 4.5)},${ey + 4} Q${f1(72 + 5)},${ey + 10} ${f1(72 + 3.5)},${ey + 14}" fill="none" stroke="#87ceeb" stroke-width="1.4" opacity=".65" stroke-linecap="round"/>`;
+  }
+  if (phase === 4) o += `<path d="M42,78 Q40,86 41,94" fill="none" stroke="#87ceeb" stroke-width="1.2" opacity=".3" stroke-linecap="round"/>`;
+  const hp = hairPieces(a, X, age, hc, { sy: 115, chest: 146 });
+  o += hp.front;
+  if (a.glasses === 1) o += `<g fill="none" stroke="${LINE}" stroke-width="1.7"><circle cx="48" cy="72" r="7.8"/><circle cx="72" cy="72" r="7.8"/><path d="M55.8,71 Q60,68.5 64.2,71 M40.2,71 L35,69 M79.8,71 L85,69"/></g>`;
+  if (a.glasses === 2) o += `<g fill="none" stroke="${LINE}" stroke-width="1.7"><rect x="39.5" y="65.5" width="17" height="12.5" rx="2.5"/><rect x="63.5" y="65.5" width="17" height="12.5" rx="2.5"/><path d="M56.5,71 L63.5,71 M39.5,70 L35,69 M80.5,70 L85,69"/></g>`;
+  return o + '</svg>';
+}
+
+/* ---------- 옷 위 유두 음영 (nippleShadow) ---------- */
+function nippleShadow(top, F, skinD) {
+  if (!F || !F.f || !F.adult || F.bust < 2) return '';
+  if (top !== 0 && top !== 3) return '';
+  const op = top === 3 ? .14 : .11;
+  const by = F.chest + 14 + F.bust * .45, bx = F.rib + F.bust * .35;
+  return `<circle cx="${f1(60 - bx * .55)}" cy="${f1(by)}" r="${f1(1.8 + F.bust * .08)}" fill="${shade(skinD, .6)}" opacity="${op}"/>
+    <circle cx="${f1(60 + bx * .55)}" cy="${f1(by)}" r="${f1(1.8 + F.bust * .08)}" fill="${shade(skinD, .6)}" opacity="${op}"/>`;
+}
+
+/* ---------- 성적 흥분 시각 (aroused) ---------- */
+function arousalFX(level) {
+  if (!level || level < 60) return '';
+  let o = '';
+  if (level >= 80) {
+    o += `<ellipse cx="44" cy="84" rx="6" ry="3.8" fill="#e8857a" opacity=".25"/>`;
+    o += `<ellipse cx="76" cy="84" rx="6" ry="3.8" fill="#e8857a" opacity=".25"/>`;
+    o += `<circle cx="48.5" cy="70.5" r="1.2" fill="#fff" opacity=".35"/>`;
+    o += `<circle cx="72.5" cy="70.5" r="1.2" fill="#fff" opacity=".35"/>`;
+  } else {
+    o += `<ellipse cx="44" cy="84" rx="5.5" ry="3.5" fill="#e8857a" opacity=".15"/>`;
+    o += `<ellipse cx="76" cy="84" rx="5.5" ry="3.5" fill="#e8857a" opacity=".15"/>`;
+  }
+  if (level >= 90) o += sweatDrops(2);
+  return o;
 }
 
 /* ---------- 그리기 ---------- */
@@ -612,6 +850,8 @@ function render(a, size = 48, state = 25) {
   UID++;
   const X = extras(a);
   const kid = age <= 12, teen = age >= 13 && age <= 18, adult = age >= 20;
+  if (adult && st.duringIntimate != null) return renderDuringIntimate(a, size, st);
+  if (adult && st.preIntimate) return renderPreIntimate(a, size, st);
   const af = adult && !full && st.after ? st.after : null, tier = af ? tierOf(af.sat ?? 50) : -1;
   const skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86);
   const old = age >= 40 && a.gray < (age - 38) / 22;   // 40대부터 흰머리 확률 증가
@@ -640,9 +880,10 @@ function render(a, size = 48, state = 25) {
     const bt = bottomOf(a, X, age, F);
     const U = upperBody(a, top, F, skinD, bt);
     o += lowerBody(a, X, age, F, skinD, bt) + neck + U.svg + arms(top, F, skinD, U, kid ? 'default' : st.pose || POSE[st.personality] || 'default');
+    if (adult) o += nippleShadow(top, F, skinD);
   } else {
     const hw = halfWidth(a, kid, adult);
-    o += neck + (af ? morningBody(a, skin, skinD, hw) : clothes(a, top, kid, skinD, hw, adult));
+    o += neck + (af ? morningBody(a, skin, skinD, hw, tier, st.after && st.after.fig) : clothes(a, top, kid, skinD, hw, adult));
   }
   // 턱 아래·목 옆 그림자
   o += `<ellipse cx="60" cy="101.5" rx="${f1(nh - .5)}" ry="6" fill="${shade(skin, .6)}" opacity=".26"/>`;
@@ -656,6 +897,7 @@ function render(a, size = 48, state = 25) {
   // 볼 홍조 (모두 옅게, 어린이·볼 빨간 사람은 더), 주근깨, 주름
   const blush = f1((af ? [.1, .1, .25, .42, .55][tier] + (af.personality === 'shy' && tier >= 2 ? .15 : 0) : kid ? .3 : a.blush ? .24 : .1) * 100) / 100;
   o += `<ellipse cx="44" cy="84" rx="${kid ? 6.5 : 5.5}" ry="3.3" fill="#e8857a" opacity="${blush}"/><ellipse cx="76" cy="84" rx="${kid ? 6.5 : 5.5}" ry="3.3" fill="#e8857a" opacity="${blush}"/>`;
+  if (st.aroused && adult) o += arousalFX(st.aroused);
   if (a.freckles) o += [[43, 80], [46, 82], [49, 80], [71, 80], [74, 82], [77, 80]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".9" fill="${shade(skin, .62)}"/>`).join('');
   if (age >= 45) o += `<path d="M41,77 Q44,79 47,78 M73,78 Q76,79 79,77" fill="none" stroke="${shade(skin, .75)}" stroke-width="1"/>`;
   // 눈: 흰자 + 홍채 + 하이라이트 + 속눈썹 (어린이는 조금 크게) / 다음 날 아침엔 감은 눈
@@ -680,6 +922,10 @@ function render(a, size = 48, state = 25) {
   const lip = { c: female && age >= 18 ? LIPS[X.lip] : female ? '#e39aa0' : NATURAL_LIP[a.skin] || NATURAL_LIP[1], teeth: X.teeth };
   o += af ? (tier === 0 ? FROWN : tier === 1 ? mouthSVG(2, lip, female) : tier >= 3 && af.personality !== 'cool' ? mouthSVG(1, lip, female) : mouthSVG(0, lip, female)) : mouthSVG(a.mouth, lip, female);
   if (af && af.lipstick && tier >= 3) o += `<path d="M75,90 q2.5,-3 5,0 q2.5,-3 5,0 q-2.5,4 -5,4 q-2.5,0 -5,-4 Z" fill="#c43c4f" opacity=".75" transform="rotate(-12 80 90)"/>`;   // 볼에 립스틱 자국
+  if (af && tier >= 4 && female) {
+    o += `<path d="M42,74 Q38,78 36,82" fill="none" stroke="#555" stroke-width="1.2" opacity=".25" stroke-linecap="round"/>`;
+    o += `<path d="M78,74 Q82,78 84,82" fill="none" stroke="#555" stroke-width="1.2" opacity=".25" stroke-linecap="round"/>`;
+  }
   if (a.dimples) o += `<path d="M50,87 q-1.5,2 0,3.5 M70,87 q1.5,2 0,3.5" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.1" stroke-linecap="round"/>`;
   // 앞머리·옆머리
   o += hp.front;

@@ -192,9 +192,40 @@ function sceneCard(html) {
 const CONTRA_LABEL = { none: '피임 안 함', condom: '콘돔', pill: '피임약', both: '콘돔 + 피임약' };
 // 다음 날 아침 카드: 만족감에 따라 표정·머리가 달라진 초상화(80×107) + 아침 한 줄 + 바닥의 옷
 function morningCard(sc, p) {
-  const S = G.state(), look = { age: G.npcAge(p), after: { sat: sc.sat, personality: p.personality, lipstick: S.gender === 'f' && p.gender === 'm' } };
-  return `<div class="sc-card sc-morning"><p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
-    <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button></div>`;
+  const S = G.state(), look = { age: G.npcAge(p), after: { sat: sc.sat, personality: p.personality, lipstick: S.gender === 'f' && p.gender === 'm', fig: sc.fig } };
+  return `<p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
+    <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
+}
+function blanketSVG(shape) {
+  const legs = { A: 'M30,52 Q34,80 32,100 M48,52 Q52,80 50,100 M70,52 Q66,80 68,100 M88,52 Q84,80 86,100',
+    B: 'M28,50 Q32,78 30,100 M46,50 Q50,78 48,100 M72,48 Q64,76 66,100 M90,50 Q86,78 88,100',
+    C: 'M30,52 Q34,80 32,100 M48,52 Q52,80 50,100 M68,38 Q60,58 62,100 M86,42 Q80,62 82,100' };
+  const blanket = { A: 'M0,42 Q30,28 60,36 Q90,28 120,42 L120,56 Q90,48 60,52 Q30,48 0,56 Z',
+    B: 'M0,44 Q30,26 60,32 Q90,20 120,38 L120,54 Q90,44 60,48 Q30,44 0,54 Z',
+    C: 'M0,40 Q30,22 60,28 Q90,14 120,34 L120,52 Q90,40 60,44 Q30,40 0,52 Z' };
+  return `<svg class="blanket-svg" viewBox="0 0 120 100"><path d="${legs[shape] || legs.A}" fill="none" stroke="#444" stroke-width="3.5" stroke-linecap="round"/><path d="${blanket[shape] || blanket.A}" fill="#ece6da" opacity=".9"/><path d="${blanket[shape] || blanket.A}" fill="none" stroke="#cfc6b6" stroke-width="1.2"/></svg>`;
+}
+function phaseCard(sc, p, phase, shape, icon) {
+  const look = G.look(p), age = G.npcAge(p);
+  const avatarPhase = phase === 'climax' ? 3 : phase === 'end' ? 4 : phase;
+  const duringState = { age, duringIntimate: avatarPhase, personality: sc.personality || p.personality };
+  const portrait = Avatar.render(look, 90, duringState);
+  const particles = phase === 'climax' ? Array.from({ length: 4 }, (_, i) => {
+    const dx = (Math.random() * 120 - 60) + 'px', dy = -(40 + Math.random() * 60) + 'px';
+    return `<div class="sc-particle" style="left:${20 + Math.random() * 60}%;top:${30 + Math.random() * 40}%;--dx:${dx};--dy:${dy};animation-delay:${i * .15}s"></div>`;
+  }).join('') : '';
+  const cls = typeof phase === 'number' ? `phase${phase + 1}` : phase === 'climax' ? 'phase-climax' : 'phase-end';
+  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><span class="m">♂</span><span class="f">♀</span></div>${blanketSVG(shape)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
+}
+function foreplayCard(sc, p) {
+  return `<div class="sc-foreplay"><svg viewBox="0 0 200 160"><circle cx="72" cy="30" r="14" class="fp-fill"/><path d="M52,150 C52,90 60,60 72,56 C84,60 92,90 92,150 Z" class="fp-fill"/><circle cx="128" cy="28" r="14" class="fp-fill"/><path d="M108,150 C108,90 116,58 128,54 C140,58 148,90 148,150 Z" class="fp-fill"/><path d="M88,64 Q100,56 112,66 Q116,72 112,76 Q100,68 88,74 Z" class="fp-fill"/></svg></div>`;
+}
+function uterusSVG(preg) {
+  const res = preg ? 'glow' : 'bounce';
+  return `<div class="sc-uterus"><svg viewBox="0 0 300 220"><path class="organ-fill" d="M120,80 L120,160 Q120,190 150,190 Q180,190 180,160 L180,80 Q180,50 150,50 Q120,50 120,80 Z"/><path class="organ" d="M120,80 L120,160 Q120,190 150,190 Q180,190 180,160 L180,80"/><path class="organ" d="M120,80 Q100,60 70,55 Q50,52 40,65"/><path class="organ" d="M180,80 Q200,60 230,55 Q250,52 260,65"/><circle class="ovary" cx="35" cy="68" r="14"/><circle class="ovary" cx="265" cy="68" r="14"/>${[1, 2, 3, 4, 5].map(i => {
+    const x = 140 + (i % 3) * 10 - 10, delay = i * .2;
+    return `<g class="sp-u sp-u${i}" style="animation:spUp${res === 'glow' ? 'G' : 'B'} 2.5s ease-in ${delay}s forwards"><ellipse cx="${x}" cy="185" rx="4" ry="2.8" fill="#f4f4f4"/><path class="tail" d="M${x - 4},185 q-4,-3 -8,0 t-8,0" fill="none" stroke="#f4f4f4" stroke-width="1.2"/></g>`;
+  }).join('')}${preg ? '<circle class="egg-target" cx="48" cy="65" r="8" fill="#ffd9a8" opacity="0" style="animation:eggGlow .5s ease-out 2.8s forwards"/>' : ''}<style>@keyframes spUpG{0%{transform:translate(0,0);opacity:1}60%{opacity:1}100%{transform:translate(${preg ? '-95px,-120px' : '-80px,-100px'});opacity:${preg ? 1 : 0}}}@keyframes spUpB{0%{transform:translate(0,0);opacity:1}70%{opacity:.8}100%{transform:translate(-60px,-80px);opacity:0}}@keyframes eggGlow{to{opacity:.7;r:12}}</style></svg></div>`;
 }
 function playScene(sc) {
   const p = G.person(sc.pid);
@@ -206,14 +237,35 @@ function playScene(sc) {
     sceneCard(`<div class="sc-card">${SIL[sc.kind] || ''}<p>${esc(sc.text || '')}</p><button type="button" data-sc-next>계속</button></div>`);
     return;
   }
-  sceneQueue = [morningCard(sc, p)].concat(sc.preg ? [`<div class="sc-card">${CONCEIVE}<p class="sc-later">몇 주 뒤…</p><button type="button" data-sc-next>계속</button></div>`] : []);
-  if (calm) { nextScene(); return; }
-  sceneCard(`<div class="sc-night"><div class="sym"><span class="m">♂</span><span class="f">♀</span></div><div class="beat">💓</div></div>`);
-  sceneTimer = setTimeout(nextScene, 2300);
+  const internal = sc.contra === 'none' || sc.contra === 'pill';
+  const uterusQ = internal ? [`<div class="sc-card">${uterusSVG(!!sc.preg)}<p class="sc-later" style="color:#aaa;margin-top:8px">${sc.preg ? '몇 주 뒤…' : ''}</p><button type="button" data-sc-next>계속</button></div>`] : [];
+  const morningQ = [`<div class="sc-card sc-morning">${morningCard(sc, p)}</div>`];
+  const pregQ = sc.preg ? [`<div class="sc-card">${CONCEIVE}<p class="sc-later">몇 주 뒤…</p><button type="button" data-sc-next>계속</button></div>`] : [];
+  if (calm) {
+    sceneQueue = morningQ.concat(pregQ);
+    nextScene();
+    return;
+  }
+  sceneQueue = [
+    foreplayCard(sc, p),
+    phaseCard(sc, p, 0, 'A', '💓'),
+    phaseCard(sc, p, 1, 'A', '💓💓'),
+    phaseCard(sc, p, 2, 'B', '🔥'),
+    phaseCard(sc, p, 3, 'C', '🔥🔥'),
+    phaseCard(sc, p, 'climax', 'C', '💦'),
+    phaseCard(sc, p, 'end', 'A', ''),
+  ].concat(uterusQ, morningQ, pregQ);
+  nextScene();
 }
 function nextScene() {
   clearTimeout(sceneTimer);
-  if (sceneQueue.length) { sceneCard(sceneQueue.shift()); return; }
+  if (sceneQueue.length) {
+    const html = sceneQueue.shift();
+    sceneCard(html);
+    const isPhase = sceneBox.querySelector('.sc-phase') || sceneBox.querySelector('.sc-foreplay') || sceneBox.querySelector('.sc-uterus');
+    if (isPhase) sceneTimer = setTimeout(nextScene, sceneBox.querySelector('.sc-foreplay') ? 1800 : sceneBox.querySelector('.sc-uterus') ? 3500 : sceneBox.querySelector('.phase-climax') ? 2200 : sceneBox.querySelector('.phase-end') ? 2000 : 2500);
+    return;
+  }
   sceneEl.hidden = true; sceneBox.innerHTML = '';
   G.clearScene();
 }
@@ -223,9 +275,9 @@ function maybeScene(S) {
   sceneSeen = key;
   playScene(sc);
 }
-// 버튼이나 맞물림 화면 아무 데나 누르면 다음으로 (맞물림 중이면 바로 아침으로)
 sceneEl.addEventListener('click', e => {
-  if (e.target.closest('[data-sc-next]') || sceneBox.querySelector('.sc-night')) nextScene();
+  if (e.target.closest('[data-sc-next]')) { nextScene(); return; }
+  if (sceneBox.querySelector('.sc-night') || sceneBox.querySelector('.sc-phase') || sceneBox.querySelector('.sc-foreplay') || sceneBox.querySelector('.sc-uterus')) nextScene();
 });
 
 /* ---------- 모달 ---------- */

@@ -235,4 +235,58 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 @keyframes sp2{0%{transform:translate(6px,36px);opacity:1}80%{opacity:.8}100%{transform:translate(150px,46px);opacity:0}}
 @keyframes sp3{0%{transform:translate(0,86px);opacity:1}80%{opacity:.8}100%{transform:translate(140px,76px);opacity:0}}
 @keyframes wig{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
-@media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *{animation:none!important}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}}
+/* 진행 중 장면 (multi-phase night scene) */
+.sc-phase{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px 10px;background:#0a0a0a;border-radius:4px;min-height:260px;align-items:center;position:relative;overflow:hidden}
+.sc-phase .portrait{display:flex;justify-content:center;align-items:center}
+.sc-phase .blanket-side{display:flex;flex-direction:column;align-items:center;gap:6px}
+.sc-phase .sym{font-size:32px;color:#eee;text-align:center;white-space:nowrap}
+.sc-phase .sym .m,.sc-phase .sym .f{display:inline-block}
+.sc-phase .blanket-wrap{width:100%;position:relative}
+.sc-phase .blanket-svg{width:100%;height:auto}
+.sc-phase .beat-icon{font-size:20px;text-align:center;opacity:.8}
+.sc-phase .sc-sweat{position:absolute;font-size:12px;opacity:0;animation:swDrop 1.2s ease-in forwards}
+.sc-redden{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(180,40,40,.15),transparent 70%);opacity:0;transition:opacity .6s}
+.sc-phase.phase2 .sc-redden{opacity:.4}
+.sc-phase.phase3 .sc-redden{opacity:.7}
+.sc-phase.phase-climax .sc-redden{opacity:0}
+.sc-flash{position:absolute;inset:0;pointer-events:none;background:#fff;opacity:0}
+.sc-phase.phase-climax .sc-flash{animation:flash .4s ease-out forwards}
+.sc-particles{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.sc-particle{position:absolute;width:6px;height:6px;background:#fff;border-radius:50%;opacity:0}
+.sc-phase.phase-climax .sc-particle{animation:pDrift 1.2s ease-out forwards}
+@keyframes portrait-shake{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.phase1 .portrait{animation:portrait-shake .6s ease-in-out infinite}
+.phase2 .portrait{animation:portrait-shake .35s ease-in-out infinite}
+.phase3 .portrait{animation:portrait-shake .18s ease-in-out infinite}
+.phase-climax .portrait{animation:none}
+.phase-end .portrait{animation:none}
+@keyframes blanket-bob{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-5px) scaleY(1.03)}}
+.phase1 .blanket-svg{animation:blanket-bob .6s ease-in-out infinite}
+.phase2 .blanket-svg{animation:blanket-bob .35s ease-in-out infinite}
+.phase3 .blanket-svg{animation:blanket-bob .18s ease-in-out infinite}
+.phase-climax .blanket-svg,.phase-end .blanket-svg{animation:none}
+.phase1 .sym .m{animation:symBounce .6s ease-in-out infinite}
+.phase1 .sym .f{animation:symBounce .6s ease-in-out infinite reverse}
+.phase2 .sym .m{animation:symBounce .35s ease-in-out infinite}
+.phase2 .sym .f{animation:symBounce .35s ease-in-out infinite reverse}
+.phase3 .sym .m{animation:symBounce .18s ease-in-out infinite}
+.phase3 .sym .f{animation:symBounce .18s ease-in-out infinite reverse}
+.phase-climax .sym .m,.phase-climax .sym .f,.phase-end .sym .m,.phase-end .sym .f{animation:none}
+@keyframes symBounce{0%,100%{transform:translateX(0)}50%{transform:translateX(6px)}}
+@keyframes flash{0%{opacity:.9}100%{opacity:0}}
+@keyframes swDrop{0%{opacity:.7;transform:translateY(0)}100%{opacity:0;transform:translateY(40px)}}
+@keyframes pDrift{0%{opacity:.85;transform:translate(0,0)}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
+/* foreplay */
+.sc-foreplay{display:flex;justify-content:center;align-items:center;min-height:260px;background:#0a0a0a;border-radius:4px;position:relative;overflow:hidden}
+.sc-foreplay svg{width:220px;height:auto}
+.sc-foreplay .fp-fill{fill:#222}
+.sc-foreplay .fp-stroke{fill:none;stroke:#333;stroke-width:2}
+/* uterus cross-section */
+.sc-uterus{display:flex;justify-content:center;align-items:center;padding:14px;background:#0b0d14;border-radius:4px;min-height:200px}
+.sc-uterus svg{width:100%;max-width:300px}
+.sc-uterus .organ{fill:none;stroke:#e4a8a0;stroke-width:2.5;stroke-linecap:round}
+.sc-uterus .organ-fill{fill:#fde0d8;opacity:.3}
+.sc-uterus .ovary{fill:#fce4de;stroke:#d98a7e;stroke-width:2}
+.sc-uterus .sp-u{transform-box:fill-box}
+.sc-uterus .sp-u .tail{animation:wig .18s ease-in-out infinite alternate;transform-origin:-5px 0}
+@media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *,.sc-phase *,.sc-phase,.sc-foreplay *,.sc-uterus *{animation:none!important}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}.phase1 .portrait,.phase2 .portrait,.phase3 .portrait{animation:none!important}}
