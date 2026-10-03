@@ -74,6 +74,7 @@ function gradeStep(v, dir, cap = LETTERS.length - 1) {
 }
 
 let S = null;
+let held = null;   // 피임을 묻는 동안 잠시 멈춘 밤 { o, target, pid } — 저장하지 않음 (새로고침하면 그날 밤은 없던 일)
 const subs = [];
 const emit = () => subs.forEach(f => f(S));
 
@@ -164,6 +165,8 @@ function makePerson(spec) {
   if (p.kind === 'child') p.role = '아이';
   // 기혼 NPC — 친밀 20이면 반지가 보이고, 40이면 결혼한 걸 알게 됨. 늘 몰래 만나는 사이로만 시작
   if (spec.married ?? (age >= 26 && !['family', 'child'].includes(p.kind) && spec.taken !== false && Math.random() < (age >= 35 ? .5 : age >= 30 ? .35 : .15))) { p.married = true; p.taken = true; }
+  // 피임약을 먹고 있는 사람 (20살 이상 여자, 냉철형·무심형이 조금 더 많음) — 피임을 물을 때 드러남
+  if (gender === 'f' && age >= C.sexMinAge && !['family', 'child'].includes(p.kind) && Math.random() < (['sharp', 'cool'].includes(p.personality) ? .35 : .2)) p.pill = true;
   return p;
 }
 function npcStyle(hobby, age) {
@@ -355,10 +358,27 @@ const SIZE_V = { small: 35, avg: 60, large: 85, xlarge: 100 };
 function startCompat(p) {
   return clamp(rand(20, 45) + (p.hobby === S.hobby ? 10 : 0) + (p.value === S.value ? 5 : valueClash(p) ? -5 : 0) + (prefMatch(p) ? 10 : 0), 0, 100);
 }
-function satisfaction(p, mood) {
+function satisfaction(p, mood, adj) {
   const sz = SIZE_V[S.gender === 'm' ? S.size : p.size] ?? 60;
   const md = clamp(50 + (mood || 0) + [0, 10, 15, -10][S.drunk || 0], 0, 100);
-  return clamp(Math.round(g100(S.sexSkill || 0) * .4 + (p.compat ?? 30) * .25 + sz * .1 + p.heart * .15 + md * .1 + rand(-8, 8)), 0, 100);
+  return clamp(Math.round(g100(S.sexSkill || 0) * .4 + (p.compat ?? 30) * .25 + sz * .1 + p.heart * .15 + md * .1 + rand(-8, 8) + (adj || 0)), 0, 100);
+}
+/* ── 피임: 함께 밤을 보내기 직전에 묻고(contraAsk), 고른 뒤 그 밤을 이어서 처리 ── */
+// 아이가 생길 수 있는 사이인지 (엄마 나이 45 미만, 이미 임신 중이 아님)
+const fertile = p => !S.preg && (S.gender === 'f' ? S.age : npcAge(p)) < 45;
+// 피임약: 나(여자)가 먹고 있거나, 상대(여자)가 먹고 있음
+const onPill = p => S.gender === 'f' ? !!S.flags.onPill : !!(p && p.pill);
+// 고른 방법을 꺼냄. 물어본 적이 없으면 null. '그냥'이어도 냉철형·예민형은 안 된다고 할 때가 있고, 만취면 콘돔을 깜빡함
+function takeContra(p) {
+  const m0 = S.vars.contra;
+  delete S.vars.contra;
+  if (!m0) return null;
+  const CT = D.contra;
+  let m = m0;
+  if (m === 'pill' && !onPill(p)) m = 'none';
+  if (m === 'none' && !p.spouse && CT.insist[p.personality] && Math.random() < .6) { m = 'condom'; log(fill(CT.insist[p.personality]), { t: 'info' }); }
+  else if ((m === 'condom' || m === 'both') && (S.drunk || 0) >= 3 && Math.random() < .25) { m = m === 'both' ? 'pill' : 'none'; log(CT.drunkForgot, { t: 'info' }); }
+  return m;
 }
 const satTier = v => v >= 90 ? 4 : v >= 70 ? 3 : v >= 50 ? 2 : v >= 30 ? 1 : 0;
 // 함께 밤을 보냄: 성욕 해소, 기술·궁합 상승, 만족감에 따라 상대 마음이 달라짐 (첫 경험은 감정이 덮어줌)
@@ -366,7 +386,10 @@ function sexScene(p, o) {
   if (!canSex(p)) return null;
   const first = !S.flags.hadSex, firstWith = !p.nights;
   if (p.compat == null) p.compat = startCompat(p);
-  const sat = satisfaction(p, resolve(o.mood));
+  const contra = takeContra(p), cm = D.contra.methods[contra || 'none'];
+  let adj = cm.sat && gIdx(S.sexSkill || 0) >= gIdx(gradeMin('B')) ? Math.round(cm.sat / 2) : cm.sat;   // 콘돔은 익숙해지면 덜 깎임
+  adj += resolve(o.satBonus) || 0;
+  const sat = satisfaction(p, resolve(o.mood), adj);
   const tier = satTier(sat);
   S.stats.libido = clamp(S.stats.libido - rand(70, 90), 0, 100);
   p.libido = clamp((p.libido || 0) - rand(70, 90), 0, 100);
@@ -376,9 +399,9 @@ function sexScene(p, o) {
   const prevBest = p.bestSat || 0;
   p.lastSat = sat; p.bestSat = Math.max(prevBest, sat);
   S.flags.hadSex = true;
-  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), n: (S.scene ? S.scene.n : 0) + 1 };
+  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, n: (S.scene ? S.scene.n : 0) + 1 };
   if (first) { S.vars.fp = p.id; trigger('firstTime'); }   // 내 첫 경험 — 상대 성격마다 다른 한 줄, 추억
-  return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90 };
+  return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90, contra, pregMul: cm.preg };
 }
 /* ── 죄책감: 성격 기본값에서 만족감이 70을 넘은 만큼(×1.5) 깎임 ── */
 const guiltOf = (pers, sat) => Math.max(0, ((D.personalities.find(x => x.id === pers) || {}).guilt ?? 40) - Math.max(0, sat - 70) * 1.5);
@@ -500,12 +523,23 @@ function applyRel(map) {
 function addKarma(v) { if (v) S.karma = clamp(S.karma + val(v), -100, 100); }
 
 // 결과 적용 순서: 플래그 → 새 사람 → 함수 → 수치 → 문장
-function applyOutcome(o, target) {
+// resumed: 피임을 고른 뒤 멈췄던 밤을 이어서 처리 (플래그·새 사람·함수는 이미 적용됨)
+function applyOutcome(o, target, resumed) {
   if (!o) return;
-  asList(o.set).forEach(f => { S.flags[f] = true; });
-  asList(o.unset).forEach(f => { delete S.flags[f]; });
-  if (o.meet) addPerson(resolve(o.meet));
-  if (o.do) o.do(S, api);
+  if (!resumed) {
+    asList(o.set).forEach(f => { S.flags[f] = true; });
+    asList(o.unset).forEach(f => { delete S.flags[f]; });
+    if (o.meet) addPerson(resolve(o.meet));
+    if (o.do) o.do(S, api);
+    const tp0 = target || person(S.vars.fp);
+    // 아이가 생길 수 있는 밤이면 피임부터 물어봄 → 고르면 choose()가 이어서 처리
+    if (o.intimate && tp0 && canSex(tp0) && resolve(o.pregnant) && fertile(tp0) && EVENTS.contraAsk) {
+      held = { o, target, pid: tp0.id };
+      S.vars.fp = tp0.id;
+      trigger('contraAsk');
+      return;
+    }
+  }
   const deltas = applyEffect(o.effect);
   const tp = target || person(S.vars.fp);
   let pd = o.p ? resolve(o.p) : null;
@@ -524,7 +558,10 @@ function applyOutcome(o, target) {
   if (sx) { if (S.scene) S.scene.text = text; afterSex(tp, sx, ctx); guiltCheck(tp, sx, ctx); }
   // 키스·포옹·끌어당기기 실루엣 연출 (화면이 S.scene을 보고 그림)
   if (o.scene && tp && S.age >= C.romanceMinAge && npcAge(tp) >= C.romanceMinAge) S.scene = { kind: o.scene, pid: tp.id, text, n: (S.scene ? S.scene.n : 0) + 1 };
-  if (o.pregnant && tp && (!o.intimate || sx) && conceive(tp, resolve(o.pregnant)) && S.scene) S.scene.preg = true;
+  const conceived = !!(o.pregnant && tp && (!o.intimate || sx) && conceive(tp, resolve(o.pregnant) * (sx ? sx.pregMul : 1)));
+  if (conceived && S.scene) S.scene.preg = true;
+  // 피임 없이 보냈는데 아이가 안 생겼으면, 70% 확률로 다음 계절에 불안이 찾아옴 (배우자는 제외)
+  if (sx && sx.contra === 'none' && !conceived && !tp.spouse && fertile(tp) && Math.random() < .7) S.scare = { pid: tp.id };
   // 다른 장소로 이동 (예: 술집에서 집으로 같이, 정신 차려보니 공원)
   if (o.moveTo && PLACES[o.moveTo] && !jailed()) enterPlace(PLACES[o.moveTo], o.bring && tp && !tp.gone ? tp : null);
   riskCheck(o, tp);
@@ -627,8 +664,18 @@ function choose(i) {
   if (ch.check) o = (S.stats[ch.check.stat] || 0) + rand(-15, 15) >= ch.check.diff ? ch.success : ch.fail;
   else if (ch.chance != null) o = Math.random() < resolve(ch.chance) ? ch.success : ch.fail;
   applyOutcome(o);
+  if (p.id === 'contraAsk') resumeHeld();
   tickSeason();
   after();
+}
+// 피임을 고른 뒤 멈췄던 밤을 이어서
+function resumeHeld() {
+  const h = held;
+  held = null;
+  const tp = h && person(h.pid);
+  if (!h || !tp || !canSex(tp)) { delete S.vars.contra; log('분위기가 깨졌다. 그날은 그냥 잠들었다.', { t: 'info' }); return; }
+  S.vars.fp = tp.id;
+  applyOutcome(h.o, h.target, true);
 }
 
 /* ═════════ 계절과 고정 이벤트 ═════════ */
@@ -647,6 +694,11 @@ function enterSeason(i) {
   if (se.months.includes(S.month)) birthday();
   schoolExam(se.id);
   if (S.preg && S.preg.due == null) tellPreg();
+  if (S.scare) {   // 피임 없이 보낸 밤 뒤의 불안 (그새 아이가 생겼으면 그 소식이 대신)
+    const sp = person(S.scare.pid);
+    S.scare = null;
+    if (sp && !S.preg) { S.scares = (S.scares || 0) + 1; S.vars.fp = sp.id; trigger(S.scares >= 2 ? 'pregScareRepeat' : 'pregScare'); }
+  }
 
   // 반드시 터지는 것 (입학, 수능, 전역 등)
   const musts = D.events.filter(e => e.type === 'must' && seasonOk(e, se.id) && eligible(e));
@@ -948,6 +1000,7 @@ function yearly() {
     const kids = alive().filter(p => p.kind === 'child').length;
     S.money -= C.livingCost + (S.flags.married ? 600 : 0) + kids * 400;   // 가족이 늘면 생활비도 늘어남
   }
+  if (S.flags.onPill) S.money -= rand(36, 60);   // 피임약값 (한 달 3~5만원)
   if (S.money < 0 && a >= 20) log('통장 잔고가 마이너스다.', { deltas: applyEffect({ happy: -4 }) });
 
   // 수감
@@ -1034,6 +1087,8 @@ function doAction(id, subj) {
     tickSeason(); after(); return;
   }
   if (a.id === 'exercise' || a.id === 'play') S.vars.exN = (S.vars.exN || 0) + 1;
+  asList(a.set).forEach(f => { S.flags[f] = true; });
+  asList(a.unset).forEach(f => { delete S.flags[f]; });
   if (a.libido) S.stats.libido = clamp(S.stats.libido + val(a.libido), 0, 100);
   if (a.drunk) drinkUp(a.drunk);
   const deltas = applyEffect(a.effect);
@@ -1406,7 +1461,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,

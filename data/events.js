@@ -730,14 +730,42 @@ GAME_DATA.events = [
       : s.vars.pregMode === 'apart' ? '아이가 태어났다. 이름은 {new|으로} 지었다. 같이 살지는 않지만, 주말마다 보러 가기로 했다.'
       : '아이가 태어났다. 이름은 {new|으로} 지었다. {fp|와} 번갈아 안아보며 한참을 울었다.',
     memory: true, effect: { happy: 12 }, do: s => { s.preg = null; s.flags.intimate = true; } },
-  { id: 'pregScare', type: 'random', age: [19, 44], once: false, cooldown: 4, req: { flags: ['intimate'], noFlags: ['married'] },
-    when: (s, a) => !s.preg && a.find(p => (lover(p) || p.fling) && !p.spouse).length > 0,
-    onStart: (s, a) => a.focus(a.pick(a.find(p => (lover(p) || p.fling) && !p.spouse))),
-    text: s => s.gender === 'f' ? '생리가 늦어진다. 하루 종일 아무것도 손에 잡히지 않았다.' : '{fp}에게서 생리가 늦어진다는 연락이 왔다.',
+  /* ═════ 피임 · 임신 공포 ═════ */
+  // 함께 밤을 보내기 직전 (엔진이 부름. 고른 뒤 그 밤이 이어짐). 아이가 생길 수 있을 때만
+  { id: 'contraAsk', type: 'trigger',
+    text: (s, a) => {
+      const p = a.focused() || {};
+      if (p.spouse) return '{fp|이} 불을 끄며 작게 물었다. "우리… 아이 가질까?"';
+      return GAME_DATA.contra.ask[p.personality] || '{fp|이} 잠깐 멈추고 나를 봤다.';
+    },
     choices: [
-      { label: '같이 기다린다', p: { trust: [4, 8], close: [2, 4] }, effect: { happy: -1 }, text: '며칠 뒤, 아니었다. 둘이 동시에 긴 숨을 내쉬었다.' },
+      { label: '콘돔을 쓴다', do: s => { s.vars.contra = 'condom'; }, effect: { money: -1 } },
+      { label: '피임약을 먹고 있으니까', if: (s, a) => a.onPill(a.focused()), do: s => { s.vars.contra = 'pill'; } },
+      { label: '콘돔도 쓰고, 약도 먹었고', if: (s, a) => a.onPill(a.focused()), do: s => { s.vars.contra = 'both'; }, effect: { money: -1 } },
+      { label: (s, a) => (a.focused() || {}).spouse ? '아이가 생겨도 좋아' : '그냥', do: s => { s.vars.contra = 'none'; } },
+    ] },
+  // 피임 없이 보낸 밤 뒤, 아이가 생기지 않았을 때 다음 계절에 (엔진이 부름)
+  { id: 'pregScare', type: 'trigger',
+    text: s => s.gender === 'f' ? '그날 이후로 생리가 늦어진다. 하루 종일 아무것도 손에 잡히지 않았다.' : '그날 이후로 며칠째 불안하다. {fp}에게서 연락이 없다.',
+    choices: [
+      { label: '먼저 연락한다', if: s => s.gender === 'm', p: { trust: [5, 8], close: [3, 6] }, effect: { happy: 4 },
+        text: '"나 괜찮아. 걱정했어?" {fp}의 목소리에 안도가 묻어났다.' },
+      { label: '기다린다', if: s => s.gender === 'm', effect: { happy: 2 }, text: '며칠 뒤 {fp}에게서 "다행이다"라는 문자가 왔다. 한숨이 나왔다.' },
       { label: '모른 척한다', if: s => s.gender === 'm', karma: -4, p: { trust: -12, grudge: 8 }, text: '"알아서 하겠지." 그 말을 한 걸 오래 후회했다. 다행히 아니었다.' },
+      { label: '{fp}에게 말한다', if: s => s.gender === 'f', p: { trust: [4, 8], close: [2, 4] }, effect: { happy: -1 },
+        text: byPers({ warm: '{fp|이} 바로 달려와 같이 테스트기를 봤다. 한 줄이었다. 둘이 동시에 긴 숨을 내쉬었다.', cool: '{fp|은} 말없이 약국에 다녀왔다. 한 줄이었다. 그제야 {fp}의 손이 떨리는 게 보였다.' },
+          '{fp|와} 같이 테스트기를 봤다. 한 줄이었다. 둘이 동시에 긴 숨을 내쉬었다.') },
       { label: '혼자 병원에 간다', if: s => s.gender === 'f', effect: { happy: -2 }, text: '아니었다. 병원을 나서며, 다음엔 혼자 감당하지 않기로 했다.' },
+    ] },
+  // 두 번째부터 — 반복범
+  { id: 'pregScareRepeat', type: 'trigger',
+    text: '또다. 이번에도 괜찮을까? 불안이 점점 커진다.',
+    choices: [
+      { label: '피임약을 처방받는다', if: s => s.gender === 'f', set: 'onPill', effect: { money: -5, happy: 2 }, text: '며칠 뒤, 아니었다. 이제는 관리하기로 했다.' },
+      { label: '{fp|와} 피임 얘기를 꺼낸다', if: s => s.gender === 'm', p: { trust: [4, 8] }, effect: { happy: 2 },
+        do: (s, a) => { const p = a.focused(); if (p) p.pill = true; },
+        text: '며칠 뒤, 아니었다. {fp|이} 다음 날 병원에 다녀왔다. "이제 둘 다 마음 편하게."' },
+      { label: '다음에도 그냥', effect: { happy: -3 }, text: '다행히 아니었다. 또 운에 맡겼다. 진짜 괜찮을까.' },
     ] },
   { id: 'hiddenChildSeen', type: 'fixed', age: [28, 50], req: { flags: ['hiddenChild'] },
     text: '길에서 나를 꼭 닮은 아이를 봤다. 아이 손을 잡고 걷던 {hiddenName|이} 나를 보고 걸음을 멈췄다.',

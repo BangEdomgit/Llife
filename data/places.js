@@ -110,7 +110,7 @@ GAME_DATA.places = [
     regulars: [], regularsN: [0, 1], crowd: 'mixed', crowdN: [0, 2],
     doing: ['대기실에서 번호표를 쥐고 있다', '링거를 꽂은 채 복도를 걷고 있다', '접수창구 앞에서 서류를 쓰고 있다', '기침을 참고 있다', '깁스를 한 다리를 뻗고 앉아 있다'],
     arrive: ['병원 소독약 냄새가 났다.', '번호표를 뽑고 대기실에 앉았다.', '병원 대기실 TV에서 뉴스가 나오고 있었다.'],
-    actions: ['doctor'] },
+    actions: ['doctor', 'pill', 'pillStop'] },
 
   { id: 'center', label: '복지관', icon: '🤝', minAge: 12,
     regulars: [], regularsN: [0, 1], crowd: 'mixed',

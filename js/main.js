@@ -188,11 +188,12 @@ function sceneCard(html) {
   const b = sceneBox.querySelector('button');
   if (b) b.focus({ preventScroll: true });
 }
+const CONTRA_LABEL = { none: '피임 안 함', condom: '콘돔', pill: '피임약', both: '콘돔 + 피임약' };
 // 다음 날 아침 카드: 만족감에 따라 표정·머리가 달라진 초상화(80×107) + 아침 한 줄 + 바닥의 옷
 function morningCard(sc, p) {
   const S = G.state(), look = { age: G.npcAge(p), after: { sat: sc.sat, personality: p.personality, lipstick: S.gender === 'f' && p.gender === 'm' } };
   return `<div class="sc-card sc-morning"><p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
-    <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button></div>`;
+    <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button></div>`;
 }
 function playScene(sc) {
   const p = G.person(sc.pid);

@@ -68,6 +68,24 @@ GAME_DATA.bodyImpression = {
   // 등급이 높으면 덧붙는 인상
   extra: { cup: '가슴이 큰 편이다', hip: '골반이 넓다', shoulder: '어깨가 넓다', height: '키가 훤칠하다' },
 };
+// 피임 — preg: 아이가 생길 확률 배율 / sat: 상대 만족감 보정 (콘돔은 밤의 기술 B 이상이면 절반)
+GAME_DATA.contra = {
+  methods: {
+    none:   { preg: 1,    sat: 0 },
+    condom: { preg: .05,  sat: -10, line: '콘돔을 꺼냈다.' },
+    pill:   { preg: .1,   sat: 0 },
+    both:   { preg: .01,  sat: -10, line: '콘돔을 꺼냈다. 약도 빼먹지 않았다.' },
+  },
+  // 물어볼 때 상대 성격마다
+  ask: {
+    bold: '"그냥 해." {fp|이} 내 손을 끌어당겼다.', sharp: '"당연히 써야지." {fp|이} 서랍 쪽을 눈짓했다.', shy: '{fp|은} 아무 말도 못 하고 내 눈치만 봤다.',
+    playful: '"이거 딸기맛이다." {fp|이} 작은 포장을 흔들며 웃었다.', cool: '"알아서 해." {fp|이} 어깨를 으쓱했다.', warm: '"조심해 줄 거지?" {fp|이} 작게 물었다.',
+    sunny: '"준비성 좋은 사람이 좋더라~" {fp|이} 웃었다.', sensitive: '"…괜찮을까?" {fp|이} 걱정스러운 얼굴로 물었다.',
+  },
+  // '그냥'을 골랐는데 상대가 안 된다고 할 때 (냉철형·예민형, 배우자가 아니면)
+  insist: { sharp: '"안 돼. 써." {fp|이} 단호했다. 결국 콘돔을 썼다.', sensitive: '"…무서워. 써줘." {fp|이} 내 손을 잡았다. 콘돔을 썼다.' },
+  drunkForgot: '취해서 콘돔을 챙긴다는 걸 깜빡했다.',
+};
 // 신체 수치 등급 (1~6). [이 값 이하, 라벨] — 체형(키·체격·가슴·어깨)에서 사람마다 고정된 수치가 나옴
 GAME_DATA.bodyGrades = {
   height: {
@@ -259,6 +277,11 @@ GAME_DATA.actions = [
     text: ['하루 종일 일에 매달렸다.', '맡은 일을 끝까지 해냈다.', '정신없이 하루가 지나갔다.'] },
   { id: 'overtime',  label: '야근',   icon: '🌙', minAge: 19, req: { job: true }, work: true, perf: [10, 18], effect: { money: [80, 180], health: [-7, -3], happy: [-5, -2] },
     text: ['사무실 불을 마지막으로 껐다.', '막차를 놓쳐서 택시를 탔다.', '주말에도 나와서 일했다.'] },
+  // 피임약 — 20살 이상 여자. 처방받으면 해마다 약값이 나감 (끊으면 플래그 해제)
+  { id: 'pill',      label: '피임약 처방', icon: '💊', minAge: 20, cost: 5, if: s => s.gender === 'f' && !s.flags.onPill, set: 'onPill', effect: { happy: [0, 1] },
+    text: ['산부인과에서 피임약을 처방받았다. 매일 같은 시간에 먹어야 한다.', '진료를 받고 피임약을 받아 왔다. 알람을 하나 더 맞췄다.'] },
+  { id: 'pillStop',  label: '피임약 끊기', icon: '💊', minAge: 20, if: s => !!s.flags.onPill, unset: 'onPill',
+    text: ['피임약을 그만 먹기로 했다.', '마지막 한 알을 먹고 약 상자를 버렸다.'] },
   { id: 'doctor',    label: '진료',   icon: '🩺', minAge: 5,  cost: 30, effect: { health: [5, 10] },
     text: s => s.age < 18 ? ['엄마 손을 잡고 소아과에 갔다.', '주사를 맞고 사탕을 받았다.'] : ['진료를 받고 약을 타 왔다.', '미뤄둔 치과에 다녀왔다.', '한의원에서 침을 맞았다.'] },
   { id: 'coffee',    label: '커피',   icon: '☕', minAge: 13, cost: 5, effect: { happy: [2, 4] },
