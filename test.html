@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>아바타 체형 테스트</title>
+<style>
+  :root { --bg: #f4f1ea; --card: #fff; --text: #2b2420; --dim: #8a8078; --ok: #2f8a4a; --bad: #c8323c; --line: #ddd5c8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 13px/1.5 system-ui, sans-serif; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .dim { color: var(--dim); }
+  .bar { display: flex; gap: 16px; align-items: center; margin: 8px 0 14px; flex-wrap: wrap; }
+  .checks { display: grid; grid-template-columns: auto auto auto auto; gap: 2px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin-bottom: 14px; width: max-content; max-width: 100%; }
+  .checks b { font-weight: 600; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); font-weight: 700; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
+  section h2 { font-size: 13.5px; margin: 0 0 6px; }
+  .row { display: flex; gap: 6px; overflow-x: auto; align-items: flex-end; }
+  .fig { display: grid; justify-items: center; gap: 2px; min-width: 124px; }
+  .fig .lab { font-weight: 600; }
+  .fig .num { font-size: 11px; color: var(--dim); text-align: center; white-space: pre; line-height: 1.35; }
+  .av-bg { fill: #fbfaf7; stroke: #e6dfd3; }
+</style>
+</head>
+<body>
+<h1>아바타 체형 테스트 시트</h1>
+<p class="dim">같은 틀(0 0 120 280)·같은 바닥선·같은 cm당 px. 한 줄에서 한 항목만 바꿈. 아래 숫자는 앵커 폭(px, 전체 폭). 콘솔에 줄마다 표가 찍힘.</p>
+<div class="bar"><label><input type="checkbox" id="guides" checked> 앵커·바닥 가이드</label></div>
+<div class="checks" id="checks"></div>
+<div id="rows"></div>
+<script src="js/avatar.js"></script>
+<script>
+const A = window.Avatar;
+const base = (seed, g, top, tc) => Object.assign(A.make(seed, g), { top, tc, glasses: 0, body: g === 'f' ? { height: 'avg', build: 'avg', chest: 'avg' } : { height: 'avg', build: 'avg', shoulder: 'avg' } });
+const F0 = base('test-f', 'f', 0, 0), M0 = base('test-m', 'm', 0, 5);
+const fF = o => Object.assign({ height: 165, waist: 64, hip: 92, cup: 'C' }, o);
+const fM = o => Object.assign({ height: 178, shoulder: 44 }, o);
+const ROWS = [
+  { id: 'cup', t: '줄 1 · 여 165cm, 허리 64, 골반 92 — 컵', items: ['A', 'C', 'E', 'F'].map(c => ({ lab: c + '컵', a: F0, fig: fF({ cup: c }) })) },
+  { id: 'hip', t: '줄 2 · 여 165cm, 허리 64, 컵 C — 골반', items: [82, 92, 104].map(v => ({ lab: '골반 ' + v, a: F0, fig: fF({ hip: v }) })) },
+  { id: 'waist', t: '줄 3 · 여 165cm, 골반 92, 컵 C — 허리', items: [57, 64, 74].map(v => ({ lab: '허리 ' + v, a: F0, fig: fF({ waist: v }) })) },
+  { id: 'height', t: '줄 4 · 여 컵 C — 키', items: [150, 160, 170, 175].map(v => ({ lab: v + 'cm', a: F0, fig: fF({ height: v }) })) },
+  { id: 'shoulder', t: '줄 5 · 남 178cm — 어깨', items: [39, 44, 50].map(v => ({ lab: '어깨 ' + v, a: M0, fig: fM({ shoulder: v }) })) },
+  { id: 'mwaist', t: '줄 6 · 남 178cm — 허리 (88 이상은 통통 규칙 자동)', items: [72, 82, 92].map(v => ({ lab: '허리 ' + v, a: M0, fig: fM({ waist: v }) })) },
+  { id: 'top', t: '줄 7 · 같은 여성 체형 — 윗옷 여유분 (티 1 / 니트 3 / 후디 5 / 셔츠 2)', items: [[0, 0, '티'], [3, 0, '니트'], [2, 1, '후디'], [1, 2, '셔츠']].map(([top, tc, lab]) => ({ lab, a: base('test-f', 'f', top, tc), fig: fF({ cup: 'D' }) })) },
+  { id: 'age', t: '줄 8 · 나이 — 등신 변화 (어린이 1:3.5 → 어른 1:5.5)', items: [6, 10, 14, 17, 25].map(age => ({ lab: age + '살', a: F0, age, fig: age >= 20 ? fF({}) : null })) },
+  { id: 'pose', t: '줄 9 · 자세 — 기본 / 허리 손 / 팔짱 (팔짱은 밑가슴 +2px, 가슴에 밀려 바깥으로)', items: [['default', 'f'], ['hip', 'f'], ['cross', 'f'], ['default', 'm'], ['hip', 'm'], ['cross', 'm']].map(([pose, g]) => ({ lab: (g === 'f' ? '여 E ' : '남 ') + { default: '기본', hip: '허리 손', cross: '팔짱' }[pose], a: g === 'f' ? F0 : M0, pose, fig: g === 'f' ? fF({ cup: 'E' }) : fM({}) })) },
+];
+// 섹션 3 기준: 한 항목만 바꿨을 때 앵커 폭 차이가 이만큼은 나야 함
+const CHECKS = [
+  { row: 'cup', from: 0, to: 2, key: 'bust', min: 6, t: 'A컵 vs E컵 → 가슴' },
+  { row: 'hip', from: 0, to: 2, key: 'hip', min: 10, t: '골반 82 vs 104 → 골반' },
+  { row: 'waist', from: 0, to: 2, key: 'waist', min: 8, t: '허리 57 vs 74 → 허리' },
+  { row: 'shoulder', from: 0, to: 2, key: 'shoulder', min: 10, t: '어깨 39 vs 50 (남) → 어깨' },
+  { row: 'height', from: 0, to: 2, key: 'height', min: 26, t: '키 150 vs 170 → 전체 높이' },
+];
+const r1 = v => Math.round(v * 10) / 10;
+function draw() {
+  const guides = document.getElementById('guides').checked, px = {};
+  document.getElementById('rows').innerHTML = ROWS.map(row => {
+    const table = {};
+    const figs = row.items.map(it => {
+      const age = it.age ?? 25, an = A.anchors(it.a, age, it.fig), p = an.px;
+      (px[row.id] = px[row.id] || []).push(p);
+      table[it.lab] = { 키: r1(p.height), 어깨: r1(p.shoulder), 가슴: r1(p.bust), 밑가슴: r1(p.underbust), 허리: r1(p.waist), 골반: r1(p.hip), 허벅지: r1(p.thigh) };
+      const num = `가슴 ${r1(p.bust)} · 허리 ${r1(p.waist)}\n골반 ${r1(p.hip)} · 어깨 ${r1(p.shoulder)}\n키 ${r1(p.height)}px`;
+      return `<div class="fig">${A.render(it.a, 120, { age, full: it.fig || true, pose: it.pose || 'default', guides })}<span class="lab">${it.lab}</span><span class="num">${num}</span></div>`;
+    }).join('');
+    console.log(row.t); console.table(table);
+    return `<section><h2>${row.t}</h2><div class="row">${figs}</div></section>`;
+  }).join('');
+  document.getElementById('checks').innerHTML = '<b>검사</b><b>차이</b><b>기준</b><b>결과</b>' + CHECKS.map(c => {
+    const d = Math.abs(px[c.row][c.to][c.key] - px[c.row][c.from][c.key]), ok = d >= c.min;
+    if (!ok) console.warn('미달:', c.t, r1(d), '<', c.min);
+    return `<span>${c.t}</span><span>${r1(d)}px</span><span>${c.min}px 이상</span><span class="${ok ? 'ok' : 'bad'}">${ok ? '통과' : '미달'}</span>`;
+  }).join('');
+}
+document.getElementById('guides').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>
