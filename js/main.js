@@ -124,10 +124,10 @@ function actButtons(acts) {
 const ageBand = age => age < 13 ? '어린이' : age < 20 ? `${age < 16 ? '10대 중반' : '10대 후반'}` : `${Math.floor(age / 10) * 10}대${age % 10 < 4 ? ' 초반' : age % 10 < 7 ? ' 중반' : ' 후반'}`;
 function hereRow(h) {
   const p = h.p;
-  const who = h.stranger ? `<b>처음 보는 사람</b> <span class="dim">${ageBand(G.npcAge(p))} ${genderKo(p.gender)}</span>`
-    : `<b>${esc(G.pname(p))}</b> <span class="dim">${G.npcAge(p)}살 ${esc(G.relLabel(p))}</span>`;
-  return `<button type="button" class="hp${h.used ? ' used' : ''}" data-hp="${h.key}">${av(p, 48)}
-    <span class="hw">${who}</span><span class="hd">${esc(h.doing)}${h.used ? ' · 이야기함' : ''}</span></button>`;
+  const who = h.stranger ? `<b>처음 보는 사람</b><span class="dim">${ageBand(G.npcAge(p))} ${genderKo(p.gender)}</span>`
+    : `<b>${esc(G.pname(p))}</b><span class="dim">${G.npcAge(p)}살 · ${esc(G.relLabel(p))}</span>`;
+  return `<button type="button" class="hp${h.used ? ' used' : ''}" data-hp="${h.key}" title="${esc(h.doing)}">${av(p, 48)}
+    <span class="hw">${who}</span><span class="hd">${h.used ? '이야기함' : esc(h.doing)}</span></button>`;
 }
 function renderWhere(S) {
   const box = $('#where');
@@ -145,7 +145,7 @@ function renderWhere(S) {
   }
   const here = G.here(), acts = G.actionList();
   box.innerHTML = `
-    <div class="here-head"><span>📍 <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}</span><button type="button" data-leave>← 돌아가기</button></div>
+    <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}</span><button type="button" data-leave>← 돌아가기</button></div>
     <p class="sec-t">여기 있는 사람들 <span class="dim">· 말 걸기는 행동을 안 씀</span></p>
     <div class="here">${here.map(hereRow).join('') || '<p class="empty">아무도 없다.</p>'}</div>
     <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· 행동 1</span></p>
@@ -222,6 +222,8 @@ function openPerson(id) {
   if (p.secret) tags.push('<span class="tag warn">들키면 안 됨</span>');
   if (p.debt) tags.push(`<span class="tag warn">빌린 돈 ${G.fmtMoney(p.debt)}</span>`);
   if (p.ex) tags.push('<span class="tag">예전에 사귐</span>');
+  if (S.preg && S.preg.pid === p.id && S.preg.mode && S.gender === 'm') tags.push('<span class="tag">아이를 가짐</span>');
+  if (p.livesWith) tags.push('<span class="tag">같이 삶</span>');
   const prof = G.profile(p).map(f => `<dt>${f.label}</dt><dd${f.value == null ? ' class="unk"' : ''}>${f.value == null ? '???' : esc(f.value)}</dd>`).join('');
   const its = G.interactions(id), anyFree = its.some(it => it.free);
   const acts = its.map(it =>
@@ -325,6 +327,7 @@ function openMe() {
   const me = G.myLook() && window.Avatar ? Avatar.render(G.myLook(), 60, S.age) : '';
   showModal('me', `📋 ${S.name}`, `
     <div class="me-top">${me}<dl class="prof">${prof}</dl></div>
+    ${S.preg && S.preg.mode ? `<p class="dim" style="font-size:13px">${S.gender === 'f' ? '임신 중' : '곧 아이가 태어난다'} — ${S.preg.due > S.age ? '내년' : '올해'} 출산 예정</p>` : ''}
     <p class="sec-t">능력치</p>
     <div class="stats">${ab}</div>
     <p class="hint">능력치는 100에서 멈추지 않는다. F부터 SS까지, 등급이 오를수록 올리기 어렵다.</p>
