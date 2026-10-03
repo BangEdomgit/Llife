@@ -86,6 +86,7 @@ function relLabel(p) {
   if (p.partner) return '연인';
   if (p.secret) return '몰래 만나는 사이';
   if (p.grudge >= 50) return '원수';
+  if (p.fling) return mainPartner() || p.taken || p.heart < 40 ? '복잡한 사이' : '썸';   // 사귀지 않고 밤을 보낸 사이
   if (p.ex) return '전 연인';
   if (p.heart >= 40 && heartOk(p)) return '썸';
   if (p.close >= 75) return '절친';
@@ -173,7 +174,7 @@ function applyP(p, delta, mult) {
 }
 function breakUp(p, grudge) {
   if (!p) return;
-  p.partner = false; p.secret = false; p.ex = true;
+  p.partner = false; p.secret = false; p.ex = true; p.fling = false; p.livesWith = false;
   p.grudge = clamp(p.grudge + (grudge || 0), 0, 100);
   p.heart = Math.min(p.heart, 15);
 }
@@ -192,7 +193,36 @@ function endMain(grudge) {
 }
 function startRelation(p, sneaky) {
   if (sneaky) p.secret = true; else p.partner = true;
-  p.taken = false; p.ex = false;
+  p.taken = false; p.ex = false; p.fling = false;
+}
+/* ═════════ 친밀한 관계와 아이 ═════════ */
+// 함께 밤을 보냄 (fling: 사귀지 않는 사이 → '썸' 또는 '복잡한 사이')
+function night(p, fling) {
+  if (!p) return;
+  S.flags.intimate = true;
+  p.nights = (p.nights || 0) + 1;
+  if (fling && !(p.partner || p.spouse || p.secret)) p.fling = true;
+}
+// 아이가 생길 수 있음. 엄마 나이 30살부터 확률이 줄고 45살부터는 0. 소식은 다음 계절에 (tellPreg)
+function conceive(p, chance) {
+  if (!p || p.gone || S.preg || !chance) return false;
+  const mom = S.gender === 'f' ? S.age : npcAge(p);
+  let c = chance * (mom >= 45 ? 0 : mom >= 40 ? .25 : mom >= 35 ? .5 : mom >= 30 ? .8 : 1);
+  if (alive().filter(x => x.kind === 'child').length >= 3) c *= .3;
+  if (Math.random() >= c) return false;
+  S.preg = { pid: p.id, due: null, mode: null };
+  return true;
+}
+// 임신 소식: 배우자면 기뻐하고 내년에 출산(babyBorn), 아니면 선택지 이벤트(unexpectedPreg)
+function tellPreg() {
+  const g = S.preg, p = person(g.pid);
+  g.due = S.age + 1;
+  if (p && p.spouse) {
+    g.mode = 'married';
+    log(fill(S.gender === 'f' ? '임신 테스트기에 두 줄이 떴다. {p}에게 보여주자 한참 말을 잇지 못했다.' : '{p|이} 말없이 임신 테스트기를 내밀었다. 두 줄이었다.', { p: pname(p) }), { memory: true, deltas: applyEffect({ happy: 6 }) });
+  } else if (p) { S.vars.fp = p.id; trigger('unexpectedPreg'); }
+  else if (S.gender === 'f') { g.mode = 'alone'; log('임신이었다. 아이 아빠와는 연락이 닿지 않았다. 혼자 낳기로 했다.', { memory: true }); }
+  else S.preg = null;   // 연락이 끊긴 상대 — 나는 끝내 알지 못함
 }
 function marry(p) {
   if (!p) return;
@@ -278,8 +308,9 @@ function applyOutcome(o, target) {
   addKarma(o.karma);
   if (o.heat) S.heat = clamp(S.heat + val(o.heat), 0, 100);
   const text = o.text != null ? fill(textOf(o.text), target ? { p: pname(target) } : {}) : '';
-  if (text) log(text, { memory: !!o.memory, deltas });
+  if (text) log(text, { memory: !!resolve(o.memory), deltas });
   else if (deltas.length) log('', { t: 'info', deltas });
+  if (o.pregnant && tp) conceive(tp, resolve(o.pregnant));
   riskCheck(o, tp);
   if (o.then) { const t = resolve(o.then); if (t) trigger(t); }
 }
@@ -391,6 +422,7 @@ function enterSeason(i) {
   S.log.push({ n: ++S.seq, t: 'season', season: se.id, icon: se.icon, wx: S.weather });
   if (se.months.includes(S.month)) birthday();
   schoolExam(se.id);
+  if (S.preg && S.preg.due == null) tellPreg();
 
   // 반드시 터지는 것 (입학, 수능, 전역 등)
   const musts = D.events.filter(e => e.type === 'must' && seasonOk(e, se.id) && eligible(e));
@@ -1051,7 +1083,7 @@ const api = {
   focus: p => { S.vars.fp = p ? p.id : null; },
   focused: () => person(S.vars.fp),
   changeP: (p, d) => applyP(p, d),
-  startRelation, marry, breakUp, divorce, endMain,
+  startRelation, marry, breakUp, divorce, endMain, night, conceive,
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,
@@ -1078,7 +1110,7 @@ function newLife(opt = {}) {
     month: clamp(+opt.month || rand(1, 12), 1, 12),
     stats: { happy: rand(60, 80), health: rand(65, 90), smart: rand(5, 20), fit: rand(5, 20), looks: rand(5, 25), charm: rand(5, 20), art: rand(5, 20), craft: rand(5, 20) },
     school: { subj: { kor: 0, math: 0, eng: 0, sci: 0 }, naesin: [], mock: null, sat: null, tier: null, major: null, start: null, years: null, gpa: 0, gpaN: 0, studyYear: 0, degree: null },
-    karma: 0, heat: 0, record: 0, crimes: 0, jail: 0, rank: 0, perf: 0,
+    karma: 0, heat: 0, record: 0, crimes: 0, jail: 0, rank: 0, perf: 0, preg: null,
     flags: {}, vars: {}, done: {}, last: {},
     people: [], job: null, salary: 0, log: [], memories: [], pending: [], ended: null,
     weather: 'sunny', time: 0,

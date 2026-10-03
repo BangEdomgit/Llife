@@ -17,12 +17,12 @@
 window.GAME_DATA = window.GAME_DATA || {};
 
 (function () {
-// 집에 같이 사는 사람: 독립 전엔 부모님·형제, 결혼하면 배우자, 아이들
+// 집에 같이 사는 사람: 독립 전엔 부모님·형제, 결혼하면 배우자, 같이 사는 연인, 아이들
 function household(s, a) {
   const out = [];
   const withParents = !s.flags.ownPlace && !s.flags.married;
   for (const p of a.find(() => true)) {
-    if (p.spouse) out.push(p);
+    if (p.spouse || p.livesWith) out.push(p);
     else if (p.kind === 'child' && a.npcAge(p) < 20) out.push(p);
     else if (withParents && p.kind === 'family' && (!p.sibling || a.npcAge(p) < 25)) out.push(p);
   }

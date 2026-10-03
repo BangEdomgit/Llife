@@ -29,6 +29,23 @@ const hereWho = (a, fn) => a.here().filter(p => !fn || fn(p));
 const focusHere = fn => (s, a) => a.focus(a.pick(hereWho(a, fn)));
 const focusNew = (s, a) => a.focus(a.person(s.vars.newId));
 const NOT_ROUTINE = ['playground', 'park', 'cafe', 'library', 'gym', 'pcbang', 'mall', 'hospital', 'center', 'bar', 'church', 'conveni', 'concert'];
+// 친밀한 관계: 사귀는 사이 / 사귀지 않고 밤을 보낸 사이 / 다음 날 아침 한 줄(상대 성격마다, data/social.js)
+const lover = p => p.partner || p.spouse || p.secret;
+const nightLine = (a, set) => { const p = a.focused(), L = p && GAME_DATA.nightLines[set][p.personality]; return (L ? a.pick(L) : GAME_DATA.nightLines[set]._).replace(/\{p([|}])/g, '{fp$1'); };
+const firstNight = (s, a) => (a.focused() || {}).nights === 1;
+// 아이를 같이 키우기로 함: 다른 애인과는 끝내고 이 사람과 사귐 (marry면 결혼까지)
+function raiseTogether(s, a, marry) {
+  const p = a.focused();
+  if (!p || !s.preg) return;
+  const m = a.main();
+  s.vars.leftName = m && m !== p ? a.josa(m.name || m.role, '와는') : '';
+  if (m && m !== p) a.endMain(40);
+  p.secret = false;
+  if (!p.partner && !p.spouse) a.startRelation(p, false);
+  if (marry && !p.spouse) a.marry(p);
+  s.preg.mode = marry || p.spouse ? 'married' : 'together';
+}
+const leftLine = s => s.vars.leftName ? ` ${s.vars.leftName} 끝났다.` : '';
 GAME_DATA.events = [
   /* ═════ 반드시 (must) ═════ */
   { id: 'firstSteps', type: 'must', at: 1, text: '처음으로 걸음마를 뗐다. 엄마가 박수를 쳤다.', memory: true, effect: { happy: 3 } },
@@ -195,8 +212,8 @@ GAME_DATA.events = [
       { label: '결혼하자', do: (s, a) => a.marry(a.focused()), memory: true, effect: { happy: 12, money: -1500 }, text: '작은 결혼식을 올렸다. {fp|이} 울다가 웃었다.' },
       { label: '아직은 이르다', p: { heart: -8 }, text: '조금 더 지켜보기로 했다.' },
     ] },
-  { id: 'baby', type: 'fixed', age: [27, 45], once: false, weight: 2,
-    when: (s, a) => { const m = a.main(); return m && m.spouse && a.find(p => p.kind === 'child').length < 2; },
+  { id: 'baby', type: 'fixed', age: [27, 45], once: false, weight: 2, req: { flags: ['intimate'] },
+    when: (s, a) => { const m = a.main(); return m && m.spouse && !s.preg && a.find(p => p.kind === 'child').length < 2; },
     meet: s => ({ kind: 'child', ageDiff: -s.age, close: 80, trust: 60 }),
     text: '아이가 태어났다. 이름은 {new|으로} 지었다.', memory: true, effect: { happy: 15 } },
 
@@ -287,7 +304,7 @@ GAME_DATA.events = [
   { id: 'onlineFriend', type: 'random', on: ['game'], age: [12, 49], once: false, cooldown: 3,
     meet: s => ({ kind: 'friend', ageRange: s.age < 19 ? [s.age - 1, s.age + 1] : [Math.max(19, s.age - 5), s.age + 5], close: 20 }), text: '게임에서 만난 {new|와} 친해졌다.' },
   { id: 'grandma', type: 'random', on: ['volunteer'], text: '봉사하다 만난 할머니가 고맙다며 손을 꼭 잡아주셨다.', memory: true, karma: 3, effect: { happy: 4 } },
-  { id: 'travelNight', type: 'random', on: ['travel'], once: false, cooldown: 3, text: '여행지에서 길을 잃었다가 우연히 엄청난 노을을 봤다.', memory: true, effect: { happy: 5 } },
+  { id: 'travelSunset', type: 'random', on: ['travel'], once: false, cooldown: 3, text: '여행지에서 길을 잃었다가 우연히 엄청난 노을을 봤다.', memory: true, effect: { happy: 5 } },
   { id: 'oldFriend', type: 'random', age: [20, 50], once: false, cooldown: 3,
     when: (s, a) => friends(a).some(p => p.close < 40),
     onStart: (s, a) => a.focus(friends(a).filter(p => p.close < 40)[0]),
@@ -584,6 +601,149 @@ GAME_DATA.events = [
     ] },
   { id: 'regularMissed', type: 'random', on: NOT_ROUTINE, age: [10, 50], once: false, cooldown: 4, when: s => !!s.regular[s.place],
     text: '"요즘 왜 안 왔어요?" {place}에서 누가 먼저 안부를 물었다. 별것 아닌데 기분이 좋았다.', effect: { happy: 3 } },
+
+  /* ═════ 친밀한 관계 (둘 다 19살 이상, 이성, 가족 아님) — 행위는 한 줄로 넘기고 그 전후에 무게 ═════ */
+  // 연인의 빈 집
+  { id: 'emptyHouse', type: 'fixed', age: [19, 49], once: false, cooldown: 2,
+    when: (s, a) => { const m = a.main(); return m && m.partner && m.heart >= 55; },
+    onStart: (s, a) => a.focus(a.main()),
+    text: '{fp}의 가족이 여행을 갔다. 빈 집에 둘만 있다.',
+    choices: [
+      { label: '영화를 틀었다', text: '영화를 틀었지만 끝까지 본 건 아니었다.', do: (s, a) => a.night(a.focused()), pregnant: .08,
+        p: { heart: [8, 14], close: [4, 8] }, effect: { happy: [4, 6] }, memory: firstNight },
+      { label: '일찍 들어간다', text: '아쉬운 표정을 뒤로하고 나왔다.' },
+    ] },
+  // 여행지에서
+  { id: 'travelNight', type: 'random', on: ['travel'], age: [19, 49], once: false, cooldown: 4,
+    when: (s, a) => { const m = a.main(); return m && m.heart >= 60; },
+    onStart: (s, a) => a.focus(a.main()),
+    text: '여행지 숙소에서 {fp|와} 단둘이. 창밖으로 바다가 보인다.',
+    do: (s, a) => a.night(a.focused()), pregnant: (s, a) => a.focused().spouse ? .12 : .06,
+    p: { heart: [6, 12], close: [5, 8] }, effect: { happy: [5, 8] }, memory: true },
+  // 술자리 뒤
+  { id: 'drunkNight', type: 'random', on: ['bar'], age: [19, 49], once: false, cooldown: 3,
+    when: (s, a) => hereWho(a, p => a.canRomance(p) && p.heart >= 45 && !p.partner && !p.spouse).length > 0,
+    onStart: (s, a) => a.focus(a.pick(hereWho(a, p => a.canRomance(p) && p.heart >= 45 && !p.partner && !p.spouse))),
+    text: '술집을 나서는데 {fp|이} 택시를 같이 타자고 했다.',
+    choices: [
+      { label: '같이 탄다', text: (s, a) => '택시는 {fp}의 집 앞에 섰다. ' + nightLine(a, 'fling'),
+        do: (s, a) => a.night(a.focused(), true), pregnant: .05, memory: firstNight,
+        p: { heart: [10, 16], close: [4, 6] }, effect: { happy: [3, 6] }, risk: .2, riskTaken: .15 },
+      { label: '각자 간다', text: '손을 흔들고 돌아섰다. 조금 아쉬웠다.' },
+    ] },
+  // 몰래 만나는 사이
+  { id: 'secretMeet', type: 'fixed', age: [19, 49], once: false, cooldown: 2,
+    when: (s, a) => a.find(p => p.secret && p.heart >= 40).length > 0,
+    onStart: (s, a) => a.focus(a.pick(a.find(p => p.secret && p.heart >= 40))),
+    text: '{fp|이} 아무도 우리를 모르는 동네에서 보자고 했다.',
+    choices: [
+      { label: '간다', text: (s, a) => '낯선 동네의 작은 숙소였다. ' + nightLine(a, 'lover') + ' 돌아오는 길은 유난히 길었다.',
+        do: (s, a) => a.night(a.focused()), pregnant: .06, risk: .25,
+        p: { heart: [6, 10], close: [3, 6] }, effect: { happy: 3, money: -10 } },
+      { label: '오늘은 못 간다', p: { heart: -5 }, text: '답장이 한참 뒤에 왔다. "응."' },
+    ] },
+  // 사귀지 않고 밤을 보낸 뒤
+  { id: 'flingTalk', type: 'fixed', age: [19, 49], once: false, cooldown: 2, weight: 2,
+    when: (s, a) => a.find(p => p.fling && !lover(p)).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => p.fling && !lover(p))[0]),
+    text: '{fp|이} 그날 밤 이야기를 꺼냈다. "우리, 이대로 괜찮아?"',
+    choices: [
+      { label: '사귀자고 한다', memory: true, effect: { happy: [4, 8] }, do: (s, a) => a.startRelation(a.focused(), !!a.main()),
+        text: (s, a) => a.focused().secret ? '{fp|와} 몰래 만나기 시작했다. 아무도 몰라야 한다.' : '{fp|와} 정식으로 사귀기로 했다.' },
+      { label: '없던 일로 하자고 한다', do: (s, a) => { a.focused().fling = false; },
+        p: { heart: [-20, -12], close: [-6, -3], grudge: [3, 8] },
+        text: (s, a) => ({ sensitive: '{fp|은} 아무렇지 않은 척했지만 목소리가 떨렸다.', cool: '{fp|은} "그래, 그게 낫겠다."라고 짧게 답했다.',
+          bold: '{fp|이} "알았어. 근데 난 진심이었어."라고 했다.', playful: '{fp|이} 웃으며 넘겼다. 눈은 웃고 있지 않았다.' })[a.focused().personality] || '{fp|이} 고개를 끄덕였다. 그 뒤로 조금 어색해졌다.' },
+      { label: '대답을 미룬다', p: { heart: -4, trust: -3 }, text: '{fp|은} 더 묻지 않았다.' },
+    ] },
+  { id: 'flingAwkward', type: 'random', on: NOT_ROUTINE.concat(['office', 'campus']), age: [19, 50], once: false, cooldown: 2,
+    when: (s, a) => hereWho(a, p => p.fling && !lover(p)).length > 0,
+    onStart: focusHere(p => p.fling && !lover(p)), text: '{fp|와} 마주쳤다. 그날 이후 처음이었다.',
+    choices: [
+      { label: '먼저 인사한다', p: { close: [2, 4], heart: [1, 3] }, text: '"잘 지냈어?" 둘 다 같은 말을 동시에 했다.' },
+      { label: '못 본 척한다', p: { close: -4, grudge: 3 }, text: '{fp}의 시선이 등 뒤에 오래 머물렀다.' },
+    ] },
+  // 임신
+  { id: 'unexpectedPreg', type: 'trigger',
+    text: s => s.gender === 'm' ? '{fp|이} 할 말이 있다며 만나자고 했다. 임신이라고 했다.' : '임신 테스트기에 두 줄이 떴다. {fp}의 아이다.',
+    choices: [
+      { label: '결혼하자', if: (s, a) => s.gender === 'm' && s.age >= 20 && !(a.main() && a.main().spouse && a.main() !== a.focused()),
+        do: (s, a) => raiseTogether(s, a, true), memory: true, effect: { happy: 5, money: -500 },
+        text: s => '서둘러 혼인신고를 했다. 배가 불러오기 전에 작은 식을 올렸다.' + leftLine(s) },
+      { label: '같이 키우자', if: s => s.gender === 'm', do: (s, a) => raiseTogether(s, a, false), memory: true, effect: { happy: 4 },
+        text: s => '{fp|와} 함께 키우기로 했다. 인생이 한순간에 바뀌었다.' + leftLine(s) },
+      { label: '책임은 지겠다', if: s => s.gender === 'm', do: s => { s.preg.mode = 'apart'; }, memory: true, effect: { happy: -2 },
+        text: '같이 살지는 않지만, 아이에 대한 책임은 지기로 했다.' },
+      { label: '못 본 척한다', if: s => s.gender === 'm', karma: -30, p: { grudge: 50, trust: -40, heart: -30 }, effect: { happy: -8 },
+        do: (s, a) => { s.vars.hiddenName = a.focused().name; s.flags.hiddenChild = true; s.preg = null; },
+        text: '전화를 받지 않았다. 오래 찜찜했다.' },
+      { label: '{fp}에게 말한다', if: s => s.gender === 'f', chance: (s, a) => { const p = a.focused(); return Math.min(.9, (p.heart + p.trust) / 150 + (p.personality === 'warm' || p.personality === 'bold' ? .15 : 0)); },
+        success: { do: (s, a) => raiseTogether(s, a, false), memory: true, effect: { happy: 4 },
+          text: s => '{fp|이} 한참 말이 없더니 내 손을 잡았다. "같이 키우자."' + leftLine(s) },
+        fail: { do: s => { s.preg.mode = 'alone'; }, p: { heart: -20, trust: -25, grudge: 20 }, memory: true, effect: { happy: -6 },
+          text: '{fp|은} 그 뒤로 연락을 피했다. 혼자 낳기로 마음먹었다.' } },
+      { label: '결혼하자고 한다', if: (s, a) => s.gender === 'f' && s.age >= 20 && !(a.main() && a.main().spouse && a.main() !== a.focused()),
+        chance: (s, a) => { const p = a.focused(); return Math.min(.85, (p.heart + p.trust) / 170); },
+        success: { do: (s, a) => raiseTogether(s, a, true), memory: true, effect: { happy: 6, money: -500 },
+          text: s => '{fp|이} 고개를 끄덕였다. 배가 불러오기 전에 작은 식을 올렸다.' + leftLine(s) },
+        fail: { do: s => { s.preg.mode = 'alone'; }, p: { heart: -15, trust: -15, grudge: 15 }, memory: true, effect: { happy: -6 },
+          text: '{fp|은} 아직 준비가 안 됐다고 했다. 그 말을 듣고 혼자 낳기로 했다.' } },
+      { label: '혼자 키운다', if: s => s.gender === 'f', do: s => { s.preg.mode = 'alone'; }, memory: true, effect: { happy: -2 },
+        text: '{fp}에게는 말하지 않기로 했다. 혼자서도 해낼 수 있을 것 같았다.' },
+    ] },
+  { id: 'babyBorn', type: 'must', once: false,
+    when: s => !!s.preg && !!s.preg.mode && s.preg.due != null && s.age >= s.preg.due,
+    onStart: (s, a) => { a.focus(a.person(s.preg.pid)); s.vars.pregMode = s.preg.mode; },
+    meet: s => ({ kind: 'child', ageDiff: -s.age, close: s.preg.mode === 'apart' ? 55 : 80, trust: 60 }),
+    text: s => s.vars.pregMode === 'alone' ? '혼자 아이를 낳았다. 이름은 {new|으로} 지었다. 작은 손이 내 손가락을 꼭 쥐었다.'
+      : s.vars.pregMode === 'apart' ? '아이가 태어났다. 이름은 {new|으로} 지었다. 같이 살지는 않지만, 주말마다 보러 가기로 했다.'
+      : '아이가 태어났다. 이름은 {new|으로} 지었다. {fp|와} 번갈아 안아보며 한참을 울었다.',
+    memory: true, effect: { happy: 12 }, do: s => { s.preg = null; s.flags.intimate = true; } },
+  { id: 'pregScare', type: 'random', age: [19, 44], once: false, cooldown: 4, req: { flags: ['intimate'], noFlags: ['married'] },
+    when: (s, a) => !s.preg && a.find(p => (lover(p) || p.fling) && !p.spouse).length > 0,
+    onStart: (s, a) => a.focus(a.pick(a.find(p => (lover(p) || p.fling) && !p.spouse))),
+    text: s => s.gender === 'f' ? '생리가 늦어진다. 하루 종일 아무것도 손에 잡히지 않았다.' : '{fp}에게서 생리가 늦어진다는 연락이 왔다.',
+    choices: [
+      { label: '같이 기다린다', p: { trust: [4, 8], close: [2, 4] }, effect: { happy: -1 }, text: '며칠 뒤, 아니었다. 둘이 동시에 긴 숨을 내쉬었다.' },
+      { label: '모른 척한다', if: s => s.gender === 'm', karma: -4, p: { trust: -12, grudge: 8 }, text: '"알아서 하겠지." 그 말을 한 걸 오래 후회했다. 다행히 아니었다.' },
+      { label: '혼자 병원에 간다', if: s => s.gender === 'f', effect: { happy: -2 }, text: '아니었다. 병원을 나서며, 다음엔 혼자 감당하지 않기로 했다.' },
+    ] },
+  { id: 'hiddenChildSeen', type: 'fixed', age: [28, 50], req: { flags: ['hiddenChild'] },
+    text: '길에서 나를 꼭 닮은 아이를 봤다. 아이 손을 잡고 걷던 {hiddenName|이} 나를 보고 걸음을 멈췄다.',
+    choices: [
+      { label: '다가가서 사과한다', karma: 10, unset: 'hiddenChild', memory: true, effect: { happy: -2 },
+        text: '아이는 내 얼굴을 빤히 올려다봤다. {hiddenName|은} 한참 만에 "늦었어."라고만 했다.' },
+      { label: '고개를 돌린다', karma: -5, effect: { happy: -6 }, text: '그날 밤 한숨도 못 잤다.' },
+    ] },
+  // 전 연인
+  { id: 'exCall', type: 'random', on: ['bar', 'drink', 'home', 'rest'], age: [19, 49], once: false, cooldown: 3,
+    when: (s, a) => a.find(p => p.ex && !lover(p) && a.canRomance(p) && p.grudge < 40 && p.close >= 15).length > 0,
+    onStart: (s, a) => a.focus(a.pick(a.find(p => p.ex && !lover(p) && a.canRomance(p) && p.grudge < 40 && p.close >= 15))),
+    text: '새벽 두 시, {fp}에게서 전화가 왔다. "자?"',
+    choices: [
+      { label: '받는다', p: { heart: [6, 10], close: [3, 5] }, risk: .15, text: '{fp|와} 새벽까지 통화했다. 끊고 나서 한참 천장을 봤다.' },
+      { label: '안 받는다', effect: { happy: -1 }, text: '휴대폰을 엎어놨다. 진동이 두 번 더 울렸다.' },
+    ] },
+  // 결혼 뒤
+  { id: 'quietNight', type: 'fixed', age: [24, 49], once: false, cooldown: 3,
+    when: (s, a) => { const m = a.main(); return m && m.spouse && m.heart >= 50 && m.trust >= 40; },
+    onStart: (s, a) => a.focus(a.main()),
+    text: (s, a) => a.find(p => p.kind === 'child' && a.npcAge(p) < 10).length ? '아이들이 잠든 뒤, {fp|와} 오랜만에 둘만 남았다.' : '{fp|와} 오랜만에 둘 다 일찍 퇴근했다.',
+    choices: [
+      { label: '와인을 꺼낸다', text: (s, a) => '오랜만에 둘만의 밤이었다. ' + nightLine(a, 'lover'), do: (s, a) => a.night(a.focused()), pregnant: .12,
+        p: { heart: [6, 10], close: [3, 6] }, effect: { happy: [3, 5] } },
+      { label: '피곤하다며 먼저 잔다', p: { heart: -3 }, text: '{fp|이} 등을 돌리고 누웠다.' },
+    ] },
+  { id: 'marriageBoredom', type: 'fixed', age: [30, 49], once: false, cooldown: 4,
+    when: (s, a) => { const m = a.main(); return m && m.spouse && m.heart < 30; },
+    onStart: (s, a) => a.focus(a.main()),
+    text: '{fp|와} 마지막으로 손을 잡은 게 언제인지 기억이 안 난다.',
+    choices: [
+      { label: '깜짝 데이트를 계획한다', if: s => s.money >= 50,
+        p: { heart: [10, 18], close: [6, 10] }, effect: { happy: 4, money: -50 },
+        text: '오랜만에 둘이 나갔다. 처음 만났을 때 이야기가 나왔다.', memory: true },
+      { label: '그냥 지나간다', text: '오늘도 각자의 방에서 잠들었다.' },
+    ] },
 
   /* ═════ 업보 ═════ */
   { id: 'kLostWallet', type: 'karma', sign: -1, once: false, text: '지갑을 잃어버렸다. 어디서 흘렸는지 모르겠다.', effect: s => ({ money: s.age >= 18 ? [-80, -10] : [-3, -1], happy: -3 }) },
