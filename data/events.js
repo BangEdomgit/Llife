@@ -633,37 +633,37 @@ GAME_DATA.events = [
 
   /* ═════ 친밀한 관계 (둘 다 19살 이상, 이성, 가족 아님) — 행위는 한 줄로 넘기고 그 전후에 무게 ═════ */
   // 연인의 빈 집
-  { id: 'emptyHouse', type: 'fixed', age: [19, 49], once: false, cooldown: 2,
-    when: (s, a) => { const m = a.main(); return m && m.partner && m.heart >= 55; },
+  { id: 'emptyHouse', type: 'fixed', age: [20, 49], once: false, cooldown: 2,
+    when: (s, a) => { const m = a.main(); return m && m.partner && m.heart >= 55 && a.canSex(m); },
     onStart: (s, a) => a.focus(a.main()),
     text: '{fp}의 가족이 여행을 갔다. 빈 집에 둘만 있다.',
     choices: [
-      { label: '영화를 틀었다', text: '영화를 틀었지만 끝까지 본 건 아니었다.', intimate: true, pregnant: .08,
+      { label: '가까이 앉는다', text: '영화를 틀었지만 20분을 못 넘겼다. 소파 위에 이불이 흘러내렸다.', intimate: true, mood: 15, pregnant: .08,
         p: { heart: [8, 14], close: [4, 8] }, effect: { happy: [4, 6] }, memory: firstNight },
       { label: '일찍 들어간다', text: '아쉬운 표정을 뒤로하고 나왔다.' },
     ] },
   // 여행지에서
-  { id: 'travelNight', type: 'random', on: ['travel'], age: [19, 49], once: false, cooldown: 4,
-    when: (s, a) => { const m = a.main(); return m && m.heart >= 60; },
+  { id: 'travelIntimate', type: 'random', on: ['travel'], age: [20, 49], once: false, cooldown: 4,
+    when: (s, a) => { const m = a.main(); return m && m.heart >= 60 && a.canSex(m); },
     onStart: (s, a) => a.focus(a.main()),
-    text: '여행지 숙소에서 {fp|와} 단둘이. 창밖으로 바다가 보인다.',
+    text: '여행지 숙소에서 {fp|와} 단둘이. 파도 소리 말고는 아무것도 들리지 않았다.',
     intimate: true, mood: 25, pregnant: (s, a) => a.focused().spouse ? .12 : .06,
     p: { heart: [6, 12], close: [5, 8] }, effect: { happy: [5, 8] }, memory: true },
   // 술자리 뒤
-  { id: 'drunkNight', type: 'random', on: ['bar'], age: [19, 49], once: false, cooldown: 3,
-    when: (s, a) => hereWho(a, p => a.canRomance(p) && p.heart >= 45 && !p.partner && !p.spouse).length > 0,
-    onStart: (s, a) => a.focus(a.pick(hereWho(a, p => a.canRomance(p) && p.heart >= 45 && !p.partner && !p.spouse))),
+  { id: 'drunkNight', type: 'random', on: ['bar'], age: [20, 49], once: false, cooldown: 3,
+    when: (s, a) => hereWho(a, p => a.canSex(p) && p.heart >= 45 && !p.partner && !p.spouse).length > 0,
+    onStart: (s, a) => a.focus(a.pick(hereWho(a, p => a.canSex(p) && p.heart >= 45 && !p.partner && !p.spouse))),
     text: '술집을 나서는데 {fp|이} 택시를 같이 타자고 했다.',
     choices: [
-      { label: '같이 탄다', text: (s, a) => '택시는 {fp}의 집 앞에 섰다. ' + nightLine(a, 'fling'),
+      { label: '같이 탄다', text: (s, a) => '택시 뒷좌석에서 {fp}의 머리가 내 어깨에 기댔다. 아무도 안 내렸다. ' + nightLine(a, 'fling'),
         intimate: true, fling: true, pregnant: .05, memory: firstNight,
         p: { heart: [10, 16], close: [4, 6] }, effect: { happy: [3, 6] }, risk: .2, riskTaken: .15 },
       { label: '각자 간다', text: '손을 흔들고 돌아섰다. 조금 아쉬웠다.' },
     ] },
   // 몰래 만나는 사이
-  { id: 'secretMeet', type: 'fixed', age: [19, 49], once: false, cooldown: 2,
-    when: (s, a) => a.find(p => p.secret && p.heart >= 40).length > 0,
-    onStart: (s, a) => a.focus(a.pick(a.find(p => p.secret && p.heart >= 40))),
+  { id: 'secretMeet', type: 'fixed', age: [20, 49], once: false, cooldown: 2,
+    when: (s, a) => a.find(p => p.secret && p.heart >= 40 && a.canSex(p)).length > 0,
+    onStart: (s, a) => a.focus(a.pick(a.find(p => p.secret && p.heart >= 40 && a.canSex(p)))),
     text: '{fp|이} 아무도 우리를 모르는 동네에서 보자고 했다.',
     choices: [
       { label: '간다', text: (s, a) => '낯선 동네의 작은 숙소였다. ' + nightLine(a, 'lover') + ' 돌아오는 길은 유난히 길었다.',
@@ -673,8 +673,8 @@ GAME_DATA.events = [
     ] },
   // 사귀지 않고 밤을 보낸 뒤
   { id: 'flingTalk', type: 'fixed', age: [19, 49], once: false, cooldown: 2, weight: 2,
-    when: (s, a) => a.find(p => p.fling && !lover(p)).length > 0,
-    onStart: (s, a) => a.focus(a.find(p => p.fling && !lover(p))[0]),
+    when: (s, a) => a.find(p => p.fling && !p.fwb && !lover(p)).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => p.fling && !p.fwb && !lover(p))[0]),
     text: '{fp|이} 그날 밤 이야기를 꺼냈다. "우리, 이대로 괜찮아?"',
     choices: [
       { label: '사귀자고 한다', memory: true, effect: { happy: [4, 8] }, do: (s, a) => a.startRelation(a.focused(), !!a.main()),
@@ -683,6 +683,8 @@ GAME_DATA.events = [
         p: { heart: [-20, -12], close: [-6, -3], grudge: [3, 8] },
         text: (s, a) => ({ sensitive: '{fp|은} 아무렇지 않은 척했지만 목소리가 떨렸다.', cool: '{fp|은} "그래, 그게 낫겠다."라고 짧게 답했다.',
           bold: '{fp|이} "알았어. 근데 난 진심이었어."라고 했다.', playful: '{fp|이} 웃으며 넘겼다. 눈은 웃고 있지 않았다.' })[a.focused().personality] || '{fp|이} 고개를 끄덕였다. 그 뒤로 조금 어색해졌다.' },
+      { label: '편하게 만나자고 한다', if: (s, a) => a.focused().heart <= 60, do: (s, a) => { a.focused().fwb = true; },
+        p: { heart: [-6, -2] }, text: '{fp|이} 잠깐 생각하더니 고개를 끄덕였다. "그래, 편하게."' },
       { label: '대답을 미룬다', p: { heart: -4, trust: -3 }, text: '{fp|은} 더 묻지 않았다.' },
     ] },
   { id: 'flingAwkward', type: 'random', on: NOT_ROUTINE.concat(['office', 'campus']), age: [19, 50], once: false, cooldown: 2,
@@ -755,7 +757,7 @@ GAME_DATA.events = [
     ] },
   // 결혼 뒤
   { id: 'quietNight', type: 'fixed', age: [24, 49], once: false, cooldown: 3,
-    when: (s, a) => { const m = a.main(); return m && m.spouse && m.heart >= 50 && m.trust >= 40; },
+    when: (s, a) => { const m = a.main(); return m && m.spouse && m.heart >= 50 && m.trust >= 40 && a.canSex(m); },
     onStart: (s, a) => a.focus(a.main()),
     text: (s, a) => a.find(p => p.kind === 'child' && a.npcAge(p) < 10).length ? '아이들이 잠든 뒤, {fp|와} 오랜만에 둘만 남았다.' : '{fp|와} 오랜만에 둘 다 일찍 퇴근했다.',
     choices: [
@@ -770,8 +772,122 @@ GAME_DATA.events = [
     choices: [
       { label: '깜짝 데이트를 계획한다', if: s => s.money >= 50,
         p: { heart: [10, 18], close: [6, 10] }, effect: { happy: 4, money: -50 },
-        text: '오랜만에 둘이 나갔다. 처음 만났을 때 이야기가 나왔다.', memory: true },
+        text: '처음 만났을 때 이야기가 나왔다. 집에 돌아와서도 불을 바로 끄지 않았다.', memory: true },
       { label: '그냥 지나간다', text: '오늘도 각자의 방에서 잠들었다.' },
+    ] },
+
+  /* ═════ 친밀한 관계 — 첫 경험, 성욕, 만족감 ═════ */
+  // 내 첫 경험 (엔진이 함께 보낸 첫 밤에 부름)
+  { id: 'firstTime', type: 'trigger',
+    text: byPers({ bold: '{fp|이} 먼저 불을 껐다.', shy: '둘 다 긴장해서 한참을 가만히 있었다.', playful: '{fp|이} "긴장했어?" 하고 웃었다.', cool: '아무 말 없이, 자연스럽게.',
+      warm: '{fp|이} 내 손을 꼭 잡고 눈을 맞췄다.', sharp: '"준비됐어?" {fp|이} 물었다. 고개를 끄덕였다.', sunny: '{fp|이} 웃으면서 이불을 끌어올렸다.', sensitive: '{fp}의 심장 소리가 들렸다. 내 것도.' },
+      '서툴렀지만, 오래 기억에 남을 밤이었다.'),
+    p: { heart: [12, 20], close: [6, 10], trust: [8, 12] }, effect: { happy: [6, 10] }, memory: true },
+  { id: 'partnerFrustrated', type: 'fixed', age: [20, 49], once: false, cooldown: 3,
+    when: mainIs(m => (m.partner || m.spouse) && (m.libido || 0) >= 75 && m.heart >= 40), onStart: focusMain,
+    text: '{fp|이} 요즘 우리 좀 그런 거 같지 않냐고 말했다.',
+    choices: [
+      { label: '"미안, 요즘 정신이 없었어"', p: { heart: [3, 6] }, text: '{fp|이} 고개를 끄덕였지만, 표정이 다 풀리진 않았다.' },
+      { label: '오늘 밤 보여줄게', intimate: true, mood: 10, p: { heart: [10, 16] }, effect: { happy: [4, 8] },
+        pregnant: (s, a) => a.focused().spouse ? .12 : .06, text: '{fp|이} 웃었다. 그날 밤은 평소보다 길었다.' },
+    ] },
+  { id: 'npcInitiate', type: 'fixed', age: [20, 49], once: false, cooldown: 2, weight: 1.5,
+    when: mainIs(m => m.heart >= 70 && (m.libido || 0) >= 60), onStart: focusMain,
+    text: byPers({ bold: '{fp|이} 대뜸 내 손을 잡고 방으로 끌었다.', shy: '{fp|이} 한참을 우물쭈물하다가 내 옷자락을 잡았다.', playful: '{fp|이} "오늘 일찍 자자"고 하더니 불을 먼저 껐다.',
+      cool: '{fp|이} 말없이 내 옆에 누워서 어깨에 머리를 기댔다.', warm: '{fp|이} 뒤에서 안으며 "보고 싶었어"라고 했다.', sharp: '{fp|이} "요즘 왜 이렇게 안 해?"라고 직접적으로 말했다.',
+      sunny: '{fp|이} 욕실에서 나오더니 수건만 두른 채로 웃었다.', sensitive: '{fp|이} 이유 없이 꼭 안기더니 고개를 들어 입술을 맞췄다.' }, '{fp|이} 먼저 다가왔다.'),
+    choices: [
+      { label: '받아들인다', intimate: true, mood: 15, p: { heart: [8, 14] }, effect: { happy: [4, 6] }, pregnant: (s, a) => a.focused().spouse ? .12 : .06,
+        risk: (s, a) => a.focused().secret ? .15 : 0, text: (s, a) => nightLine(a, 'lover') },
+      { label: '오늘은 피곤하다', p: { heart: -3, close: -2 }, text: '{fp|이} 머쓱하게 웃으며 돌아누웠다.' },
+    ] },
+  { id: 'neckKiss', type: 'random', on: ['home', 'rest'], age: [20, 49], once: false, cooldown: 2,
+    when: (s, a) => { const m = a.main(); return m && m.heart >= 55 && (m.livesWith || m.spouse); }, onStart: focusMain,
+    text: '소파에 앉아 있는데 {fp}의 입술이 목덜미에 닿았다.',
+    choices: [
+      { label: '돌아본다', intimate: true, mood: 10, p: { heart: [6, 10] }, effect: { happy: [3, 5] }, pregnant: (s, a) => a.focused().spouse ? .12 : .06, text: (s, a) => nightLine(a, 'lover') },
+      { label: '"간지러워" 하고 웃는다', p: { heart: [2, 4] }, text: '{fp|이} 장난스럽게 한 번 더 그랬다.' },
+    ] },
+  { id: 'npcApproach', type: 'random', on: NOT_ROUTINE, age: [20, 49], once: false, weight: 3,
+    when: (s, a) => {
+      const g = a.myFace(), gap = g >= 6 ? 1 : g >= 5 ? 2 : g >= 4 ? 3 : s.stats.fit >= a.gradeMin('A') && s.stats.charm >= a.gradeMin('C') ? 4 : 99;
+      return s.age - (s.last.npcApproach ?? -99) >= gap;
+    },
+    meet: s => ({ kind: 'friend', gender: s.gender === 'm' ? 'f' : 'm', ageRange: [Math.max(20, s.age - 5), Math.min(49, s.age + 5)], hangout: s.place, close: 30, heart: 20 }),
+    text: s => s.place === 'bar' ? ['옆 테이블 {new|이} 먼저 말을 걸어왔다. "혼자세요?"', '{new|이} "같이 한 잔 해도 돼요?"라며 옆에 앉았다.']
+      : ['{new|이} 웃으며 자기 번호를 적은 냅킨을 밀어왔다.', '{new|이} 머뭇거리다 먼저 말을 걸어왔다. "아까부터 보고 있었어요."'] },
+  { id: 'barWhisper', type: 'random', on: ['bar', 'drink'], age: [20, 49], once: false, cooldown: 2,
+    when: (s, a) => hereWho(a, p => a.canSex(p) && p.heart >= 35 && !lover(p)).length > 0,
+    onStart: focusHere(p => p.heart >= 35 && !lover(p)), text: '{fp|이} 귓가에 속삭였다. "우리 나갈래?"',
+    choices: [
+      { label: '같이 나간다', intimate: true, fling: true, mood: 10, p: { heart: [8, 12], close: [3, 5] }, effect: { happy: [3, 5] }, pregnant: .05, risk: .2, riskTaken: .15, memory: firstNight,
+        text: (s, a) => a.pick(GAME_DATA.nightLines.flingIntro) + ' ' + nightLine(a, 'fling') },
+      { label: '웃으며 넘긴다', p: { heart: -2 }, text: '{fp|이} 어깨를 으쓱하고 잔을 비웠다.' },
+    ] },
+  { id: 'gymSpotHand', type: 'random', on: ['gym', 'exercise'], age: [20, 49], once: false, cooldown: 3,
+    when: (s, a) => hereWho(a, p => a.canSex(p) && !lover(p)).length > 0, onStart: focusHere(p => !lover(p)),
+    text: '자세를 봐주겠다며 {fp|이} 내 허리에 손을 올렸다. 손이 조금 오래 머물렀다.', p: { heart: [3, 6] }, libido: [5, 10] },
+  { id: 'lateOffice', type: 'random', on: ['office', 'overtime'], age: [22, 49], once: false, cooldown: 3,
+    when: (s, a) => hereWho(a, p => a.canSex(p) && p.kind === 'coworker' && p.heart >= 30).length > 0,
+    onStart: focusHere(p => p.kind === 'coworker' && p.heart >= 30), text: '야근이 끝난 사무실에 {fp|와} 둘만 남았다. {fp|이} 넥타이를 느슨하게 풀며 웃었다.',
+    choices: [
+      { label: '같이 야식을 먹는다', p: { heart: [5, 9], close: [3, 5] }, risk: .1, text: '편의점 테이블에서 컵라면을 먹었다. 무릎이 몇 번 닿았다.' },
+      { label: '먼저 퇴근한다', text: '엘리베이터 문이 닫힐 때까지 {fp|이} 손을 흔들었다.' },
+    ] },
+  { id: 'loverAfterglow', type: 'random', age: [20, 49], once: false, cooldown: 2,
+    when: (s, a) => a.find(p => lover(p) && (p.lastSat || 0) >= 90).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => lover(p) && (p.lastSat || 0) >= 90)[0]),
+    text: '{fp|이} 요즘 부쩍 먼저 연락한다. 별일 없이도 "뭐 해?"', p: { heart: [3, 5] }, do: (s, a) => { const p = a.focused(); p.libido = Math.min(100, (p.libido || 0) + 20); } },
+  { id: 'loverCold', type: 'fixed', age: [20, 49], once: false, cooldown: 3,
+    when: (s, a) => a.find(p => lover(p) && p.nights >= 2 && (p.lastSat ?? 50) < 30).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => lover(p) && p.nights >= 2 && (p.lastSat ?? 50) < 30)[0]),
+    text: '{fp|이} 요즘 스킨십을 슬쩍 피한다.',
+    choices: [
+      { label: '솔직하게 이야기해본다', p: { trust: [5, 8] }, do: (s, a) => { const p = a.focused(); p.compat = Math.min(100, (p.compat || 30) + 10); },
+        text: '어색했지만 끝까지 이야기했다. 서로 몰랐던 게 많았다.' },
+      { label: '모른 척한다', p: { heart: [-6, -3] }, text: '침대 양 끝에 누워 잠들었다.' },
+    ] },
+  { id: 'libidoRestless', type: 'random', age: [20, 49], once: false, cooldown: 2, when: s => s.stats.libido >= 80,
+    text: '밤마다 잠이 안 온다. 괜히 휴대폰 연락처만 위아래로 넘겼다.',
+    choices: [
+      { label: '전 연인에게 연락한다', if: (s, a) => a.find(p => p.ex && a.canSex(p) && p.grudge < 40).length > 0, risk: .15,
+        do: (s, a) => a.focus(a.find(p => p.ex && a.canSex(p) && p.grudge < 40)[0]), p: { heart: [4, 8] }, text: '"자?" 한 글자를 보냈다. 1이 금방 사라졌다.' },
+      { label: '편한 사람을 부른다', if: (s, a) => a.find(p => (p.fwb || p.fling) && a.canSex(p)).length > 0,
+        do: (s, a) => a.focus(a.find(p => (p.fwb || p.fling) && a.canSex(p))[0]), intimate: true, fling: true, risk: .2, pregnant: .04,
+        text: (s, a) => '"지금 와." 답장은 한 글자였다. ' + nightLine(a, 'fling') },
+      { label: '찬물로 샤워한다', libido: [-25, -15], effect: { health: 1 }, text: '이가 딱딱 부딪혔다. 조금 나아졌다.' },
+    ] },
+  { id: 'libidoDistract', type: 'random', on: ['work', 'study', 'office'], age: [20, 49], once: false, cooldown: 2, when: s => s.stats.libido >= 70,
+    text: '도무지 집중이 안 된다. 같은 문장을 다섯 번째 읽고 있다.', effect: { happy: -1 }, do: (s, a) => a.perf(-3) },
+
+  /* ═════ 섹파 (감정은 깊지 않고, 서로 성욕이 차면 만나는 사이) ═════ */
+  { id: 'fwbOffer', type: 'fixed', age: [20, 49], once: false, cooldown: 2, weight: 1.5,
+    when: (s, a) => a.find(p => a.canSex(p) && !lover(p) && !p.fwb && p.nights >= 1 && p.close >= 40 && p.heart >= 30 && p.heart <= 60).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => a.canSex(p) && !lover(p) && !p.fwb && p.nights >= 1 && p.close >= 40 && p.heart >= 30 && p.heart <= 60)[0]),
+    text: byPers({ bold: '{fp|이} "우리 그냥 편하게 만나자. 서로 부담 없이."라고 했다.', cool: '{fp|이} 무심하게 물었다. "이대로 가끔 보는 거, 괜찮지?"',
+      playful: '{fp|이} 새끼손가락을 내밀었다. "사귀는 건 아니고, 근데 또 보는 거. 약속?"', sharp: '{fp|이} 조건을 정리하듯 말했다. "연애는 아니야. 그래도 가끔은 보자."' },
+      '{fp|이} 조심스럽게 물었다. "우리… 그냥 편하게 만나는 건 어때?"'),
+    choices: [
+      { label: '좋아', do: (s, a) => { const p = a.focused(); p.fwb = true; p.fling = true; }, text: '선은 확실히 그었다. 적어도 그렇다고 생각했다.' },
+      { label: '그건 싫어', do: (s, a) => { const p = a.focused(); p.fling = false; }, p: { heart: [-10, -5], close: [-3, -1] }, text: '{fp|이} 알겠다며 웃었다. 그 뒤로 조금 어색해졌다.' },
+    ] },
+  { id: 'fwbCall', type: 'random', age: [20, 49], once: false, cooldown: 1, weight: 1.5,
+    when: (s, a) => a.find(p => p.fwb && a.canSex(p) && (s.stats.libido >= 60 || (p.libido || 0) >= 60)).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => p.fwb && a.canSex(p) && (s.stats.libido >= 60 || (p.libido || 0) >= 60))[0]),
+    text: '{fp}에게서 문자가 왔다. "오늘 시간 돼?"',
+    choices: [
+      { label: '간다', intimate: true, fling: true, p: { close: [2, 4] }, effect: { happy: [2, 4] }, risk: .15, pregnant: .04,
+        text: (s, a) => '현관문이 닫히자마자 말이 필요 없었다. ' + nightLine(a, 'fling') },
+      { label: '오늘은 패스', p: { close: -2 }, text: '"ㅇㅋ" 답장이 바로 왔다.' },
+    ] },
+  { id: 'fwbFeelings', type: 'fixed', age: [20, 49], once: false, cooldown: 2, weight: 2,
+    when: (s, a) => a.find(p => p.fwb && p.heart > 70).length > 0, onStart: (s, a) => a.focus(a.find(p => p.fwb && p.heart > 70)[0]),
+    text: '{fp|이} 옷을 입다 말고 물었다. "우리… 이거 사귀는 거 아니야?"',
+    choices: [
+      { label: '사귀자', memory: true, do: (s, a) => a.startRelation(a.focused(), !!a.main() || !!a.focused().married), effect: { happy: [4, 8] },
+        text: (s, a) => a.focused().secret ? '{fp|와} 몰래 만나기 시작했다. 이번엔 진짜였다.' : '{fp|와} 정식으로 사귀기로 했다. 순서가 좀 뒤바뀌었을 뿐이다.' },
+      { label: '선은 지키자', p: { heart: [-15, -10], close: [-4, -2] }, text: '{fp|이} "그래, 그렇지." 하고 웃었다. 웃는 얼굴이 아니었다.' },
+      { label: '이제 그만하자', do: (s, a) => a.endAffair(a.focused()), p: { heart: [-20, -10], close: [-10, -5] }, text: '{fp|이} 한참 나를 보다가 문을 닫고 나갔다.' },
     ] },
 
   /* ═════ 업보 ═════ */
@@ -1337,7 +1453,7 @@ GAME_DATA.events = [
         success: { p: { trust: [3, 6] }, text: '아버님과 축구 이야기로 한참 떠들었다.' },
         fail: { p: { trust: -4 }, text: '어머님이 내 옷차림을 위아래로 훑어보셨다.' } },
     ] },
-  { id: 'honeymoon', type: 'fixed', weight: 4, when: mainIs((m, s) => m.spouse && s.age - (s.vars.marriedAt ?? -9) <= 1), onStart: focusMain,
+  { id: 'honeymoon', type: 'fixed', weight: 4, when: mainIs((m, s) => m.spouse && s.age - (s.vars.marriedAt ?? -9) <= 1 && s.age >= 20), onStart: focusMain,
     text: '신혼여행을 떠났다.',
     choices: [
       { label: '바다로', memory: true, effect: { happy: 8, money: -300 }, p: { heart: [6, 10] }, intimate: true, mood: 25, pregnant: .1,

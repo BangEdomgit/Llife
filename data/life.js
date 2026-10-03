@@ -71,36 +71,37 @@ GAME_DATA.bodyImpression = {
 // 성격 — mod: 상호작용별 효과 배율 / signal: 설렘이 생겼을 때 보내는 신호 / friendLine: 친해졌을 때 모습
 //        open: 처음 보는 사이에 말 걸었을 때 잘 받아주는 정도 / hello: 받아줬을 때 / snub: 대화가 끊겼을 때
 //        allure: 꼬심 보정 (직진형일수록 잘 넘어오고, 냉철형일수록 어려움)
+//        guilt: 떳떳하지 못한 관계에서 느끼는 죄책감 기본값 (만족감이 70을 넘으면 그만큼 눌림)
 GAME_DATA.personalities = [
-  { id: 'bold',      label: '직진형', desc: '마음에 들면 바로 표현한다.',     mod: { flirt: 1.2, hang: 1.1 }, allure: 15, confessBonus: 10,
+  { id: 'bold',      label: '직진형', desc: '마음에 들면 바로 표현한다.',     mod: { flirt: 1.2, hang: 1.1 }, allure: 15, guilt: 10, confessBonus: 10,
     signal: '{fp|이} 먼저 영화 보자고 연락해왔다.', friendLine: '{fp|이} 대뜸 주말에 뭐 하냐고 물었다.',
     open: .15, hello: '"나 {p}. 너는?" 상대가 먼저 손을 내밀었다.',
     snub: '"아, 지금 좀 바빠서요." 단칼에 잘렸다.' },
-  { id: 'shy',       label: '소심형', desc: '표현은 서툴지만 오래 기억한다.', mod: { flirt: .8, listen: 1.3, talk: 1.1 }, allure: -5,
+  { id: 'shy',       label: '소심형', desc: '표현은 서툴지만 오래 기억한다.', mod: { flirt: .8, listen: 1.3, talk: 1.1 }, allure: -5, guilt: 75,
     signal: '{fp|이} 지나가듯 한 내 말을 기억하고 있었다.', friendLine: '{fp|이} 쭈뼛거리며 과자를 내밀었다.',
     open: -.15, hello: '{p|이} 깜짝 놀라더니, 작은 목소리로 이름을 알려줬다.',
     snub: '상대가 고개만 꾸벅하고 자리를 피했다.' },
-  { id: 'playful',   label: '장난형', desc: '장난으로 마음을 드러낸다.',       mod: { hang: 1.3, argue: .7 }, allure: 8,
+  { id: 'playful',   label: '장난형', desc: '장난으로 마음을 드러낸다.',       mod: { hang: 1.3, argue: .7 }, allure: 8, guilt: 20,
     signal: '{fp}의 장난이 부쩍 늘었다. 이상하게 나한테만.', friendLine: '{fp|이} 몰래 내 가방에 웃긴 쪽지를 넣어놨다.',
     open: .1, hello: '{p|이} 이름 대신 수수께끼를 냈다. 겨우 맞히고 나서야 이름을 알려줬다.',
     snub: '농담으로 받아치더니 그대로 가버렸다.' },
-  { id: 'cool',      label: '무심형', desc: '무심한 척 다 챙겨준다.',          mod: { talk: .8, gift: 1.3 }, allure: 0,
+  { id: 'cool',      label: '무심형', desc: '무심한 척 다 챙겨준다.',          mod: { talk: .8, gift: 1.3 }, allure: 0, guilt: 40,
     signal: '{fp|이} 아무렇지 않게 우산을 씌워줬다.', friendLine: '{fp|이} 말없이 음료수를 놓고 갔다.',
     open: -.1, hello: '{p|은} 짧게 이름만 말했다. 그래도 싫은 눈치는 아니었다.',
     snub: '대답이 "네." 한마디로 끝났다.' },
-  { id: 'warm',      label: '다정형', desc: '누구에게나 따뜻하다.',            mod: { listen: 1.3, apologize: 1.3 }, allure: 5,
+  { id: 'warm',      label: '다정형', desc: '누구에게나 따뜻하다.',            mod: { listen: 1.3, apologize: 1.3 }, allure: 5, guilt: 70,
     signal: '{fp|이} 내가 아팠던 날을 기억하고 죽을 사왔다.', friendLine: '{fp|이} 내 생일을 제일 먼저 챙겼다.',
     open: .1, hello: '{p|이} 환하게 웃으며 옆자리를 내줬다.',
     snub: '상대가 미안하다며 일행에게 돌아갔다.' },
-  { id: 'sharp',     label: '냉철형', desc: '솔직하고 이성적이다.',            mod: { talk: 1.2, flirt: .85, argue: 1.2 }, allure: -10,
+  { id: 'sharp',     label: '냉철형', desc: '솔직하고 이성적이다.',            mod: { talk: 1.2, flirt: .85, argue: 1.2 }, allure: -10, guilt: 25,
     signal: '{fp|이} 나랑 있을 때만 말이 길어진다.', friendLine: '{fp|이} 내 고민에 정확한 답을 줬다.',
     open: 0, hello: '{p|은} 용건부터 물었다. 대답을 듣고 나서야 이름을 알려줬다.',
     snub: '"무슨 일이시죠?" 대화가 거기서 끝났다.' },
-  { id: 'sunny',     label: '낙천형', desc: '어디서든 분위기를 띄운다.',       mod: { hang: 1.2 }, allure: 0,
+  { id: 'sunny',     label: '낙천형', desc: '어디서든 분위기를 띄운다.',       mod: { hang: 1.2 }, allure: 0, guilt: 15,
     signal: '{fp|이} 나만 보면 웃는다.', friendLine: '{fp} 덕분에 하루 종일 웃었다.',
     open: .15, hello: '{p|이} 처음 본 사이가 맞나 싶을 만큼 반겨줬다.',
     snub: '웃으며 인사는 받아줬지만 금방 다른 데로 갔다.' },
-  { id: 'sensitive', label: '예민형', desc: '섬세하고 상처를 잘 받는다.',      mod: { argue: 1.5, gift: 1.2, listen: 1.2 }, allure: 0,
+  { id: 'sensitive', label: '예민형', desc: '섬세하고 상처를 잘 받는다.',      mod: { argue: 1.5, gift: 1.2, listen: 1.2 }, allure: 0, guilt: 90,
     signal: '{fp|이} 내 표정 하나하나를 읽는다.', friendLine: '{fp|이} 내 기분이 안 좋은 걸 먼저 알아챘다.',
     open: -.05, hello: '{p|이} 잠깐 망설이다가 조심스럽게 웃었다.',
     snub: '경계하는 눈빛이 돌아왔다. 괜히 말을 걸었나 싶었다.' },
@@ -124,6 +125,26 @@ GAME_DATA.satLines = {
   3: ['{p|이} 만족스러운 얼굴로 기지개를 켰다.', '{p|이} 콧노래를 흥얼거리며 머리를 묶었다.'],
   4: ['{p|이} "어떻게 이래?" 하며 한참을 웃었다. 잊을 수가 없는 밤이었다.', '{p|이} 하루 종일 그 밤 이야기만 했다. 잊을 수가 없는 밤이었다.'],
   firstLow: ['서툴렀지만 상관없었다. 둘 다 처음 같은 밤이었다.', '어색하고 서툴렀다. 그래도 {p}의 손은 계속 따뜻했다.'],
+};
+// 죄책감 — 상대가 떳떳하지 못한 관계일 때 (기혼, 애인 있음, 나와 몰래 만나는 중) / mine: 내가 바람피우는 중일 때
+GAME_DATA.guiltLines = {
+  light: ['"나쁜 건 아는데… 좋으니까." {p|이} 웃었다.', '{p|이} 잠깐 휴대폰 화면을 보다가 엎어놓았다.'],
+  mid: ['"이러면 안 되는데." {p|이} 혼잣말처럼 말했다.', '{p|이} 옷을 입으며 한참 말이 없었다.'],
+  heavy: ['{p|이} 화장실에서 오래 나오지 않았다. 눈이 부어 있었다.', '{p|이} 등을 돌린 채 "나 진짜 나쁜 사람이지"라고 했다.'],
+  breakMid: ['"이러면 안 되는데…" {p|은} 결국 선을 그었다. 그 뒤로 연락이 뜸해졌다.'],
+  breakHeavy: ['{p|이} "더는 못 하겠어."라고 했다. 그날이 마지막이었다.'],
+  breakNow: ['{p|이} 울면서 사과했다. "미안해, 이건 아니야." 그 뒤로 연락이 끊겼다.'],
+  override: {
+    shy: '"이러면 안 되는 거 알아… 근데 자꾸 네 생각이 나."',
+    sensitive: '"미칠 것 같아. 그만둬야 하는데, 네가 너무 좋아."',
+    warm: '"나 나쁜 사람이지? … 그래도 오늘만."',
+  },
+  noGuilt: {
+    shy: '{p|이} 이제 먼저 이불을 끌어당겼다. 처음과 달랐다.',
+    sensitive: '{p|이} "또 언제 봐?"라고 먼저 물었다. 눈이 달라져 있었다.',
+    warm: '{p|이} 웃으면서 옷을 챙겼다. 자연스러웠다.',
+  },
+  mine: [['돌아오는 길에 {partner}의 문자가 와 있었다. 답장을 한참 고쳤다.'], ['{partner}의 얼굴이 자꾸 떠올랐다.', '집에 와서 샤워를 오래 했다. 씻겨 내려가지 않는 게 있었다.'], ['거울 속 내 얼굴을 볼 수가 없었다.', '{partner|이} 웃으며 반겨줬다. 그 웃음이 칼 같았다.']],
 };
 // 어릴 때 처음 보는 아이에게 말 걸었을 때
 GAME_DATA.kidHello = ['{p|이} 같이 놀자며 손을 잡아끌었다.', '{p|와} 금방 친구가 됐다. 서로 이름을 크게 외쳤다.', '{p|이} 아끼는 사탕을 하나 나눠줬다.'];

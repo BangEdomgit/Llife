@@ -99,6 +99,7 @@ function relLabel(p) {
   if (p.partner) return '연인';
   if (p.secret) return '몰래 만나는 사이';
   if (p.grudge >= 50) return '원수';
+  if (p.fwb) return '섹파';                                                              // 감정은 깊지 않고 만나서 해소하는 사이
   if (p.fling) return mainPartner() || p.taken || p.heart < 40 ? '복잡한 사이' : '썸';   // 사귀지 않고 밤을 보낸 사이
   if (p.ex) return '전 연인';
   if (p.heart >= 40 && heartOk(p)) return '썸';
@@ -213,7 +214,7 @@ function applyP(p, delta, mult) {
 }
 function breakUp(p, grudge) {
   if (!p) return;
-  p.partner = false; p.secret = false; p.ex = true; p.fling = false; p.livesWith = false;
+  p.partner = false; p.secret = false; p.ex = true; p.fling = false; p.fwb = false; p.livesWith = false;
   p.grudge = clamp(p.grudge + (grudge || 0), 0, 100);
   p.heart = Math.min(p.heart, 15);
 }
@@ -232,7 +233,7 @@ function endMain(grudge) {
 }
 function startRelation(p, sneaky) {
   if (sneaky) p.secret = true; else p.partner = true;
-  p.taken = false; p.ex = false; p.fling = false;
+  p.taken = false; p.ex = false; p.fling = false; p.fwb = false;
   p.since = S.age;
 }
 /* ═════════ 친밀한 관계와 아이 ═════════ */
@@ -349,7 +350,48 @@ function sexScene(p, o) {
   p.lastSat = sat; p.bestSat = Math.max(prevBest, sat);
   S.flags.hadSex = true;
   S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), n: (S.scene ? S.scene.n : 0) + 1 };
+  if (first) { S.vars.fp = p.id; trigger('firstTime'); }   // 내 첫 경험 — 상대 성격마다 다른 한 줄, 추억
   return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90 };
+}
+/* ── 죄책감: 성격 기본값에서 만족감이 70을 넘은 만큼(×1.5) 깎임 ── */
+const guiltOf = (pers, sat) => Math.max(0, ((D.personalities.find(x => x.id === pers) || {}).guilt ?? 40) - Math.max(0, sat - 70) * 1.5);
+// 상대가 떳떳하지 못한 사이 (기혼, 애인 있음, 나와 몰래 만나는 중)
+const npcIllicit = p => !!(p.married || p.taken || p.secret);
+// 관계를 끝냄 (몰래 만나는 사이·섹파·썸 모두)
+function endAffair(p) {
+  if (p.secret || p.partner) breakUp(p, 0);
+  p.fling = false; p.fwb = false;
+  p.heart = Math.max(0, p.heart - 10);
+}
+function guiltCheck(p, sx, ctx) {
+  const G = D.guiltLines, c = Object.assign({ p: pname(p) }, ctx);
+  // 상대의 죄책감
+  if (npcIllicit(p)) {
+    const pt = personality(p), base = pt.guilt ?? 40, g = guiltOf(p.personality, sx.sat);
+    p.guiltN = (p.guiltN || 0) + 1;
+    let line = null, end = false;
+    if (g >= 86) { end = true; line = G.breakNow; }
+    else if (g >= 66) { p.guiltLimit = p.guiltLimit || rand(1, 2); end = p.guiltN >= p.guiltLimit; line = end ? G.breakHeavy : G.heavy; }
+    else if (g >= 41) { p.guiltLimit = p.guiltLimit || rand(3, 4); end = p.guiltN >= p.guiltLimit; line = end ? G.breakMid : (Math.random() < .5 ? G.mid : null); }
+    else if (g >= 16) line = Math.random() < .3 ? G.light : null;
+    if (!end && base >= 66 && g < base) line = g === 0 ? (G.noGuilt[p.personality] || line) : (G.override[p.personality] || line);   // 만족감이 죄책감을 눌렀을 때
+    if (line) log(fill(pick(asList(line)), c), { t: end ? 'text' : 'info' });
+    if (end) {
+      endAffair(p);
+      if (g >= 66 && Math.random() < .35) {   // 자기 애인·배우자에게 털어놓음
+        S.vars.fp = p.id;
+        trigger(p.married ? 'spouseCaught' : 'rivalFound');
+      }
+    }
+  }
+  // 내 죄책감 (내가 바람피우는 중일 때)
+  const m = mainPartner();
+  if (m && m !== p) {
+    const g = guiltOf(S.personality, sx.sat);
+    const hit = g >= 86 ? -8 : g >= 66 ? -5 : g >= 41 ? -3 : g >= 16 ? -1 : 0;
+    if (hit) log(fill(pick(G.mine[g >= 66 ? 2 : g >= 41 ? 1 : 0]), { partner: pname(m) }), { t: 'info', deltas: applyEffect({ happy: hit }) });
+    if (g >= 86) addKarma(-3);
+  }
 }
 // 만족감에 따라 설렘·친밀 변화 배율 (사귀는 사이는 실망해도 덜 깎임, 첫 경험은 무조건 오름)
 function scaleBySat(pd, sx) {
@@ -450,7 +492,7 @@ function applyOutcome(o, target) {
   const text = o.text != null ? fill(textOf(o.text), ctx) : '';
   if (text) log(text, { memory: !!resolve(o.memory), deltas });
   else if (deltas.length) log('', { t: 'info', deltas });
-  if (sx) afterSex(tp, sx, ctx);
+  if (sx) { afterSex(tp, sx, ctx); guiltCheck(tp, sx, ctx); }
   if (o.pregnant && tp && (!o.intimate || sx) && conceive(tp, resolve(o.pregnant)) && S.scene) S.scene.preg = true;
   riskCheck(o, tp);
   if (o.then) { const t = resolve(o.then); if (t) trigger(t); }
@@ -464,14 +506,15 @@ function afterSex(p, sx, ctx) {
 }
 // 얽힌 사이: 들키지 않으면 괜찮지만… (risk: 내 애인에게 / riskTaken: 상대 애인에게)
 function riskCheck(o, p) {
-  const risk = resolve(o.risk) || 0, rt = resolve(o.riskTaken) || 0;
+  const low = p && p.fwb ? .6 : 1;   // 섹파는 감정이 깊지 않아서 들킬 위험도 낮음
+  const risk = (resolve(o.risk) || 0) * low, rt = (resolve(o.riskTaken) || 0) * low;
   const m = mainPartner();
   if (risk && p && m && m !== p && Math.random() < risk + .05 * alive().filter(x => x.secret).length) {
     S.vars.mainId = m.id; S.vars.mainName = pname(m); S.vars.loverId = p.id; S.vars.lover = pname(p);
     trigger('affairCaught');
   } else if (rt && p && p.taken && Math.random() < rt) {
     S.vars.fp = p.id;
-    trigger('rivalFound');
+    trigger(p.married ? 'spouseCaught' : 'rivalFound');   // 상대 애인에게 / 기혼이면 상대 배우자에게
   }
 }
 
@@ -526,7 +569,7 @@ function whoIn(raw) {
   if (/\{new\b/.test(raw)) return S.vars.newId || null;
   return null;
 }
-const trigger = id => fire(EVENTS[id]);
+const trigger = id => { if (EVENTS[id]) fire(EVENTS[id]); };
 const choicesOf = ev => ev.choices.filter(c => !c.if || c.if(S, api));
 
 function currentEvent() {
@@ -846,6 +889,7 @@ function yearly() {
     p.grudge = clamp(p.grudge - 3, 0, 100);
     if (!mine && npcAge(p) >= 24 && Math.random() < .05) p.taken = !p.taken;
     if (!mine && !p.debt && p.close <= 0 && p.grudge <= 0) { p.gone = true; log(`${josa(pname(p), '와')}는 연락이 끊겼다.`, { t: 'info' }); }
+    else if (p.fwb && (p.close <= 20 || ((p.lastSat ?? 50) < 40 && Math.random() < .5))) { p.fwb = false; p.fling = false; log(`${josa(pname(p), '와')}의 관계는 흐지부지 끝났다.`, { t: 'info' }); }
   }
 
   // 일: 연봉, 성과, 승진
@@ -1279,7 +1323,7 @@ const api = {
   focus: p => { S.vars.fp = p ? p.id : null; },
   focused: () => person(S.vars.fp),
   changeP: (p, d) => applyP(p, d),
-  startRelation, marry, breakUp, divorce, endMain, night, conceive,
+  startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   canSex, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
