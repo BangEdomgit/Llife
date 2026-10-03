@@ -5,8 +5,8 @@
 const D = window.GAME_DATA;
 const C = D.config;
 const SEASONS = C.seasons;
-const SAVE_KEY = 'llife-save-v4';
-const OLD_SAVE_KEY = 'llife-save-v3';
+const SAVE_KEY = 'llife-save-v5';
+const OLD_KEYS = ['llife-save-v4', 'llife-save-v3'];
 const COND = ['happy', 'health'];             // 상태: 0~100
 const ABIL = D.abilities;                     // 능력: 상한 없음, 등급
 const STATS = COND.concat(ABIL);
@@ -59,6 +59,19 @@ function gradeInfo(v) {
   return { letter: GR[i][0], idx: i, pct: Math.min(1, (v - lo) / (hi - lo)), value: v };
 }
 const scoreGrade = sc => clamp(Math.round(9 - (sc - 15) / 9), 1, 9);   // 과목 점수 → 1~9등급 (87점 이상이면 1등급)
+const LETTERS = GR.map(g => g[0]);
+const pickKey = obj => weighted(Object.keys(obj), k => obj[k]);
+// 등급 글자 → 그 등급 안의 아무 값
+function gradeValue(letter) {
+  const i = Math.max(0, LETTERS.indexOf(letter)), lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : lo + 60;
+  return rand(lo, hi - 1);
+}
+// 한 등급 위/아래로 (등급 안에서의 위치는 유지). cap: 최고 등급 번호
+function gradeStep(v, dir, cap = LETTERS.length - 1) {
+  const g = gradeInfo(v), i = clamp(g.idx + dir, 0, cap);
+  const lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : lo + 60;
+  return Math.round(lo + g.pct * (hi - lo - 1));
+}
 
 let S = null;
 const subs = [];
@@ -127,7 +140,7 @@ function makePerson(spec) {
   const p = {
     id: null, kind: spec.kind || 'friend', role: spec.role || null,
     name: spec.name || pick(gender === 'm' ? D.namesM : D.namesF), gender, ageDiff,
-    close: spec.close ?? rand(15, 30), trust: spec.trust ?? rand(15, 30), heart: 0, grudge: spec.grudge ?? 0,
+    close: spec.close ?? rand(15, 30), trust: spec.trust ?? rand(15, 30), heart: spec.heart && age >= 19 && S.age >= 19 ? spec.heart : 0, grudge: spec.grudge ?? 0,
     taken: spec.taken ?? (age >= 24 ? Math.random() < .35 : age >= 19 ? Math.random() < .15 : false),
     met: S.age, debt: 0, sibling: !!spec.sibling,
     // 프로필 — 친해질수록 보임
@@ -139,10 +152,34 @@ function makePerson(spec) {
     npcJob: age >= 23 ? pick(D.npcJobs) : null,
     feature: pick(D.features),
     hangout: spec.hangout !== undefined ? spec.hangout : pickHangout(hobby, age),   // 자주 가는 곳
+    // 외모 3층 (등급 번호 0=F … 6=S). 몸은 체형(appearance.body)에서 계산
+    face: spec.face ?? LETTERS.indexOf(pickKey(D.npcFace)),
+    style: spec.style ?? npcStyle(hobby, age),
+    bodyPlus: Math.random() < .4,
+    pref: age >= 19 && Math.random() < .6 ? randomPref() : null,   // 좋아하는 체형 (null이면 상관없음)
   };
   if (p.kind === 'child') p.role = '아이';
   return p;
 }
+function npcStyle(hobby, age) {
+  if (age < 13) return rand(0, 1);
+  return clamp(rand(1, 3) + (hobby === 'fashion' ? 2 : 0) + (age >= 40 ? -1 : 0), 0, 6);
+}
+function randomPref() {
+  const pr = { height: Math.random() < .5 ? pick(['short', 'avg', 'tall', 'tall']) : null, build: Math.random() < .6 ? pick(['slim', 'avg', 'fit', 'fit', 'chubby']) : null };
+  return pr.height || pr.build ? pr : null;
+}
+// NPC 몸 등급 (체격 기준, 40대부터 하나 내려감)
+function bodyIdx(p) {
+  const b = (lookOf(p) || {}).body || {};
+  let i = { fit: 4, avg: 2, slim: 2, chubby: 1 }[b.build] ?? 2;
+  if (p.bodyPlus) i++;
+  if (npcAge(p) >= 40) i--;
+  return clamp(i, 0, 6);
+}
+// 내 체격: 체력이 B 이상이면 탄탄, 아니면 타고난 골격
+const myBuild = () => gIdx(S.stats.fit) >= 4 ? 'fit' : S.frame || 'avg';
+function syncMyBody() { if (S.look && S.look.body) S.look.body.build = myBuild(); }
 // 생김새 (js/avatar.js). 같은 인생의 같은 id면 늘 같은 얼굴. 가족·아이는 피부색이 나와 같음
 function lookOf(p) {
   if (!p.appearance && window.Avatar) p.appearance = Avatar.make(`${S.id}:${p.id}`, p.gender, { feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null });
@@ -275,6 +312,8 @@ function applyEffect(eff) {
     if (!STATS.includes(k)) continue;
     if (v > 0 && tr.mult && tr.mult[k]) v = Math.round(v * tr.mult[k]);
     if (v < 0 && tr.negMult && tr.negMult[k]) v = Math.round(v * tr.negMult[k]);
+    if (v > 0 && k === 'fit') v = Math.round(v * (S.age < 20 ? 1 : S.age < 30 ? 1.2 : S.age < 40 ? 1 : .8));   // 몸: 20대 잘 오르고 40대 잘 안 오름
+    if (v > 0 && k === 'style') v = Math.round(v * (1 + gIdx(S.stats.art) * .1));                              // 감성이 높으면 같은 돈으로 더 잘 꾸밈
     const b = S.stats[k];
     if (COND.includes(k)) {
       S.stats[k] = clamp(b + v, 0, 100);
@@ -665,8 +704,16 @@ function yearly() {
   if (tr.agingMult) aging = Math.round(aging * tr.agingMult);
   if (jailed()) aging += 1;
   st.health = clamp(st.health - aging, 0, 100);
-  if (a >= 35 && Math.random() < .4) st.looks = Math.max(0, st.looks - rand(1, 3));
-  if (a >= 40 && Math.random() < .5) st.fit = Math.max(0, st.fit - rand(1, 3));
+  // 외모 3층: 생김새는 40대부터 5년에 한 등급 / 꾸밈은 안 하면 떨어짐 / 몸은 운동 안 하면 빠짐 (40대는 운동해도 조금씩)
+  if (a === 40 || a === 45) { st.face = gradeStep(st.face, -1); log('거울 속 얼굴에 세월이 보이기 시작했다.', { t: 'info' }); }
+  if (a >= 13) st.style = Math.max(0, st.style - rand(D.styleDecay[0], D.styleDecay[1]));
+  const ex = S.vars.exN || 0;
+  if (a >= 20) {
+    const loss = a < 30 ? (ex ? 0 : rand(0, 2)) : a < 40 ? (ex >= 2 ? 0 : rand(1, 3)) : (ex >= 3 ? rand(0, 1) : rand(2, 5));
+    st.fit = Math.max(0, st.fit - loss);
+  }
+  S.vars.exN = 0;
+  syncMyBody();
   if (st.happy > 65) st.happy--; else if (st.happy < 40) st.happy++;
 
   // 중학교 입학: 그동안 쌓은 지능이 과목 실력의 바탕
@@ -799,6 +846,7 @@ function doAction(id, subj) {
     else { escape(false); log('탈옥하다 붙잡혔다. 형기가 2년 늘었다.'); }
     tickSeason(); after(); return;
   }
+  if (a.id === 'exercise' || a.id === 'play') S.vars.exN = (S.vars.exN || 0) + 1;
   const deltas = applyEffect(a.effect);
   const c = costOf(a);
   if (c) deltas.push(...applyEffect({ money: -c }));
@@ -1049,12 +1097,38 @@ function known(p, field) {
   if (p.kind === 'family' || p.kind === 'child') return true;
   return Math.max(p.close, p.trust) >= (D.revealAt[field] || 0);
 }
+// 쓰리 사이즈 — 체형에서 정해지고 사람마다 고정 (id 기준)
+function threeSizes(p) {
+  const b = (lookOf(p) || {}).body || {};
+  let h = 7; for (const ch of String(S.id) + p.id) h = (h * 31 + ch.charCodeAt(0)) % 2147483647;
+  const r = (lo, hi) => { h = (h * 16807) % 2147483647; return lo + (h % (hi - lo + 1)); };
+  if (p.gender === 'f') return [r(...{ small: [76, 81], avg: [82, 88], large: [89, 97] }[b.chest] || [82, 88]),
+    r(...{ slim: [57, 61], avg: [62, 66], fit: [61, 65], chubby: [70, 77] }[b.build] || [62, 66]), r(...{ slim: [83, 87], avg: [88, 92], fit: [88, 93], chubby: [95, 101] }[b.build] || [88, 92])];
+  return [r(...{ narrow: [86, 90], avg: [92, 97], wide: [99, 105] }[b.shoulder] || [92, 97]) + (b.build === 'fit' ? 3 : b.build === 'chubby' ? 6 : 0),
+    r(...{ slim: [69, 73], avg: [76, 81], fit: [74, 78], chubby: [86, 94] }[b.build] || [76, 81]), r(...[89, 97])];
+}
+// 몸에 대해 보이는 것: 처음엔 키·대략적 체형 / 친밀 30 인상 / 친밀 60 쓰리 사이즈 / 함께 밤을 보낸 뒤 전부 (20살 이상만)
+function bodyInfo(p) {
+  const age = npcAge(p), b = (lookOf(p) || {}).body || {}, BL = D.bodyLabel;
+  if (age < 13 || p.kind === 'family' || p.kind === 'child') return [];
+  const deep = Math.max(p.close, p.trust), slept = (p.nights || 0) > 0, adult = age >= 20 && S.age >= 20;
+  const out = [{ label: '체형', value: `${BL.height[b.height] || ''}, ${BL.build[b.build] || ''} (몸 ${LETTERS[bodyIdx(p)]})` }];
+  if (!adult) return out;
+  out.push({ label: '인상', value: deep >= 30 || slept ? D.bodyImpression[p.gender][b.build] : null });
+  out.push({ label: '사이즈', value: deep >= 60 || slept ? threeSizes(p).join('-') : null });
+  if (slept) out.push({ label: '몸', value: [p.gender === 'f' ? BL.chest[b.chest] : BL.shoulder[b.shoulder], p.size ? `크기 ${BL.size[p.size]}` : ''].filter(Boolean).join(', ') });
+  if (p.pref) out.push({ label: '좋아하는 타입', value: deep >= 50 || slept ? [BL.height[p.pref.height], BL.build[p.pref.build]].filter(Boolean).join(', ') : null });
+  return out;
+}
 function profile(p) {
   const L = (list, id) => (list.find(x => x.id === id) || {}).label;
   const age = npcAge(p);
   const f = (field, label, value) => ({ field, label, value: known(p, field) ? value : null });
+  const kin = p.kind === 'family' || p.kind === 'child';
   return [
     { field: 'feature', label: '특징', value: p.feature },
+    ...(age >= 13 && !kin ? [{ field: 'face', label: '생김새', value: `${LETTERS[p.face] || 'D'} · 꾸밈 ${LETTERS[p.style] || 'D'}` }] : []),
+    ...bodyInfo(p).map(x => Object.assign({ field: 'body' }, x)),
     f('personality', '성격', L(D.personalities, p.personality)),
     f('hobby', '취미', L(D.hobbies, p.hobby)),
     f('dream', age >= 23 ? '직업' : '꿈', age >= 23 ? (p.npcJob || '—') : L(D.dreams, p.dream)),
@@ -1064,8 +1138,11 @@ function profile(p) {
 }
 function myProfile() {
   const L = (list, id) => (list.find(x => x.id === id) || {}).label;
+  const b = (S.look && S.look.body) || {}, BL = D.bodyLabel;
   return [
     ['소질', trait().label], ['성격', L(D.personalities, S.personality)], ['취미', L(D.hobbies, S.hobby)],
+    ['체형', [BL.height[b.height], BL.build[b.build]].filter(Boolean).join(', ') + ` (몸 ${gradeOf(S.stats.fit)})`],
+    ...(S.flags.unnatural ? [['특징', '어딘가 부자연스럽다']] : []),
     ['가치관', L(D.values, S.value)], ['집안', L(D.wealth, S.wealth)], ['꿈', L(D.dreams, S.dream) + (S.flags.dreamDone ? ' (이룸)' : '')],
     ['형제', L(D.siblings, S.sibling)], ['생일', `${S.month}월`],
   ];
@@ -1076,7 +1153,8 @@ const api = {
   rand, pick, josa, money: fmtMoney,
   givenName: g => pick(g === 'm' ? D.namesM : g === 'f' ? D.namesF : D.namesM.concat(D.namesF)),
   meet: spec => addPerson(spec),
-  person, npcAge, canRomance, heartOk, jailed,
+  person, npcAge, canRomance, heartOk, jailed, gradeMin, gradeOf,
+  faceStep: dir => { S.stats.face = gradeStep(S.stats.face, dir, LETTERS.indexOf('S')); },
   place: () => S.place, isHere: p => !!p && !!S.place && S.here.some(h => h.key === p.id),
   here: () => S.here.filter(h => !h.x).map(h => person(h.key)).filter(Boolean),
   regular: id => !!S.regular[id],
@@ -1110,7 +1188,7 @@ function newLife(opt = {}) {
     dream: opt.dream || pick(D.dreams).id,
     sibling: sib.id,
     month: clamp(+opt.month || rand(1, 12), 1, 12),
-    stats: { happy: rand(60, 80), health: rand(65, 90), smart: rand(5, 20), fit: rand(5, 20), looks: rand(5, 25), charm: rand(5, 20), art: rand(5, 20), craft: rand(5, 20) },
+    stats: { happy: rand(60, 80), health: rand(65, 90), smart: rand(5, 20), fit: rand(5, 20), face: gradeValue(pickKey(tr.face || D.faceStart)), style: rand(0, 10), charm: rand(5, 20), art: rand(5, 20), craft: rand(5, 20) },
     school: { subj: { kor: 0, math: 0, eng: 0, sci: 0 }, naesin: [], mock: null, sat: null, tier: null, major: null, start: null, years: null, gpa: 0, gpaN: 0, studyYear: 0, degree: null },
     karma: 0, heat: 0, record: 0, crimes: 0, jail: 0, rank: 0, perf: 0, preg: null,
     flags: {}, vars: {}, done: {}, last: {},
@@ -1121,6 +1199,8 @@ function newLife(opt = {}) {
   if (tr.start) for (const k in tr.start) S.stats[k] = COND.includes(k) ? clamp(S.stats[k] + tr.start[k], 0, 100) : S.stats[k] + tr.start[k];
   S.look = window.Avatar ? Avatar.make(`${S.id}:me`, gender) : null;
   S.skin = S.look ? S.look.skin : 1;
+  S.frame = S.look && S.look.body.build !== 'fit' ? S.look.body.build : 'avg';
+  syncMyBody();
   const w = D.wealth.find(x => x.id === S.wealth);
   S.money = w.money;
   const dr = D.dreams.find(x => x.id === S.dream);
@@ -1146,10 +1226,31 @@ function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } cat
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && s.v === 4) return s;
-    const old = JSON.parse(localStorage.getItem(OLD_SAVE_KEY));
-    return old && old.v === 3 ? migrate(old) : null;
+    if (s && s.v === 5) return s;
+    for (const k of OLD_KEYS) {
+      const old = JSON.parse(localStorage.getItem(k));
+      if (old && (old.v === 3 || old.v === 4)) return upgrade(old.v === 3 ? migrate(old) : old);
+    }
+    return null;
   } catch (e) { return null; }
+}
+// v4 → v5 (외모 3층, 체형). 비어 있는 값만 채움
+function upgrade(s) {
+  S = s;
+  s.v = 5;
+  if (s.stats.face == null) { s.stats.face = s.stats.looks ?? gradeValue(pickKey(D.faceStart)); delete s.stats.looks; }
+  if (s.stats.style == null) s.stats.style = 20;
+  if (!s.look && window.Avatar) s.look = Avatar.make(`${s.id}:me`, s.gender);
+  if (s.look && !s.look.body && window.Avatar) s.look.body = Avatar.make(`${s.id}:me`, s.gender).body;
+  if (!s.frame) s.frame = s.look && s.look.body && s.look.body.build !== 'fit' ? s.look.body.build : 'avg';
+  for (const p of s.people) {
+    if (p.face == null) p.face = LETTERS.indexOf(pickKey(D.npcFace));
+    if (p.style == null) p.style = npcStyle(p.hobby, npcAge(p));
+    if (p.pref === undefined) p.pref = npcAge(p) >= 19 && Math.random() < .6 ? randomPref() : null;
+    if (p.appearance && !p.appearance.body && window.Avatar) p.appearance.body = Avatar.make(`${s.id}:${p.id}`, p.gender, { feature: p.feature }).body;
+  }
+  syncMyBody();
+  return s;
 }
 // v3 저장 → v4 (장소, 단골 장소)
 function migrate(s) {

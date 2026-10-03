@@ -60,7 +60,7 @@ body{height:100%;margin:0;background:var(--page-bg);color:var(--text);font-famil
 
 /* 상태 + 능력 등급 */
 .conds{display:grid;grid-template-columns:auto 1fr auto auto 1fr auto;gap:2px 8px;padding-top:8px;font-size:13px;align-items:center}
-.abils{display:grid;grid-template-columns:repeat(3,1fr);gap:3px 10px;padding-top:6px;font-size:12.5px}
+.abils{display:grid;grid-template-columns:repeat(4,1fr);gap:3px 8px;padding-top:6px;font-size:12.5px}
 .ab{display:flex;align-items:baseline;gap:5px;white-space:nowrap;overflow:hidden}
 .ab .g{font-weight:700;min-width:1.6em}
 .ab .pb{color:var(--text-dim);letter-spacing:-.5px;font-size:11px}
@@ -68,7 +68,8 @@ body{height:100%;margin:0;background:var(--page-bg);color:var(--text);font-famil
 .g-D,.g-C{color:var(--text)}
 .g-B,.g-A{color:var(--plus)}
 .g-S,.g-SS{color:var(--accent)}
-@media (max-width:360px){.abils{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:440px){.abils .pb{display:none}}
+@media (max-width:330px){.abils{grid-template-columns:repeat(3,1fr)}}
 
 /* 기록 */
 .log{flex:1 1 auto;min-height:140px;overflow-y:auto;padding:4px 12px 12px;font-size:14px;line-height:1.6;overscroll-behavior:contain}

@@ -1,7 +1,9 @@
 // NPC 상반신 아바타 — 파츠(얼굴·머리·눈·입·옷…)를 조합해 SVG 문자열로 그림. 외부 이미지 없음
 // Avatar.make(seed, gender, opt)    → appearance (파츠 번호 묶음). 같은 seed면 늘 같은 얼굴
-// Avatar.render(appearance, size, age) → SVG 문자열 (가로 size, 세로 size×4/3)
+// Avatar.render(appearance, size, state) → SVG 문자열 (가로 size, 세로 size×4/3)
+//   state: 나이(숫자) 또는 { age, after: { sat, personality, lipstick } }
 //   나이는 그릴 때 반영: 어린이는 머리 스타일이 단순해지고, 10대는 교복, 40대부터 흰머리가 늘어남
+//   체형(appearance.body)은 20살부터 옷 위 실루엣으로 드러남 (어깨 너비, 체격, 가슴선)
 (function () {
 'use strict';
 
@@ -61,6 +63,14 @@ function make(seed, gender, opt = {}) {
   if (f.includes('눈썹')) a.thick = true;
   if (f.includes('이어폰')) a.buds = true;
   if (f.includes('키가')) a.tall = true;
+  // 체형 — 키·체격, 여자는 가슴, 남자는 어깨
+  const pickW = w => { let t = r() * w.reduce((x, y) => x + y[1], 0); for (const [k, v] of w) { t -= v; if (t <= 0) return k; } return w[0][0]; };
+  a.body = {
+    height: a.tall ? 'tall' : pickW([['short', 3], ['avg', 5], ['tall', 3]]),
+    build: pickW([['slim', 3], ['avg', 4], ['fit', 2], ['chubby', 1.2]]),
+  };
+  if (a.g === 'f') a.body.chest = pickW([['small', 3], ['avg', 5], ['large', 2.5]]);
+  else a.body.shoulder = pickW([['narrow', 2.5], ['avg', 5], ['wide', 3]]);
   return a;
 }
 
@@ -121,16 +131,38 @@ const MOUTHS = [
   `<path d="M55,87 Q60,86 65,87 Q64,93 60,93 Q56,93 55,87 Z" fill="#7a2f33" stroke="${LINE}" stroke-width="1.2" stroke-linejoin="round"/>`,    // 약간 벌린
 ];
 
-/* ---------- 옷 ---------- */
-function body(kid) {
-  return kid ? 'M24,160 C24,137 36,123 51,119 L69,119 C84,123 96,137 96,160 Z'
-    : 'M12,160 C12,133 29,119 49,115 L71,115 C91,119 108,133 108,160 Z';
+/* ---------- 몸·옷 ---------- */
+// 몸통 반폭: 어린이 36, 어른 남자는 어깨(좁음 42 / 보통 48 / 넓음 54), 여자 44. 체격이 통통하면 넓게, 마르면 좁게
+function halfWidth(a, kid, adult) {
+  if (kid) return 36;
+  const b = a.body || {};
+  let hw = a.g === 'm' ? ({ narrow: 42, avg: 48, wide: 54 }[adult ? b.shoulder : 'avg'] || 48) : 44;
+  if (adult) hw += { chubby: 4, slim: -3, fit: a.g === 'm' ? 2 : 0 }[b.build] || 0;
+  return hw;
 }
-function clothes(a, top, kid, skin) {
+function body(kid, hw = kid ? 36 : 48) {
+  const sh = kid ? 4 : 0;
+  return `M${60 - hw},160 C${60 - hw},${133 + sh} ${77 - hw},${119 + sh} 49,${115 + sh} L71,${115 + sh} C${43 + hw},${119 + sh} ${60 + hw},${133 + sh} ${60 + hw},160 Z`;
+}
+// 옷 위로 드러나는 체형선 (20살부터): 니트 > 티셔츠 > 셔츠 > 후디 순으로 잘 보임
+function shapeLines(a, top, color) {
+  const b = a.body || {}, op = [.4, .32, .14, .55][top] || 0;
+  if (!op) return '';
+  const st = `fill="none" stroke="${shade(color, .68)}" stroke-width="1.5" stroke-linecap="round" opacity="${op}"`;
+  if (a.g === 'f') {
+    if (b.chest === 'large') return `<path d="M39,139 Q48,152 58,143 M62,143 Q72,152 81,139" ${st}/>`;
+    if (b.chest === 'avg') return `<path d="M43,140 Q50,148 58,143 M62,143 Q70,148 77,140" ${st}/>`;
+    return '';
+  }
+  if (b.build === 'fit' || b.shoulder === 'wide') return `<path d="M43,135 Q51,140 59,136 M61,136 Q69,140 77,135" ${st}/>`;
+  return '';
+}
+function clothes(a, top, kid, skin, hw, adult) {
   const sh = kid ? 4 : 0;   // 어린이는 어깨선이 조금 아래
+  const body_ = () => body(kid, hw);
   if (top === 4) {   // 교복 — 블레이저 + 셔츠 + 넥타이(남) / 리본(여)
     const tie = UNIFORM.tie[a.tie];
-    return `<path d="${body(kid)}" fill="${UNIFORM.blazer}"/>
+    return `<path d="${body_()}" fill="${UNIFORM.blazer}"/>
       <path d="M50,${115 + sh} L60,${142 + sh} L70,${115 + sh} Z" fill="${UNIFORM.shirt}"/>
       <path d="M50,${115 + sh} L56,${131 + sh} L47,${129 + sh} L42,${118 + sh} Z M70,${115 + sh} L64,${131 + sh} L73,${129 + sh} L78,${118 + sh} Z" fill="${shade(UNIFORM.blazer, 1.25)}"/>
       ${a.g === 'm'
@@ -138,7 +170,7 @@ function clothes(a, top, kid, skin) {
         : `<path d="M60,${123 + sh} L51,${118 + sh} L51,${128 + sh} Z M60,${123 + sh} L69,${118 + sh} L69,${128 + sh} Z" fill="${tie}"/><circle cx="60" cy="${123 + sh}" r="2.4" fill="${shade(tie, .8)}"/>`}`;
   }
   const c = TOP_COLORS[a.tc], dark = shade(c, .78);
-  let out = `<path d="${body(kid)}" fill="${c}"/>`;
+  let out = `<path d="${body_()}" fill="${c}"/>`;
   if (top === 0) out += `<path d="M49,${115 + sh} Q60,${126 + sh} 71,${115 + sh}" fill="${skin}" stroke="${dark}" stroke-width="3"/>`;   // 티셔츠
   else if (top === 1) out += `<path d="M52,${115 + sh} L60,${128 + sh} L68,${115 + sh} Z" fill="${skin}"/>
       <path d="M50,${114 + sh} L60,${128 + sh} L52,${132 + sh} L45,${119 + sh} Z M70,${114 + sh} L60,${128 + sh} L68,${132 + sh} L75,${119 + sh} Z" fill="${shade(c, 1.35)}" stroke="${dark}" stroke-width="1"/>
@@ -149,14 +181,18 @@ function clothes(a, top, kid, skin) {
   else out += `<path d="M48,${114 + sh} Q60,${122 + sh} 72,${114 + sh} L72,${119 + sh} Q60,${128 + sh} 48,${119 + sh} Z" fill="${dark}"/>
       <path d="M50,${114 + sh} Q60,${120 + sh} 70,${114 + sh}" fill="${skin}"/>
       <path d="M30,154 L30,160 M38,154 L38,160 M46,154 L46,160 M54,154 L54,160 M62,154 L62,160 M70,154 L70,160 M78,154 L78,160 M86,154 L86,160" stroke="${dark}" stroke-width="1.4"/>`;   // 니트
+  if (adult) out += shapeLines(a, top, c);
   return out;
 }
 
 /* ---------- 그리기 ---------- */
-function render(a, size = 48, age = 25) {
+function render(a, size = 48, state = 25) {
+  const st = typeof state === 'object' && state ? state : { age: state };
+  const age = st.age ?? 25;
   const w = Math.round(size), h = Math.round(size * 4 / 3);
   if (!a) return `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/></svg>`;
-  const kid = age <= 12, teen = age >= 13 && age <= 18;
+  const kid = age <= 12, teen = age >= 13 && age <= 18, adult = age >= 20;
+  const hw = halfWidth(a, kid, adult);
   const skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86);
   const old = age >= 40 && a.gray < (age - 38) / 22;   // 40대부터 흰머리 확률 증가
   const hc = HAIR[old ? GRAY : (kid || teen) && a.hc >= 4 ? a.hc - 3 : a.hc] || HAIR[0];   // 어린이·10대는 염색 안 함
@@ -174,7 +210,7 @@ function render(a, size = 48, age = 25) {
   if (style.bun) o += `<circle cx="${style.bun[0]}" cy="${style.bun[1]}" r="${style.bun[2]}" fill="${shade(hc, .9)}"/>`;
   // 목, 몸
   o += `<path d="M51,${neckTop} L69,${neckTop} L69,${neckBot} L51,${neckBot} Z" fill="${skinD}"/>`;
-  o += clothes(a, top, kid, skinD);
+  o += clothes(a, top, kid, skinD, hw, adult);
   if (a.buds) o += `<path d="M34,78 C30,96 40,112 47,130" fill="none" stroke="#f4f4f4" stroke-width="1.3"/>`;
   // 귀, 얼굴
   o += `<ellipse cx="33.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/><ellipse cx="86.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;

@@ -84,7 +84,7 @@ GAME_DATA.social = [
   { id: 'flirt', label: '플러팅', icon: '😉',
     if: (s, p, a) => a.canRomance(p) && !p.partner && !p.spouse && !a.jailed(),
     run: (s, p, a) => {
-      const ok = (s.stats.looks + s.stats.charm) / 5 + p.close / 2 + 20 + a.rand(-15, 15) >= 55;   // 외모·매력·친밀이 높을수록 잘 먹힘
+      const ok = (s.stats.face + s.stats.style + s.stats.charm) / 6 + p.close / 2 + 20 + a.rand(-15, 15) >= 55;   // 외모·매력·친밀이 높을수록 잘 먹힘
       const risk = a.main() && a.main() !== p ? .2 : 0;
       return ok
         ? { p: { heart: [8, 14], close: [1, 3] }, risk, riskTaken: p.taken ? .15 : 0,

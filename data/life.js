@@ -20,9 +20,10 @@ GAME_DATA.config = {
 };
 
 /* ───── 능력치: 100에서 멈추지 않고 등급으로 올라감 ───── */
-// 상태(0~100): 행복, 건강 / 능력(상한 없음, 등급): 지능, 체력, 외모, 매력, 감성, 손재주
-GAME_DATA.abilities = ['smart', 'fit', 'looks', 'charm', 'art', 'craft'];
-GAME_DATA.statLabel = { happy: '행복', health: '건강', smart: '지능', fit: '체력', looks: '외모', charm: '매력', art: '감성', craft: '손재주', money: '돈' };
+// 상태(0~100): 행복, 건강 / 능력(상한 없음, 등급): 지능, 체력, 생김새, 꾸밈, 매력, 감성, 손재주
+// 외모는 3층 — 생김새(face): 타고남, 성형으로만 오름 / 몸(body): 체력 등급 그대로 / 꾸밈(style): 돈과 시간, 매년 떨어짐
+GAME_DATA.abilities = ['smart', 'fit', 'face', 'style', 'charm', 'art', 'craft'];
+GAME_DATA.statLabel = { happy: '행복', health: '건강', libido: '성욕', smart: '지능', fit: '체력', face: '생김새', style: '꾸밈', charm: '매력', art: '감성', craft: '손재주', money: '돈' };
 // [등급, 시작값, 이 등급에서 오르는 속도]
 GAME_DATA.grades = [
   ['F', 0, 1], ['E', 25, 1], ['D', 50, 1], ['C', 80, .85],
@@ -34,7 +35,7 @@ GAME_DATA.grades = [
 GAME_DATA.traits = [
   { id: 'gifted',   label: '영재',        desc: '지능이 1.5배로 오르고 높게 시작한다.',   mult: { smart: 1.5 }, start: { smart: 15 } },
   { id: 'athletic', label: '운동 신경',   desc: '체력이 1.5배로 오르고 높게 시작한다.',   mult: { fit: 1.5 }, start: { fit: 15 } },
-  { id: 'pretty',   label: '타고난 외모', desc: '외모가 아주 높게 시작한다.',             mult: { looks: 1.2 }, start: { looks: 30 } },
+  { id: 'pretty',   label: '타고난 외모', desc: '생김새가 B~S 등급으로 타고난다.',        face: { B: 50, A: 35, S: 15 } },
   { id: 'social',   label: '사교적',      desc: '매력이 잘 오르고 사람과 금방 가까워진다.', mult: { charm: 1.5 }, relMult: 1.3 },
   { id: 'artistic', label: '예술 감각',   desc: '감성이 1.5배로 오르고 높게 시작한다.',   mult: { art: 1.5 }, start: { art: 15 } },
   { id: 'handy',    label: '손재주',      desc: '손재주가 1.5배로 오르고 높게 시작한다.', mult: { craft: 1.5 }, start: { craft: 15 } },
@@ -42,6 +43,26 @@ GAME_DATA.traits = [
   { id: 'optimist', label: '낙천적',      desc: '안 좋은 일에도 행복이 덜 떨어진다.',     negMult: { happy: .5 } },
   { id: 'nimble',   label: '손이 빠름',   desc: '나쁜 짓도 잘 안 걸린다. 그래도 언젠가는…', crimeBonus: .12 },
 ];
+
+/* ───── 외모 3층 ───── */
+// 생김새 시작 등급 (가중치). 소질 '타고난 외모'면 traits의 face를 씀
+GAME_DATA.faceStart = { F: 15, E: 25, D: 25, C: 20, B: 10, A: 5 };
+GAME_DATA.npcFace = { F: 15, E: 25, D: 25, C: 20, B: 10, A: 4, S: 1 };
+GAME_DATA.styleDecay = [20, 30];        // 꾸밈은 안 하면 매년 이만큼 떨어짐
+GAME_DATA.surgeryCost = 1500;
+// 체형 — 아바타의 appearance.body (키·체격·가슴·어깨), 남자는 크기(size)도 있음
+GAME_DATA.bodyLabel = {
+  height:   { short: '작은 키', avg: '보통 키', tall: '큰 키' },
+  build:    { slim: '마른 체형', avg: '보통 체형', fit: '탄탄한 체형', chubby: '통통한 체형' },
+  chest:    { small: '아담한 가슴', avg: '보통 가슴', large: '풍만한 가슴' },
+  shoulder: { narrow: '좁은 어깨', avg: '보통 어깨', wide: '넓은 어깨' },
+  size:     { small: '작은 편', avg: '보통', large: '큰 편', xlarge: '아주 큰 편' },
+};
+// 친밀 30부터 보이는 인상 (20살 이상)
+GAME_DATA.bodyImpression = {
+  m: { slim: '선이 가늘고 날렵하다', avg: '수수한 체격이다', fit: '어깨가 단단하고 탄탄하다', chubby: '푸근하고 듬직하다' },
+  f: { slim: '가늘고 여리여리하다', avg: '균형 잡힌 체형이다', fit: '건강하고 탄탄한 몸이다', chubby: '부드럽고 볼륨감이 있다' },
+};
 
 /* ───── 사람 정보 (나와 NPC 공통) ───── */
 // 성격 — mod: 상호작용별 효과 배율 / signal: 설렘이 생겼을 때 보내는 신호 / friendLine: 친해졌을 때 모습
@@ -152,7 +173,7 @@ GAME_DATA.actions = [
     text: ['해가 질 때까지 뛰어놀았다.', '무릎이 까지도록 놀았다.', '모래 범벅이 돼서 집에 갔다.'] },
   { id: 'study',     label: '공부',   icon: '📚', minAge: 6,  effect: { smart: [2, 5], happy: [-2, 0] },
     text: ['문제집 한 권을 끝냈다.', '노트 정리를 깔끔하게 끝냈다.', '밤늦게까지 책상 앞에 앉아 있었다.'] },
-  { id: 'exercise',  label: '운동',   icon: '🏃', minAge: 5,  effect: { fit: [3, 6], health: [1, 3], looks: [0, 1] },
+  { id: 'exercise',  label: '운동',   icon: '🏃', minAge: 5,  effect: { fit: [3, 6], health: [1, 3] },
     text: ['동네를 몇 바퀴 뛰었다.', '땀을 흠뻑 흘렸다.', '숨이 턱까지 차도록 움직였다.'] },
   { id: 'read',      label: '독서',   icon: '📖', minAge: 7,  effect: { smart: [1, 3], art: [0, 2], happy: [1, 2] },
     text: ['책 한 권을 다 읽었다.', '책에 빠져 시간 가는 줄 몰랐다.', '읽다 만 책을 드디어 끝냈다.'] },
@@ -166,7 +187,7 @@ GAME_DATA.actions = [
     text: ['학원 수업을 끝까지 버텼다.', '단어 시험에서 재시험을 봤다.', '밤 10시에 학원 문을 나섰다.'] },
   { id: 'game',     label: '게임',   icon: '🎮', minAge: 8,  effect: { happy: [3, 6], smart: [-1, 0] },
     text: ['게임 한 판만 하려다 세 시간이 지났다.', '드디어 어려운 판을 깼다.', '친구들이랑 밤늦게까지 게임을 했다.'] },
-  { id: 'style',     label: '꾸미기', icon: '💇', minAge: 13, cost: 20, effect: { looks: [2, 5], charm: [0, 1], happy: [0, 2] },
+  { id: 'style',     label: '꾸미기', icon: '💇', minAge: 13, cost: 20, effect: { style: [10, 16], charm: [0, 1], happy: [0, 2] },
     text: ['머리를 새로 했다.', '옷장을 정리하고 새 옷을 샀다.', '거울 앞에서 한참을 고민했다.'] },
   { id: 'parttime',  label: '알바',   icon: '🏪', minAge: 16, req: { job: false }, effect: { money: [30, 70], health: [-2, 0], charm: [0, 1], happy: [-2, 0] },
     text: s => s.place === 'cafe' ? ['카페에서 주말 알바를 했다.', '하루 종일 우유 거품을 냈다.'] : s.place === 'conveni' ? ['편의점 야간 알바를 했다.', '새벽에 들어온 물건을 진열했다.']
@@ -179,7 +200,7 @@ GAME_DATA.actions = [
     text: s => s.age < 18 ? ['엄마 손을 잡고 소아과에 갔다.', '주사를 맞고 사탕을 받았다.'] : ['진료를 받고 약을 타 왔다.', '미뤄둔 치과에 다녀왔다.', '한의원에서 침을 맞았다.'] },
   { id: 'coffee',    label: '커피',   icon: '☕', minAge: 13, cost: 5, effect: { happy: [2, 4] },
     text: ['창가 자리에서 커피를 마셨다.', '처음 보는 메뉴를 시켜봤다.', '커피 한 잔을 두고 멍하니 있었다.'] },
-  { id: 'shop',      label: '쇼핑',   icon: '🛍', minAge: 10, cost: 30, effect: { happy: [3, 6], looks: [0, 2] },
+  { id: 'shop',      label: '쇼핑',   icon: '🛍', minAge: 10, cost: 30, effect: { happy: [3, 6], style: [4, 8] },
     text: ['충동구매를 했다. 후회는 없다.', '구경만 하려다 두 손이 무거워졌다.', '오래 고민하던 신발을 샀다.'] },
   { id: 'drink',     label: '한잔',   icon: '🍺', minAge: 19, cost: 30, effect: { happy: [3, 7], health: [-3, -1], charm: [0, 1] },
     text: ['한 잔만 하려다 두 병을 비웠다.', '시원한 생맥주 한 잔에 하루가 풀렸다.', '안주가 맛있어서 술이 술술 들어갔다.'] },

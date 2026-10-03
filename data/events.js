@@ -144,7 +144,7 @@ GAME_DATA.events = [
   { id: 'dogWalk', type: 'fixed', age: [9, 15], req: { flags: ['dog'] }, text: '{dogName|와} 동네를 한 바퀴 돌았다. 꼬리가 쉬지 않았다.', effect: { health: 2, happy: 3 } },
 
   /* ═════ 고정 — 10대 ═════ */
-  { id: 'puberty', type: 'fixed', age: [13, 14], text: '거울 보는 시간이 부쩍 늘었다.', effect: { looks: 2, happy: -2 } },
+  { id: 'puberty', type: 'fixed', age: [13, 14], text: '거울 보는 시간이 부쩍 늘었다.', effect: { style: [3, 6], happy: -2 } },
   { id: 'midterm', type: 'fixed', age: [13, 15], season: ['봄', '겨울'],
     text: (s, a) => a.subjAvg() >= 60 ? '중간고사에서 반 5등 안에 들었다.' : '중간고사 성적표를 가방 깊숙이 넣었다.',
     effect: (s, a) => a.subjAvg() >= 60 ? { happy: 4 } : { happy: -3 } },
@@ -489,12 +489,12 @@ GAME_DATA.events = [
   // 헬스장
   { id: 'gymPT', type: 'random', on: ['gym'], age: [19, 50], once: false, cooldown: 4, text: 'PT 상담을 받았다. 20회에 150만원이라고 한다.',
     choices: [
-      { label: '등록한다', if: s => s.money >= 150, text: '첫 수업 다음 날, 계단을 기어서 내려갔다. 그래도 몸이 달라지는 게 느껴졌다.', effect: { money: -150, fit: [6, 10], health: [3, 5], looks: [1, 3] } },
+      { label: '등록한다', if: s => s.money >= 150, text: '첫 수업 다음 날, 계단을 기어서 내려갔다. 그래도 몸이 달라지는 게 느껴졌다.', effect: { money: -150, fit: [6, 10], health: [3, 5] } },
       { label: '혼자 해본다', text: '유튜브 영상을 보며 따라 했다.', effect: { fit: [1, 2] } },
     ] },
   { id: 'gymSpot', type: 'random', on: ['gym', 'exercise'], age: [16, 50], once: false, cooldown: 4, meet: meetHere({ hobby: 'sport', close: 18 }),
     text: '벤치프레스를 하다 바벨이 안 올라갔다. 옆에 있던 {new|이} 잡아줬다. "무리하지 마세요." 그 뒤로 인사하는 사이가 됐다.' },
-  { id: 'gymMirror', type: 'random', on: ['gym', 'exercise'], age: [16, 50], when: s => s.stats.fit >= 100, text: '거울 속 내 몸이 달라졌다는 걸 처음으로 느꼈다.', memory: true, effect: { looks: [2, 4], happy: 4 } },
+  { id: 'gymMirror', type: 'random', on: ['gym', 'exercise'], age: [16, 50], when: s => s.stats.fit >= 100, text: '거울 속 내 몸이 달라졌다는 걸 처음으로 느꼈다.', memory: true, effect: { charm: [1, 3], happy: 4 } },
 
   // PC방
   { id: 'pcDuo', type: 'random', on: ['pcbang', 'game'], age: [12, 45], once: false, cooldown: 3, meet: meetHere({ hobby: 'game', close: 20 }),
@@ -509,7 +509,7 @@ GAME_DATA.events = [
         text: '{new|이} 고맙다며 다음 공연 날짜를 알려줬다.' },
       { label: '박수만 치고 간다', text: '노래가 귀에 오래 남았다.', effect: { art: [0, 1] } },
     ] },
-  { id: 'mallScout', type: 'random', on: ['mall', 'shop', 'style'], age: [15, 30], when: s => s.stats.looks >= 110, text: '길에서 누가 명함을 내밀었다. 모델 일을 해볼 생각이 없냐고 한다.',
+  { id: 'mallScout', type: 'random', on: ['mall', 'shop', 'style'], age: [15, 30], when: s => s.stats.face >= 120 && s.stats.style >= 50, text: '길에서 누가 명함을 내밀었다. 모델 일을 해볼 생각이 없냐고 한다.',
     choices: [
       { label: '해본다', chance: .45,
         success: { text: '광고 사진 한 장에 내 얼굴이 실렸다. 버스 정류장에서 나를 마주쳤다.', memory: true, effect: { money: [100, 400], charm: [2, 4], happy: 6 } },
@@ -521,7 +521,7 @@ GAME_DATA.events = [
       { label: '안내데스크에 데려간다', karma: 5, text: '아이 엄마가 뛰어와 몇 번이고 고개를 숙였다.', effect: { happy: 3 } },
       { label: '못 본 척한다', karma: -3, text: '뒤에서 울음소리가 한참 들렸다.' },
     ] },
-  { id: 'mallSale', type: 'random', on: ['mall', 'shop'], age: [13, 50], once: false, cooldown: 3, text: '마감 세일. 몇 주째 눈여겨보던 옷이 반값이었다.', effect: s => ({ money: s.age >= 18 ? -15 : -1, looks: [1, 2], happy: 3 }) },
+  { id: 'mallSale', type: 'random', on: ['mall', 'shop'], age: [13, 50], once: false, cooldown: 3, text: '마감 세일. 몇 주째 눈여겨보던 옷이 반값이었다.', effect: s => ({ money: s.age >= 18 ? -15 : -1, style: [4, 8], happy: 3 }) },
 
   // 병원
   { id: 'hospOrange', type: 'random', on: ['hospital'], once: false, cooldown: 4, text: '대기실 옆자리 할머니가 귤 하나를 손에 쥐여주셨다. "젊은 사람이 아프면 쓰나."', effect: { happy: 3 } },
@@ -606,6 +606,30 @@ GAME_DATA.events = [
     ] },
   { id: 'regularMissed', type: 'random', on: NOT_ROUTINE, age: [10, 50], once: false, cooldown: 4, when: s => !!s.regular[s.place],
     text: '"요즘 왜 안 왔어요?" {place}에서 누가 먼저 안부를 물었다. 별것 아닌데 기분이 좋았다.', effect: { happy: 3 } },
+
+  /* ═════ 외모 (생김새·몸·꾸밈) ═════ */
+  { id: 'faceAttract', type: 'random', on: NOT_ROUTINE, age: [19, 49], once: false, cooldown: 2, when: (s, a) => s.stats.face >= a.gradeMin('B'),
+    meet: s => ({ kind: 'friend', gender: s.gender === 'm' ? 'f' : 'm', ageRange: [Math.max(19, s.age - 6), Math.min(49, s.age + 6)], hangout: s.place, close: 30, heart: 15 }),
+    text: '처음 보는 {new|이} 먼저 말을 걸어왔다. 웃는 얼굴이 낯설지 않은 것 같다고 했다.' },
+  { id: 'faceNumber', type: 'random', on: ['cafe', 'coffee'], age: [19, 49], once: false, cooldown: 3, when: (s, a) => s.stats.face >= a.gradeMin('A'),
+    meet: s => ({ kind: 'friend', gender: s.gender === 'm' ? 'f' : 'm', ageRange: [Math.max(19, s.age - 5), Math.min(49, s.age + 5)], hangout: 'cafe', close: 35, heart: 25 }),
+    text: '카페에서 {new|이} 쪽지를 밀어왔다. 번호가 적혀 있다.' },
+  { id: 'faceSelfConscious', type: 'fixed', age: [14, 25], once: false, cooldown: 4, when: (s, a) => s.stats.face < a.gradeMin('D'),
+    text: '거울을 보다가 한숨이 나왔다.',
+    choices: [
+      { label: '운동이라도 하자', text: '줄넘기를 샀다. 일단 몸부터 바꿔보기로 했다.', effect: { fit: [3, 5], happy: 2 } },
+      { label: '옷이라도 신경 쓰자', text: '옷장을 뒤집어엎었다. 어울리는 색을 찾았다.', effect: { style: [5, 10], happy: 1 } },
+      { label: '신경 안 쓰기로 했다', text: '거울을 뒤집어 놓았다. 그래도 가끔 생각났다.', effect: { happy: -2 } },
+    ] },
+  { id: 'surgery', type: 'fixed', age: [20, 45], once: false, cooldown: 5,
+    when: (s, a) => s.stats.face < a.gradeMin('B') && s.money >= GAME_DATA.surgeryCost && !s.flags.unnatural,
+    text: '성형외과 앞을 지나갔다. 상담만 받아볼까.',
+    choices: [
+      { label: `한다 (${GAME_DATA.surgeryCost}만원)`, chance: .8,
+        success: { text: '붓기가 빠지자 거울 속 얼굴이 달라져 있었다.', memory: true, effect: { money: -GAME_DATA.surgeryCost, happy: 8 }, do: (s, a) => a.faceStep(1) },
+        fail: { text: '수술이 잘 안 됐다. 어딘가 부자연스럽다.', memory: true, set: 'unnatural', effect: { money: -GAME_DATA.surgeryCost, health: -10, happy: -8 }, do: (s, a) => a.faceStep(-1) } },
+      { label: '이대로가 나다', text: '상담 실장의 명함을 가방 깊숙이 넣었다.' },
+    ] },
 
   /* ═════ 친밀한 관계 (둘 다 19살 이상, 이성, 가족 아님) — 행위는 한 줄로 넘기고 그 전후에 무게 ═════ */
   // 연인의 빈 집
@@ -1560,7 +1584,7 @@ GAME_DATA.events = [
   { id: 'diet', type: 'fixed', age: [17, 45], once: false, cooldown: 4, text: '다이어트를 하기로 결심했다.',
     choices: [
       { label: '식단과 운동을 같이 한다', check: { stat: 'fit', diff: 60 },
-        success: { text: '석 달 만에 바지가 헐렁해졌다.', effect: { looks: [2, 4], health: [2, 4], happy: 3 } },
+        success: { text: '석 달 만에 바지가 헐렁해졌다.', effect: { fit: [3, 5], style: [4, 8], health: [2, 4], happy: 3 } },
         fail: { text: '2주째 밤, 치킨 앞에서 무너졌다.', effect: { happy: -2 } } },
       { label: '내일부터', text: '내일도 내일부터였다.', effect: { happy: 1 } },
     ] },
