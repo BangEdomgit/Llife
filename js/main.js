@@ -30,6 +30,7 @@ function abHTML(k, v) {
 function deltaHTML(d) {
   if (!d || !d.length) return '';
   const parts = d.map(([k, v]) => {
+    if (k === 'sat') return `${esc(G.LABEL.sat)} <b class="sat">${v}</b>`;
     const shown = isMoney(k) ? G.fmtMoney(Math.abs(v)) : Math.abs(v);
     return `${esc(G.LABEL[k] || k)} <span class="${v > 0 ? 'p' : 'm'}">${v > 0 ? '+' : '-'}${shown}</span>`;
   });
@@ -77,8 +78,8 @@ function render(S) {
   const money = $('#money');
   money.textContent = G.fmtMoney(S.money);
   money.classList.toggle('neg', S.money < 0);
-  $('#conds').innerHTML = G.conds.map(k =>
-    `<span>${G.LABEL[k]}</span><span class="bar${S.stats[k] < 25 ? ' low' : ''}">${bar(S.stats[k])}</span><span class="num">${S.stats[k]}</span>`).join('');
+  $('#conds').innerHTML = G.conds.filter(k => k !== 'libido' || S.age >= G.config.sexMinAge).map(k =>
+    `<span>${G.LABEL[k]}</span><span class="bar${(k === 'libido' ? S.stats[k] >= 60 : S.stats[k] < 25) ? ' low' : ''}">${bar(S.stats[k])}</span><span class="num">${S.stats[k]}</span>`).join('');
   $('#abils').innerHTML = G.abilities.map(k => abHTML(k, S.stats[k])).join('');
 
   renderLog(S);
@@ -216,6 +217,11 @@ function openPerson(id) {
     if (k === 'heart' && !G.heartOk(p) && !p.heart) return `<span>${G.LABEL[k]}</span><span class="dim">—</span><span class="num"></span>`;
     return `<span>${G.LABEL[k]}</span><span class="bar${k === 'grudge' ? ' low' : ''}">${bar(p[k])}</span><span class="num">${p[k]}</span>`;
   }).join('');
+  const im = G.intimacy(p);
+  const imHTML = im ? `<div class="stats">
+      <span>${G.LABEL.libido}</span><span class="bar${im.libido >= 60 ? ' low' : ''}">${bar(im.libido)}</span><span class="num">${im.libido}</span>
+      ${im.nights ? `<span>궁합</span><span class="bar">${bar(im.compat || 0)}</span><span class="num">${im.compat || 0}</span>
+      <span>만족감</span><span class="bar">${bar(im.sat || 0)}</span><span class="num">${im.sat ?? '—'}</span>` : ''}</div>` : '';
   const tags = [];
   const mine = p.partner || p.spouse || p.secret;
   if (p.taken && !mine && p.kind !== 'family' && p.kind !== 'child') tags.push('<span class="tag">애인 있음</span>');
@@ -231,6 +237,7 @@ function openPerson(id) {
   showModal('person', `${G.pname(p)}`, `
     <div class="p-top">${av(p, 60)}<div class="p-who"><b>${esc(G.pname(p))}</b><span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}, ${esc(G.relLabel(p))}</span></div></div>
     <div class="stats">${stats}</div>
+    ${imHTML}
     ${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}
     <dl class="prof">${prof}</dl>
     ${G.profile(p).some(f => f.value == null) ? '<p class="hint">더 친해지면 더 알 수 있다.</p>' : ''}
@@ -399,7 +406,7 @@ function openEnding() {
 
   const close = G.people().filter(p => p.kind === 'family' || p.kind === 'child' || p.spouse || p.partner || p.close >= 60)
     .map(p => `${G.pname(p)}(${G.relLabel(p)})`).join(', ') || '없음';
-  const stats = G.conds.map(k => `<span>${G.LABEL[k]}</span><span class="bar">${bar(S.stats[k])}</span><span class="num">${S.stats[k]}</span>`).join('')
+  const stats = G.conds.filter(k => k !== 'libido' || S.age >= G.config.sexMinAge).map(k => `<span>${G.LABEL[k]}</span><span class="bar">${bar(S.stats[k])}</span><span class="num">${S.stats[k]}</span>`).join('')
     + G.abilities.map(k => { const g = G.gradeInfo(S.stats[k]); return `<span>${G.LABEL[k]}</span><span class="bar">${bar(g.pct * 100)}</span><span class="num"><b class="g-${g.letter}">${g.letter}</b></span>`; }).join('');
   const album = S.memories.map(m => `<p><span class="dim">${m.age}살 ${m.season || ''} ${wxIcon(m.wx)}</span> ${esc(m.text)}</p>`).join('');
 

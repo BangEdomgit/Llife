@@ -12,28 +12,35 @@
 // noFree: true  → 장소에 같이 있어도 늘 행동 1 (이동하는 것들)
 // 문장의 {p}는 상대 이름 (조사는 {p|와} 처럼)
 //
-// 친밀한 관계 — 조건: 둘 다 19살 이상, 이성, 가족 아님, 집에서만. 행위는 묘사하지 않고 한 줄로 넘긴 뒤, 그다음 아침과 결과에 무게를 둠
+// intimate: true → 엔진이 '함께 밤을 보냄'으로 처리 (성욕 해소, 기술·궁합, 만족감에 따라 설렘 변화). mood: 분위기 보정
+//
+// 친밀한 관계 — 조건: 둘 다 20살 이상, 이성, 가족 아님, 집에서만. 행위 과정은 쓰지 않고, 그 전후와 다음 날 아침에 무게를 둠
+// 받아줄지는 꼬심 점수(잠자리 수락 가중치: 설렘·친밀·성욕·상황이 크고 외모는 작게)로 정함
 window.GAME_DATA = window.GAME_DATA || {};
 
 (function () {
 const notKin = p => p.kind !== 'family' && p.kind !== 'child';
 const lover = p => p.partner || p.spouse || p.secret;
-// 이미 사귀는 사이는 상대가 50살을 넘어도 됨. 그 외엔 연애 가능 조건 그대로
-const adultPair = (s, p, a) => notKin(p) && p.gender !== s.gender && s.age >= 19 && a.npcAge(p) >= 19 && (lover(p) ? a.heartOk(p) : a.canRomance(p));
+// 이미 사귀는 사이는 상대가 50살을 넘어도 됨. 그 외엔 연애 가능 조건 그대로 (엔진의 canSex: 둘 다 20살 이상)
+const adultPair = (s, p, a) => a.canSex(p);
 const pickLine = (a, set, p) => { const L = GAME_DATA.nightLines[set][p.personality]; return L ? a.pick(L) : GAME_DATA.nightLines[set]._; };
 
 // 함께 밤을 보낸 다음 날 아침 — 상대 성격마다 다름 (lover: 사귀는 사이 / fling: 사귀지 않는 사이)
 GAME_DATA.nightLines = {
+  // 불이 꺼지기 전 한 줄 (사귀는 사이)
+  intro: ['불을 끄자 방 안에 숨소리만 남았다.', '{p|이} 내 셔츠 단추에 손을 올렸다. 멈추지 않았다.', '소파에서 시작된 키스가 침대까지 이어졌다.', '{p}의 손이 등을 타고 올라왔다. 숨이 가까워졌다.'],
+  // 사귀지 않는 사이
+  flingIntro: ['문이 닫히자마자 입술이 먼저 닿았다.', '술기운 탓이라고 하기엔 서로 너무 또렷하게 기억하고 있었다.', '엘리베이터 안에서 시작된 건 택시 안에서 끝나지 않았다.', '샤워기 소리가 멈추자 방 안이 조용해졌다. 둘 다 어색했다.'],
   lover: {
-    bold:      ['{p|이} 먼저 이불을 걷어찼다. "일어나, 밥 먹자."', '{p|이} 눈 뜨자마자 오늘 뭐 할지부터 정했다.'],
-    shy:       ['{p|이} 내 팔에 얼굴을 묻고 한참을 안 일어났다.', '{p|이} 눈이 마주치자 이불을 머리끝까지 끌어올렸다.'],
-    playful:   ['눈을 떠 보니 {p|이} 내 얼굴에 낙서를 하고 있었다.', '{p|이} 내 베개를 빼앗아 들고 거실로 도망갔다.'],
-    cool:      ['{p|이} 아무렇지 않게 커피를 내리고 있었다.', '{p|은} 말없이 내 몫의 토스트까지 구워놨다.'],
-    warm:      ['{p|이} 먼저 일어나 아침을 차려 놓았다.', '{p|이} 내 머리를 쓸어 넘기며 더 자라고 했다.'],
-    sharp:     ['{p|이} 창밖을 보며 "어제 좋았어"라고 짧게 말했다.', '{p|이} 옷을 챙기며 "다음 주 금요일 비워둬."라고 했다.'],
-    sunny:     ['아침부터 {p}의 웃음소리가 집 안을 가득 채웠다.', '{p|이} 콧노래를 부르며 커튼을 활짝 열었다.'],
-    sensitive: ['{p|이} 내 손을 꼭 잡고 한참을 놓지 않았다.', '{p|이} 내 얼굴을 오래 보더니 "이대로 있고 싶다"고 했다.'],
-    _: '{p|와} 조용한 아침을 보냈다.',
+    bold:      ['{p|이} 내 위에서 일어나며 웃었다. "또 해도 돼?"', '{p|이} 먼저 이불을 걷어찼다. "일어나, 밥 먹자."'],
+    shy:       ['{p|이} 이불 속에서 내 가슴에 얼굴을 묻었다. 귀 끝이 아직 빨갛다.', '{p|이} 눈이 마주치자 이불을 머리끝까지 끌어올렸다.'],
+    playful:   ['{p|이} 내 등에 남은 손톱 자국을 보더니 "내 작품"이라며 깔깔거렸다.', '눈을 떠 보니 {p|이} 내 얼굴에 낙서를 하고 있었다.'],
+    cool:      ['{p|이} 아무 일 없었다는 듯이 커피를 내리고 있었다. 컵이 두 개다.', '{p|은} 말없이 내 몫의 토스트까지 구워놨다.'],
+    warm:      ['{p|이} 먼저 일어나 아침을 차려 놓았다. 내 옷을 걸치고.', '{p|이} 내 머리를 쓸어 넘기며 더 자라고 했다.'],
+    sharp:     ['{p|이} "어젯밤 좋았어"라고 짧게 말했다. 목에 자국이 남아 있었다.', '{p|이} 옷을 챙기며 "다음 주 금요일 비워둬."라고 했다.'],
+    sunny:     ['아침부터 {p}의 콧노래가 집 안을 채웠다. 바닥에 옷이 흩어져 있었다.', '{p|이} 콧노래를 부르며 커튼을 활짝 열었다.'],
+    sensitive: ['{p|이} 아직 내 팔 안에 있었다. "가지 마"라고 작게 말했다.', '{p|이} 내 손을 꼭 잡고 한참을 놓지 않았다.'],
+    _: '{p|와} 뒤엉킨 이불 속에서 늦은 아침을 맞았다.',
   },
   fling: {
     bold:      ['{p|이} "우리 이제 뭐야?"라고 대놓고 물었다.'],
@@ -84,13 +91,15 @@ GAME_DATA.social = [
   { id: 'flirt', label: '플러팅', icon: '😉',
     if: (s, p, a) => a.canRomance(p) && !p.partner && !p.spouse && !a.jailed(),
     run: (s, p, a) => {
-      const ok = (s.stats.face + s.stats.style + s.stats.charm) / 6 + p.close / 2 + 20 + a.rand(-15, 15) >= 55;   // 외모·매력·친밀이 높을수록 잘 먹힘
+      const ok = a.charmed(p, null, a.need('flirt'));   // 꼬심 점수: 아는 정도에 따라 외모·매력·관계 가중치가 바뀜
       const risk = a.main() && a.main() !== p ? .2 : 0;
+      const g = a.faceGrade(), react = GAME_DATA.faceReact.flirt[g === 'SS' ? 'S' : g];
+      const say = s.place === 'bar' ? ['"오늘 재밌었어." ', '"오늘 재밌었어." ', '"너 눈 진짜 예쁘다. 아까부터 계속 보고 있었어." ', '"나 좋아해? 좋아하지?" '][s.drunk || 0] : '';
       return ok
         ? { p: { heart: [8, 14], close: [1, 3] }, risk, riskTaken: p.taken ? .15 : 0,
-            text: ['{p|이} 내 농담에 오래 웃었다.', '{p|와} 눈이 마주쳤다. 둘 다 먼저 피하지 않았다.', '{p|이} 다음에 또 보자고 했다.'] }
+            text: () => say + (['S', 'SS', 'A', 'B'].includes(g) ? react : a.pick(['{p|이} 내 농담에 오래 웃었다.', '{p|와} 눈이 마주쳤다. 둘 다 먼저 피하지 않았다.', '{p|이} 다음에 또 보자고 했다.'])) }
         : { p: { close: [-3, -1] }, effect: { happy: -2 }, risk, riskTaken: p.taken ? .1 : 0,
-            text: ['분위기가 어색해졌다.', '{p|이} 못 들은 척했다.'] };
+            text: () => say + (['D', 'E', 'F'].includes(g) ? react : a.pick(['분위기가 어색해졌다.', '{p|이} 못 들은 척했다.'])) };
     } },
 
   { id: 'confess', label: '고백하기', icon: '💌',
@@ -118,46 +127,51 @@ GAME_DATA.social = [
       : { p: { heart: -10 }, effect: { happy: -5 }, text: '{p|은} 아직은 아니라고 했다.' } },
 
   /* ── 친밀한 관계 (집에서만) ── */
-  { id: 'intimate', label: '함께 밤을 보내다', icon: '🌙',
+  { id: 'intimate', label: '함께 밤을 보내다', icon: '♂♀',
     if: (s, p, a) => adultPair(s, p, a) && lover(p) && p.heart >= 60 && p.trust >= 40 && s.place === 'home' && !a.jailed(),
     run: (s, p, a) => {
-      const first = !p.nights;
       const m = a.main();
+      // 사귀는 사이라도 상대가 내키지 않을 때가 있음 (성욕이 바닥이면 더)
+      if (!a.charmed(p, 'bed', a.need('lover') + ((p.libido || 0) < 20 ? 15 : 0)))
+        return { p: { heart: [-2, 0] }, text: a.pick(['{p|이} 오늘은 피곤하다며 이불을 끌어올렸다.', '{p|이} 내 이마에 입을 맞추고 먼저 돌아누웠다.', '"오늘은 그냥 안고만 자자." {p|이} 작게 말했다.']) };
+      const first = !p.nights;
       return {
+        intimate: true,
         p: { heart: [8, 15], close: [5, 10], trust: [3, 6] },
         effect: { happy: [4, 8] },
-        do: () => a.night(p),
         memory: first,                                  // 이 사람과 처음 보낸 밤은 추억으로 (날씨와 함께 앨범에)
         pregnant: s.flags.married || p.spouse ? .15 : .08,   // 엔진이 30살부터 확률을 줄이고, 45살부터는 0
         risk: p.secret ? (m && a.isHere(m) ? .6 : .2) : 0,  // 몰래 만나는 사이면 들킬 위험 (배우자가 집에 있으면 훨씬 큼)
-        text: () => (first ? '{p|와} 처음으로 함께 밤을 보냈다. ' : '{p|와} 함께 밤을 보냈다. ') + pickLine(a, 'lover', p),
+        text: () => a.pick(GAME_DATA.nightLines.intro) + ' ' + pickLine(a, 'lover', p),
       };
     } },
 
-  { id: 'onenight', label: '하룻밤', icon: '🌙',
-    if: (s, p, a) => adultPair(s, p, a) && !lover(p) && p.heart >= 50 && p.close >= 40 && s.place === 'home' && !a.jailed(),
+  { id: 'onenight', label: '하룻밤', icon: '♂♀',
+    if: (s, p, a) => adultPair(s, p, a) && !lover(p) && p.close >= 40 && (p.heart >= 50 || (p.fwb && p.heart >= 25)) && s.place === 'home' && !a.jailed(),
     run: (s, p, a) => {
+      if (!p.fwb && !a.charmed(p, 'bed', a.need('bed')))
+        return { p: { heart: [-3, -1] }, effect: { happy: -2 }, text: a.pick(['{p|이} 웃으며 고개를 저었다. "오늘은 여기까지."', '{p|이} 잠깐 망설이더니 택시를 불렀다.']) };
       const risk = a.main() ? .25 : 0;     // 애인이 있으면 들킬 위험
       const theirRisk = p.taken ? .2 : 0;  // 상대에게 애인이 있으면 그쪽도 위험
       return {
+        intimate: true, fling: true,       // 관계가 '썸' 또는 '복잡한 사이'로
         p: { heart: [10, 18], close: [4, 8] },
         effect: { happy: [3, 6] },
-        do: () => a.night(p, true),        // 관계가 '썸' 또는 '복잡한 사이'로
         memory: !p.nights,
         pregnant: .05,
         risk, riskTaken: theirRisk,
-        text: () => a.pick(['밤이 깊었다. 둘 다 집에 가지 않았다. ', '술기운 탓이라고 하기엔, 서로 눈을 너무 오래 마주쳤다. ']) + pickLine(a, 'fling', p),
+        text: () => a.pick(GAME_DATA.nightLines.flingIntro) + ' ' + pickLine(a, 'fling', p),
       };
     } },
 
   { id: 'takeHome', label: '집으로 데려가기', icon: '🏠', noFree: true,
     if: (s, p, a) => ['bar', 'concert'].includes(s.place) && a.isHere(p) && !s.flags.married && adultPair(s, p, a) && p.heart >= 45 && p.close >= 30 && !a.jailed(),
-    run: (s, p, a) => ({
+    run: (s, p, a) => a.charmed(p, 'bed', a.need('takeHome')) ? {
       moveTo: 'home', p: { heart: [2, 4] },
       risk: a.main() && a.main() !== p ? .1 : 0,
       text: !s.flags.ownPlace ? '부모님이 주무시는 걸 확인하고 {p|와} 조용히 현관문을 열었다.'
         : ['택시 창밖으로 불빛이 길게 번졌다. {p|와} 우리 집 앞에서 내렸다.', '{p|와} 말없이 걸었다. 어느새 우리 집 골목이었다.'],
-    }) },
+    } : { p: { heart: [-2, 0] }, text: ['{p|이} 택시를 잡아주고 혼자 돌아섰다.', '"다음에." {p|이} 웃으며 손을 흔들었다.'] } },
 
   { id: 'breakup', label: '헤어지기', icon: '💔',
     if: (s, p, a) => (p.partner || p.secret) && !a.jailed(),

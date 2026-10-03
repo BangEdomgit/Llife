@@ -11,6 +11,8 @@ GAME_DATA.config = {
   maxPeople: 24,
   romanceMinAge: 19,        // 설렘(연애): 플레이어와 상대 모두 이 나이 이상
   romanceMaxAge: 49,        //             상대가 이 나이 이하
+  sexMinAge: 20,            // 성적인 것(성욕, 함께 밤을 보내기): 플레이어와 상대 모두 이 나이 이상
+  allureNeed: { flirt: 33, lover: 30, bed: 50, takeHome: 45 },   // 꼬심 점수가 이만큼 넘어야 (± 15 운)
   seasons: [
     { id: '봄',   icon: '🌸', at: 0, fixed: true,  months: [3, 4, 5],  weather: { sunny: 3, partly: 3, rain: 2, dust: 2, fog: 1, rainbow: 1 } },
     { id: '여름', icon: '🌻', at: 3, fixed: true,  months: [6, 7, 8],  weather: { sunny: 4, partly: 2, rain: 3, storm: 2, cloudy: 1, rainbow: 1 } },
@@ -50,6 +52,7 @@ GAME_DATA.faceStart = { F: 15, E: 25, D: 25, C: 20, B: 10, A: 5 };
 GAME_DATA.npcFace = { F: 15, E: 25, D: 25, C: 20, B: 10, A: 4, S: 1 };
 GAME_DATA.styleDecay = [20, 30];        // 꾸밈은 안 하면 매년 이만큼 떨어짐
 GAME_DATA.surgeryCost = 1500;
+GAME_DATA.sizeWeights = { small: 20, avg: 50, large: 25, xlarge: 5 };
 // 체형 — 아바타의 appearance.body (키·체격·가슴·어깨), 남자는 크기(size)도 있음
 GAME_DATA.bodyLabel = {
   height:   { short: '작은 키', avg: '보통 키', tall: '큰 키' },
@@ -67,40 +70,61 @@ GAME_DATA.bodyImpression = {
 /* ───── 사람 정보 (나와 NPC 공통) ───── */
 // 성격 — mod: 상호작용별 효과 배율 / signal: 설렘이 생겼을 때 보내는 신호 / friendLine: 친해졌을 때 모습
 //        open: 처음 보는 사이에 말 걸었을 때 잘 받아주는 정도 / hello: 받아줬을 때 / snub: 대화가 끊겼을 때
+//        allure: 꼬심 보정 (직진형일수록 잘 넘어오고, 냉철형일수록 어려움)
 GAME_DATA.personalities = [
-  { id: 'bold',      label: '직진형', desc: '마음에 들면 바로 표현한다.',     mod: { flirt: 1.2, hang: 1.1 }, confessBonus: 10,
+  { id: 'bold',      label: '직진형', desc: '마음에 들면 바로 표현한다.',     mod: { flirt: 1.2, hang: 1.1 }, allure: 15, confessBonus: 10,
     signal: '{fp|이} 먼저 영화 보자고 연락해왔다.', friendLine: '{fp|이} 대뜸 주말에 뭐 하냐고 물었다.',
     open: .15, hello: '"나 {p}. 너는?" 상대가 먼저 손을 내밀었다.',
     snub: '"아, 지금 좀 바빠서요." 단칼에 잘렸다.' },
-  { id: 'shy',       label: '소심형', desc: '표현은 서툴지만 오래 기억한다.', mod: { flirt: .8, listen: 1.3, talk: 1.1 },
+  { id: 'shy',       label: '소심형', desc: '표현은 서툴지만 오래 기억한다.', mod: { flirt: .8, listen: 1.3, talk: 1.1 }, allure: -5,
     signal: '{fp|이} 지나가듯 한 내 말을 기억하고 있었다.', friendLine: '{fp|이} 쭈뼛거리며 과자를 내밀었다.',
     open: -.15, hello: '{p|이} 깜짝 놀라더니, 작은 목소리로 이름을 알려줬다.',
     snub: '상대가 고개만 꾸벅하고 자리를 피했다.' },
-  { id: 'playful',   label: '장난형', desc: '장난으로 마음을 드러낸다.',       mod: { hang: 1.3, argue: .7 },
+  { id: 'playful',   label: '장난형', desc: '장난으로 마음을 드러낸다.',       mod: { hang: 1.3, argue: .7 }, allure: 8,
     signal: '{fp}의 장난이 부쩍 늘었다. 이상하게 나한테만.', friendLine: '{fp|이} 몰래 내 가방에 웃긴 쪽지를 넣어놨다.',
     open: .1, hello: '{p|이} 이름 대신 수수께끼를 냈다. 겨우 맞히고 나서야 이름을 알려줬다.',
     snub: '농담으로 받아치더니 그대로 가버렸다.' },
-  { id: 'cool',      label: '무심형', desc: '무심한 척 다 챙겨준다.',          mod: { talk: .8, gift: 1.3 },
+  { id: 'cool',      label: '무심형', desc: '무심한 척 다 챙겨준다.',          mod: { talk: .8, gift: 1.3 }, allure: 0,
     signal: '{fp|이} 아무렇지 않게 우산을 씌워줬다.', friendLine: '{fp|이} 말없이 음료수를 놓고 갔다.',
     open: -.1, hello: '{p|은} 짧게 이름만 말했다. 그래도 싫은 눈치는 아니었다.',
     snub: '대답이 "네." 한마디로 끝났다.' },
-  { id: 'warm',      label: '다정형', desc: '누구에게나 따뜻하다.',            mod: { listen: 1.3, apologize: 1.3 },
+  { id: 'warm',      label: '다정형', desc: '누구에게나 따뜻하다.',            mod: { listen: 1.3, apologize: 1.3 }, allure: 5,
     signal: '{fp|이} 내가 아팠던 날을 기억하고 죽을 사왔다.', friendLine: '{fp|이} 내 생일을 제일 먼저 챙겼다.',
     open: .1, hello: '{p|이} 환하게 웃으며 옆자리를 내줬다.',
     snub: '상대가 미안하다며 일행에게 돌아갔다.' },
-  { id: 'sharp',     label: '냉철형', desc: '솔직하고 이성적이다.',            mod: { talk: 1.2, flirt: .85, argue: 1.2 },
+  { id: 'sharp',     label: '냉철형', desc: '솔직하고 이성적이다.',            mod: { talk: 1.2, flirt: .85, argue: 1.2 }, allure: -10,
     signal: '{fp|이} 나랑 있을 때만 말이 길어진다.', friendLine: '{fp|이} 내 고민에 정확한 답을 줬다.',
     open: 0, hello: '{p|은} 용건부터 물었다. 대답을 듣고 나서야 이름을 알려줬다.',
     snub: '"무슨 일이시죠?" 대화가 거기서 끝났다.' },
-  { id: 'sunny',     label: '낙천형', desc: '어디서든 분위기를 띄운다.',       mod: { hang: 1.2 },
+  { id: 'sunny',     label: '낙천형', desc: '어디서든 분위기를 띄운다.',       mod: { hang: 1.2 }, allure: 0,
     signal: '{fp|이} 나만 보면 웃는다.', friendLine: '{fp} 덕분에 하루 종일 웃었다.',
     open: .15, hello: '{p|이} 처음 본 사이가 맞나 싶을 만큼 반겨줬다.',
     snub: '웃으며 인사는 받아줬지만 금방 다른 데로 갔다.' },
-  { id: 'sensitive', label: '예민형', desc: '섬세하고 상처를 잘 받는다.',      mod: { argue: 1.5, gift: 1.2, listen: 1.2 },
+  { id: 'sensitive', label: '예민형', desc: '섬세하고 상처를 잘 받는다.',      mod: { argue: 1.5, gift: 1.2, listen: 1.2 }, allure: 0,
     signal: '{fp|이} 내 표정 하나하나를 읽는다.', friendLine: '{fp|이} 내 기분이 안 좋은 걸 먼저 알아챘다.',
     open: -.05, hello: '{p|이} 잠깐 망설이다가 조심스럽게 웃었다.',
     snub: '경계하는 눈빛이 돌아왔다. 괜히 말을 걸었나 싶었다.' },
 ];
+// 내 생김새(첫인상) 등급에 따른 상대 반응 — 플러팅할 때 / 처음 만났을 때 (연애 가능한 상대만)
+GAME_DATA.faceReact = {
+  flirt: {
+    S: '{p|이} 숨을 멈췄다. 눈을 못 떼는 게 보였다.', A: '{p|이} 얼굴이 빨개졌다. 분명히 의식하고 있다.', B: '{p|이} 웃으며 몸을 기울였다.',
+    C: '{p|이} 웃으며 대화를 이어갔다.', D: '{p|이} 웃긴 했지만 어딘가 거리를 두는 느낌이다.', E: '{p|이} 어색하게 웃고 휴대폰을 봤다.', F: '{p|이} 못 들은 척 고개를 돌렸다.',
+  },
+  first: {
+    SS: '{p|이} 나를 계속 훔쳐보고 있었다.', S: '{p|이} 나를 계속 훔쳐보고 있었다.', A: '{p|이} 눈이 마주치자 먼저 웃었다.', B: '{p|이} 호감 어린 표정으로 인사했다.',
+    C: '평범한 인사를 나눴다.', D: '{p|이} 무심하게 고개만 까딱했다.', E: '{p|이} 관심 없다는 듯 시선을 피했다.', F: '{p|이} 눈도 잘 마주치지 않았다.',
+  },
+};
+// 함께 밤을 보낸 뒤 상대가 느낀 만족감 (0: 0~29 / 1: 30~49 / 2: 50~69 / 3: 70~89 / 4: 90~100)
+GAME_DATA.satLines = {
+  0: ['{p}의 표정이 미묘했다. 한 번이면 됐다는 얼굴이었다.', '{p|이} 말없이 휴대폰만 들여다봤다.'],
+  1: ['{p|이} "기대했는데 좀…" 하고 말끝을 흐렸다.', '{p|이} 웃었지만 어딘가 심심한 얼굴이었다.'],
+  2: [],
+  3: ['{p|이} 만족스러운 얼굴로 기지개를 켰다.', '{p|이} 콧노래를 흥얼거리며 머리를 묶었다.'],
+  4: ['{p|이} "어떻게 이래?" 하며 한참을 웃었다. 잊을 수가 없는 밤이었다.', '{p|이} 하루 종일 그 밤 이야기만 했다. 잊을 수가 없는 밤이었다.'],
+  firstLow: ['서툴렀지만 상관없었다. 둘 다 처음 같은 밤이었다.', '어색하고 서툴렀다. 그래도 {p}의 손은 계속 따뜻했다.'],
+};
 // 어릴 때 처음 보는 아이에게 말 걸었을 때
 GAME_DATA.kidHello = ['{p|이} 같이 놀자며 손을 잡아끌었다.', '{p|와} 금방 친구가 됐다. 서로 이름을 크게 외쳤다.', '{p|이} 아끼는 사탕을 하나 나눠줬다.'];
 // 취미 — 같은 취미면 같이 놀 때 더 가까워짐. act: 같이 놀 때 문장
@@ -169,6 +193,8 @@ GAME_DATA.actions = [
   { id: 'rest',      label: '쉬기',   icon: '🛋', minAge: 0,  effect: { health: [1, 2], happy: [1, 3] },
     text: s => s.age < 4 ? ['낮잠을 푹 잤다.', '엄마 품에서 잠들었다.', '모빌을 보다가 잠들었다.']
       : ['이불 속에서 뒹굴었다.', '아무것도 안 하고 하루를 보냈다.', '낮잠을 자고 일어나니 저녁이었다.'] },
+  { id: 'selfRelief', label: '자위',  icon: '🚿', minAge: 20, if: s => s.stats.libido >= 30, libido: [-50, -40], effect: { happy: [-1, 1] },
+    text: ['샤워를 오래 했다.', '혼자만의 시간을 보냈다.', '좀 나아졌다.'] },
   { id: 'play',      label: '놀기',   icon: '🪁', minAge: 4,  effect: { happy: [3, 5], fit: [1, 3], charm: [0, 1] },
     text: ['해가 질 때까지 뛰어놀았다.', '무릎이 까지도록 놀았다.', '모래 범벅이 돼서 집에 갔다.'] },
   { id: 'study',     label: '공부',   icon: '📚', minAge: 6,  effect: { smart: [2, 5], happy: [-2, 0] },

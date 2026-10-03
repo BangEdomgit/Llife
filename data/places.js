@@ -36,7 +36,7 @@ GAME_DATA.places = [
       : a.npcAge(p) < 19 ? ['방에서 숙제를 하고 있다', '휴대폰을 붙잡고 누워 있다', '냉장고 문을 열고 서 있다', '방문을 닫고 음악을 듣고 있다']
       : ['TV를 보고 있다', '부엌에서 뭔가 만들고 있다', '빨래를 개고 있다', '소파에 누워 휴대폰을 보고 있다', '식탁에 앉아 신문을 읽고 있다', '베란다 화분에 물을 주고 있다'],
     arrive: s => s.age < 4 ? ['집에서 하루를 보냈다.', '엄마 품에서 하루를 보냈다.'] : ['오늘은 집에 있기로 했다.', '현관문을 닫자 바깥 소리가 멀어졌다.', '집에서 하루를 보내기로 했다.'],
-    actions: ['rest', 'study', 'read', 'game', 'make', 'artPrac'] },
+    actions: ['rest', 'study', 'read', 'game', 'make', 'artPrac', 'selfRelief'] },
 
   { id: 'playground', label: '놀이터', icon: '🛝', minAge: 4, maxAge: 12,
     regulars: ['classmate', 'friend'], crowd: 'kid', crowdN: [1, 3],

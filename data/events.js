@@ -638,7 +638,7 @@ GAME_DATA.events = [
     onStart: (s, a) => a.focus(a.main()),
     text: '{fp}의 가족이 여행을 갔다. 빈 집에 둘만 있다.',
     choices: [
-      { label: '영화를 틀었다', text: '영화를 틀었지만 끝까지 본 건 아니었다.', do: (s, a) => a.night(a.focused()), pregnant: .08,
+      { label: '영화를 틀었다', text: '영화를 틀었지만 끝까지 본 건 아니었다.', intimate: true, pregnant: .08,
         p: { heart: [8, 14], close: [4, 8] }, effect: { happy: [4, 6] }, memory: firstNight },
       { label: '일찍 들어간다', text: '아쉬운 표정을 뒤로하고 나왔다.' },
     ] },
@@ -647,7 +647,7 @@ GAME_DATA.events = [
     when: (s, a) => { const m = a.main(); return m && m.heart >= 60; },
     onStart: (s, a) => a.focus(a.main()),
     text: '여행지 숙소에서 {fp|와} 단둘이. 창밖으로 바다가 보인다.',
-    do: (s, a) => a.night(a.focused()), pregnant: (s, a) => a.focused().spouse ? .12 : .06,
+    intimate: true, mood: 25, pregnant: (s, a) => a.focused().spouse ? .12 : .06,
     p: { heart: [6, 12], close: [5, 8] }, effect: { happy: [5, 8] }, memory: true },
   // 술자리 뒤
   { id: 'drunkNight', type: 'random', on: ['bar'], age: [19, 49], once: false, cooldown: 3,
@@ -656,7 +656,7 @@ GAME_DATA.events = [
     text: '술집을 나서는데 {fp|이} 택시를 같이 타자고 했다.',
     choices: [
       { label: '같이 탄다', text: (s, a) => '택시는 {fp}의 집 앞에 섰다. ' + nightLine(a, 'fling'),
-        do: (s, a) => a.night(a.focused(), true), pregnant: .05, memory: firstNight,
+        intimate: true, fling: true, pregnant: .05, memory: firstNight,
         p: { heart: [10, 16], close: [4, 6] }, effect: { happy: [3, 6] }, risk: .2, riskTaken: .15 },
       { label: '각자 간다', text: '손을 흔들고 돌아섰다. 조금 아쉬웠다.' },
     ] },
@@ -667,7 +667,7 @@ GAME_DATA.events = [
     text: '{fp|이} 아무도 우리를 모르는 동네에서 보자고 했다.',
     choices: [
       { label: '간다', text: (s, a) => '낯선 동네의 작은 숙소였다. ' + nightLine(a, 'lover') + ' 돌아오는 길은 유난히 길었다.',
-        do: (s, a) => a.night(a.focused()), pregnant: .06, risk: .25,
+        intimate: true, mood: 10, pregnant: .06, risk: .25,
         p: { heart: [6, 10], close: [3, 6] }, effect: { happy: 3, money: -10 } },
       { label: '오늘은 못 간다', p: { heart: -5 }, text: '답장이 한참 뒤에 왔다. "응."' },
     ] },
@@ -759,7 +759,7 @@ GAME_DATA.events = [
     onStart: (s, a) => a.focus(a.main()),
     text: (s, a) => a.find(p => p.kind === 'child' && a.npcAge(p) < 10).length ? '아이들이 잠든 뒤, {fp|와} 오랜만에 둘만 남았다.' : '{fp|와} 오랜만에 둘 다 일찍 퇴근했다.',
     choices: [
-      { label: '와인을 꺼낸다', text: (s, a) => '오랜만에 둘만의 밤이었다. ' + nightLine(a, 'lover'), do: (s, a) => a.night(a.focused()), pregnant: .12,
+      { label: '와인을 꺼낸다', text: (s, a) => '오랜만에 둘만의 밤이었다. ' + nightLine(a, 'lover'), intimate: true, mood: 10, pregnant: .12,
         p: { heart: [6, 10], close: [3, 6] }, effect: { happy: [3, 5] } },
       { label: '피곤하다며 먼저 잔다', p: { heart: -3 }, text: '{fp|이} 등을 돌리고 누웠다.' },
     ] },
@@ -1340,9 +1340,9 @@ GAME_DATA.events = [
   { id: 'honeymoon', type: 'fixed', weight: 4, when: mainIs((m, s) => m.spouse && s.age - (s.vars.marriedAt ?? -9) <= 1), onStart: focusMain,
     text: '신혼여행을 떠났다.',
     choices: [
-      { label: '바다로', memory: true, effect: { happy: 8, money: -300 }, p: { heart: [6, 10] }, do: (s, a) => a.night(a.focused()), pregnant: .1,
+      { label: '바다로', memory: true, effect: { happy: 8, money: -300 }, p: { heart: [6, 10] }, intimate: true, mood: 25, pregnant: .1,
         text: '매일 저녁 {fp|와} 해변에 앉아 노을이 질 때까지 있었다.' },
-      { label: '낯선 도시로', memory: true, effect: { happy: 7, money: -400, art: [1, 3] }, p: { heart: [5, 9] }, do: (s, a) => a.night(a.focused()), pregnant: .1,
+      { label: '낯선 도시로', memory: true, effect: { happy: 7, money: -400, art: [1, 3] }, p: { heart: [5, 9] }, intimate: true, mood: 25, pregnant: .1,
         text: '말도 안 통하는 도시에서 {fp|와} 길을 잃고 또 잃었다. 다 좋았다.' },
       { label: '집에서 쉰다', effect: { happy: 3 }, p: { close: [3, 5] }, text: '돈을 아끼기로 했다. 집에서 배달 음식을 시켜 먹으며 영화를 봤다.' },
     ] },
