@@ -2062,5 +2062,102 @@ GAME_DATA.events = [
         meet: s => ({ kind: 'rival', ageRange: [Math.max(19, s.age - 5), Math.min(49, s.age + 5)], close: 0, grudge: 60 }),
         text: '{new|와} 크게 부딪쳤다. 적이 하나 생겼다.' },
     ] },
+
+  /* ═════ 평판 · 소문 (엔진이 해마다 소문을 굴림: rumor 0~100, rumorType bad/good/skill) ═════ */
+  { id: 'badRumor', type: 'fixed', age: [20, 49], once: false, cooldown: 3,
+    when: s => (s.rumor || 0) >= 50 && s.rumorType === 'bad',
+    text: s => s.job ? '직장 동료가 슬쩍 물었다. "너 요즘 많이 놀아?"' : '오랜만에 만난 동창이 슬쩍 물었다. "너 요즘 많이 놀아?"',
+    choices: [
+      { label: '무시한다', effect: { happy: -2 }, do: (s, a) => { if (s.job) a.perf(-5); }, text: '신경 쓰이지만 모른 척했다.' },
+      { label: '부인한다', check: { stat: 'charm', diff: 60 },
+        success: { do: s => { s.rumor = Math.max(0, s.rumor - 20); }, text: '"무슨 소리야." 웃으며 넘겼다. 다들 믿는 눈치였다.' },
+        fail: { effect: { happy: -3 }, do: (s, a) => { if (s.job) a.perf(-5); }, text: '"무슨 소리야." 넘어가긴 했지만, 다들 눈빛이 묘했다.' } },
+      { label: '당분간 조용히 지낸다', effect: { happy: -1 }, do: s => { s.rumor = Math.max(0, s.rumor - 30); }, text: '한동안 약속을 잡지 않았다. 소문은 조금씩 잦아들었다.' },
+    ] },
+  { id: 'rumorFriendAsk', type: 'random', age: [20, 49], once: false, cooldown: 3,
+    when: (s, a) => (s.rumor || 0) >= 30 && s.rumorType === 'bad' && adultFriends(a).length > 0,
+    onStart: (s, a) => a.focus(a.pick(adultFriends(a))),
+    text: '{fp|이} 조심스럽게 물었다. "너 그 소문… 진짜야?"',
+    choices: [
+      { label: '솔직하게 말한다', p: { trust: [4, 8] }, text: '{fp|은} 한참 듣더니 "그래도 넌 너지"라고 했다.' },
+      { label: '"헛소문이야"', p: { trust: [-4, 0] }, text: '{fp|은} 고개를 끄덕였지만, 믿는 눈치는 아니었다.' },
+    ] },
+  { id: 'goodRumor', type: 'fixed', age: [22, 50], once: false, cooldown: 4,
+    when: s => (s.rumor || 0) >= 30 && s.rumorType === 'good',
+    text: '"너네 진짜 오래 간다. 부럽다." 어느새 주변에서 그렇게들 말한다.', effect: { happy: 3, charm: [0, 1] } },
+  { id: 'dirtyRumor', type: 'fixed', age: [20, 49], once: false, cooldown: 4,
+    when: s => (s.rumor || 0) >= 30 && s.rumorType === 'skill',
+    meet: s => ({ kind: 'friend', gender: s.gender === 'm' ? 'f' : 'm', ageRange: [Math.max(20, s.age - 6), Math.min(49, s.age + 6)], close: 25, heart: 30, libido: 60, taken: false, married: false }),
+    text: '처음 보는 {new|이} 의미심장하게 웃으며 다가왔다. "소문 들었는데…"', effect: { happy: 2 } },
+
+  /* ═════ 야한 문자 ═════ */
+  // 만취 상태에서 보낸 야한 문자가 엉뚱한 곳으로 (data/social.js sexyText)
+  { id: 'wrongText', type: 'trigger',
+    do: (s, a) => {
+      const r = Math.random(), mom = a.find(p => p.id === 'mom').length, ex = a.find(p => p.ex);
+      s.vars.wrongTo = r < .4 ? 'work' : r < .7 && mom ? 'mom' : r < .9 && ex.length ? 'ex' : 'friend';
+      if (s.vars.wrongTo === 'work' && s.job) a.perf(-15);
+      if (s.vars.wrongTo === 'ex') { const e = a.pick(ex); e.heart = Math.min(100, e.heart + 5); }
+    },
+    text: s => ({ work: s.job ? '다음 날 아침, 보낸 메시지를 확인했다. 직장 동료 단톡방이었다. 월요일이 무서워졌다.' : '다음 날 아침, 보낸 메시지를 확인했다. 동창 단톡방이었다.',
+      mom: '다음 날 아침, 보낸 메시지를 확인했다. 엄마한테였다. 인생 최악의 순간이었다.',
+      ex: '다음 날 아침, 보낸 메시지를 확인했다. 전 연인한테였다. 읽음 표시가 떠 있었다.',
+      friend: '다음 날 아침, 보낸 메시지를 확인했다. 다행히 친한 친구한테였다. "ㅋㅋㅋ 누구한테 보내려던 거야"' })[s.vars.wrongTo],
+    effect: s => ({ work: { happy: -8 }, mom: { happy: -12 }, ex: { happy: -5 }, friend: { happy: -2 } })[s.vars.wrongTo] },
+  // 상대가 먼저 보내옴
+  { id: 'sexyTextIn', type: 'random', age: [20, 49], once: false, cooldown: 2,
+    when: (s, a) => a.find(p => a.canSex(p) && (lover(p) || p.fwb) && p.heart >= 60 && (p.libido || 0) >= 60).length > 0,
+    onStart: (s, a) => a.focus(a.pick(a.find(p => a.canSex(p) && (lover(p) || p.fwb) && p.heart >= 60 && (p.libido || 0) >= 60))),
+    text: '{fp}에게서 사진 한 장이 왔다. 열어보기 전에 주위를 둘러봤다.',
+    choices: [
+      { label: '"지금 갈게"', libido: [8, 12], p: { heart: [3, 6] }, do: (s, a) => { a.focused().texted = true; }, text: '답장을 보내자마자 {fp}에게서 하트가 쏟아졌다.' },
+      { label: '"이따 봐"', libido: [5, 8], do: (s, a) => { a.focused().texted = true; }, text: '하루 종일 일이 손에 안 잡혔다.' },
+      { label: '"지금 바빠"', p: { heart: [-3, 0] }, text: '{fp|이} 삐친 이모티콘을 보냈다.' },
+    ] },
+  { id: 'textGrin', type: 'random', on: ['work', 'overtime', 'cafe', 'library'], age: [20, 49], once: false, cooldown: 3,
+    when: (s, a) => a.find(p => p.texted && a.canSex(p)).length > 0,
+    text: '휴대폰 화면을 보며 실실 웃다가 옆자리 사람과 눈이 마주쳤다. 황급히 화면을 껐다.', effect: { happy: 2 } },
+
+  /* ═════ 피임 ═════ */
+  { id: 'condomStore', type: 'random', on: ['conveni'], age: [20, 45], once: false, cooldown: 3, req: { flags: ['hadSex'] },
+    text: '편의점 계산대에 콘돔을 올려놓는 순간, 뒤에서 아는 목소리가 들렸다.',
+    choices: [
+      { label: '태연하게 계산한다', check: { stat: 'charm', diff: 55 },
+        success: { effect: { happy: 2 }, text: '"어, 안녕?" 아무렇지 않게 인사했다. 상대가 더 당황했다.' },
+        fail: { effect: { happy: -2 }, text: '"…안녕?" 목소리가 갈라졌다. 서로 못 본 척하기로 했다.' } },
+      { label: '껌을 하나 같이 올려놓는다', effect: { happy: 1 }, text: '아무도 속지 않았다.' },
+    ] },
+  { id: 'pillForgot', type: 'fixed', age: [20, 44], once: false, cooldown: 3, req: { flags: ['onPill'] },
+    when: s => s.gender === 'f',
+    text: '어젯밤 피임약 먹는 걸 깜빡했다.',
+    choices: [
+      { label: '바로 챙겨 먹는다', effect: { happy: -1 }, text: '알람을 하나 더 맞췄다.' },
+      { label: '하루쯤이야', text: '괜찮겠지. 아마.',
+        do: (s, a) => { const m = a.main(); if (m && a.canSex(m) && a.fertile(m) && Math.random() < .5) s.scare = { pid: m.id }; } },
+    ] },
+  { id: 'pillSide', type: 'fixed', age: [20, 44], req: { flags: ['onPill'] }, when: s => s.gender === 'f',
+    text: '피임약 때문인지 요즘 몸이 붓고 기분이 오락가락한다.',
+    choices: [
+      { label: '병원에서 약을 바꾼다', effect: { money: -5, health: [1, 3] }, text: '약을 바꾸니 한결 나아졌다.' },
+      { label: '그냥 참는다', effect: { happy: -2 }, text: '한동안 거울 보기가 싫었다.' },
+      { label: '끊는다', unset: 'onPill', text: '약을 끊었다. 이제 다른 방법을 써야 한다.' },
+    ] },
+  { id: 'partnerPill', type: 'fixed', age: [20, 44], once: false, cooldown: 4,
+    when: mainIs((m, s, a) => s.gender === 'm' && a.canSex(m) && !m.pill && !m.spouse && m.heart >= 50 && m.trust >= 40), onStart: focusMain,
+    text: '{fp|이} 피임약을 먹어볼까 고민 중이라고 했다.',
+    choices: [
+      { label: '"네 몸이 먼저야. 내가 챙길게."', p: { trust: [6, 10], close: [2, 4] }, text: '{fp|이} 한참 나를 보다가 웃었다.' },
+      { label: '"그럼 편하겠다"', p: { trust: [-4, -2] }, do: (s, a) => { a.focused().pill = true; }, text: '{fp|은} 대답 없이 웃었다. 며칠 뒤 혼자 병원에 다녀왔다.' },
+    ] },
+
+  /* ═════ 기념일 ═════ */
+  { id: 'anniversaryHotel', type: 'fixed', age: [21, 49], once: false, cooldown: 3,
+    when: mainIs((m, s, a) => (m.partner || m.spouse) && a.canSex(m) && m.heart >= 50 && s.age - (m.since ?? s.age) >= 1 && s.money >= 30), onStart: focusMain,
+    text: '{fp|와} 만난 지 또 한 해가 됐다.',
+    choices: [
+      { label: '호텔을 잡는다', intimate: true, spot: 'hotel', mood: 20, memory: true, effect: { happy: [4, 6], money: -30 }, p: { heart: [6, 10], close: [3, 5] },
+        pregnant: (s, a) => a.focused().spouse ? .12 : .06, text: '창밖으로 도시 불빛이 내려다보였다. 기념일다운 밤이었다.' },
+      { label: '집에서 조촐하게', p: { close: [3, 6] }, effect: { happy: 2 }, text: '케이크에 초를 하나 꽂고 둘이 마주 앉았다.' },
+    ] },
 ];
 })();

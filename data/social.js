@@ -177,6 +177,18 @@ GAME_DATA.social = [
       };
     } },
 
+  // 야한 문자 — 사귀는 사이·섹파·몰래 만나는 사이, 설렘 40·신뢰 30 이상. 상대 성욕 +10~20, 내 성욕 +5~10, 다음 밤 만족감 보너스
+  // 만취(술집)면 15% 확률로 엉뚱한 사람에게 감 (wrongText)
+  { id: 'sexyText', label: '야한 문자 보내기', icon: '📱',
+    if: (s, p, a) => a.canSex(p) && (lover(p) || p.fwb) && p.heart >= 40 && p.trust >= 30 && !a.jailed(),
+    run: (s, p, a) => a.drunk() >= 3 && Math.random() < .15 ? { then: 'wrongText', text: '취한 손가락으로 메시지를 보냈다. 전송 완료.' } : {
+      p: { heart: [3, 6] }, libido: [5, 10],
+      do: () => { p.libido = Math.min(100, (p.libido || 0) + a.rand(10, 20)); p.texted = true; },
+      text: ({ bold: '{p|이} 즉시 답장했다. "지금 갈까?"', shy: '{p|이} 5분 뒤에 답했다. 이모티콘만 다섯 개.', playful: '{p|이} 더 야한 사진으로 답장했다.',
+        cool: '{p}의 답장은 "ㅋ" 한 글자. 하지만 읽자마자 답했다.', warm: '{p}에게서 답장이 왔다. "보고 싶어… 빨리 만나자."', sharp: '{p}의 답장. "지금 회사인데? …저녁에 봐."',
+        sunny: '{p}에게서 답장이 왔다. "ㅋㅋㅋㅋ 미쳤어!!! 근데 나도 💕"', sensitive: '{p}에게서 한참 뒤에 답장이 왔다. "…나도 생각하고 있었어."' })[p.personality] || '{p}에게서 답장이 왔다.',
+    } },
+
   { id: 'takeHome', label: '집으로 데려가기', icon: '🏠', noFree: true,
     if: (s, p, a) => ['bar', 'concert'].includes(s.place) && a.isHere(p) && !s.flags.married && adultPair(s, p, a) && p.heart >= 45 && p.close >= 30 && !a.jailed(),
     run: (s, p, a) => a.charmed(p, 'bed', a.need('takeHome')) ? {

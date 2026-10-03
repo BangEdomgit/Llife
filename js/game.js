@@ -158,11 +158,13 @@ function makePerson(spec) {
     face: spec.face ?? LETTERS.indexOf(pickKey(D.npcFace)),
     style: spec.style ?? npcStyle(hobby, age),
     bodyPlus: Math.random() < .4,
-    libido: age >= C.sexMinAge ? rand(10, 50) : 0,
+    libido: age >= C.sexMinAge ? spec.libido ?? rand(10, 50) : 0,
     size: gender === 'm' ? pickKey(D.sizeWeights) : null,   // 함께 밤을 보낸 뒤에만 보임
     pref: age >= 19 && Math.random() < .6 ? randomPref(gender) : null,   // 좋아하는 체형 (null이면 상관없음)
   };
   if (p.kind === 'child') p.role = '아이';
+  // 좋은 소문(한 사람과 오래, 존중함)이 돌면 새로 만난 어른이 처음부터 조금 더 믿어줌
+  if (S.rumorType === 'good' && (S.rumor || 0) >= 30 && age >= 19 && p.kind !== 'family') p.trust = clamp(p.trust + rand(5, 10), 0, 100);
   // 기혼 NPC — 친밀 20이면 반지가 보이고, 40이면 결혼한 걸 알게 됨. 늘 몰래 만나는 사이로만 시작
   if (spec.married ?? (age >= 26 && !['family', 'child'].includes(p.kind) && spec.taken !== false && Math.random() < (age >= 35 ? .5 : age >= 30 ? .35 : .15))) { p.married = true; p.taken = true; }
   // 피임약을 먹고 있는 사람 (20살 이상 여자, 냉철형·무심형이 조금 더 많음) — 피임을 물을 때 드러남
@@ -348,6 +350,7 @@ function allure(p, sit) {
   if (S.age >= C.sexMinAge && st.libido >= 60) m += st.libido / 8;
   if ((p.libido || 0) >= 60 && npcAge(p) >= C.sexMinAge) m += p.libido / 10;
   if (p.married) m -= rand(15, 20);
+  if (S.rumorType === 'bad' && (S.rumor || 0) >= 30 && sit !== 'close' && sit !== 'bed') m -= rand(10, 20);   // 나쁜 소문 — 새 사람이 경계함
   m += [0, 3, rand(10, 12), 5][d];
   return looks + human + rel + m;
 }
@@ -367,6 +370,31 @@ function satisfaction(p, mood, adj) {
 }
 // 지금이 인생에서 몇 번째 행동인지 (싸운 뒤 몇 턴, 오랜만인지 계산용)
 const turnNo = () => S.age * C.apPerYear + S.used;
+/* ── 평판: 몇 명이냐보다 어떻게 관리하느냐. 해마다 최근 2년 안에 밤을 보낸 상대(배우자 제외) 수 × 5% ──
+   × 상대마다 (섹파·연인이면 .3) (만족감 70+면 .5) (대놓고 데려간 적 없으면 .4) (원한 낮으면 .3) 의 평균 × (들킨 적 없으면 .5)
+   소문 종류: bad(원나잇·원한·들킴) / skill(기술 A 이상 + 다들 만족) / good(한 사람과 3년 넘게, 신뢰 70+) */
+const PUBLIC = ['bar', 'concert', 'station', 'mall', 'cafe'];
+const RUMOR_LINE = { bad: '많이 놀고 다닌다더라', good: '한 사람만 오래 만난다더라', skill: '밤에 대단하다더라' };
+function rumorYear() {
+  if (S.age < C.sexMinAge) return;
+  S.rumor = Math.max(0, (S.rumor || 0) - 15);
+  if (!S.rumor) S.rumorType = null;
+  const ps = S.people.filter(p => p.nights && (p.nightsAt ?? -9) >= S.age - 2 && !p.spouse && p.kind !== 'family');
+  if (!ps.length) {
+    const m = mainPartner();
+    if (m && S.age - (m.since ?? S.age) >= 3 && m.trust >= 70 && S.rumorType !== 'bad' && Math.random() < .2) {
+      S.rumor = clamp((S.rumor || 0) + rand(25, 40), 0, 100); S.rumorType = 'good';
+    }
+    return;
+  }
+  const f = ps.reduce((t, p) => t + (p.fwb || lover(p) ? .3 : 1) * ((p.bestSat || 0) >= 70 ? .5 : 1) * (p.flaunt ? 1 : .4) * (p.grudge < 20 ? .3 : 1), 0) / ps.length;
+  const chance = ps.length * .05 * f * (S.caughtN ? 1 : .5);
+  if (Math.random() >= chance) return;
+  const avgSat = ps.reduce((t, p) => t + (p.bestSat || 0), 0) / ps.length;
+  const type = !S.caughtN && !ps.some(p => p.grudge >= 40) && gIdx(S.sexSkill || 0) >= 5 && avgSat >= 75 ? 'skill' : 'bad';
+  S.rumor = clamp((S.rumor || 0) + rand(30, 50), 0, 100); S.rumorType = type;
+  log(type === 'skill' ? '어디선가 내 이야기가 돌고 있다. 나쁜 얘기는 아닌 것 같은데… 얼굴이 화끈거렸다.' : '어디선가 내 이야기가 돌고 있다는 걸 알았다. 수군거리는 소리가 들렸다.', { t: 'info' });
+}
 // 거절: 기본 10% + 피곤함(성욕 20 미만) 15% + 싸운 지 얼마 안 됨 20% + 생리 중 20% + 올해 벌써 3번 넘게 10% - 성욕이 높으면 10~20%
 // 거절하면 이유('period'|'fight'|'tired'|'mood'), 받아주면 null
 function refusal(p) {
@@ -406,7 +434,9 @@ function sexScene(p, o) {
   adj += resolve(o.satBonus) || 0;
   const awkward = gIdx(S.sexSkill || 0) === 0;   // 밤의 기술 F — 어색한 순간이 끼어듦
   // 권태와 신선함: 같은 상대와 4번째부터 3씩 깎임(최대 -24). 새 장소 +8~12, 오랜만(5턴 이상) +5~10, 새 상대 +10~15, 여행지 +8
-  const t = turnNo(), spot = o.away ? 'travel' : o.moveTo || S.place || 'home';
+  const t = turnNo(), spot = o.away ? 'travel' : o.spot || o.moveTo || S.place || 'home';
+  if (PUBLIC.includes(S.place)) p.flaunt = true;
+  if (p.texted) { adj += 6; delete p.texted; }   // 야한 문자를 주고받은 뒤
   p.spots = p.spots || [];
   let fresh = 0;
   if (firstWith) { if (S.flags.hadSex) fresh += rand(10, 15); }
@@ -599,6 +629,8 @@ function applyOutcome(o, target, resumed) {
   if (conceived && S.scene) S.scene.preg = true;
   // 피임 없이 보냈는데 아이가 안 생겼으면, 70% 확률로 다음 계절에 불안이 찾아옴 (배우자는 제외)
   if (sx && sx.contra === 'none' && !conceived && !tp.spouse && fertile(tp) && Math.random() < .7) S.scare = { pid: tp.id };
+  // 사람 많은 곳에서 대놓고 데려가면 눈에 띔 (소문 방지 조건이 깨짐)
+  if (o.bring && tp && PUBLIC.includes(S.place)) tp.flaunt = true;
   // 다른 장소로 이동 (예: 술집에서 집으로 같이, 정신 차려보니 공원)
   if (o.moveTo && PLACES[o.moveTo] && !jailed()) enterPlace(PLACES[o.moveTo], o.bring && tp && !tp.gone ? tp : null);
   riskCheck(o, tp);
@@ -649,9 +681,11 @@ function riskCheck(o, p) {
   const m = mainPartner();
   if (risk && p && m && m !== p && Math.random() < risk + .05 * alive().filter(x => x.secret).length) {
     S.vars.mainId = m.id; S.vars.mainName = pname(m); S.vars.loverId = p.id; S.vars.lover = pname(p);
+    S.caughtN = (S.caughtN || 0) + 1;
     trigger('affairCaught');
   } else if (rt && p && p.taken && Math.random() < rt) {
     S.vars.fp = p.id;
+    S.caughtN = (S.caughtN || 0) + 1;
     trigger(p.married ? 'spouseCaught' : 'rivalFound');   // 상대 애인에게 / 기혼이면 상대 배우자에게
   }
 }
@@ -1070,6 +1104,7 @@ function yearly() {
   }
   if (S.flags.onPill) S.money -= rand(36, 60);   // 피임약값 (한 달 3~5만원)
   if (S.money < 0 && a >= 20) log('통장 잔고가 마이너스다.', { deltas: applyEffect({ happy: -4 }) });
+  if (!jailed()) rumorYear();
 
   // 수감
   if (jailed()) {
@@ -1508,6 +1543,7 @@ function myProfile() {
     ...(S.flags.unnatural ? [['특징', '어딘가 부자연스럽다']] : []),
     ...(S.age >= C.sexMinAge && S.size ? [['크기', D.bodyLabel.size[S.size]]] : []),
     ...(S.flags.hadSex ? [['밤의 기술', gradeOf(S.sexSkill)]] : []),
+    ...((S.rumor || 0) >= 30 && S.rumorType ? [['소문', RUMOR_LINE[S.rumorType]]] : []),
     ['가치관', L(D.values, S.value)], ['집안', L(D.wealth, S.wealth)], ['꿈', L(D.dreams, S.dream) + (S.flags.dreamDone ? ' (이룸)' : '')],
     ['형제', L(D.siblings, S.sibling)], ['생일', `${S.month}월`],
   ];
@@ -1650,6 +1686,6 @@ window.Game = {
   creation: { traits: D.traits, personalities: D.personalities, wealth: D.wealth, hobbies: D.hobbies, values: D.values, dreams: D.dreams, siblings: D.siblings },
   LABEL, config: C, seasons: SEASONS,
   // 개발·테스트용 (브라우저 콘솔이나 헤드리스 검사에서 이벤트를 직접 터뜨려볼 때)
-  dev: { fire: id => { fire(EVENTS[id]); tickSeason(); after(); }, eligible: id => eligible(EVENTS[id]), meet: spec => addPerson(spec), api },
+  dev: { fire: id => { fire(EVENTS[id]); tickSeason(); after(); }, eligible: id => eligible(EVENTS[id]), meet: spec => addPerson(spec), rumorYear, api },
 };
 })();
