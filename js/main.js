@@ -25,7 +25,8 @@ const pbar = p => { const n = Math.round(p * 5); return '▰'.repeat(n) + '▱'.
 const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, G.npcAge(p)) : '';
 // 누르면 전신으로 펼쳐지는 초상화 (20살부터 키·허리·골반 수치가 실루엣에 반영)
 const avBtn = (key, html) => `<button type="button" class="av-btn" data-full="${key}" aria-label="${fullView === key ? '접기' : '전신 보기'}" title="${fullView === key ? '접기' : '전신 보기'}">${html}</button>`;
-const fullAv = (look, age, fig) => window.Avatar ? `<div class="p-full">${Avatar.render(look, 132, { age, full: age >= 20 && fig ? fig : true })}</div>` : '';
+// 전신: 성격에 따라 기본 자세가 다름 (직진형·낙천형 한 손 허리, 냉철형·무심형 팔짱)
+const fullAv = (look, age, fig, personality) => window.Avatar ? `<div class="p-full">${Avatar.render(look, 132, { age, full: age >= 20 && fig ? fig : true, personality })}</div>` : '';
 function abHTML(k, v) {
   const g = G.gradeInfo(v);
   return `<span class="ab" title="${v}"><span>${G.LABEL[k]}</span><span class="g g-${g.letter}">${g.letter}</span><span class="pb">${pbar(g.pct)}</span></span>`;
@@ -313,7 +314,7 @@ function openPerson(id) {
     `<button type="button" data-i="${it.id}"${it.ok ? '' : ' disabled'}>${it.icon} ${it.label}${it.cost ? ` <small>${G.fmtMoney(it.cost)}</small>` : ''}${anyFree && !it.free ? ' <small>행동 1</small>' : ''}</button>`).join('');
   showModal('person', `${G.pname(p)}`, `
     <div class="p-top">${avBtn(id, av(p, 60))}<div class="p-who"><b>${esc(G.pname(p))}</b><span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}, ${esc(G.relLabel(p))}</span></div></div>
-    ${fullView === id ? fullAv(G.look(p), G.npcAge(p), G.figure(p)) : ''}
+    ${fullView === id ? fullAv(G.look(p), G.npcAge(p), G.figure(p), p.personality) : ''}
     <div class="stats">${stats}</div>
     ${imHTML}
     ${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}
@@ -412,7 +413,7 @@ function openMe() {
   const me = G.myLook() && window.Avatar ? avBtn('me', Avatar.render(G.myLook(), 60, S.age)) : '';
   showModal('me', `📋 ${S.name}`, `
     <div class="me-top">${me}<dl class="prof">${prof}</dl></div>
-    ${fullView === 'me' && G.myLook() ? fullAv(G.myLook(), S.age, G.figure(null)) : ''}
+    ${fullView === 'me' && G.myLook() ? fullAv(G.myLook(), S.age, G.figure(null), S.personality) : ''}
     ${S.preg && S.preg.mode ? `<p class="dim" style="font-size:13px">${S.gender === 'f' ? '임신 중' : '곧 아이가 태어난다'} — ${S.preg.due > S.age ? '내년' : '올해'} 출산 예정</p>` : ''}
     <p class="sec-t">능력치</p>
     <div class="stats">${ab}</div>
