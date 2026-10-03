@@ -206,68 +206,63 @@ function morningCard(sc, p) {
 }
 function blanketSVG(shape, build) {
   const bm = build === 'slim' ? .85 : build === 'chubby' ? 1.15 : 1;
-  const sk = '#c4a882', skD = '#a88a6a', skL = '#d4bb9a', hair = '#3a3430';
-  const bed = `<rect x="0" y="108" width="220" height="8" rx="2" fill="#2a2018"/><rect x="4" y="82" width="212" height="28" rx="4" fill="#1e1814" opacity=".7"/><rect x="4" y="82" width="212" height="28" rx="4" fill="none" stroke="#2a2420" stroke-width="1"/>
-    <rect x="-2" y="78" width="10" height="42" rx="3" fill="#2a2018"/><rect x="212" y="78" width="10" height="42" rx="3" fill="#2a2018"/>`;
-  const pillow = `<ellipse cx="32" cy="68" rx="22" ry="12" fill="#d8d0c4" opacity=".8"/><path d="M14,66 Q32,58 50,66" fill="none" stroke="#c0b8a8" stroke-width="1" opacity=".5"/>
-    <ellipse cx="32" cy="68" rx="18" ry="8" fill="#e2dbd0" opacity=".3"/>`;
-  let bodies = '';
+  const sk = '#c4a882', skD = '#a88a6a', skL = '#d4bb9a', hr = '#3a3430';
+  const mattress = `<rect x="0" y="90" width="200" height="12" rx="3" fill="#1e1814" opacity=".6"/><rect x="0" y="102" width="200" height="6" rx="2" fill="#2a2018"/>`;
+  const pillow = `<ellipse cx="28" cy="80" rx="20" ry="9" fill="#d8d0c4" opacity=".7"/>`;
+  let base = '', active = '';
   if (shape === 'A') {
-    bodies += `<g class="bed-body">`;
-    bodies += `<circle cx="34" cy="56" r="9" fill="${sk}"/><ellipse cx="34" cy="52" rx="10" ry="7" fill="${hair}" opacity=".85"/>`;
-    bodies += `<path d="M43,58 C46,60 48,64 48,68 L48,82 Q46,86 42,88 L38,108 L28,108 L30,88 Q24,86 22,82 L22,68 C22,64 24,60 27,58" fill="${sk}" opacity=".85"/>`;
-    bodies += `<path d="M48,68 Q52,66 56,68 C58,70 56,76 52,78 L48,78 Z" fill="${sk}" opacity=".7"/>`;
-    bodies += `<path d="M42,88 Q48,92 50,100 L48,108 L38,108 Z" fill="${sk}" opacity=".75"/>`;
-    bodies += `<path d="M30,88 Q24,92 22,100 L24,108 L34,108 Z" fill="${sk}" opacity=".75"/>`;
-    bodies += `<ellipse cx="36" cy="72" rx="${4.5 * bm}" ry="${3.5 * bm}" fill="${skL}" opacity=".5"/>`;
-    bodies += `<path d="M36,82 L36,88" stroke="${skD}" stroke-width="1" opacity=".3"/>`;
-    bodies += `<circle cx="148" cy="52" r="8" fill="${sk}"/><ellipse cx="148" cy="48" rx="9" ry="6.5" fill="${hair}" opacity=".85"/>`;
-    bodies += `<path d="M156,54 C160,56 164,60 164,66 L164,80 Q160,84 156,86 L152,108 L142,108 L144,86 Q140,84 138,80 L138,66 C138,60 140,56 144,54" fill="${sk}" opacity=".75"/>`;
-    bodies += `<path d="M164,66 Q168,62 172,64 C176,66 176,72 172,76 L164,78 Z" fill="${sk}" opacity=".6"/>`;
-    bodies += `<path d="M156,86 Q162,90 164,100 L160,108 L150,108 Z" fill="${sk}" opacity=".65"/>`;
-    bodies += `<path d="M144,86 Q138,90 136,100 L138,108 L148,108 Z" fill="${sk}" opacity=".65"/>`;
-    bodies += `<path d="M58,74 C70,68 84,62 100,58 C116,54 132,52 140,54" fill="none" stroke="${skD}" stroke-width="1.5" opacity=".3"/>`;
-    bodies += `</g>`;
+    base = `<g class="pose-base">${pillow}
+      <circle cx="30" cy="70" r="8.5" fill="${sk}"/><ellipse cx="30" cy="66" rx="9.5" ry="7" fill="${hr}" opacity=".85"/>
+      <path d="M38,72 C46,70 56,68 68,70 Q78,72 86,76 L86,90 L36,90 L36,78 Z" fill="${sk}" opacity=".85"/>
+      <ellipse cx="50" cy="69" rx="${4.5 * bm}" ry="${3 * bm}" fill="${skL}" opacity=".45"/>
+      <path d="M50,76 Q46,80 44,86" fill="none" stroke="${skD}" stroke-width="1" opacity=".25"/>
+      <path d="M82,72 Q96,58 110,54 L112,58 Q100,66 92,78 Z" fill="${sk}" opacity=".75"/>
+      <path d="M84,82 Q100,84 114,88 L114,92 L82,90 Z" fill="${sk}" opacity=".7"/>
+      <path d="M44,76 Q40,82 38,90" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".6"/>
+    </g>`;
+    active = `<g class="pose-active">
+      <circle cx="82" cy="38" r="7.5" fill="${sk}"/><ellipse cx="82" cy="34" rx="8.5" ry="6" fill="${hr}" opacity=".85"/>
+      <path d="M77,46 C79,54 82,62 86,72 L94,76 L97,68 C94,58 90,50 88,44 Z" fill="${sk}" opacity=".82"/>
+      <path d="M79,50 Q68,60 62,74" fill="none" stroke="${sk}" stroke-width="3.5" stroke-linecap="round" opacity=".6"/>
+      <path d="M88,48 Q98,56 102,66" fill="none" stroke="${sk}" stroke-width="3.5" stroke-linecap="round" opacity=".6"/>
+      <path d="M86,72 L94,76 L98,84 Q98,90 94,92 L86,90 L83,80 Z" fill="${sk}" opacity=".75"/>
+      <path d="M98,84 Q112,86 122,90 L122,94 L96,92 Z" fill="${sk}" opacity=".7"/>
+    </g>`;
   } else if (shape === 'B') {
-    bodies += `<g class="bed-body">`;
-    bodies += `<circle cx="32" cy="54" r="9" fill="${sk}"/><ellipse cx="32" cy="50" rx="10" ry="7" fill="${hair}" opacity=".85"/>`;
-    bodies += `<path d="M41,56 C44,58 46,62 46,66 L46,78 Q44,82 40,84 L36,108 L26,108 L28,84 Q22,82 20,78 L20,66 C20,62 22,58 25,56" fill="${sk}" opacity=".85"/>`;
-    bodies += `<ellipse cx="34" cy="70" rx="${4.5 * bm}" ry="${3.5 * bm}" fill="${skL}" opacity=".5"/>`;
-    bodies += `<path d="M40,84 Q46,90 48,100 L46,108 L36,108 Z" fill="${sk}" opacity=".75"/>`;
-    bodies += `<path d="M28,84 Q22,88 20,96 L18,108 L30,108 Z" fill="${sk}" opacity=".75"/>`;
-    bodies += `<path d="M46,66 Q52,62 58,66 C60,68 58,74 54,76 L46,76 Z" fill="${sk}" opacity=".7"/>`;
-    bodies += `<circle cx="142" cy="48" r="8" fill="${sk}"/><ellipse cx="142" cy="44" rx="9" ry="6.5" fill="${hair}" opacity=".85"/>`;
-    bodies += `<path d="M150,50 C154,52 158,56 160,62 L162,76 Q158,80 154,82 L150,108 L140,108 L142,82 Q138,80 136,76 L134,62 C134,56 136,52 140,50" fill="${sk}" opacity=".75"/>`;
-    bodies += `<path d="M162,64 Q168,60 174,62 C178,64 178,72 174,76 L162,76 Z" fill="${sk}" opacity=".6"/>`;
-    bodies += `<path d="M154,82 Q160,86 164,96 L162,108 L150,108 Z" fill="${sk}" opacity=".65"/>`;
-    bodies += `<path d="M142,82 Q136,86 132,96 L134,108 L144,108 Z" fill="${sk}" opacity=".65"/>`;
-    bodies += `<path d="M56,72 C72,66 90,58 110,54 C126,50 136,50 142,52" fill="none" stroke="${skD}" stroke-width="1.5" opacity=".3"/>`;
-    bodies += `</g>`;
+    base = `<g class="pose-base">${pillow}
+      <circle cx="30" cy="68" r="8" fill="${sk}"/><ellipse cx="30" cy="64" rx="9" ry="6.5" fill="${hr}" opacity=".85"/>
+      <path d="M38,70 C46,68 58,67 72,68 Q82,70 90,74 L90,90 L36,90 L36,76 Z" fill="${sk}" opacity=".8"/>
+      <path d="M86,76 Q102,80 114,86 L114,92 L84,90 Z" fill="${sk}" opacity=".7"/>
+      <path d="M42,74 Q38,80 36,90" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+    </g>`;
+    active = `<g class="pose-active">
+      <circle cx="88" cy="26" r="7.5" fill="${sk}"/><ellipse cx="88" cy="22" rx="8.5" ry="6" fill="${hr}" opacity=".85"/>
+      <path d="M82,34 L80,48 Q78,56 80,62 L86,72 L94,72 L98,62 Q100,56 98,48 L96,34 Z" fill="${sk}" opacity=".82"/>
+      <ellipse cx="86" cy="42" rx="${4 * bm}" ry="${3 * bm}" fill="${skL}" opacity=".4"/>
+      <path d="M86,72 Q80,78 76,86 L74,92 L84,90 Z" fill="${sk}" opacity=".75"/>
+      <path d="M94,72 Q100,78 104,86 L106,92 L96,90 Z" fill="${sk}" opacity=".75"/>
+      <path d="M82,40 Q74,48 70,58" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+      <path d="M96,40 Q104,48 108,58" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+    </g>`;
   } else {
-    bodies += `<g class="bed-body">`;
-    bodies += `<circle cx="30" cy="50" r="9" fill="${sk}"/><ellipse cx="30" cy="46" rx="10" ry="7" fill="${hair}" opacity=".85"/>`;
-    bodies += `<path d="M39,52 C42,54 44,58 44,62 L44,74 Q42,78 38,80 L34,108 L24,108 L26,80 Q20,78 18,74 L18,62 C18,58 20,54 23,52" fill="${sk}" opacity=".85"/>`;
-    bodies += `<ellipse cx="32" cy="66" rx="${4.5 * bm}" ry="${3.5 * bm}" fill="${skL}" opacity=".5"/>`;
-    bodies += `<path d="M38,80 Q44,86 46,96 L44,108 L34,108 Z" fill="${sk}" opacity=".75"/>`;
-    bodies += `<path d="M26,80 Q20,86 18,96 L20,108 L28,108 Z" fill="${sk}" opacity=".75"/>`;
-    bodies += `<path d="M44,62 Q50,58 56,60 C60,62 60,70 56,74 L44,74 Z" fill="${sk}" opacity=".7"/>`;
-    bodies += `<circle cx="136" cy="44" r="8" fill="${sk}"/><ellipse cx="136" cy="40" rx="9" ry="6.5" fill="${hair}" opacity=".85"/>`;
-    bodies += `<path d="M144,46 C148,48 152,52 154,58 L156,72 Q152,76 148,78 L144,108 L134,108 L136,78 Q132,76 130,72 L128,58 C128,52 130,48 134,46" fill="${sk}" opacity=".75"/>`;
-    bodies += `<path d="M156,60 Q162,56 168,58 C172,60 172,68 168,72 L156,72 Z" fill="${sk}" opacity=".6"/>`;
-    bodies += `<path d="M148,78 Q156,84 160,94 L158,108 L144,108 Z" fill="${sk}" opacity=".65"/>`;
-    bodies += `<path d="M136,78 Q130,84 126,94 L128,108 L138,108 Z" fill="${sk}" opacity=".65"/>`;
-    bodies += `<path d="M54,68 C72,60 92,52 112,48 C128,44 134,46 140,48" fill="none" stroke="${skD}" stroke-width="1.5" opacity=".3"/>`;
-    bodies += `</g>`;
+    base = `<g class="pose-base">
+      <circle cx="34" cy="54" r="8" fill="${sk}"/><ellipse cx="34" cy="50" rx="9" ry="6.5" fill="${hr}" opacity=".85"/>
+      <path d="M34,62 Q30,68 28,76 L26,90 L34,90 Z" fill="${sk}" opacity=".7"/>
+      <path d="M42,56 C48,54 56,52 66,52 Q74,54 80,58 L84,66 L84,78 Q82,82 78,84 L76,90 L42,90 L42,62 Z" fill="${sk}" opacity=".82"/>
+      <ellipse cx="56" cy="54" rx="${4 * bm}" ry="${2.8 * bm}" fill="${skL}" opacity=".4"/>
+      <path d="M78,84 Q84,88 88,92 L82,92 Z" fill="${sk}" opacity=".7"/>
+      <path d="M34,62 Q28,58 24,62 L22,76" fill="none" stroke="${sk}" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+    </g>`;
+    active = `<g class="pose-active">
+      <circle cx="120" cy="36" r="7.5" fill="${sk}"/><ellipse cx="120" cy="32" rx="8.5" ry="6" fill="${hr}" opacity=".85"/>
+      <path d="M116,44 C114,50 108,58 100,66 L96,72 L88,68 L92,62 C98,56 104,48 108,42 Z" fill="${sk}" opacity=".8"/>
+      <path d="M96,72 Q94,80 92,90 L84,90 L88,68 Z" fill="${sk}" opacity=".75"/>
+      <path d="M116,44 Q124,52 130,62" fill="none" stroke="${sk}" stroke-width="3.5" stroke-linecap="round" opacity=".55"/>
+      <path d="M100,66 L104,78 Q106,84 108,90 L120,90 L118,80 L114,72 Z" fill="${sk}" opacity=".75"/>
+      <path d="M118,80 Q128,84 136,88 L136,92 L116,90 Z" fill="${sk}" opacity=".7"/>
+    </g>`;
   }
-  const by = shape === 'C' ? 44 : shape === 'B' ? 48 : 52;
-  const blanket = `M-2,${by} Q25,${by - 8} 50,${by - 3} Q75,${by + 5} 100,${by - 5} Q130,${by - 12} 160,${by - 2} Q190,${by + 8} 222,${by} L222,90 L-2,90 Z`;
-  const wy = by + 8;
-  const folds = `<path d="M15,${wy} Q50,${wy + 4} 85,${wy} M115,${wy - 2} Q150,${wy + 3} 195,${wy - 1}" fill="none" stroke="#cfc6b6" stroke-width="1" stroke-linecap="round" opacity=".4"/>
-    <path d="M40,${wy + 6} Q80,${wy + 9} 120,${wy + 5} Q160,${wy + 8} 200,${wy + 5}" fill="none" stroke="#cfc6b6" stroke-width=".8" stroke-linecap="round" opacity=".25"/>`;
-  return `<svg class="blanket-svg" viewBox="0 0 220 120">${bed}${pillow}${bodies}
-    <path d="${blanket}" fill="#ece6da" opacity=".85"/>
-    <path d="${blanket}" fill="none" stroke="#cfc6b6" stroke-width="1.2"/>
-    ${folds}</svg>`;
+  return `<svg class="blanket-svg" viewBox="0 0 200 110">${mattress}${base}${active}</svg>`;
 }
 function phaseCard(sc, p, phase, shape, icon) {
   const look = G.look(p), age = G.npcAge(p);

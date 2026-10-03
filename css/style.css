@@ -260,19 +260,32 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .phase3 .portrait{animation:portrait-shake .18s ease-in-out infinite}
 .phase-climax .portrait{animation:none}
 .phase-end .portrait{animation:none}
-@keyframes blanket-bob{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-5px) scaleY(1.03)}}
-.phase1 .blanket-svg{animation:blanket-bob .6s ease-in-out infinite}
-.phase2 .blanket-svg{animation:blanket-bob .35s ease-in-out infinite}
-.phase3 .blanket-svg{animation:blanket-bob .18s ease-in-out infinite}
-.phase-climax .blanket-svg,.phase-end .blanket-svg{animation:none}
-.phase1 .sym .m-sym{animation:symT1 .6s ease-in-out infinite}
-.phase2 .sym .m-sym{animation:symT2 .35s ease-in-out infinite}
-.phase3 .sym .m-sym{animation:symT3 .18s ease-in-out infinite}
+/* pose thrust — elastic snap forward, settle, slow pull back */
+.phase1 .blanket-svg .pose-active{animation:thr1 .7s infinite}
+.phase2 .blanket-svg .pose-active{animation:thr2 .42s infinite}
+.phase3 .blanket-svg .pose-active{animation:thr3 .22s infinite}
+.phase-climax .blanket-svg .pose-active{animation:none;transform:translate(-8px,2px)}
+.phase-end .blanket-svg .pose-active{animation:none}
+@keyframes thr1{0%{transform:translate(6px,0)}14%{transform:translate(-7px,2.5px)}24%{transform:translate(-2px,1px)}34%{transform:translate(-6px,2px)}52%{transform:translate(-5px,1.5px)}100%{transform:translate(6px,0)}}
+@keyframes thr2{0%{transform:translate(5px,0)}12%{transform:translate(-9px,3px)}22%{transform:translate(-3px,1px)}32%{transform:translate(-8px,2.5px)}50%{transform:translate(-7px,2px)}100%{transform:translate(5px,0)}}
+@keyframes thr3{0%{transform:translate(3px,0)}15%{transform:translate(-10px,3.5px)}28%{transform:translate(-5px,1.5px)}40%{transform:translate(-9px,3px)}100%{transform:translate(3px,0)}}
+/* base reacts to impact */
+.phase1 .blanket-svg .pose-base{animation:rct1 .7s infinite}
+.phase2 .blanket-svg .pose-base{animation:rct2 .42s infinite}
+.phase3 .blanket-svg .pose-base{animation:rct3 .22s infinite}
+.phase-climax .blanket-svg .pose-base,.phase-end .blanket-svg .pose-base{animation:none}
+@keyframes rct1{0%,50%,100%{transform:translate(0,0)}14%{transform:translate(-3px,1px)}28%{transform:translate(0,0)}}
+@keyframes rct2{0%,45%,100%{transform:translate(0,0)}12%{transform:translate(-4px,1.5px)}26%{transform:translate(0,0)}}
+@keyframes rct3{0%,40%,100%{transform:translate(0,0)}15%{transform:translate(-4px,2px)}30%{transform:translate(0,0)}}
+/* symbol thrust */
+.phase1 .sym .m-sym{animation:symT1 .7s infinite}
+.phase2 .sym .m-sym{animation:symT2 .42s infinite}
+.phase3 .sym .m-sym{animation:symT3 .22s infinite}
 .phase-climax .sym .m-sym{animation:none;transform:translateX(10px)}
 .phase-end .sym .m-sym{animation:none;transform:translateX(10px)}
-@keyframes symT1{0%,100%{transform:translateX(-6px)}50%{transform:translateX(10px)}}
-@keyframes symT2{0%,100%{transform:translateX(-4px)}50%{transform:translateX(10px)}}
-@keyframes symT3{0%,100%{transform:translateX(-2px)}50%{transform:translateX(10px)}}
+@keyframes symT1{0%{transform:translateX(-6px)}14%{transform:translateX(10px)}28%{transform:translateX(4px)}40%{transform:translateX(9px)}55%{transform:translateX(8px)}100%{transform:translateX(-6px)}}
+@keyframes symT2{0%{transform:translateX(-4px)}12%{transform:translateX(10px)}24%{transform:translateX(4px)}36%{transform:translateX(9px)}100%{transform:translateX(-4px)}}
+@keyframes symT3{0%{transform:translateX(-2px)}15%{transform:translateX(10px)}30%{transform:translateX(5px)}45%{transform:translateX(9px)}100%{transform:translateX(-2px)}}
 @keyframes flash{0%{opacity:.9}100%{opacity:0}}
 @keyframes swDrop{0%{opacity:.7;transform:translateY(0)}100%{opacity:0;transform:translateY(40px)}}
 @keyframes pDrift{0%{opacity:.85;transform:translate(0,0)}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
