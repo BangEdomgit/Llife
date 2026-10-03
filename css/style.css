@@ -266,9 +266,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .phase3 .blanket-svg .pose-active{animation:thr3 .22s infinite}
 .phase-climax .blanket-svg .pose-active{animation:none;transform:translate(-8px,2px)}
 .phase-end .blanket-svg .pose-active{animation:none}
-@keyframes thr1{0%{transform:translate(6px,0)}14%{transform:translate(-7px,2.5px)}24%{transform:translate(-2px,1px)}34%{transform:translate(-6px,2px)}52%{transform:translate(-5px,1.5px)}100%{transform:translate(6px,0)}}
-@keyframes thr2{0%{transform:translate(5px,0)}12%{transform:translate(-9px,3px)}22%{transform:translate(-3px,1px)}32%{transform:translate(-8px,2.5px)}50%{transform:translate(-7px,2px)}100%{transform:translate(5px,0)}}
-@keyframes thr3{0%{transform:translate(3px,0)}15%{transform:translate(-10px,3.5px)}28%{transform:translate(-5px,1.5px)}40%{transform:translate(-9px,3px)}100%{transform:translate(3px,0)}}
+@keyframes thr1{0%{transform:translate(10px,-2px)}14%{transform:translate(-12px,4px)}24%{transform:translate(-4px,1.5px)}34%{transform:translate(-10px,3px)}52%{transform:translate(-8px,2.5px)}100%{transform:translate(10px,-2px)}}
+@keyframes thr2{0%{transform:translate(9px,-2px)}12%{transform:translate(-14px,5px)}22%{transform:translate(-5px,2px)}32%{transform:translate(-12px,4px)}50%{transform:translate(-10px,3px)}100%{transform:translate(9px,-2px)}}
+@keyframes thr3{0%{transform:translate(7px,-1px)}15%{transform:translate(-16px,5.5px)}28%{transform:translate(-7px,2.5px)}40%{transform:translate(-14px,4.5px)}100%{transform:translate(7px,-1px)}}
 /* base reacts to impact */
 .phase1 .blanket-svg .pose-base{animation:rct1 .7s infinite}
 .phase2 .blanket-svg .pose-base{animation:rct2 .42s infinite}

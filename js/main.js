@@ -206,60 +206,176 @@ function morningCard(sc, p) {
 }
 function blanketSVG(shape, build) {
   const bm = build === 'slim' ? .88 : build === 'chubby' ? 1.12 : 1;
-  const sk = '#c4a882', skD = '#a08060', skL = '#d4bb9a', hr = '#3a3430';
+  const fsk = '#e2c3a0', fskD = '#b89071', fskL = '#f0d4b2'; // female: lighter
+  const msk = '#b89675', mskD = '#8a6a4a';                    // male: darker
+  const hrF = '#2a1e18', hrM = '#1e1612', nip = '#9a6650';
   const mattress = `<rect x="0" y="92" width="200" height="10" rx="3" fill="#1e1814" opacity=".55"/><rect x="0" y="102" width="200" height="6" rx="2" fill="#261e18"/>`;
-  const pillow = `<ellipse cx="30" cy="80" rx="20" ry="9" fill="#d8d0c4" opacity=".65"/>`;
+  const pillow = `<ellipse cx="28" cy="80" rx="22" ry="9" fill="#e8dfd0" opacity=".7"/><ellipse cx="28" cy="78" rx="18" ry="6" fill="#f4ece0" opacity=".4"/>`;
   let base = '', active = '';
   if (shape === 'A') {
+    // 정상위: 여자 누움(아래), 남자 위에서 (base=여, active=남)
     base = `<g class="pose-base">${pillow}
-      <circle cx="32" cy="72" r="8" fill="${sk}"/><path d="M24,66 Q32,60 40,66 Q42,72 40,76 Q36,80 28,78 Q22,76 22,72 Z" fill="${hr}" opacity=".8"/>
-      <path d="M40,74 L42,78 L46,76 C54,74 64,73 74,74 Q80,76 86,80 L86,92 L38,92 L38,80 Z" fill="${sk}" opacity=".85"/>
-      <ellipse cx="52" cy="74" rx="${4.2 * bm}" ry="${2.6 * bm}" fill="${skL}" opacity=".4"/>
-      <path d="M82,76 C86,72 92,66 100,60 Q106,56 110,58 Q108,62 102,68 C96,74 92,78 88,82 Z" fill="${sk}" opacity=".78"/>
-      <path d="M84,84 C90,86 100,88 110,90 L110,94 L82,92 Z" fill="${sk}" opacity=".72"/>
-      <path d="M46,78 C44,82 42,86 40,92" fill="none" stroke="${skD}" stroke-width="4" stroke-linecap="round" opacity=".5"/>
-      <path d="M56,80 Q62,86 66,92" fill="none" stroke="${skD}" stroke-width="3.5" stroke-linecap="round" opacity=".35"/>
+      <!-- 여자 긴 머리 베개 위 퍼짐 -->
+      <path d="M12,72 Q8,80 10,88 Q16,90 22,86 Q18,78 20,70 Z" fill="${hrF}" opacity=".85"/>
+      <path d="M14,70 Q10,74 12,80 L18,80 Q20,74 20,70 Z" fill="${hrF}" opacity=".7"/>
+      <!-- 여자 머리 -->
+      <circle cx="30" cy="72" r="8.5" fill="${fsk}"/>
+      <path d="M22,70 Q22,62 30,61 Q38,62 38,70 Q38,74 36,76 L24,76 Q22,74 22,70 Z" fill="${hrF}" opacity=".92"/>
+      <!-- 얼굴 디테일: 눈 감김 + 입 -->
+      <path d="M26,72 Q27.5,71.5 29,72" stroke="${mskD}" stroke-width=".6" fill="none" opacity=".6"/>
+      <path d="M32,72 Q33.5,71.5 35,72" stroke="${mskD}" stroke-width=".6" fill="none" opacity=".6"/>
+      <ellipse cx="30.5" cy="76" rx="1.5" ry=".6" fill="#c75858" opacity=".55"/>
+      <!-- 목 -->
+      <path d="M27,78 L34,78 L35,82 L26,82 Z" fill="${fsk}"/>
+      <!-- 어깨→토르소→가슴(옆에서 본 반원) -->
+      <path d="M26,82 L35,82 Q42,82 48,83 L56,85 Q62,86 68,86 L80,88 L80,94 L38,94 Z" fill="${fsk}" opacity=".92"/>
+      <!-- 가슴 두 봉우리 (옆얼굴 뷰) -->
+      <path d="M48,83 Q52,78 56,79 Q58,82 56,85 Q53,86 48,85 Z" fill="${fsk}"/>
+      <circle cx="55" cy="81.5" r="${1.1 * bm}" fill="${nip}" opacity=".7"/>
+      <path d="M60,85 Q64,80 68,81 Q70,84 68,87 Q65,88 60,87 Z" fill="${fsk}" opacity=".9"/>
+      <circle cx="67" cy="83" r="${1 * bm}" fill="${nip}" opacity=".6"/>
+      <!-- 무릎 세운 다리(V자): 왼다리 세움 -->
+      <path d="M68,88 Q78,70 92,58 Q98,56 102,60 Q104,66 98,70 Q86,78 80,90 Z" fill="${fsk}" opacity=".9"/>
+      <!-- 오른다리 세움 -->
+      <path d="M76,90 Q90,74 106,66 Q112,66 114,72 Q112,76 108,78 Q94,86 86,94 Z" fill="${fsk}" opacity=".88"/>
+      <!-- 다리 음영 -->
+      <path d="M86,82 Q94,72 102,66" stroke="${fskD}" stroke-width=".8" fill="none" opacity=".5"/>
     </g>`;
     active = `<g class="pose-active">
-      <circle cx="78" cy="42" r="7" fill="${sk}"/><path d="M71,36 Q78,30 85,36 Q87,42 84,46 Q80,48 74,46 Q70,44 70,40 Z" fill="${hr}" opacity=".82"/>
-      <path d="M74,48 L72,52 C72,58 76,66 80,74 Q82,78 86,80 L92,78 Q94,74 92,70 C90,64 88,56 86,50 L84,46 Z" fill="${sk}" opacity=".84"/>
-      <path d="M72,54 C68,58 64,64 60,72 L56,78" fill="none" stroke="${skD}" stroke-width="5" stroke-linecap="round" opacity=".55"/>
-      <path d="M86,52 C90,56 94,62 98,70 L100,76" fill="none" stroke="${skD}" stroke-width="5" stroke-linecap="round" opacity=".5"/>
-      <path d="M86,80 L92,78 L96,84 Q96,90 92,92 L86,92 L82,86 Z" fill="${sk}" opacity=".78"/>
-      <path d="M96,86 C104,88 114,90 122,92 L122,96 L94,94 Z" fill="${sk}" opacity=".7"/>
+      <!-- 남자: 위에서 덮친 자세, 상체 아치 -->
+      <!-- 머리 (앞쪽 보고 숙임) -->
+      <circle cx="80" cy="40" r="7.5" fill="${msk}"/>
+      <path d="M72,38 Q72,30 80,30 Q88,30 88,38 Q88,42 86,44 L74,44 Q72,42 72,38 Z" fill="${hrM}" opacity=".95"/>
+      <path d="M74,36 L86,36" stroke="${hrM}" stroke-width="1" opacity=".7"/>
+      <!-- 목 뒤 -->
+      <path d="M77,46 L84,46 L84,50 L77,50 Z" fill="${msk}"/>
+      <!-- 넓은 어깨+등 아치(위에서 아래로 숙임) -->
+      <path d="M73,48 Q66,52 68,56 L74,60 Q78,66 82,72 L88,80 L96,82 Q100,80 98,76 L94,70 Q92,62 92,56 L94,50 Q92,46 86,46 Z" fill="${msk}" opacity=".95"/>
+      <!-- 등근육 음영 -->
+      <path d="M78,54 Q82,60 86,66" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
+      <!-- 왼팔 (여자 옆 바닥 짚기) -->
+      <path d="M70,52 Q58,58 52,70 Q50,76 54,80 Q58,80 60,76 Q66,66 74,60 Z" fill="${msk}" opacity=".92"/>
+      <circle cx="54" cy="78" r="3" fill="${msk}"/>
+      <!-- 오른팔 (여자 어깨 옆 짚기) -->
+      <path d="M90,50 Q104,54 112,66 Q114,72 110,76 Q106,76 104,72 Q96,62 88,56 Z" fill="${msk}" opacity=".9"/>
+      <circle cx="110" cy="74" r="3" fill="${msk}"/>
+      <!-- 엉덩이+다리 (뒤에서 보임) -->
+      <path d="M88,80 Q94,84 96,88 L100,94 L108,94 L106,88 Q104,82 100,80 Z" fill="${msk}" opacity=".88"/>
+      <path d="M94,88 L112,92 L118,94 L96,94 Z" fill="${msk}" opacity=".82"/>
+      <!-- 엉덩이 라인 -->
+      <path d="M94,84 Q98,86 102,88" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
     </g>`;
   } else if (shape === 'B') {
+    // 기승위: 남자 아래 누움(base), 여자 위에 올라탐(active)
     base = `<g class="pose-base">${pillow}
-      <circle cx="32" cy="70" r="7.5" fill="${sk}"/><path d="M25,64 Q32,58 39,64 Q41,70 38,74 Q34,76 28,74 Q24,72 24,68 Z" fill="${hr}" opacity=".8"/>
-      <path d="M39,72 L42,76 C50,74 62,72 74,74 Q82,76 88,80 L88,92 L38,92 L38,78 Z" fill="${sk}" opacity=".8"/>
-      <path d="M84,82 C92,84 104,88 114,92 L114,96 L82,92 Z" fill="${sk}" opacity=".68"/>
-      <path d="M44,76 C42,80 40,86 38,92" fill="none" stroke="${skD}" stroke-width="4" stroke-linecap="round" opacity=".45"/>
+      <!-- 남자 머리 (베개 위) -->
+      <circle cx="30" cy="78" r="8" fill="${msk}"/>
+      <path d="M22,76 Q22,69 30,69 Q38,69 38,76 Q38,80 36,82 L24,82 Q22,80 22,76 Z" fill="${hrM}" opacity=".95"/>
+      <!-- 얼굴: 입 벌림 (쾌감) -->
+      <path d="M27,78 Q28,77.5 29,78" stroke="${mskD}" stroke-width=".7" fill="none" opacity=".65"/>
+      <path d="M31,78 Q32,77.5 33,78" stroke="${mskD}" stroke-width=".7" fill="none" opacity=".65"/>
+      <ellipse cx="30" cy="82" rx="1.6" ry="1" fill="#4a2a20" opacity=".65"/>
+      <!-- 목 -->
+      <path d="M27,84 L34,84 L35,88 L26,88 Z" fill="${msk}"/>
+      <!-- 남자 넓은 가슴·몸통 (누운) -->
+      <path d="M24,86 Q22,88 24,92 L80,92 Q86,92 90,90 L82,86 L46,84 Z" fill="${msk}" opacity=".92"/>
+      <!-- 가슴근육 라인 -->
+      <path d="M44,86 Q48,89 52,90" stroke="${mskD}" stroke-width=".9" fill="none" opacity=".55"/>
+      <path d="M58,86 Q62,89 66,90" stroke="${mskD}" stroke-width=".9" fill="none" opacity=".55"/>
+      <!-- 왼팔 (여자 허리 잡음) -->
+      <path d="M46,88 Q50,80 60,76 Q66,74 70,78 Q72,82 68,84 Q60,86 54,90 Z" fill="${msk}" opacity=".88"/>
+      <!-- 오른팔 -->
+      <path d="M66,88 Q70,80 80,76 Q86,74 90,78 Q92,82 88,84 Q80,86 74,90 Z" fill="${msk}" opacity=".88"/>
     </g>`;
     active = `<g class="pose-active">
-      <circle cx="82" cy="28" r="7" fill="${sk}"/><path d="M75,22 Q82,16 89,22 Q91,28 88,32 Q84,34 78,32 Q74,30 74,26 Z" fill="${hr}" opacity=".82"/>
-      <path d="M78,34 L76,38 Q74,44 76,52 L78,58 Q80,62 82,66 L86,72 L94,72 L96,66 Q98,62 98,58 L100,52 Q102,44 100,38 L98,34 Z" fill="${sk}" opacity=".84"/>
-      <ellipse cx="84" cy="44" rx="${3.8 * bm}" ry="${2.6 * bm}" fill="${skL}" opacity=".38"/>
-      <path d="M86,72 Q82,76 78,82 L74,88 L72,92 L82,92 Z" fill="${sk}" opacity=".78"/>
-      <path d="M94,72 Q98,76 102,82 L106,88 L108,92 L98,92 Z" fill="${sk}" opacity=".78"/>
-      <path d="M78,38 C74,44 70,52 66,60" fill="none" stroke="${skD}" stroke-width="4.5" stroke-linecap="round" opacity=".48"/>
-      <path d="M98,38 C102,44 106,52 110,60" fill="none" stroke="${skD}" stroke-width="4.5" stroke-linecap="round" opacity=".48"/>
+      <!-- 여자: 위에 올라타 상체 세움 (측면 뷰) -->
+      <!-- 긴 머리 등 뒤 -->
+      <path d="M74,24 Q68,28 68,38 Q68,48 72,52 Q76,46 76,36 Q76,28 74,24 Z" fill="${hrF}" opacity=".88"/>
+      <path d="M70,34 Q66,42 68,52" stroke="${hrF}" stroke-width=".8" fill="none" opacity=".6"/>
+      <!-- 머리 -->
+      <circle cx="80" cy="26" r="7.5" fill="${fsk}"/>
+      <path d="M72,24 Q72,16 80,16 Q88,16 88,24 Q88,28 86,30 L74,30 Q72,28 72,24 Z" fill="${hrF}" opacity=".95"/>
+      <!-- 얼굴 -->
+      <path d="M77,27 Q78,26.5 79,27" stroke="${mskD}" stroke-width=".6" fill="none" opacity=".7"/>
+      <path d="M82,27 Q83,26.5 84,27" stroke="${mskD}" stroke-width=".6" fill="none" opacity=".7"/>
+      <ellipse cx="80.5" cy="30.5" rx="1.3" ry=".6" fill="#c75858" opacity=".7"/>
+      <!-- 목 -->
+      <path d="M77,32 L84,32 L85,36 L76,36 Z" fill="${fsk}"/>
+      <!-- 상체 세움 (허리 S라인) -->
+      <path d="M74,36 Q68,46 70,58 Q72,70 76,78 L92,78 Q96,70 98,58 Q100,46 94,36 Z" fill="${fsk}" opacity=".93"/>
+      <!-- 가슴 두 봉우리 (측면이지만 정면 쪽) -->
+      <path d="M74,42 Q76,36 82,37 Q84,42 82,46 Q77,47 74,46 Z" fill="${fsk}"/>
+      <circle cx="81" cy="40" r="${1.3 * bm}" fill="${nip}" opacity=".75"/>
+      <path d="M86,42 Q88,36 94,37 Q96,42 94,46 Q89,47 86,46 Z" fill="${fskL}" opacity=".95"/>
+      <circle cx="93" cy="40" r="${1.3 * bm}" fill="${nip}" opacity=".75"/>
+      <!-- 배꼽 -->
+      <circle cx="84" cy="56" r=".8" fill="${fskD}" opacity=".5"/>
+      <!-- 허리 음영 -->
+      <path d="M72,52 Q84,54 96,52" stroke="${fskD}" stroke-width=".6" fill="none" opacity=".4"/>
+      <!-- 왼팔 (뒤로 짚음) -->
+      <path d="M72,46 Q62,54 58,66 Q58,72 62,74 Q66,74 66,70 Q68,60 76,52 Z" fill="${fsk}" opacity=".9"/>
+      <circle cx="62" cy="72" r="2.8" fill="${fsk}"/>
+      <!-- 오른팔 (앞으로 가슴/허리) -->
+      <path d="M96,46 Q106,54 110,66 Q110,72 106,74 Q102,74 102,70 Q100,60 92,52 Z" fill="${fsk}" opacity=".9"/>
+      <circle cx="106" cy="72" r="2.8" fill="${fsk}"/>
+      <!-- 다리: 남자 허리 양옆으로 벌림 (무릎 접음) -->
+      <path d="M76,78 Q68,84 64,92 L58,92 Q58,86 62,80 Q66,76 70,76 Z" fill="${fsk}" opacity=".88"/>
+      <path d="M92,78 Q100,84 104,92 L110,92 Q110,86 106,80 Q102,76 98,76 Z" fill="${fsk}" opacity=".88"/>
     </g>`;
   } else {
+    // 후배위: 여자 네발 (base), 남자 뒤에서 (active)
     base = `<g class="pose-base">
-      <circle cx="30" cy="56" r="7.5" fill="${sk}"/><path d="M23,50 Q30,44 37,50 Q39,56 36,60 Q32,62 26,60 Q22,58 22,54 Z" fill="${hr}" opacity=".8"/>
-      <path d="M37,58 L40,62 C44,60 52,56 62,54 Q70,54 76,56 L80,60 C82,64 84,70 84,76 L84,82 Q82,86 78,88 L76,92 L40,92 L38,66 Z" fill="${sk}" opacity=".84"/>
-      <ellipse cx="54" cy="56" rx="${3.8 * bm}" ry="${2.4 * bm}" fill="${skL}" opacity=".38"/>
-      <path d="M78,88 Q82,90 86,92 L80,92 Z" fill="${sk}" opacity=".68"/>
-      <path d="M37,60 C32,58 28,62 26,68 L24,80" fill="none" stroke="${skD}" stroke-width="4.5" stroke-linecap="round" opacity=".5"/>
-      <path d="M40,68 Q38,76 36,84 L34,92" fill="none" stroke="${skD}" stroke-width="3.5" stroke-linecap="round" opacity=".35"/>
+      <!-- 여자 긴 머리 아래로 -->
+      <path d="M24,52 Q18,62 20,74 Q24,78 30,74 Q28,66 30,56 Z" fill="${hrF}" opacity=".88"/>
+      <path d="M22,60 Q18,70 22,76" stroke="${hrF}" stroke-width=".8" fill="none" opacity=".6"/>
+      <!-- 머리 (앞으로 숙임) -->
+      <circle cx="30" cy="52" r="7.5" fill="${fsk}"/>
+      <path d="M22,50 Q22,42 30,42 Q38,42 38,50 Q38,54 36,56 L24,56 Q22,54 22,50 Z" fill="${hrF}" opacity=".95"/>
+      <!-- 목 (앞으로) -->
+      <path d="M30,58 L36,58 L38,64 L32,64 Z" fill="${fsk}"/>
+      <!-- 등 아치 (어깨→허리→엉덩이) -->
+      <path d="M32,60 Q40,58 50,58 L68,60 Q82,62 92,66 L102,72 Q104,76 102,80 L96,86 Q82,86 68,84 Q50,80 36,72 Q30,66 32,60 Z" fill="${fsk}" opacity=".94"/>
+      <!-- 등 중앙 음영 -->
+      <path d="M42,62 Q60,66 78,70 Q88,74 96,78" stroke="${fskD}" stroke-width=".9" fill="none" opacity=".5"/>
+      <!-- 엉덩이 라인 -->
+      <path d="M92,74 Q98,78 102,82" stroke="${fskD}" stroke-width=".9" fill="none" opacity=".55"/>
+      <!-- 아래로 늘어진 가슴 -->
+      <ellipse cx="48" cy="72" rx="${5 * bm}" ry="${7 * bm}" fill="${fsk}" opacity=".92"/>
+      <circle cx="48" cy="77" r="${1.3 * bm}" fill="${nip}" opacity=".75"/>
+      <ellipse cx="62" cy="72" rx="${5 * bm}" ry="${7 * bm}" fill="${fskL}" opacity=".95"/>
+      <circle cx="62" cy="77" r="${1.3 * bm}" fill="${nip}" opacity=".7"/>
+      <!-- 양팔 바닥 짚음 -->
+      <path d="M34,66 Q28,76 26,86 Q26,92 32,92 Q34,86 36,76 Z" fill="${fsk}" opacity=".9"/>
+      <circle cx="30" cy="90" r="3" fill="${fsk}"/>
+      <path d="M46,68 Q42,76 40,86 Q40,92 46,92 Q48,86 50,78 Z" fill="${fsk}" opacity=".88"/>
+      <circle cx="44" cy="90" r="3" fill="${fsk}"/>
+      <!-- 무릎 꿇은 다리 -->
+      <path d="M86,80 Q88,86 86,92 L78,92 Q76,86 78,80 Z" fill="${fsk}" opacity=".88"/>
+      <path d="M98,80 Q102,86 100,92 L92,92 Q90,86 92,80 Z" fill="${fsk}" opacity=".88"/>
     </g>`;
     active = `<g class="pose-active">
-      <circle cx="116" cy="36" r="7" fill="${sk}"/><path d="M109,30 Q116,24 123,30 Q125,36 122,40 Q118,42 112,40 Q108,38 108,34 Z" fill="${hr}" opacity=".82"/>
-      <path d="M112,42 L110,46 C108,52 104,60 98,68 L94,74 L88,70 Q86,66 88,64 C94,58 100,50 104,44 L108,40 Z" fill="${sk}" opacity=".82"/>
-      <path d="M94,74 Q92,80 90,86 L88,92 L82,92 L86,70 Z" fill="${sk}" opacity=".75"/>
-      <path d="M112,44 C116,48 120,54 124,62" fill="none" stroke="${skD}" stroke-width="5" stroke-linecap="round" opacity=".5"/>
-      <path d="M98,68 L102,76 Q104,82 106,88 L108,92 L118,92 L116,84 L112,74 Z" fill="${sk}" opacity=".78"/>
-      <path d="M116,86 C122,88 130,90 136,92 L136,96 L114,94 Z" fill="${sk}" opacity=".68"/>
+      <!-- 남자: 여자 뒤에서 무릎 꿇음, 허리 잡음 -->
+      <!-- 머리 -->
+      <circle cx="140" cy="40" r="7.5" fill="${msk}"/>
+      <path d="M132,38 Q132,30 140,30 Q148,30 148,38 Q148,42 146,44 L134,44 Q132,42 132,38 Z" fill="${hrM}" opacity=".95"/>
+      <path d="M134,36 L146,36" stroke="${hrM}" stroke-width="1" opacity=".7"/>
+      <!-- 목 -->
+      <path d="M137,46 L144,46 L144,50 L137,50 Z" fill="${msk}"/>
+      <!-- 상체 (앞으로 숙임) -->
+      <path d="M132,50 Q126,54 128,62 L132,72 Q136,78 142,80 L150,80 Q156,78 158,72 L160,62 Q162,54 156,50 Z" fill="${msk}" opacity=".94"/>
+      <!-- 가슴근육 -->
+      <path d="M136,58 Q140,60 142,62" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
+      <path d="M150,58 Q154,60 156,62" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
+      <!-- 왼팔 (여자 허리 잡음, 앞으로) -->
+      <path d="M130,56 Q118,62 108,70 Q104,74 108,78 Q112,78 116,74 Q124,66 134,62 Z" fill="${msk}" opacity=".9"/>
+      <circle cx="110" cy="76" r="2.8" fill="${msk}"/>
+      <!-- 오른팔 -->
+      <path d="M158,56 Q166,62 168,70 Q168,74 164,74 Q160,72 158,66 Z" fill="${msk}" opacity=".88"/>
+      <!-- 엉덩이+다리 (무릎 꿇음, 뒤에서) -->
+      <path d="M138,80 Q134,86 134,92 L144,92 L146,86 Z" fill="${msk}" opacity=".88"/>
+      <path d="M150,80 Q154,86 154,92 L164,92 L162,86 Z" fill="${msk}" opacity=".88"/>
+      <!-- 엉덩이 음영 -->
+      <path d="M140,82 Q148,82 156,82" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
     </g>`;
   }
   return `<svg class="blanket-svg" viewBox="0 0 200 110">${mattress}${base}${active}</svg>`;
