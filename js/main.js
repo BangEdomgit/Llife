@@ -205,33 +205,43 @@ function morningCard(sc, p) {
     <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
 function blanketSVG(shape, build) {
-  const bm = build === 'slim' ? .8 : build === 'chubby' ? 1.3 : 1;
-  const cleg = (x, y0, y1, tw) => { tw *= bm;
-    const kw = tw * .68, cw = tw * .82, aw = tw * .48;
-    const ky = y0 + (y1 - y0) * .47, cy = y0 + (y1 - y0) * .72;
-    return `M${x - tw},${y0} C${x - tw},${ky - 4} ${x - kw - .5},${ky - 1} ${x - kw},${ky} C${x - kw + .3},${ky + 4} ${x - cw - .2},${cy - 2} ${x - cw},${cy} C${x - cw + .2},${cy + 4} ${x - aw - .3},${y1 - 3} ${x - aw},${y1} L${x + aw},${y1} C${x + aw + .3},${y1 - 3} ${x + cw - .2},${cy + 4} ${x + cw},${cy} C${x + cw + .2},${cy - 2} ${x + kw - .3},${ky + 4} ${x + kw},${ky} C${x + kw + .5},${ky - 1} ${x + tw},${ky - 4} ${x + tw},${y0} Z`;
-  };
-  const ft = (x, s) => `<ellipse cx="${x + s * 3.5}" cy="99" rx="4.2" ry="2" fill="#3a3430" opacity=".5"/>`;
-  const bentLeg = (x, y0) => { const w = 5 * bm; return `M${x - w},${y0} C${x - w + 2},${y0 - 8} ${x + 1},${y0 - 14} ${x + 4},${y0 - 16} C${x + 4 + 3 * bm},${y0 - 18} ${x + 4 + 5 * bm},${y0 - 14} ${x + 3 + 5 * bm},${y0 - 8} C${x + 2 + 5 * bm},${y0 - 2} ${x + 3},${y0 + 6} ${x - 1},${y0 + 10} L${x - w},${y0 + 6} C${x - w + 1},${y0 + 2} ${x - w},${y0 - 2} ${x - w},${y0} Z`; };
-  let legs = '';
-  if (shape === 'B') {
-    legs = `<path d="${cleg(32, 52, 98, 5)} ${cleg(50, 52, 98, 4.5)}" fill="#3a3430" opacity=".6"/>${ft(32, -1)}${ft(50, -1)}`;
-    legs += `<path d="${bentLeg(76, 50)}" fill="#3a3430" opacity=".6"/>`;
-    legs += `<path d="${cleg(90, 52, 98, 4.5)}" fill="#3a3430" opacity=".6"/>${ft(90, 1)}`;
-  } else if (shape === 'C') {
-    legs += `<path d="${bentLeg(34, 50)} ${bentLeg(52, 52)}" fill="#3a3430" opacity=".6"/>`;
-    legs += `<path d="${bentLeg(72, 48)} ${bentLeg(90, 50)}" fill="#3a3430" opacity=".6"/>`;
+  const bm = build === 'slim' ? .85 : build === 'chubby' ? 1.2 : 1;
+  const bed = '<rect x="2" y="72" width="156" height="28" rx="3" fill="#1a1616" opacity=".6"/><rect x="0" y="68" width="10" height="32" rx="2" fill="#2a2420" opacity=".7"/><rect x="150" y="68" width="10" height="32" rx="2" fill="#2a2420" opacity=".7"/>';
+  const pillow = '<ellipse cx="24" cy="58" rx="18" ry="10" fill="#d8d0c4" opacity=".7"/><path d="M10,56 Q24,50 38,56" fill="none" stroke="#c0b8a8" stroke-width="1" opacity=".5"/>';
+  const bHead = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#3a3430" opacity=".75"/>`;
+  const mw = 7 * bm, fw = 5.5 * bm;
+  let bodies = '';
+  if (shape === 'A') {
+    bodies += `<g class="bed-body">${bHead(28, 50, 8)}`;
+    bodies += `<path d="M36,52 C42,54 48,58 52,64 L52,72 L20,72 L20,56 C20,52 24,50 28,50 Z" fill="#3a3430" opacity=".5"/>`;
+    bodies += `<path d="M52,64 C62,62 72,60 82,58 C88,56 94,54 100,54 L100,72 L52,72 Z" fill="#3a3430" opacity=".45"/>`;
+    bodies += bHead(106, 48, 7);
+    bodies += `<path d="M100,54 C104,52 108,50 112,50 L116,72 L96,72 L100,54 Z" fill="#3a3430" opacity=".45"/>`;
+    bodies += '</g>';
+  } else if (shape === 'B') {
+    bodies += `<g class="bed-body">${bHead(26, 48, 8)}`;
+    bodies += `<path d="M34,50 C42,52 50,56 56,62 C58,64 58,68 56,72 L18,72 L18,54 C18,50 22,48 26,48 Z" fill="#3a3430" opacity=".5"/>`;
+    bodies += `<path d="M56,62 C66,58 78,54 90,52 L100,52 L108,72 L52,72 Z" fill="#3a3430" opacity=".45"/>`;
+    bodies += bHead(98, 44, 7);
+    bodies += `<path d="M94,50 Q98,48 102,50 L108,72 L88,72 Z" fill="#3a3430" opacity=".45"/>`;
+    bodies += `<path d="M108,68 C114,64 120,62 126,64 L130,72 L108,72 Z" fill="#3a3430" opacity=".4"/>`;
+    bodies += '</g>';
   } else {
-    legs = `<path d="${cleg(32, 52, 98, 5)} ${cleg(50, 52, 98, 4.5)}" fill="#3a3430" opacity=".6"/>${ft(32, -1)}${ft(50, -1)}`;
-    legs += `<path d="${cleg(70, 52, 98, 5)} ${cleg(88, 52, 98, 4.5)}" fill="#3a3430" opacity=".6"/>${ft(70, 1)}${ft(88, 1)}`;
+    bodies += `<g class="bed-body">${bHead(24, 46, 8)}`;
+    bodies += `<path d="M32,48 C40,50 50,54 58,60 C62,64 60,70 56,72 L16,72 L16,52 C16,48 20,46 24,46 Z" fill="#3a3430" opacity=".5"/>`;
+    bodies += `<path d="M58,60 C68,54 82,48 96,46 L106,48 L114,72 L52,72 Z" fill="#3a3430" opacity=".45"/>`;
+    bodies += bHead(102, 40, 7);
+    bodies += `<path d="M96,46 Q102,42 108,46 L114,72 L90,72 Z" fill="#3a3430" opacity=".45"/>`;
+    bodies += `<path d="M114,64 C122,56 132,52 138,56 L140,72 L114,72 Z" fill="#3a3430" opacity=".4"/>`;
+    bodies += '</g>';
   }
-  const blanket = { A: 'M0,42 Q30,28 60,36 Q90,28 120,42 L120,56 Q90,48 60,52 Q30,48 0,56 Z',
-    B: 'M0,44 Q30,26 60,32 Q90,20 120,38 L120,54 Q90,44 60,48 Q30,44 0,54 Z',
-    C: 'M0,40 Q30,22 60,28 Q90,14 120,34 L120,52 Q90,40 60,44 Q30,40 0,52 Z' };
-  const b = blanket[shape] || blanket.A;
-  const wy = shape === 'C' ? 47 : shape === 'B' ? 49 : 51;
-  return `<svg class="blanket-svg" viewBox="0 0 120 100">${legs}<path d="${b}" fill="#ece6da" opacity=".9"/><path d="${b}" fill="none" stroke="#cfc6b6" stroke-width="1.2"/>
-    <path d="M18,${wy} Q38,${wy + 4} 56,${wy + 1} M66,${wy - 1} Q86,${wy + 3} 104,${wy}" fill="none" stroke="#cfc6b6" stroke-width="1.4" stroke-linecap="round" opacity=".5"/></svg>`;
+  const blanketY = shape === 'C' ? 40 : shape === 'B' ? 44 : 48;
+  const blanket = `M0,${blanketY} Q20,${blanketY - 6} 40,${blanketY - 2} Q60,${blanketY + 4} 80,${blanketY - 4} Q100,${blanketY - 10} 120,${blanketY - 2} Q140,${blanketY + 6} 160,${blanketY} L160,76 L0,76 Z`;
+  const wy = blanketY + 6;
+  return `<svg class="blanket-svg" viewBox="0 0 160 100">${bed}${pillow}${bodies}
+    <path d="${blanket}" fill="#ece6da" opacity=".88"/>
+    <path d="${blanket}" fill="none" stroke="#cfc6b6" stroke-width="1.2"/>
+    <path d="M12,${wy} Q40,${wy + 3} 70,${wy} M90,${wy - 2} Q120,${wy + 2} 148,${wy - 1}" fill="none" stroke="#cfc6b6" stroke-width="1.2" stroke-linecap="round" opacity=".45"/></svg>`;
 }
 function phaseCard(sc, p, phase, shape, icon) {
   const look = G.look(p), age = G.npcAge(p);
@@ -243,7 +253,7 @@ function phaseCard(sc, p, phase, shape, icon) {
     return `<div class="sc-particle" style="left:${20 + Math.random() * 60}%;top:${30 + Math.random() * 40}%;--dx:${dx};--dy:${dy};animation-delay:${i * .15}s"></div>`;
   }).join('') : '';
   const cls = typeof phase === 'number' ? `phase${phase + 1}` : phase === 'climax' ? 'phase-climax' : 'phase-end';
-  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><svg viewBox="0 0 90 76" aria-hidden="true"><g class="f-sym"><circle cx="55" cy="40" r="12" fill="none" stroke="#ff69b4" stroke-width="2.5"/><line x1="55" y1="52" x2="55" y2="68" stroke="#ff69b4" stroke-width="2.5"/><line x1="48" y1="60" x2="62" y2="60" stroke="#ff69b4" stroke-width="2.5"/></g><g class="m-sym"><circle cx="35" cy="40" r="12" fill="none" stroke="#4da6ff" stroke-width="2.5"/><line x1="43" y1="32" x2="52" y2="23" stroke="#4da6ff" stroke-width="2.5"/><polyline points="46,23 52,23 52,29" fill="none" stroke="#4da6ff" stroke-width="2.5"/></g></svg></div>${blanketSVG(shape, p.body && p.body.build)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
+  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><svg viewBox="0 0 90 76" aria-hidden="true"><g class="f-sym"><circle cx="50" cy="40" r="12" fill="none" stroke="#ff69b4" stroke-width="2.5"/><line x1="50" y1="52" x2="50" y2="68" stroke="#ff69b4" stroke-width="2.5"/><line x1="43" y1="60" x2="57" y2="60" stroke="#ff69b4" stroke-width="2.5"/></g><g class="m-sym"><circle cx="35" cy="40" r="12" fill="none" stroke="#4da6ff" stroke-width="2.5"/><line x1="44" y1="31" x2="58" y2="17" stroke="#4da6ff" stroke-width="2.5"/><polyline points="51,17 58,17 58,24" fill="none" stroke="#4da6ff" stroke-width="2.5"/></g></svg></div>${blanketSVG(shape, p.body && p.body.build)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
 }
 function foreplayCard(sc, p) {
   const fl = p.gender === 'f';

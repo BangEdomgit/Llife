@@ -1025,15 +1025,25 @@ function renderDuringIntimate(a, size, st) {
   const skinD = shade(skin, .86);
   const w = Math.round(size), h = Math.round(size * 64 / 45);
   const nh = female ? 10.5 : 12, shHalf = female ? 36 : 42;
-  let o = `<svg class="av av-during" width="${w}" height="${h}" viewBox="15 5 90 128" aria-hidden="true">`;
-  o += `<rect class="av-bg" x="15.5" y="5.5" width="89" height="127" rx="6"/>`;
+  const bustW = female && st.fig && st.fig.cup ? (CUP_OUT[st.fig.cup] || 7) + 5 : 14;
+  const vbH = female ? 160 : 138;
+  let o = `<svg class="av av-during" width="${w}" height="${Math.round(w * vbH / 90)}" viewBox="15 5 90 ${vbH}" aria-hidden="true">`;
+  o += `<rect class="av-bg" x="15.5" y="5.5" width="89" height="${vbH - 1}" rx="6"/>`;
   o += `<rect x="${f1(60 - nh)}" y="95" width="${f1(nh * 2)}" height="22" fill="${skinD}"/>`;
-  o += `<path d="M${f1(60 - nh)},115 C${f1(60 - nh - 6)},116 ${f1(60 - shHalf + 6)},118 ${f1(60 - shHalf)},121 L${f1(60 - shHalf)},133 L${f1(60 + shHalf)},133 L${f1(60 + shHalf)},121 C${f1(60 + shHalf - 6)},118 ${f1(60 + nh + 6)},116 ${f1(60 + nh)},115 Z" fill="${skin}"/>`;
+  o += `<path d="M${f1(60 - nh)},115 C${f1(60 - nh - 6)},116 ${f1(60 - shHalf + 6)},118 ${f1(60 - shHalf)},121 L${f1(60 - shHalf)},${female ? 158 : 143} L${f1(60 + shHalf)},${female ? 158 : 143} L${f1(60 + shHalf)},121 C${f1(60 + shHalf - 6)},118 ${f1(60 + nh + 6)},116 ${f1(60 + nh)},115 Z" fill="${skin}"/>`;
   o += `<path d="M57,110 Q${f1(60 - shHalf * .55)},112 ${f1(60 - shHalf + 6)},111 M63,110 Q${f1(60 + shHalf * .55)},112 ${f1(60 + shHalf - 6)},111" fill="none" stroke="${shade(skin, .74)}" stroke-width="1.1" opacity=".7" stroke-linecap="round"/>`;
   if (female) {
-    const bustW = st.fig && st.fig.cup ? (CUP_OUT[st.fig.cup] || 7) + 5 : 14;
-    o += `<path d="M${f1(60 - bustW)},124 Q60,${f1(130 + Math.min(bustW * .2, 3))} ${f1(60 + bustW)},124" fill="none" stroke="${shade(skin, .6)}" stroke-width="1.2" opacity=".4" stroke-linecap="round"/>`;
-    o += `<path d="M${f1(60 - shHalf + 8)},121 Q${f1(60 - shHalf * .4)},124 ${f1(60 - bustW)},126 M${f1(60 + shHalf - 8)},121 Q${f1(60 + shHalf * .4)},124 ${f1(60 + bustW)},126" fill="none" stroke="${shade(skin, .55)}" stroke-width="1" opacity=".3"/>`;
+    const bustY = 126, bustDrop = Math.min(bustW * .35, 5);
+    const lx = 60 - bustW * .6, rx = 60 + bustW * .6;
+    o += `<path d="M${f1(60 - shHalf + 6)},122 Q${f1(lx - 2)},${f1(bustY - 1)} ${f1(lx)},${f1(bustY + bustDrop)} Q${f1(lx + bustW * .3)},${f1(bustY + bustDrop + 4)} 60,${f1(bustY + 2)}" fill="${skin}"/>`;
+    o += `<path d="M${f1(60 + shHalf - 6)},122 Q${f1(rx + 2)},${f1(bustY - 1)} ${f1(rx)},${f1(bustY + bustDrop)} Q${f1(rx - bustW * .3)},${f1(bustY + bustDrop + 4)} 60,${f1(bustY + 2)}" fill="${skin}"/>`;
+    o += `<path d="M${f1(lx + 1)},${f1(bustY + bustDrop - 1)} Q${f1(lx + bustW * .2)},${f1(bustY + bustDrop + 3)} ${f1(60 - 2)},${f1(bustY + 1)}" fill="none" stroke="${shade(skin, .55)}" stroke-width="1.2" opacity=".45" stroke-linecap="round"/>`;
+    o += `<path d="M${f1(rx - 1)},${f1(bustY + bustDrop - 1)} Q${f1(rx - bustW * .2)},${f1(bustY + bustDrop + 3)} ${f1(60 + 2)},${f1(bustY + 1)}" fill="none" stroke="${shade(skin, .55)}" stroke-width="1.2" opacity=".45" stroke-linecap="round"/>`;
+    o += `<ellipse cx="${f1(lx + 2)}" cy="${f1(bustY + bustDrop)}" rx="1.8" ry="1.8" fill="${shade(skin, .65)}" opacity=".6"/>`;
+    o += `<ellipse cx="${f1(rx - 2)}" cy="${f1(bustY + bustDrop)}" rx="1.8" ry="1.8" fill="${shade(skin, .65)}" opacity=".6"/>`;
+    o += `<path d="M${f1(60 - 1)},${f1(bustY)} L${f1(60 - 1)},${f1(bustY + bustDrop + 6)}" fill="none" stroke="${shade(skin, .5)}" stroke-width="1" opacity=".3" stroke-linecap="round"/>`;
+  } else {
+    o += `<path d="M${f1(60 - shHalf + 10)},124 L${f1(60 + shHalf - 10)},124" fill="none" stroke="${shade(skin, .7)}" stroke-width="1" opacity=".25"/>`;
   }
   if (phase >= 2) o += `<ellipse cx="50" cy="113" rx="1.4" ry="2" fill="#87ceeb" opacity=".5"/>`;
   if (phase >= 3) o += `<ellipse cx="72" cy="116" rx="1.2" ry="1.8" fill="#87ceeb" opacity=".45"/>`;
