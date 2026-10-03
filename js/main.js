@@ -173,11 +173,19 @@ const SIL = {
 };
 function floorClothes(p) {
   const c = Avatar.topColor(G.look(p));
+  const pers = p.personality || 'warm';
+  const uc = p.gender === 'f'
+    ? (pers === 'bold' ? '#2a2a2a' : pers === 'shy' ? '#e8dff0' : pers === 'sensitive' ? '#f5e0e4' : '#d4c8b8')
+    : '#3a4a5a';
   const under = p.gender === 'f'
-    ? '<path d="M150,30 q8,-12 16,0 q8,-12 16,0 M146,30 L186,30" fill="none" stroke="var(--text)" stroke-width="2" opacity=".45"/>'
-    : '<path d="M146,18 L186,18 L188,40 L171,40 L166,27 L161,40 L144,40 Z M146,23 L186,23" fill="none" stroke="var(--text)" stroke-width="2" stroke-linejoin="round" opacity=".45"/>';
-  return `<svg class="floor" viewBox="0 0 240 44" aria-hidden="true"><path d="M20,38 C14,30 24,18 40,20 C52,10 74,14 78,24 C92,22 100,32 92,38 C70,44 40,44 20,38 Z" fill="${c}"/>
-    <path d="M34,30 Q48,24 60,32 M62,24 Q72,28 80,34" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="2"/>${under}</svg>`;
+    ? `<g transform="translate(158,10) rotate(-8)"><path d="M0,8 Q8,-4 16,8 Q24,-4 32,8 L30,14 Q24,4 16,14 Q8,4 2,14 Z" fill="${uc}" opacity=".45"/><path d="M0,8 Q8,-4 16,8 Q24,-4 32,8" fill="none" stroke="${uc}" stroke-width="1.5" opacity=".55"/></g>
+       <g transform="translate(148,26) rotate(12)"><path d="M0,0 L18,0 L20,12 L10,14 L0,12 Z" fill="${uc}" opacity=".4"/><path d="M4,4 Q10,2 16,4" fill="none" stroke="rgba(0,0,0,.15)" stroke-width="1"/></g>`
+    : `<g transform="translate(150,12) rotate(-6)"><path d="M0,0 L30,0 L32,22 L18,22 L16,8 L14,22 L0,22 Z" fill="${uc}" opacity=".4"/><path d="M2,6 L28,6" fill="none" stroke="rgba(0,0,0,.15)" stroke-width="1.2"/></g>`;
+  return `<svg class="floor" viewBox="0 0 240 48" aria-hidden="true">
+    <g transform="rotate(-10 50 30)"><path d="M18,36 C10,28 18,14 36,16 C46,8 70,12 74,22 C86,20 96,30 88,36 C68,42 38,42 18,36 Z" fill="${c}"/>
+    <path d="M30,28 Q44,22 56,30 M58,22 Q68,26 76,32" fill="none" stroke="rgba(0,0,0,.2)" stroke-width="1.8"/>
+    <path d="M22,20 L18,8 L26,6 M72,18 L78,8 L70,6" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round" opacity=".7"/></g>
+    ${under}</svg>`;
 }
 const CONCEIVE = `<svg class="conceive" viewBox="0 0 300 120" aria-hidden="true"><defs><radialGradient id="egg" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#fff2e6"/><stop offset="1" stop-color="#e9a88e"/></radialGradient></defs>
   <circle class="glow" cx="232" cy="60" r="48" fill="#ffd9a8"/>
@@ -197,35 +205,79 @@ function morningCard(sc, p) {
     <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
 function blanketSVG(shape) {
-  const legs = { A: 'M30,52 Q34,80 32,100 M48,52 Q52,80 50,100 M70,52 Q66,80 68,100 M88,52 Q84,80 86,100',
-    B: 'M28,50 Q32,78 30,100 M46,50 Q50,78 48,100 M72,48 Q64,76 66,100 M90,50 Q86,78 88,100',
-    C: 'M30,52 Q34,80 32,100 M48,52 Q52,80 50,100 M68,38 Q60,58 62,100 M86,42 Q80,62 82,100' };
+  const cleg = (x, y0, y1, tw) => {
+    const kw = tw * .68, cw = tw * .82, aw = tw * .48;
+    const ky = y0 + (y1 - y0) * .47, cy = y0 + (y1 - y0) * .72;
+    return `M${x - tw},${y0} C${x - tw},${ky - 4} ${x - kw - .5},${ky - 1} ${x - kw},${ky} C${x - kw + .3},${ky + 4} ${x - cw - .2},${cy - 2} ${x - cw},${cy} C${x - cw + .2},${cy + 4} ${x - aw - .3},${y1 - 3} ${x - aw},${y1} L${x + aw},${y1} C${x + aw + .3},${y1 - 3} ${x + cw - .2},${cy + 4} ${x + cw},${cy} C${x + cw + .2},${cy - 2} ${x + kw - .3},${ky + 4} ${x + kw},${ky} C${x + kw + .5},${ky - 1} ${x + tw},${ky - 4} ${x + tw},${y0} Z`;
+  };
+  const ft = (x, s) => `<ellipse cx="${x + s * 3.5}" cy="99" rx="4.2" ry="2" fill="#3a3430" opacity=".5"/>`;
+  const bentLeg = (x, y0) => `M${x - 5},${y0} C${x - 3},${y0 - 8} ${x + 1},${y0 - 14} ${x + 4},${y0 - 16} C${x + 7},${y0 - 18} ${x + 9},${y0 - 14} ${x + 8},${y0 - 8} C${x + 7},${y0 - 2} ${x + 3},${y0 + 6} ${x - 1},${y0 + 10} L${x - 5},${y0 + 6} C${x - 4},${y0 + 2} ${x - 5},${y0 - 2} ${x - 5},${y0} Z`;
+  let legs = '';
+  if (shape === 'B') {
+    legs = `<path d="${cleg(32, 52, 98, 5)} ${cleg(50, 52, 98, 4.5)}" fill="#3a3430" opacity=".6"/>${ft(32, -1)}${ft(50, -1)}`;
+    legs += `<path d="${bentLeg(76, 50)}" fill="#3a3430" opacity=".6"/>`;
+    legs += `<path d="${cleg(90, 52, 98, 4.5)}" fill="#3a3430" opacity=".6"/>${ft(90, 1)}`;
+  } else if (shape === 'C') {
+    legs += `<path d="${bentLeg(34, 50)} ${bentLeg(52, 52)}" fill="#3a3430" opacity=".6"/>`;
+    legs += `<path d="${bentLeg(72, 48)} ${bentLeg(90, 50)}" fill="#3a3430" opacity=".6"/>`;
+  } else {
+    legs = `<path d="${cleg(32, 52, 98, 5)} ${cleg(50, 52, 98, 4.5)}" fill="#3a3430" opacity=".6"/>${ft(32, -1)}${ft(50, -1)}`;
+    legs += `<path d="${cleg(70, 52, 98, 5)} ${cleg(88, 52, 98, 4.5)}" fill="#3a3430" opacity=".6"/>${ft(70, 1)}${ft(88, 1)}`;
+  }
   const blanket = { A: 'M0,42 Q30,28 60,36 Q90,28 120,42 L120,56 Q90,48 60,52 Q30,48 0,56 Z',
     B: 'M0,44 Q30,26 60,32 Q90,20 120,38 L120,54 Q90,44 60,48 Q30,44 0,54 Z',
     C: 'M0,40 Q30,22 60,28 Q90,14 120,34 L120,52 Q90,40 60,44 Q30,40 0,52 Z' };
-  return `<svg class="blanket-svg" viewBox="0 0 120 100"><path d="${legs[shape] || legs.A}" fill="none" stroke="#444" stroke-width="3.5" stroke-linecap="round"/><path d="${blanket[shape] || blanket.A}" fill="#ece6da" opacity=".9"/><path d="${blanket[shape] || blanket.A}" fill="none" stroke="#cfc6b6" stroke-width="1.2"/></svg>`;
+  const b = blanket[shape] || blanket.A;
+  const wy = shape === 'C' ? 47 : shape === 'B' ? 49 : 51;
+  return `<svg class="blanket-svg" viewBox="0 0 120 100">${legs}<path d="${b}" fill="#ece6da" opacity=".9"/><path d="${b}" fill="none" stroke="#cfc6b6" stroke-width="1.2"/>
+    <path d="M18,${wy} Q38,${wy + 4} 56,${wy + 1} M66,${wy - 1} Q86,${wy + 3} 104,${wy}" fill="none" stroke="#cfc6b6" stroke-width="1.4" stroke-linecap="round" opacity=".5"/></svg>`;
 }
 function phaseCard(sc, p, phase, shape, icon) {
   const look = G.look(p), age = G.npcAge(p);
   const avatarPhase = phase === 'climax' ? 3 : phase === 'end' ? 4 : phase;
-  const duringState = { age, duringIntimate: avatarPhase, personality: sc.personality || p.personality };
+  const duringState = { age, duringIntimate: avatarPhase, personality: sc.personality || p.personality, fig: sc.fig };
   const portrait = Avatar.render(look, 90, duringState);
   const particles = phase === 'climax' ? Array.from({ length: 4 }, (_, i) => {
     const dx = (Math.random() * 120 - 60) + 'px', dy = -(40 + Math.random() * 60) + 'px';
     return `<div class="sc-particle" style="left:${20 + Math.random() * 60}%;top:${30 + Math.random() * 40}%;--dx:${dx};--dy:${dy};animation-delay:${i * .15}s"></div>`;
   }).join('') : '';
   const cls = typeof phase === 'number' ? `phase${phase + 1}` : phase === 'climax' ? 'phase-climax' : 'phase-end';
-  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><span class="m">♂</span><span class="f">♀</span></div>${blanketSVG(shape)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
+  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><svg viewBox="0 0 90 76" aria-hidden="true"><g class="f-sym"><circle cx="52" cy="30" r="11" fill="none" stroke="#ff69b4" stroke-width="2.5"/><line x1="52" y1="41" x2="52" y2="58" stroke="#ff69b4" stroke-width="2.5"/><line x1="45" y1="50" x2="59" y2="50" stroke="#ff69b4" stroke-width="2.5"/></g><g class="m-sym"><circle cx="34" cy="30" r="11" fill="none" stroke="#4da6ff" stroke-width="2.5"/><line x1="41" y1="23" x2="49" y2="15" stroke="#4da6ff" stroke-width="2.5"/><polyline points="44,15 49,15 49,20" fill="none" stroke="#4da6ff" stroke-width="2.5"/></g></svg></div>${blanketSVG(shape)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
 }
 function foreplayCard(sc, p) {
-  return `<div class="sc-foreplay"><svg viewBox="0 0 200 160"><circle cx="72" cy="30" r="14" class="fp-fill"/><path d="M52,150 C52,90 60,60 72,56 C84,60 92,90 92,150 Z" class="fp-fill"/><circle cx="128" cy="28" r="14" class="fp-fill"/><path d="M108,150 C108,90 116,58 128,54 C140,58 148,90 148,150 Z" class="fp-fill"/><path d="M88,64 Q100,56 112,66 Q116,72 112,76 Q100,68 88,74 Z" class="fp-fill"/></svg></div>`;
+  const fl = p.gender === 'f', ml = !fl;
+  const lH = fl ? 28 : 32, rH = ml ? 28 : 32;
+  const lBody = fl
+    ? '<path d="M64,46 C58,48 54,56 53,66 C52,72 54,78 56,84 C52,90 50,100 50,112 C50,124 52,136 54,150 L66,150 L68,112 L72,150 L84,150 C86,136 88,124 88,112 C88,100 86,90 82,84 C84,78 86,72 85,66 C84,56 80,48 74,46 Z" class="fp-fill"/>'
+    : '<path d="M62,48 C56,50 50,58 49,68 C48,76 50,82 52,88 C48,94 46,104 46,116 C46,128 48,138 50,150 L62,150 L64,114 L68,150 L80,150 C82,138 84,128 84,116 C84,104 82,94 78,88 C80,82 82,76 81,68 C80,58 74,50 68,48 Z" class="fp-fill"/>';
+  const rBody = ml
+    ? '<path d="M120,46 C114,48 110,56 109,66 C108,72 110,78 112,84 C108,90 106,100 106,112 C106,124 108,136 110,150 L122,150 L124,112 L128,150 L140,150 C142,136 144,124 144,112 C144,100 142,90 138,84 C140,78 142,72 141,66 C140,56 136,48 130,46 Z" class="fp-fill"/>'
+    : '<path d="M118,48 C112,50 108,58 107,68 C106,76 108,82 110,88 C106,94 104,104 104,116 C104,128 106,138 108,150 L120,150 L122,114 L126,150 L138,150 C140,138 142,128 142,116 C142,104 140,94 136,88 C138,82 140,76 139,68 C138,58 132,50 126,48 Z" class="fp-fill"/>';
+  const arm = '<path d="M84,70 Q96,62 110,68 Q114,74 110,78 Q98,70 86,76 Z" class="fp-fill"/>';
+  return `<div class="sc-foreplay"><svg viewBox="0 0 200 160"><circle cx="69" cy="${lH}" r="14" class="fp-fill"/><path d="M63,${lH + 8} Q69,${lH + 14} 75,${lH + 8}" class="fp-stroke"/>${lBody}<circle cx="125" cy="${rH}" r="14" class="fp-fill"/><path d="M119,${rH + 8} Q125,${rH + 14} 131,${rH + 8}" class="fp-stroke"/>${rBody}${arm}</svg></div>`;
 }
 function uterusSVG(preg) {
-  const res = preg ? 'glow' : 'bounce';
-  return `<div class="sc-uterus"><svg viewBox="0 0 300 220"><path class="organ-fill" d="M120,80 L120,160 Q120,190 150,190 Q180,190 180,160 L180,80 Q180,50 150,50 Q120,50 120,80 Z"/><path class="organ" d="M120,80 L120,160 Q120,190 150,190 Q180,190 180,160 L180,80"/><path class="organ" d="M120,80 Q100,60 70,55 Q50,52 40,65"/><path class="organ" d="M180,80 Q200,60 230,55 Q250,52 260,65"/><circle class="ovary" cx="35" cy="68" r="14"/><circle class="ovary" cx="265" cy="68" r="14"/>${[1, 2, 3, 4, 5].map(i => {
-    const x = 140 + (i % 3) * 10 - 10, delay = i * .2;
-    return `<g class="sp-u sp-u${i}" style="animation:spUp${res === 'glow' ? 'G' : 'B'} 2.5s ease-in ${delay}s forwards"><ellipse cx="${x}" cy="185" rx="4" ry="2.8" fill="#f4f4f4"/><path class="tail" d="M${x - 4},185 q-4,-3 -8,0 t-8,0" fill="none" stroke="#f4f4f4" stroke-width="1.2"/></g>`;
-  }).join('')}${preg ? '<circle class="egg-target" cx="48" cy="65" r="8" fill="#ffd9a8" opacity="0" style="animation:eggGlow .5s ease-out 2.8s forwards"/>' : ''}<style>@keyframes spUpG{0%{transform:translate(0,0);opacity:1}60%{opacity:1}100%{transform:translate(${preg ? '-95px,-120px' : '-80px,-100px'});opacity:${preg ? 1 : 0}}}@keyframes spUpB{0%{transform:translate(0,0);opacity:1}70%{opacity:.8}100%{transform:translate(-60px,-80px);opacity:0}}@keyframes eggGlow{to{opacity:.7;r:12}}</style></svg></div>`;
+  const anim = preg ? 'G' : 'B';
+  const sperm = [1, 2, 3, 4, 5, 6, 7].map(i => {
+    const x = 195 + (i % 3) * 12 - 12, delay = (i * .3).toFixed(1);
+    const dx = preg && i <= 2 ? -135 : -60 - i * 12, dy = preg && i <= 2 ? -155 : -80 - i * 8;
+    const fade = preg && i <= 2 ? 1 : 0;
+    return `<g class="sp-u" style="animation:spU${anim}${i} 3s ease-in ${delay}s forwards"><ellipse cx="${x}" cy="240" rx="4.5" ry="3" fill="#f4f4f4"/><path class="tail" d="M${x - 4.5},240 q-5,-4 -10,0 t-10,0 t-10,0" fill="none" stroke="#f4f4f4" stroke-width="1.3"/></g>
+      <style>@keyframes spU${anim}${i}{0%{transform:translate(0,0);opacity:1}60%{opacity:${fade || .8}}100%{transform:translate(${dx}px,${dy}px);opacity:${fade}}}</style>`;
+  }).join('');
+  return `<div class="sc-uterus"><svg viewBox="0 0 400 280">
+    <defs><radialGradient id="ug" cx="50%" cy="40%"><stop offset="0" stop-color="#fde0d8" stop-opacity=".5"/><stop offset="1" stop-color="#e4a098" stop-opacity=".3"/></radialGradient></defs>
+    <path d="M155,85 C155,55 170,40 200,40 C230,40 245,55 245,85 L245,185 Q245,225 200,225 Q155,225 155,185 Z" fill="url(#ug)"/>
+    <path d="M155,85 C155,55 170,40 200,40 C230,40 245,55 245,85 L245,185 Q245,225 200,225 Q155,225 155,185 Z" fill="none" stroke="#d98a7e" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M161,85 C161,58 174,46 200,46 C226,46 239,58 239,85 L239,183 Q239,219 200,219 Q161,219 161,183 Z" fill="none" stroke="#e4a8a0" stroke-width="2" opacity=".5"/>
+    <path d="M155,85 Q130,60 95,52 Q72,48 55,55 Q42,62 38,78" fill="none" stroke="#d98a7e" stroke-width="5" stroke-linecap="round"/>
+    <path d="M38,78 Q34,86 28,88 Q20,90 16,84 Q12,76 18,68 Q24,60 36,56" fill="none" stroke="#d98a7e" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M245,85 Q270,60 305,52 Q328,48 345,55 Q358,62 362,78" fill="none" stroke="#d98a7e" stroke-width="5" stroke-linecap="round"/>
+    <path d="M362,78 Q366,86 372,88 Q380,90 384,84 Q388,76 382,68 Q376,60 364,56" fill="none" stroke="#d98a7e" stroke-width="3.5" stroke-linecap="round"/>
+    <ellipse class="ovary" cx="28" cy="75" rx="16" ry="12"/><circle cx="24" cy="72" r="4" fill="#fff2e6" opacity=".7"/><circle cx="32" cy="78" r="3" fill="#fff2e6" opacity=".5"/>
+    <ellipse class="ovary" cx="372" cy="75" rx="16" ry="12"/><circle cx="368" cy="72" r="4" fill="#fff2e6" opacity=".7"/><circle cx="376" cy="78" r="3" fill="#fff2e6" opacity=".5"/>
+    <path d="M185,230 Q200,245 215,230" fill="none" stroke="#d98a7e" stroke-width="4" stroke-linecap="round"/>
+    ${sperm}${preg ? '<circle class="egg-target" cx="38" cy="72" r="6" fill="#ffd9a8" opacity="0" style="animation:eggGlow .6s ease-out 3.2s forwards"/><style>@keyframes eggGlow{to{opacity:.85;r:14}}</style>' : ''}</svg></div>`;
 }
 function playScene(sc) {
   const p = G.person(sc.pid);

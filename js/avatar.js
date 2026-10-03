@@ -727,9 +727,10 @@ function topFull(a, top, A, skin, bt) {
       for (let i = 0; i < (A.ci >= 5 ? 2 : 1); i++) for (const s of [-1, 1]) dd += `M${f1(60 + s * bustW * .62)},${f1(y.bust - 1 - i * 2.4 * k)} Q${f1(60 + s * bustW * .82)},${f1(y.bust - 3 - i * 2.4 * k)} ${f1(60 + s * (ax - 1.2))},${f1(y.armpit + 2.5 - i * 1.2 * k)} `;
       o += `<path d="${dd}" ${sf} stroke-width=".7" opacity=".3"/>`;
     }
-    if ((top === 0 || top === 3) && A.ci >= 2) {   // 얇은 옷 위 유두 음영
-      const op = top === 3 ? .14 : .11;
-      o += [-1, 1].map(s => `<circle cx="${f1(60 + s * bustW * .5)}" cy="${f1(y.bust + .8)}" r="${f1(.7 + A.ci * .1)}" fill="${shade(skin, .52)}" opacity="${op}"/>`).join('');
+    if ((top === 0 || top === 3) && A.ci >= 2) {
+      const op = top === 3 ? .13 : .09;
+      const nipY = A.ci >= 4 ? y.bust + 2 : y.bust + .8;
+      o += [-1, 1].map(s => `<circle cx="${f1(60 + s * bustW * .5)}" cy="${f1(nipY)}" r="${f1(.7 + A.ci * .1)}" fill="${shade(skin, .52)}" opacity="${op}"/>`).join('');
     }
   } else if (!A.f && A.adult && (A.fitM || A.C.shoulder >= 46)) o += `<path d="M${f1(60 - w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 - w.rib * .35)},${f1(y.bust + 3)} 59,${f1(y.bust + 1.5)} M${f1(60 + w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 + w.rib * .35)},${f1(y.bust + 3)} 61,${f1(y.bust + 1.5)}" ${sf} stroke-width=".9" opacity=".22"/>`;   // 가슴 근육선
   return { svg: o, color: c, gw: yy => edgeAt(R, yy), bustEdge: bustW + e };
@@ -792,7 +793,7 @@ const tierOf = v => v >= 90 ? 4 : v >= 70 ? 3 : v >= 50 ? 2 : v >= 30 ? 1 : 0;
 function morningBody(a, skin, skinD, hw, tier, fig) {
   tier = tier || 0;
   const female = a.g === 'f', b = a.body || {};
-  const blanketY = female ? 128 : 136;
+  const blanketY = female ? [120, 124, 128, 133, 137][tier] : [128, 132, 136, 140, 144][tier];
   let o = `<path d="${body(false, hw)}" fill="${skinD}"/>`;
   o += `<path d="M47,121 Q53,124 58,122 M62,122 Q67,124 73,121" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.3" stroke-linecap="round"/>`;
   if (female) {
@@ -856,25 +857,58 @@ function nudeTorso(F, skin, skinD) {
   o += `<path d="M${f1(60 - F.waist * .45)},${f1(F.waistY + 12)} Q60,${f1(F.waistY + 18)} ${f1(60 + F.waist * .45)},${f1(F.waistY + 12)}" ${sl} opacity=".25"/>`;
   return o;
 }
-function coverArms(F, skin) {
+function coverArms(F, skin, personality) {
   const bust = F.bust || 0, bustPeak = F.chest + 14 + bust * .35, aw = F.arm * 2, fw = F.fore * 2;
+  const pers = personality || 'warm';
   let o = '';
   if (F.f) {
-    const sx = 60 + F.sh - 2, sy = F.sy + 12, mx = 60 - F.rib * .2, my = bustPeak, ex = 60 - F.sh + 5, ey = bustPeak - 4;
-    o += limb(sx, sy, (sx + mx) / 2 + 3, (sy + my) / 2, mx, my, aw - 1, skin);
-    o += limb(mx, my, (mx + ex) / 2 - 1, (my + ey) / 2 + 2, ex, ey, fw - 1, skin);
-    o += mitt(ex - 2, ey, -1, skin, -40);
+    if (pers === 'bold') {
+      const sx = 60 + F.sh - 2, sy = F.sy + 12, mx = 60 + F.rib * .1, my = bustPeak + 4, ex = 60 - F.rib * .3, ey = bustPeak + 6;
+      o += limb(sx, sy, (sx + mx) / 2 + 2, (sy + my) / 2 + 2, mx, my, aw - 1, skin);
+      o += limb(mx, my, (mx + ex) / 2, (my + ey) / 2, ex, ey, fw - 1, skin);
+      o += mitt(ex - 1, ey, -1, skin, -20);
+      const jsx = 60 - F.sh + 1, jsy = F.sy + 12, elx = 60 - F.sh + 8, ely = F.waistY + 10;
+      const gx = 60 - 2, gy = F.crotch + 2;
+      o += limb(jsx, jsy, (jsx + elx) / 2 - 2, (jsy + ely) / 2, elx, ely, aw - 1, skin);
+      o += limb(elx, ely, (elx + gx) / 2, (ely + gy) / 2 + 3, gx, gy, fw - 1, skin);
+      o += mitt(gx, gy + 2, 1, skin, 80);
+    } else if (pers === 'shy' || pers === 'sensitive') {
+      const sx = 60 + F.sh - 2, sy = F.sy + 10;
+      const mx = 60 - F.rib * .4, my = bustPeak - 3, ex = 60 - F.sh + 3, ey = bustPeak - 6;
+      o += limb(sx, sy, (sx + mx) / 2 + 4, (sy + my) / 2, mx, my, aw - 1, skin);
+      o += limb(mx, my, (mx + ex) / 2 - 2, (my + ey) / 2 + 1, ex, ey, fw - 1, skin);
+      o += mitt(ex - 2, ey, -1, skin, -45);
+      const jsx = 60 - F.sh + 1, jsy = F.sy + 10;
+      const elx = 60 - F.sh + 4, ely = F.waistY;
+      const gx = 60 + 1, gy = F.crotch - 8;
+      o += limb(jsx, jsy, (jsx + elx) / 2 - 4, (jsy + ely) / 2, elx, ely, aw - 1, skin);
+      o += limb(elx, ely, (elx + gx) / 2 - 1, (ely + gy) / 2 + 3, gx, gy, fw - 1, skin);
+      o += mitt(gx, gy + 1, 1, skin, 85);
+    } else {
+      const sx = 60 + F.sh - 2, sy = F.sy + 12, mx = 60 - F.rib * .2, my = bustPeak, ex = 60 - F.sh + 5, ey = bustPeak - 4;
+      o += limb(sx, sy, (sx + mx) / 2 + 3, (sy + my) / 2, mx, my, aw - 1, skin);
+      o += limb(mx, my, (mx + ex) / 2 - 1, (my + ey) / 2 + 2, ex, ey, fw - 1, skin);
+      o += mitt(ex - 2, ey, -1, skin, -40);
+      const gx = 60, gy = F.crotch - 6, elx = 60 - F.sh + 6, ely = F.waistY + 4;
+      const jsx = 60 - F.sh + 1, jsy = F.sy + 12;
+      o += limb(jsx, jsy, (jsx + elx) / 2 - 3, (jsy + ely) / 2, elx, ely, aw - 1, skin);
+      o += limb(elx, ely, (elx + gx) / 2, (ely + gy) / 2 + 4, gx, gy, fw - 1, skin);
+      o += mitt(gx, gy + 2, 1, skin, 85);
+    }
   } else {
-    const sx = 60 + F.sh - 2, sy = F.sy + 14, mx = 60, my = F.chest + 20, ex = 60 - F.rib - 3, ey = F.chest + 14;
-    o += limb(sx, sy, (sx + mx) / 2 + 3, (sy + my) / 2, mx, my, aw, skin);
-    o += limb(mx, my, (mx + ex) / 2, (my + ey) / 2 + 2, ex, ey, fw, skin);
-    o += mitt(ex - 2, ey + 1, -1, skin, -30);
+    const jsx = 60 + F.sh - 2, jsy = F.sy + 14;
+    const elx = 60 + F.sh - 8, ely = F.waistY + 2;
+    const gx = 60 + 1, gy = F.crotch - 6;
+    o += limb(jsx, jsy, (jsx + elx) / 2 + 2, (jsy + ely) / 2, elx, ely, aw, skin);
+    o += limb(elx, ely, (elx + gx) / 2, (ely + gy) / 2 + 4, gx, gy, fw, skin);
+    o += mitt(gx, gy + 2, 1, skin, 85);
+    const lsx = 60 - F.sh + 1, lsy = F.sy + 14;
+    const lex = 60 - F.sh - 2, ley = F.waistY + 8;
+    const lwx = 60 - F.sh - 4, lwy = F.hipY + 4;
+    o += limb(lsx, lsy, (lsx + lex) / 2 - 3, (lsy + ley) / 2, lex, ley, aw, skin);
+    o += limb(lex, ley, (lex + lwx) / 2, (ley + lwy) / 2 + 2, lwx, lwy, fw, skin);
+    o += mitt(lwx, lwy + 2, -1, skin, 10);
   }
-  const gx = 60, gy = F.crotch - 6, elx = 60 - F.sh + 6, ely = F.waistY + 4;
-  const jsx = 60 - F.sh + 1, jsy = F.sy + 12;
-  o += limb(jsx, jsy, (jsx + elx) / 2 - 3, (jsy + ely) / 2, elx, ely, aw - 1, skin);
-  o += limb(elx, ely, (elx + gx) / 2, (ely + gy) / 2 + 4, gx, gy, fw - 1, skin);
-  o += mitt(gx, gy + 2, 1, skin, 85);
   return o;
 }
 function renderPreIntimate(a, size, st) {
@@ -896,7 +930,7 @@ function renderPreIntimate(a, size, st) {
   const R = legPath(F, 1), Lg = legPath(F, -1);
   o += `<path d="${Lg.d} ${R.d}" fill="${skin}"/>`;
   o += nudeTorso(F, skin, skinD);
-  o += coverArms(F, skin);
+  o += coverArms(F, skin, personality);
   o += clav(F.sy, F.sh * .35, skin);
   o += `<ellipse cx="60" cy="101.5" rx="${f1(nh - .5)}" ry="6" fill="${shade(skin, .6)}" opacity=".26"/>`;
   o += `<ellipse cx="33.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/><ellipse cx="86.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
@@ -964,10 +998,13 @@ function duringMouth(phase, lip, female) {
     <ellipse cx="60" cy="92.5" rx="3" ry="1.6" fill="#c96a6e" opacity=".85"/>`;
   if (phase === 2) return `<path d="M53,86.5 Q60,84.5 67,86.5 Q66.5,95 60,95.6 Q53.5,95 53,86.5 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>
     <ellipse cx="60" cy="93.6" rx="3.8" ry="2" fill="#c96a6e" opacity=".85"/>
+    <path d="M59,93 Q61,96.5 63,93.5" fill="#d4737e" opacity=".75"/>
     <path d="M66.5,91 Q69,93 68,96" fill="none" stroke="${shade(lip.c, .7)}" stroke-width="1" opacity=".6" stroke-linecap="round"/>`;
   if (phase === 3) return `<path d="M52,86 Q60,83.5 68,86 Q67.5,96 60,97 Q52.5,96 52,86 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.4"/>
     <ellipse cx="60" cy="94" rx="4.2" ry="2.6" fill="#c96a6e" opacity=".9"/>
-    <path d="M67,91 Q70,94 69,98" fill="none" stroke="${shade(lip.c, .7)}" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>`;
+    <path d="M58.5,93.5 Q60.5,98 62.5,93.5" fill="#d4737e" opacity=".8"/>
+    <path d="M67,91 Q70,94 69,98" fill="none" stroke="${shade(lip.c, .7)}" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>
+    <path d="M67.5,96 Q68,100 67,104" fill="none" stroke="#fff" stroke-width="1" opacity=".35" stroke-linecap="round"/>`;
   return `<path d="M54.5,87.5 Q60,86 65.5,87.5 Q65,93 60,93.5 Q55,93 54.5,87.5 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>
     <path d="M57,94 Q60,98 63,94" fill="none" stroke="#ddd" stroke-width="1" opacity=".4" stroke-linecap="round"/>`;
 }
@@ -984,15 +1021,44 @@ function renderDuringIntimate(a, size, st) {
   const nLash = female ? 3 : 0, ey = 72, exx = [48, 72];
   const lip = { c: female ? LIPS[X.lip] : NATURAL_LIP[a.skin] || NATURAL_LIP[1], teeth: X.teeth };
   const skinD = shade(skin, .86);
-  const w = Math.round(size), h = Math.round(size * 4 / 3);
-  let o = `<svg class="av av-during" width="${w}" height="${h}" viewBox="20 10 80 90" aria-hidden="true">`;
-  o += `<rect class="av-bg" x="20.5" y="10.5" width="79" height="89" rx="6"/>`;
+  const w = Math.round(size), h = Math.round(size * 64 / 45);
+  const nh = female ? 10.5 : 12, shHalf = female ? 36 : 42;
+  let o = `<svg class="av av-during" width="${w}" height="${h}" viewBox="15 5 90 128" aria-hidden="true">`;
+  o += `<rect class="av-bg" x="15.5" y="5.5" width="89" height="127" rx="6"/>`;
+  o += `<rect x="${f1(60 - nh)}" y="95" width="${f1(nh * 2)}" height="22" fill="${skinD}"/>`;
+  o += `<path d="M${f1(60 - nh)},115 C${f1(60 - nh - 6)},116 ${f1(60 - shHalf + 6)},118 ${f1(60 - shHalf)},121 L${f1(60 - shHalf)},133 L${f1(60 + shHalf)},133 L${f1(60 + shHalf)},121 C${f1(60 + shHalf - 6)},118 ${f1(60 + nh + 6)},116 ${f1(60 + nh)},115 Z" fill="${skin}"/>`;
+  o += `<path d="M57,110 Q${f1(60 - shHalf * .55)},112 ${f1(60 - shHalf + 6)},111 M63,110 Q${f1(60 + shHalf * .55)},112 ${f1(60 + shHalf - 6)},111" fill="none" stroke="${shade(skin, .74)}" stroke-width="1.1" opacity=".7" stroke-linecap="round"/>`;
+  if (female) {
+    const bustW = st.fig && st.fig.cup ? (CUP_OUT[st.fig.cup] || 7) + 5 : 14;
+    o += `<path d="M${f1(60 - bustW)},124 Q60,${f1(130 + Math.min(bustW * .2, 3))} ${f1(60 + bustW)},124" fill="none" stroke="${shade(skin, .6)}" stroke-width="1.2" opacity=".4" stroke-linecap="round"/>`;
+    o += `<path d="M${f1(60 - shHalf + 8)},121 Q${f1(60 - shHalf * .4)},124 ${f1(60 - bustW)},126 M${f1(60 + shHalf - 8)},121 Q${f1(60 + shHalf * .4)},124 ${f1(60 + bustW)},126" fill="none" stroke="${shade(skin, .55)}" stroke-width="1" opacity=".3"/>`;
+  }
+  if (phase >= 2) o += `<ellipse cx="50" cy="113" rx="1.4" ry="2" fill="#87ceeb" opacity=".5"/>`;
+  if (phase >= 3) o += `<ellipse cx="72" cy="116" rx="1.2" ry="1.8" fill="#87ceeb" opacity=".45"/>`;
   o += `<ellipse cx="33.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
   o += `<ellipse cx="86.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
   o += `<path d="${FACES[a.face] || FACES[0]}" fill="${skin}"/>`;
   const blO = f1(Math.min(.2 + phase * .12, .65) * 100) / 100;
   o += `<ellipse cx="44" cy="84" rx="6.5" ry="4" fill="#e8857a" opacity="${blO}"/><ellipse cx="76" cy="84" rx="6.5" ry="4" fill="#e8857a" opacity="${blO}"/>`;
-  if (phase === 3 && personality === 'bold') o += HAPPY(48, ey) + HAPPY(72, ey);
+  if (personality === 'shy') {
+    const sq = Math.min(phase, 3) * .5;
+    o += exx.map((x, i) => {
+      const s = i ? 1 : -1;
+      let e = `<path d="M${x - 5},${ey + sq} Q${x},${ey + 3 + sq} ${x + 5},${ey + sq}" fill="none" stroke="${LINE}" stroke-width="2.4" stroke-linecap="round"/>`;
+      if (nLash) e += `<path d="M${f1(x + 4.2 * s)},${f1(ey + .4 + sq)} l${f1(1.8 * s)},${f1(1.2 + sq * .3)} M${f1(x + 3 * s)},${f1(ey + 1.4 + sq)} l${f1(1.2 * s)},${f1(1.4 + sq * .3)}" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>`;
+      if (phase >= 2) e += `<path d="M${f1(x + 4.5 * s)},${ey + 4} Q${f1(x + 5 * s)},${ey + 10} ${f1(x + 3.5 * s)},${ey + 14}" fill="none" stroke="#87ceeb" stroke-width="1.4" opacity=".7" stroke-linecap="round"/>`;
+      return e;
+    }).join('');
+  } else if (personality === 'sensitive') {
+    const sq = Math.min(phase, 3) * .7;
+    o += exx.map((x, i) => {
+      const s = i ? 1 : -1;
+      let e = `<path d="M${x - 5},${ey + sq} Q${x},${ey + 3.5 + sq} ${x + 5},${ey + sq}" fill="none" stroke="${LINE}" stroke-width="2.6" stroke-linecap="round"/>`;
+      if (nLash) e += `<path d="M${f1(x + 4.2 * s)},${f1(ey + .4 + sq)} l${f1(1.8 * s)},${f1(1.2 + sq * .3)}" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>`;
+      if (phase >= 1) e += `<path d="M${f1(x + 4.5 * s)},${ey + 4} Q${f1(x + 5.5 * s)},${ey + 12} ${f1(x + 3 * s)},${ey + 18}" fill="none" stroke="#87ceeb" stroke-width="1.6" opacity=".75" stroke-linecap="round"/>`;
+      return e;
+    }).join('');
+  } else if (phase === 3 && personality === 'bold') o += exx.map((x, i) => duringEye(3, x, ey, i ? 1 : -1, nLash, X)).join('');
   else if (phase === 3 && personality === 'playful') { o += duringEye(3, 48, ey, -1, nLash, X); o += HAPPY(72, ey); }
   else o += exx.map((x, i) => duringEye(phase, x, ey, i ? 1 : -1, nLash, X)).join('');
   const bExpr = phase === 2 ? 'angry' : phase === 3 ? 'surprised' : null;
@@ -1015,18 +1081,29 @@ function renderDuringIntimate(a, size, st) {
 
 /* ---------- 성적 흥분 시각 (aroused) ---------- */
 function arousalFX(level) {
-  if (!level || level < 60) return '';
+  if (!level || level <= 30) return '';
   let o = '';
-  if (level >= 80) {
-    o += `<ellipse cx="44" cy="84" rx="6" ry="3.8" fill="#e8857a" opacity=".25"/>`;
-    o += `<ellipse cx="76" cy="84" rx="6" ry="3.8" fill="#e8857a" opacity=".25"/>`;
-    o += `<circle cx="48.5" cy="70.5" r="1.2" fill="#fff" opacity=".35"/>`;
-    o += `<circle cx="72.5" cy="70.5" r="1.2" fill="#fff" opacity=".35"/>`;
+  if (level <= 50) {
+    o += `<ellipse cx="44" cy="84" rx="5" ry="3" fill="#e8857a" opacity=".15"/>`;
+    o += `<ellipse cx="76" cy="84" rx="5" ry="3" fill="#e8857a" opacity=".15"/>`;
+  } else if (level <= 70) {
+    o += `<ellipse cx="44" cy="84" rx="5.5" ry="3.5" fill="#e8857a" opacity=".25"/>`;
+    o += `<ellipse cx="76" cy="84" rx="5.5" ry="3.5" fill="#e8857a" opacity=".25"/>`;
+    o += `<circle cx="48.5" cy="70.5" r="1.1" fill="#fff" opacity=".25"/>`;
+    o += `<circle cx="72.5" cy="70.5" r="1.1" fill="#fff" opacity=".25"/>`;
+  } else if (level <= 85) {
+    o += `<ellipse cx="44" cy="84" rx="6" ry="3.8" fill="#e8857a" opacity=".35"/>`;
+    o += `<ellipse cx="76" cy="84" rx="6" ry="3.8" fill="#e8857a" opacity=".35"/>`;
+    o += `<circle cx="48.5" cy="70.5" r="1.3" fill="#fff" opacity=".35"/>`;
+    o += `<circle cx="72.5" cy="70.5" r="1.3" fill="#fff" opacity=".35"/>`;
+    o += sweatDrops(1);
   } else {
-    o += `<ellipse cx="44" cy="84" rx="5.5" ry="3.5" fill="#e8857a" opacity=".15"/>`;
-    o += `<ellipse cx="76" cy="84" rx="5.5" ry="3.5" fill="#e8857a" opacity=".15"/>`;
+    o += `<ellipse cx="44" cy="84" rx="6.5" ry="4" fill="#e8857a" opacity=".45"/>`;
+    o += `<ellipse cx="76" cy="84" rx="6.5" ry="4" fill="#e8857a" opacity=".45"/>`;
+    o += `<circle cx="48.5" cy="70.5" r="1.4" fill="#fff" opacity=".4"/>`;
+    o += `<circle cx="72.5" cy="70.5" r="1.4" fill="#fff" opacity=".4"/>`;
+    o += sweatDrops(2);
   }
-  if (level >= 90) o += sweatDrops(2);
   return o;
 }
 

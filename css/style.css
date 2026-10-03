@@ -239,8 +239,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .sc-phase{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px 10px;background:#0a0a0a;border-radius:4px;min-height:260px;align-items:center;position:relative;overflow:hidden}
 .sc-phase .portrait{display:flex;justify-content:center;align-items:center}
 .sc-phase .blanket-side{display:flex;flex-direction:column;align-items:center;gap:6px}
-.sc-phase .sym{font-size:32px;color:#eee;text-align:center;white-space:nowrap}
-.sc-phase .sym .m,.sc-phase .sym .f{display:inline-block}
+.sc-phase .sym{text-align:center;white-space:nowrap}
+.sc-phase .sym svg{width:80px;height:auto;display:block;margin:0 auto}
 .sc-phase .blanket-wrap{width:100%;position:relative}
 .sc-phase .blanket-svg{width:100%;height:auto}
 .sc-phase .beat-icon{font-size:20px;text-align:center;opacity:.8}
@@ -265,14 +265,14 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .phase2 .blanket-svg{animation:blanket-bob .35s ease-in-out infinite}
 .phase3 .blanket-svg{animation:blanket-bob .18s ease-in-out infinite}
 .phase-climax .blanket-svg,.phase-end .blanket-svg{animation:none}
-.phase1 .sym .m{animation:symBounce .6s ease-in-out infinite}
-.phase1 .sym .f{animation:symBounce .6s ease-in-out infinite reverse}
-.phase2 .sym .m{animation:symBounce .35s ease-in-out infinite}
-.phase2 .sym .f{animation:symBounce .35s ease-in-out infinite reverse}
-.phase3 .sym .m{animation:symBounce .18s ease-in-out infinite}
-.phase3 .sym .f{animation:symBounce .18s ease-in-out infinite reverse}
-.phase-climax .sym .m,.phase-climax .sym .f,.phase-end .sym .m,.phase-end .sym .f{animation:none}
-@keyframes symBounce{0%,100%{transform:translateX(0)}50%{transform:translateX(6px)}}
+.phase1 .sym .m-sym{animation:symT1 .6s ease-in-out infinite}
+.phase2 .sym .m-sym{animation:symT2 .35s ease-in-out infinite}
+.phase3 .sym .m-sym{animation:symT3 .18s ease-in-out infinite}
+.phase-climax .sym .m-sym{animation:none;transform:translateX(6px)}
+.phase-end .sym .m-sym{animation:none;transform:translateX(6px)}
+@keyframes symT1{0%,100%{transform:translateX(-8px)}50%{transform:translateX(8px)}}
+@keyframes symT2{0%,100%{transform:translateX(-6px)}50%{transform:translateX(6px)}}
+@keyframes symT3{0%,100%{transform:translateX(-4px)}50%{transform:translateX(4px)}}
 @keyframes flash{0%{opacity:.9}100%{opacity:0}}
 @keyframes swDrop{0%{opacity:.7;transform:translateY(0)}100%{opacity:0;transform:translateY(40px)}}
 @keyframes pDrift{0%{opacity:.85;transform:translate(0,0)}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
@@ -282,8 +282,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .sc-foreplay .fp-fill{fill:#222}
 .sc-foreplay .fp-stroke{fill:none;stroke:#333;stroke-width:2}
 /* uterus cross-section */
-.sc-uterus{display:flex;justify-content:center;align-items:center;padding:14px;background:#0b0d14;border-radius:4px;min-height:200px}
-.sc-uterus svg{width:100%;max-width:300px}
+.sc-uterus{display:flex;justify-content:center;align-items:center;padding:14px;background:#0b0d14;border-radius:4px;min-height:240px}
+.sc-uterus svg{width:100%;max-width:400px}
 .sc-uterus .organ{fill:none;stroke:#e4a8a0;stroke-width:2.5;stroke-linecap:round}
 .sc-uterus .organ-fill{fill:#fde0d8;opacity:.3}
 .sc-uterus .ovary{fill:#fce4de;stroke:#d98a7e;stroke-width:2}
