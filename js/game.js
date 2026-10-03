@@ -251,6 +251,8 @@ function night(p, fling) {
   if (!p) return;
   S.flags.intimate = true;
   p.nights = (p.nights || 0) + 1;
+  if (p.nightsAt !== S.age) { p.nightsAt = S.age; p.nightsYr = 0; }
+  p.nightsYr++;
   if (fling && !(p.partner || p.spouse || p.secret)) p.fling = true;
 }
 // 아이가 생길 수 있음. 엄마 나이 30살부터 확률이 줄고 45살부터는 0. 소식은 다음 계절에 (tellPreg)
@@ -310,7 +312,7 @@ function libidoTick() {
 // 같이 있으면 서로 자극됨: 상대 성욕은 내 몸 등급만큼, 내 성욕은 상대 몸 등급만큼 빨리 오름
 function nearby(p) {
   if (!canSex(p)) return;
-  p.libido = clamp((p.libido || 0) + Math.round(rand(1, 3) * (1 + gIdx(S.stats.fit) * .08)), 0, 100);
+  p.libido = clamp((p.libido || 0) + Math.round(rand(1, 3) * (1 + gIdx(S.stats.fit) * .08) * (S.gender === 'm' && S.size === 'xlarge' && p.nights ? 1.3 : 1)), 0, 100);
   S.stats.libido = clamp(S.stats.libido + Math.round(rand(0, 2) * (1 + bodyIdx(p) * .08)), 0, 100);
 }
 // 꼬심 — 외모(생김새·몸·꾸밈) + 인간(매력·감성) + 관계(설렘·친밀) + 보정. 상황마다 가중치가 다름
@@ -363,6 +365,19 @@ function satisfaction(p, mood, adj) {
   const md = clamp(50 + (mood || 0) + [0, 10, 15, -10][S.drunk || 0], 0, 100);
   return clamp(Math.round(g100(S.sexSkill || 0) * .4 + (p.compat ?? 30) * .25 + sz * .1 + p.heart * .15 + md * .1 + rand(-8, 8) + (adj || 0)), 0, 100);
 }
+// 지금이 인생에서 몇 번째 행동인지 (싸운 뒤 몇 턴, 오랜만인지 계산용)
+const turnNo = () => S.age * C.apPerYear + S.used;
+// 거절: 기본 10% + 피곤함(성욕 20 미만) 15% + 싸운 지 얼마 안 됨 20% + 생리 중 20% + 올해 벌써 3번 넘게 10% - 성욕이 높으면 10~20%
+// 거절하면 이유('period'|'fight'|'tired'|'mood'), 받아주면 null
+function refusal(p) {
+  if (!canSex(p)) return 'mood';
+  const lib = p.libido || 0;
+  const tired = lib < 20, fight = p.fought != null && turnNo() - p.fought <= 6, period = p.gender === 'f' && Math.random() < .12;
+  let c = .10 + (tired ? .15 : 0) + (fight ? .20 : 0) + (period ? .20 : 0) + (p.nightsAt === S.age && (p.nightsYr || 0) >= 3 ? .10 : 0);
+  c -= lib >= 80 ? .20 : lib >= 60 ? .10 : 0;
+  if (Math.random() >= c) return null;
+  return period ? 'period' : fight ? 'fight' : tired ? 'tired' : 'mood';
+}
 /* ── 피임: 함께 밤을 보내기 직전에 묻고(contraAsk), 고른 뒤 그 밤을 이어서 처리 ── */
 // 아이가 생길 수 있는 사이인지 (엄마 나이 45 미만, 이미 임신 중이 아님)
 const fertile = p => !S.preg && (S.gender === 'f' ? S.age : npcAge(p)) < 45;
@@ -389,7 +404,13 @@ function sexScene(p, o) {
   const contra = takeContra(p), cm = D.contra.methods[contra || 'none'];
   let adj = cm.sat && gIdx(S.sexSkill || 0) >= gIdx(gradeMin('B')) ? Math.round(cm.sat / 2) : cm.sat;   // 콘돔은 익숙해지면 덜 깎임
   adj += resolve(o.satBonus) || 0;
-  const sat = satisfaction(p, resolve(o.mood), adj);
+  const awkward = gIdx(S.sexSkill || 0) === 0;   // 밤의 기술 F — 어색한 순간이 끼어듦
+  let sat = satisfaction(p, resolve(o.mood), adj);
+  // 크기: 작은 편이면 상한 90, 큰 편 이상이면 바닥 25~30. 아주 큰 편인데 여자 쪽이 마른 체형이면 오히려 아픔
+  const sz = S.gender === 'm' ? S.size : p.size, herBuild = S.gender === 'm' ? ((lookOf(p) || {}).body || {}).build : myBuild();
+  if (sz === 'small') sat = Math.min(sat, 90);
+  else if (sz === 'large') sat = Math.max(sat, 25);
+  else if (sz === 'xlarge') { sat = Math.max(sat, 30); if (herBuild === 'slim') sat = clamp(sat - rand(10, 15), 0, 100); }
   const tier = satTier(sat);
   S.stats.libido = clamp(S.stats.libido - rand(70, 90), 0, 100);
   p.libido = clamp((p.libido || 0) - rand(70, 90), 0, 100);
@@ -401,7 +422,7 @@ function sexScene(p, o) {
   S.flags.hadSex = true;
   S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, n: (S.scene ? S.scene.n : 0) + 1 };
   if (first) { S.vars.fp = p.id; trigger('firstTime'); }   // 내 첫 경험 — 상대 성격마다 다른 한 줄, 추억
-  return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90, contra, pregMul: cm.preg };
+  return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90, contra, pregMul: cm.preg, awkward };
 }
 /* ── 죄책감: 성격 기본값에서 만족감이 70을 넘은 만큼(×1.5) 깎임 ── */
 const guiltOf = (pers, sat) => Math.max(0, ((D.personalities.find(x => x.id === pers) || {}).guilt ?? 40) - Math.max(0, sat - 70) * 1.5);
@@ -546,6 +567,7 @@ function applyOutcome(o, target, resumed) {
   const sx = o.intimate && tp ? sexScene(tp, o) : null;   // 함께 밤을 보내는 결과 (만족감 계산)
   if (sx) { pd = scaleBySat(pd, sx); deltas.push(['sat', sx.sat]); }
   if (pd && tp) deltas.push(...applyP(tp, pd, o.mult));
+  if (o.fight && tp && lover(tp)) tp.fought = turnNo();   // 싸움 — 몇 턴 동안 거절이 잦고, 화해할 기회가 생김
   if (o.libido) S.stats.libido = clamp(S.stats.libido + val(o.libido), 0, 100);
   if (o.drunk) drinkUp(val(o.drunk));
   if (o.sober) soberUp(true);
@@ -570,6 +592,10 @@ function applyOutcome(o, target, resumed) {
 // 함께 밤을 보낸 뒤: 만족감에 따른 상대 반응 한 줄
 function afterSex(p, sx, ctx) {
   const L = D.satLines, c = Object.assign({ p: pname(p) }, ctx);
+  if (sx.awkward) log(pick(L.awkward), { t: 'info' });
+  // 그 사람과 처음 보낸 밤, 내 크기에 대한 반응 (내가 남자일 때, 아주 큰 편 / 작은 편)
+  const sr = sx.firstWith && S.gender === 'm' && (S.size === 'xlarge' ? D.sizeReaction.big : S.size === 'small' ? D.sizeReaction.small : null);
+  if (sr && sr[p.personality]) log(fill(sr[p.personality], c), { t: 'info' });
   if (sx.first && sx.tier <= 1) { log(fill(pick(L.firstLow), c), { t: 'info' }); return; }
   const line = pick(L[sx.tier] || []);
   if (line) log(fill(line, c), { t: sx.tier >= 3 ? 'text' : 'info', memory: sx.legend });
@@ -1461,7 +1487,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, onPill, fertile, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, refusal, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,

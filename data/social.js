@@ -141,9 +141,9 @@ GAME_DATA.social = [
     if: (s, p, a) => adultPair(s, p, a) && lover(p) && p.heart >= 60 && p.trust >= 40 && s.place === 'home' && !a.jailed(),
     run: (s, p, a) => {
       const m = a.main();
-      // 사귀는 사이라도 상대가 내키지 않을 때가 있음 (성욕이 바닥이면 더)
-      if (!a.charmed(p, 'bed', a.need('lover') + ((p.libido || 0) < 20 ? 15 : 0)))
-        return { p: { heart: [-2, 0] }, text: a.pick(['{p|이} 오늘은 피곤하다며 이불을 끌어올렸다.', '{p|이} 내 이마에 입을 맞추고 먼저 돌아누웠다.', '"오늘은 그냥 안고만 자자." {p|이} 작게 말했다.']) };
+      // 사귀는 사이라도 내키지 않을 때가 있음 (피곤함·싸운 뒤·생리 중·잦았을 때 더, 성욕이 높으면 덜) → 내 반응이 신뢰를 가름
+      const no = a.refusal(p);
+      if (no) return { do: () => { s.vars.why = no; }, then: 'nightRefused' };
       const first = !p.nights;
       return {
         intimate: true,
@@ -162,6 +162,8 @@ GAME_DATA.social = [
     run: (s, p, a) => {
       if (!p.fwb && !a.charmed(p, 'bed', a.need('bed')))
         return { p: { heart: [-3, -1] }, effect: { happy: -2 }, text: a.pick(['{p|이} 웃으며 고개를 저었다. "오늘은 여기까지."', '{p|이} 잠깐 망설이더니 택시를 불렀다.']) };
+      const no = a.refusal(p);
+      if (no) return { do: () => { s.vars.why = no; }, then: 'nightRefused' };
       const risk = a.main() ? .25 : 0;     // 애인이 있으면 들킬 위험
       const theirRisk = p.taken ? .2 : 0;  // 상대에게 애인이 있으면 그쪽도 위험
       return {
@@ -195,7 +197,7 @@ GAME_DATA.social = [
   /* ── 갈등 ── */
   { id: 'argue', label: '다투기', icon: '💢',
     if: (s, p, a) => s.age >= 6 && !a.jailed(),
-    run: () => ({ p: { grudge: [12, 20], close: [-12, -8], trust: [-4, -2] }, effect: { happy: [0, 2] }, karma: -2,
+    run: () => ({ fight: true, p: { grudge: [12, 20], close: [-12, -8], trust: [-4, -2] }, effect: { happy: [0, 2] }, karma: -2,
       text: ['{p|와} 크게 다퉜다.', '{p}에게 해서는 안 될 말을 했다.', '{p|와} 언성을 높였다.'] }) },
 
   { id: 'apologize', label: '사과하기', icon: '🙇',

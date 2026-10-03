@@ -767,6 +767,28 @@ GAME_DATA.events = [
         text: '며칠 뒤, 아니었다. {fp|이} 다음 날 병원에 다녀왔다. "이제 둘 다 마음 편하게."' },
       { label: '다음에도 그냥', effect: { happy: -3 }, text: '다행히 아니었다. 또 운에 맡겼다. 진짜 괜찮을까.' },
     ] },
+
+  /* ═════ 거절 & 실패 ═════ */
+  // 함께 밤을 보내자고 했는데 상대가 내키지 않을 때 (엔진의 refusal). 내 반응이 신뢰를 가름
+  { id: 'nightRefused', type: 'trigger',
+    text: (s, a) => {
+      const p = a.focused() || {}, R = GAME_DATA.refuseLines;
+      return [R.why[s.vars.why], R[p.personality]].filter(Boolean).join(' ').replace(/\{p([|}])/g, '{fp$1');
+    },
+    choices: [
+      { label: '"알겠어." 그대로 받아들인다', p: { trust: [3, 5], close: [1, 3] },
+        text: (s, a) => lover(a.focused() || {}) ? '{fp|이} 내 품으로 파고들었다. 그날은 그냥 안고 잠들었다.' : '{fp|이} 고맙다는 듯 웃었다. 다음을 기약했다.' },
+      { label: '짜증을 낸다', p: { trust: [-10, -5], heart: [-5, -3] }, text: '"맨날 이런 식이야." 말해놓고 등을 돌렸다. 둘 다 한참 잠들지 못했다.' },
+      { label: '계속 조른다', p: { trust: [-20, -15], heart: -10, grudge: [8, 12] }, karma: -3,
+        text: '"싫다고 했잖아." {fp|이} 베개를 들고 방을 나갔다. 며칠 동안 눈을 마주치지 않았다.' },
+    ] },
+  // 크기 — 기술이 결국 이김 / 크기만 믿으면 안 됨 (내가 남자일 때)
+  { id: 'skillOverSize', type: 'fixed', age: [20, 49], req: { flags: ['hadSex'] },
+    when: (s, a) => s.gender === 'm' && s.size === 'small' && (s.sexSkill || 0) >= a.gradeMin('B'),
+    text: '크기가 다가 아니라는 걸 알았다. 기술이 좋으면 상대의 표정이 달라진다.', effect: { happy: 5 }, memory: true },
+  { id: 'sizeNotEnough', type: 'fixed', age: [20, 49], req: { flags: ['hadSex'] },
+    when: (s, a) => s.gender === 'm' && s.size === 'xlarge' && (s.sexSkill || 0) < a.gradeMin('D') && !!a.main() && a.canSex(a.main()), onStart: focusMain,
+    text: '크기만 믿으면 안 된다는 걸 알았다. {fp|이} "좀 더… 천천히"라고 했다.', effect: { happy: -2 } },
   { id: 'hiddenChildSeen', type: 'fixed', age: [28, 50], req: { flags: ['hiddenChild'] },
     text: '길에서 나를 꼭 닮은 아이를 봤다. 아이 손을 잡고 걷던 {hiddenName|이} 나를 보고 걸음을 멈췄다.',
     choices: [
@@ -1624,14 +1646,14 @@ GAME_DATA.events = [
     choices: [
       { label: '솔직하게 설명한다', p: { trust: [2, 5] },
         text: byPers({ sensitive: '{fp|이} 고개를 끄덕였지만, 그날 밤 내 휴대폰을 한 번 더 쳐다봤다.', sunny: '{fp|이} "그 친구도 언제 같이 밥 먹자!"라고 했다.' }, '{fp|이} 알겠다며 웃었다.') },
-      { label: '짜증을 낸다', p: { trust: -8, grudge: 5 }, text: '"왜 그렇게 예민해?" 말해놓고 바로 후회했다.' },
+      { label: '짜증을 낸다', fight: true, p: { trust: -8, grudge: 5 }, text: '"왜 그렇게 예민해?" 말해놓고 바로 후회했다.' },
     ] },
   { id: 'smallFight', type: 'random', age: [19, 50], once: false, cooldown: 2,
     when: (s, a) => !!a.main(), onStart: focusMain,
     text: (s, a) => a.pick(['{fp|와} 설거지 문제로 다퉜다.', '{fp|와} 약속 시간 때문에 다퉜다.', '{fp|와} 별것 아닌 말투 하나로 다퉜다.']),
     choices: [
-      { label: '먼저 사과한다', p: { close: [3, 5], grudge: -4 }, karma: 1, text: '먼저 손을 내밀었다. {fp|이} 못 이기는 척 잡았다.' },
-      { label: '버틴다', p: { close: -5, grudge: [4, 8] },
+      { label: '먼저 사과한다', fight: true, p: { close: [3, 5], grudge: -4 }, karma: 1, text: '먼저 손을 내밀었다. {fp|이} 못 이기는 척 잡았다.' },
+      { label: '버틴다', fight: true, p: { close: -5, grudge: [4, 8] },
         text: byPers({ bold: '{fp|이} 문을 쾅 닫고 나갔다.', shy: '{fp|이} 방에 들어가 나오지 않았다.', cool: '{fp|은} 아무 일 없다는 듯 TV를 켰다. 그게 더 화가 났다.',
           playful: '{fp|이} 한참 뒤 웃긴 사진을 보내왔다. 화해의 신호였다.', warm: '{fp|이} 다음 날 아침, 내가 좋아하는 반찬을 해놨다.' }, '하루 종일 말을 하지 않았다.') },
     ] },
@@ -1745,8 +1767,8 @@ GAME_DATA.events = [
     when: (s, a) => { const m = a.main(); return m && a.isHere(m); }, onStart: focusMain,
     text: '{fp|와} 이야기하다 언성이 높아졌다. 다들 쳐다봤다.',
     choices: [
-      { label: '밖으로 나가서 이야기하자고 한다', p: { close: [1, 3] }, text: '찬바람을 맞으니 둘 다 조금 누그러졌다.' },
-      { label: '끝까지 따진다', p: { close: -6, grudge: 6 }, text: '{fp|이} 먼저 자리를 박차고 나갔다.' },
+      { label: '밖으로 나가서 이야기하자고 한다', fight: true, p: { close: [1, 3] }, text: '찬바람을 맞으니 둘 다 조금 누그러졌다.' },
+      { label: '끝까지 따진다', fight: true, p: { close: -6, grudge: 6 }, text: '{fp|이} 먼저 자리를 박차고 나갔다.' },
     ] },
   { id: 'bumpIntoLover', type: 'random', on: NOT_ROUTINE, age: [19, 50], once: false, cooldown: 3,
     when: (s, a) => { const m = a.main(); return m && a.isHere(m); }, onStart: focusMain,
