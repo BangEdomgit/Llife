@@ -228,10 +228,14 @@ function syncMyBody() {
 function lookOf(p) {
   if (!p.appearance && window.Avatar) {
     p.appearance = Avatar.make(`${S.id}:${p.sk || p.id}`, p.gender, { feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null, personality: p.personality, hobby: p.hobby, job: p.npcJob });
+    // 최고 미녀·미남 (BEAUTY): 20~39살 남(가족·아이 아님)의 0.5%는 성격에 맞는 유형으로 설계한 얼굴 — 지나가던 사람들이 돌아보는 사람
+    const ag = npcAge(p);
+    if (Avatar.beauty && !p.faceFixed && !['family', 'child'].includes(p.kind) && ag >= 20 && ag < 40 && Math.random() < .005)
+      p.appearance = Avatar.beauty((BEAUTY_TYPE[p.gender] || BEAUTY_TYPE.f)[p.personality] || null, p.gender, `${S.id}:${p.sk || p.id}`);
     // 30대 이상 기혼자: 남자는 셔츠·재킷, 여자는 단정한 머리(C컬 단발·허쉬컷·로우 포니테일·로우번·반묶음)가 조금 더 많음
     if (p.married && npcAge(p) >= 30 && Math.random() < .5) { if (p.gender === 'm') p.appearance.top = pick([1, 1, 7]); else p.appearance.hair = pick([4, 3, 9, 12, 10]); }
     // 비슷한 얼굴 방지 (FACE_VARIETY.md §10): 같은 생활권(같은 소속, 아니면 같은 관계·같은 단골 장소)에 얼굴 거리 3 미만이 있으면 얼굴 시드만 바꿔 다시 (최대 5번)
-    if (Avatar.faceDistance) {
+    if (Avatar.faceDistance && !p.appearance.go) {
       const peers = alive().filter(q => q !== p && q.appearance && (p.org ? q.org === p.org : q.kind === p.kind && q.hangout === p.hangout)).slice(-40);
       for (let k = 1; k <= 5 && peers.some(q => Avatar.faceDistance(p.appearance, q.appearance) < 3); k++) p.appearance.gs = k;
     }
@@ -239,12 +243,15 @@ function lookOf(p) {
   }
   return p.appearance || null;
 }
+const FACE_V = 2;   // 얼굴 점수 기준 판 (2: BEAUTY 기준) — 예전 판으로 매긴 등급은 한 번 다시 맞춤
+const BEAUTY_TYPE = { f: { warm: '청순', shy: '청순', sensitive: '청순', bold: '고혹', sharp: '시크', cool: '시크', playful: '귀염', sunny: '귀염' },
+  m: { warm: '훈남', sunny: '훈남', bold: '조각', sharp: '조각', shy: '꽃미남', sensitive: '꽃미남', playful: '꽃미남', cool: '시크' } };
 // 생김새 등급 = 얼굴 점수 (FACE_UPGRADE 4절). 정해 둔 등급(고정 인물 등)이 있으면 그 등급의 얼굴을 찾음
 function faceFromLook(p) {
   if (!p.appearance || !window.Avatar || !Avatar.faceInfo) return;
   const inf = p.faceFixed ? Avatar.fitGrade(p.appearance, LETTERS[p.face] || 'C') : Avatar.faceInfo(p.appearance, npcAge(p));
   if (inf && !p.faceFixed) p.face = LETTERS.indexOf(inf.grade);
-  p.faceG = 1;
+  p.faceG = FACE_V;
   if (p.likeEye == null && window.Face) { p.likeEye = Math.floor(Math.random() * Face.EYES.length); p.likeNose = Math.floor(Math.random() * Face.NOSES.length); }   // 내 타입 (눈 하나·코 하나)
 }
 // 내 얼굴: 생김새 능력치의 등급이 나오는 얼굴을 찾고(처음 한 번), 능력치 숫자는 얼굴 점수에서 (등급 안의 위치)
@@ -256,7 +263,7 @@ function fitMyFace() {
   if (!S.look || !window.Avatar || !Avatar.fitGrade) return;
   const inf = Avatar.fitGrade(S.look, gradeOf(S.stats.face));
   if (inf && inf.grade === gradeOf(S.stats.face)) S.stats.face = faceStat(inf);   // 같은 등급 안에서 숫자만 얼굴 점수 위치로 (이후 나이·성형 재계산과 이어지게)
-  S.look.gfit = 1;
+  S.look.gfit = FACE_V;
 }
 function syncFace() {
   if (!S.look || !window.Avatar || !Avatar.faceInfo) return null;
@@ -2868,8 +2875,8 @@ function migrate(s) {
 // 예전 저장: 내 얼굴을 생김새 등급에 맞추고(한 번), NPC 생김새 등급은 얼굴 점수로 (FACE_UPGRADE)
 function migrateFaces() {
   if (!S || !window.Avatar || !Avatar.faceInfo) return;
-  if (S.look && !S.look.gfit) fitMyFace();
-  for (const p of S.people) if (p.appearance && !p.faceG) faceFromLook(p);
+  if (S.look && (S.look.gfit || 0) < FACE_V) fitMyFace();
+  for (const p of S.people) if (p.appearance && (p.faceG || 0) < FACE_V) faceFromLook(p);
 }
 function init() { S = load(); if (S) { migrateFaces(); after(); return true; } return false; }
 // 저장 칸 목록 (화면용 요약)

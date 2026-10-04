@@ -30,6 +30,7 @@
   .fg-card .tx { font-size: 11.5px; line-height: 1.35; }
   .fg-row { display: flex; gap: 6px; align-items: center; overflow-x: auto; margin-bottom: 6px; }
   .fg-row > b { width: 24px; font-size: 16px; flex: none; }
+  .fg-row .fg-card { width: 170px; flex: none; }
   .gS { color: #b8860b; } .gA { color: #c0392b; } .gB { color: #8e44ad; } .gC { color: #2f6fb0; } .gD { color: #2f8a4a; } .gE, .gF { color: var(--dim); }
 </style>
 </head>
@@ -42,6 +43,7 @@
 <div id="faces"></div>
 <div id="hcb"></div>
 <div id="fgal"></div>
+<div id="beauty"></div>
 <script src="js/face.js"></script>
 <script src="js/outfit.js"></script>
 <script src="js/avatar.js"></script>
@@ -150,7 +152,8 @@ const fgPass = (x, grade) => (!grade || x.inf.grade === grade) && (FG.eye === ''
 function fgCard(x, small) {
   const f = x.inf;
   return `<div class="fg-card">${A.render(x.a, small ? 80 : 120, { age: x.age })}<span class="g g${f.grade}">${f.grade}${x.fit ? ' <small class="dim">(맞춤)</small>' : ''}</span>`
-    + `<span class="sc">${x.a.g === 'f' ? '여' : '남'} ${x.age}살 · 배치 ${f.layout.toFixed(1)} · 파츠 ${f.parts.toFixed(1)} · 합 ${f.raw.toFixed(1)}</span>`
+    + `<span class="sc">${x.a.g === 'f' ? '여' : '남'} ${x.age}살 · 합 ${f.raw.toFixed(1)} · ${f.type.id} ${Math.round(f.type.fit * 5)}/5</span>`
+    + `<span class="sc">윤곽 ${f.contour.toFixed(0)} · 비율 ${f.ratio.toFixed(0)} · 눈 ${f.eyes.toFixed(0)} · 코입 ${f.features.toFixed(0)} · 조화 ${f.harmony.toFixed(0)}</span>`
     + `<span class="sc">눈 ${f.eyeName} · 코 ${f.noseName}</span>${small ? '' : `<span class="tx">${f.sentence}</span>`}</div>`;
 }
 function fgHist() {
@@ -197,6 +200,15 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.fg; if (k) { FG[k] = e.target.value; drawGallery(); } });
 drawGallery();
+
+// ── 최고 미녀·미남 (BEAUTY) ── 유형마다 설계한 얼굴 (Avatar.beauty). 피부색은 시드로 섞임. 아래 줄은 같은 사람의 전신
+function drawBeauty() {
+  const box = document.getElementById('beauty'), card = (a, lab, age = 24) => { const f = A.faceInfo(a, age); return `<div class="fg-card">${A.render(a, 140, { age })}<span class="g gS">${lab} · ${f.grade} ${f.raw.toFixed(1)}</span><span class="tx">${f.sentence}</span></div>`; };
+  const rows = ['f', 'm'].map(sex => A.BEAUTY_TYPES[sex].map(t => `<div class="fg-row"><b style="width:52px">${t}</b>${[0, 1, 2, 3].slice(0, sex === 'f' ? 4 : 2).map(i => card(A.beauty(t, sex, i), `${t} ${i + 1}`)).join('')}</div>`).join('')).join('');
+  const full = A.BEAUTY_TYPES.f.map(t => { const a = A.beauty(t, 'f', 0); return `<div class="fig">${A.render(a, 110, { age: 24, full: true, ctx: { season: 'spring', event: 'date', dayN: 2, who: { personality: { 청순: 'shy', 고혹: 'bold', 귀염: 'playful', 시크: 'cool' }[t], styleG: 5 } } })}<span class="lab">${t} 1 (데이트 옷)</span></div>`; }).join('');
+  box.innerHTML = `<section><h2>최고 미녀 · 미남 — 유형별로 설계한 얼굴 (모두 S, 상위 0.01% 안)</h2>${rows}<div class="row" style="flex-wrap:wrap;margin-top:8px">${full}</div></section>`;
+}
+drawBeauty();
 </script>
 </body>
 </html>
