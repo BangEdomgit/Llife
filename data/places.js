@@ -14,6 +14,8 @@
 // arrive            도착했을 때 한 줄
 // actions           여기서 할 수 있는 행동 id (data/life.js의 actions)
 // routine: true     매일 가는 곳이라 단골이 따로 없음
+// ms: true          중학생(13~15살)도 갈 수 있는 곳 (그 나이엔 갈 수 있는 곳이 적음)
+// 어른은 구역(js/game.js ZONE)마다 이동 칸이 다름: 같은 구역 0칸, 다른 구역 1칸, 여행지(터미널) 2칸
 window.GAME_DATA = window.GAME_DATA || {};
 
 (function () {
@@ -30,7 +32,7 @@ function household(s, a) {
 }
 
 GAME_DATA.places = [
-  { id: 'home', label: '집', icon: '🏠', minAge: 0, routine: true,
+  { id: 'home', ms: true, label: '집', icon: '🏠', minAge: 0, routine: true,
     regulars: household, regularsN: [1, 4],
     doing: (s, p, a) => a.npcAge(p) < 8 ? ['블록을 쌓고 있다', '만화를 보고 있다', '바닥에 엎드려 그림을 그리고 있다', '장난감을 늘어놓고 있다']
       : a.npcAge(p) < 19 ? ['방에서 숙제를 하고 있다', '휴대폰을 붙잡고 누워 있다', '냉장고 문을 열고 서 있다', '방문을 닫고 음악을 듣고 있다']
@@ -44,19 +46,19 @@ GAME_DATA.places = [
     arrive: ['놀이터에 나갔다. 그네가 하나 비어 있었다.', '놀이터 모래 냄새가 났다.', '놀이터에서 누가 이름을 불렀다.'],
     actions: ['play', 'exercise'] },
 
-  { id: 'park', label: '공원', icon: '🌳', minAge: 4,
+  { id: 'park', ms: true, label: '공원', icon: '🌳', minAge: 4,
     regulars: ['friend', 'classmate'], crowd: 'mixed', hobby: 'sport',
     doing: ['벤치에 앉아 책을 읽고 있다', '강아지와 산책하고 있다', '조깅을 하고 있다', '돗자리를 펴고 누워 있다', '비둘기에게 과자 부스러기를 던지고 있다', '이어폰을 끼고 호수를 보고 있다', '배드민턴을 치고 있다'],
     arrive: ['공원에 나갔다. 바람이 좋았다.', '공원 산책로를 따라 걸었다.', '공원 벤치에 자리를 잡았다.'],
     actions: ['walk', 'exercise'] },
 
-  { id: 'school', label: '학교', icon: '🏫', minAge: 7, maxAge: 18, routine: true,
+  { id: 'school', ms: true, label: '학교', icon: '🏫', minAge: 7, maxAge: 18, routine: true,
     regulars: ['classmate'], regularsN: [1, 3], crowd: 'peer', kind: 'classmate',
     doing: ['엎드려 자고 있다', '친구들과 떠들고 있다', '창밖을 멍하니 보고 있다', '숙제를 베끼고 있다', '매점 빵을 먹고 있다', '교과서 귀퉁이에 낙서를 하고 있다', '복도를 뛰어가고 있다'],
     arrive: s => s.age < 13 ? ['교문 앞에서 실내화 주머니를 흔들었다.', '교실에 들어서자 떠드는 소리가 쏟아졌다.'] : ['교실 문을 열었다. 다들 엎드려 있었다.', '1교시 종이 울리기 직전에 도착했다.', '교복 넥타이를 대충 매고 등교했다.'],
     actions: ['study', 'exercise', 'read'] },
 
-  { id: 'academy', label: '학원', icon: '📝', minAge: 7, maxAge: 18, routine: true,
+  { id: 'academy', ms: true, label: '학원', icon: '📝', minAge: 7, maxAge: 18, routine: true,
     regulars: ['friend', 'classmate'], crowd: 'peer',
     doing: ['영어 단어장을 외우고 있다', '컵라면으로 저녁을 때우고 있다', '쉬는 시간에 졸고 있다', '선생님 몰래 휴대폰을 보고 있다', '문제집 답지를 슬쩍 보고 있다'],
     arrive: ['학원 버스에서 내렸다.', '학원 계단을 올라갔다. 형광등이 눈부셨다.', '학원 복도에서 컵라면 냄새가 났다.'],
@@ -82,7 +84,7 @@ GAME_DATA.places = [
     arrive: ['카페 문을 열자 커피 향이 확 풍겼다.', '구석 자리에 가방을 내려놨다.', '카페 창가 자리가 비어 있었다.'],
     actions: ['coffee', 'study', 'read', 'parttime'] },
 
-  { id: 'library', label: '도서관', icon: '📚', minAge: 7,
+  { id: 'library', ms: true, label: '도서관', icon: '📚', minAge: 7,
     regulars: ['classmate', 'friend'], crowd: 'peer', hobby: 'book',
     doing: ['두꺼운 책에 파묻혀 있다', '시험공부를 하고 있다', '서가 사이를 서성이고 있다', '책상에 엎드려 자고 있다', '열람실 창가에서 책을 읽고 있다'],
     arrive: ['도서관에 들어서자 종이 냄새가 났다.', '열람실 자리를 하나 맡았다.', '도서관은 오늘도 조용했다.'],
@@ -137,7 +139,7 @@ GAME_DATA.places = [
     arrive: ['낮은 종소리가 들렸다.', '신발을 벗고 조용히 들어갔다.', '오래된 나무 의자에 앉았다.'],
     actions: ['pray'] },
 
-  { id: 'conveni', label: '편의점', icon: '🏪', minAge: 6,
+  { id: 'conveni', ms: true, label: '편의점', icon: '🏪', minAge: 6,
     regulars: ['friend', 'classmate'], regularsN: [0, 1], crowd: 'mixed', nightCrowd: 'adult', crowdN: [0, 2],
     doing: ['삼각김밥을 고르고 있다', '컵라면에 물을 붓고 있다', '1+1 행사 상품을 들여다보고 있다', '계산대 앞에서 지갑을 뒤지고 있다', '파라솔 아래서 음료를 마시고 있다'],
     nightDoing: ['슬리퍼 차림으로 야식을 고르고 있다', '맥주 네 캔을 계산하고 있다', '라면을 먹으며 한숨을 쉬고 있다', '잠옷 위에 패딩을 걸치고 서 있다', '편의점 불빛 아래 혼자 서 있다'],
@@ -149,6 +151,12 @@ GAME_DATA.places = [
     doing: ['응원봉을 흔들고 있다', '앞줄에서 따라 부르고 있다', '굿즈 줄에 서 있다', '셋리스트를 확인하고 있다', '눈을 감고 음악에 빠져 있다'],
     arrive: ['공연장 앞에 긴 줄이 늘어서 있었다.', '조명이 꺼지자 함성이 터졌다.', '스피커 앞에 서자 가슴이 울렸다.'],
     actions: ['watch'] },
+
+  { id: 'market', ms: true, label: '시장', icon: '🧺', minAge: 6,
+    regulars: ['friend', 'classmate', 'family'], regularsN: [0, 1], crowd: 'mixed', crowdN: [1, 3], hobby: 'cook',
+    doing: ['떡볶이 포장마차 앞에 서 있다', '덤으로 귤을 더 받아 웃고 있다', '흥정하고 있다', '어묵 국물을 호호 불고 있다', '장바구니를 들고 걷고 있다', '호떡을 기다리고 있다'],
+    arrive: ['시장 골목에 기름 냄새가 가득했다.', '"싸요 싸!" 상인들 목소리가 골목을 채웠다.', '시장 입구에서 호떡 냄새가 났다.'],
+    actions: ['snack', 'walk'] },
 ];
 
 // NPC가 자주 가는 곳 — 취미에 따라 (나이에 맞는 곳만 고름)

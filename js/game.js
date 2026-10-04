@@ -5,8 +5,12 @@
 const D = window.GAME_DATA;
 const C = D.config;
 const SEASONS = C.seasons;
+// 저장: 칸 3개 (llife-save-v6-1~3), 지금 쓰는 칸은 llife-slot. 예전 v5 저장은 1번 칸으로 옮겨 읽음
+const SLOT_KEY = 'llife-slot', slotKey = n => `llife-save-v6-${n}`, SLOTS_N = 3;
 const SAVE_KEY = 'llife-save-v5';
 const OLD_KEYS = ['llife-save-v4', 'llife-save-v3'];
+let slot = 1;
+try { slot = clamp(+localStorage.getItem(SLOT_KEY) || 1, 1, SLOTS_N); } catch (e) { /* 저장 불가 */ }
 const COND = ['happy', 'health', 'libido'];   // 상태: 0~100. 성욕은 대상마다 따로(S.lust) — stats.libido는 그중 가장 높은 값(화면·조건용)
 const ABIL = D.abilities;                     // 능력: 상한 없음, 등급
 const STATS = COND.concat(ABIL);
@@ -208,13 +212,14 @@ function meetDefault() {
     : { kind, ageRange: [Math.max(19, a - 8), Math.min(C.romanceMaxAge, a + 8)] };
 }
 
-function applyP(p, delta, mult) {
+function applyP(p, delta, mult, gk) {
   if (!p || !delta) return [];
   const out = [], tr = trait();
   for (const k of Object.keys(delta)) {
     if (!PSTATS.includes(k)) continue;
     if (k === 'heart' && !heartOk(p)) continue;
     let v = val(delta[k]);
+    if (gk != null && gk !== 1 && v > 0 && k !== 'grudge') v = probRound(v * gk);
     if (!v) continue;
     if (v > 0 && k !== 'grudge' && tr.relMult) v = Math.round(v * tr.relMult);
     if (mult && mult[k] && (v > 0 || k === 'grudge')) v = Math.round(v * mult[k]);
@@ -429,7 +434,8 @@ function satisfaction(p, mood, adj) {
   return clamp(Math.round(g100(S.sexSkill || 0) * .4 + (p.compat ?? 30) * .25 + sizeTerm(p) + p.heart * .15 + md * .1 + rand(-8, 8) + (adj || 0)), 0, 100);
 }
 // 지금이 인생에서 몇 번째 행동인지 (싸운 뒤 몇 턴, 오랜만인지 계산용)
-const turnNo = () => S.age * C.apPerYear + S.used;
+// '턴' = 옛 기준 한 행동(1년의 1/10 ≈ 36.5일). 싸운 뒤 몇 턴·오랜만인지 등은 날짜로 셈
+const turnNo = () => Math.floor((S.dayN || 0) / 36.5);
 /* ── 평판: 몇 명이냐보다 어떻게 관리하느냐. 해마다 최근 2년 안에 밤을 보낸 상대(배우자 제외) 수 × 5% ──
    × 상대마다 (섹파·연인이면 .3) (만족감 70+면 .5) (대놓고 데려간 적 없으면 .4) (원한 낮으면 .3) 의 평균 × (들킨 적 없으면 .5)
    소문 종류: bad(원나잇·원한·들킴) / skill(기술 A 이상 + 다들 만족) / good(한 사람과 3년 넘게, 신뢰 70+) */
@@ -619,7 +625,8 @@ function log(text, opt = {}) {
 }
 
 /* ═════════ 효과 ═════════ */
-function applyEffect(eff) {
+// gk: 행동으로 얻는 양의 배율(단계마다 다름) — 오르는 쪽만, 확률 반올림
+function applyEffect(eff, gk) {
   eff = resolve(eff);
   if (!eff) return [];
   const tr = trait(), out = [];
@@ -627,6 +634,7 @@ function applyEffect(eff) {
     if (k === 'rel') { out.push(...applyRel(eff.rel)); continue; }
     if (k === 'libido') { out.push(...libidoDelta(eff[k], person(S.vars.fp))); continue; }
     let v = val(eff[k]);
+    if (gk != null && gk !== 1 && v > 0) v = probRound(v * gk);
     if (!v) continue;
     if (k === 'money') { S.money += v; out.push(['money', v]); continue; }
     if (!STATS.includes(k)) continue;
@@ -674,16 +682,20 @@ function applyOutcome(o, target, resumed) {
       return;
     }
   }
-  const deltas = applyEffect(o.effect);
+  const deltas = applyEffect(o.effect, o.gk);
   const tp = target || person(S.vars.fp);
   let pd = o.p ? resolve(o.p) : null;
   const sx = o.intimate && tp ? sexScene(tp, o) : null;   // 함께 밤을 보내는 결과 (만족감 계산)
   if (sx) { pd = scaleBySat(pd, sx); deltas.push(['sat', sx.sat]); }
-  if (pd && tp) deltas.push(...applyP(tp, pd, o.mult));
+  if (pd && tp) deltas.push(...applyP(tp, pd, o.mult, sx ? null : o.gk));
   if (o.fight && tp && lover(tp)) tp.fought = turnNo();   // 싸움 — 몇 턴 동안 거절이 잦고, 화해할 기회가 생김
   if (o.libido) deltas.push(...libidoDelta(o.libido, tp));
   if (o.drunk) drinkUp(val(o.drunk));
   if (o.sober) soberUp(true);
+  // 어린 시절 이야기: 성격·가치관이 어느 쪽으로 기우는지, 취미 정하기 (data/story.js)
+  if (o.lean) { S.lean = S.lean || {}; S.lean[o.lean] = (S.lean[o.lean] || 0) + 1; }
+  if (o.vlean) { S.vlean = S.vlean || {}; S.vlean[o.vlean] = (S.vlean[o.vlean] || 0) + 1; }
+  if (o.hobby) S.hobby = o.hobby;
   addKarma(o.karma);
   if (o.heat) S.heat = clamp(S.heat + val(o.heat), 0, 100);
   const ctx = target ? { p: pname(target) } : {};
@@ -841,7 +853,6 @@ function choose(i) {
   else if (ch.chance != null) o = Math.random() < resolve(ch.chance) ? ch.success : ch.fail;
   applyOutcome(o);
   if (p.id === 'contraAsk') resumeHeld();
-  tickSeason();
   after();
 }
 // 피임을 고른 뒤 멈췄던 밤을 이어서
@@ -864,11 +875,9 @@ function flavorLine(sid) {
 function enterSeason(i) {
   const se = SEASONS[i];
   S.seasonIdx = i;
-  S.weather = weighted(Object.keys(se.weather), k => se.weather[k]);
+  S.weather = rollWeather();
   updateTime();
   S.log.push({ n: ++S.seq, t: 'season', season: se.id, icon: se.icon, wx: S.weather });
-  if (se.months.includes(S.month)) birthday();
-  schoolExam(se.id);
   if (S.preg && S.preg.due == null) tellPreg();
   if (S.scare) {   // 피임 없이 보낸 밤 뒤의 불안 (그새 아이가 생겼으면 그 소식이 대신)
     const sp = person(S.scare.pid);
@@ -886,24 +895,266 @@ function enterSeason(i) {
   if (pool.length && Math.random() >= C.flavorChance) fire(weighted(pool));
   else log(flavorLine(se.id));
 }
-// 하루의 때: 계절 안에서 행동을 쓸수록 아침 → 낮 → 저녁 (계절의 마지막 행동은 늘 저녁)
+/* ═════════ 시간 (GAMEFLOW) ═════════
+   story  0~12살  선택지 이야기 — 행동 없음. '계속'을 누르면 다음 선택지(이야기·이벤트)나 해가 바뀔 때까지 시간이 흐름
+   ms     13~15살 중학교 — 1년 50턴(1턴 ≈ 1주): 수업 주간(자동)·중간·기말·자유 턴·방학
+   hs     16~18살 고등학교 — 1년 30턴: 수업·시험·자유·방학, 고3은 모의고사·수능·원서 접수·결과 발표 (재수하면 19살에 고3 턴을 한 번 더)
+   adult  19살~   하루 단위 — 행동력 12칸(1칸 = 1.5시간, 아침 6시부터), 새벽까지 깨면 18칸까지. 평일엔 출근·수업이 자동으로 칸을 씀
+   학년도는 3월 1일에 시작하고 그때 나이가 하나 늘어남. 계절은 달에서, 생일은 태어난 달에 */
+const SEASON_OF = m => m >= 3 && m <= 5 ? 0 : m >= 6 && m <= 8 ? 1 : m >= 9 && m <= 11 ? 2 : 3;
+const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+const T_OF = { C: 'class', F: 'free', M: 'mid', X: 'final', V: 'vac', K: 'mock', N: 'csat', A: 'apply', R: 'result' };
+const semOf = str => str.split('').map(c => T_OF[c]);
+// 학년도 턴 일정: [1학기, 2학기]. 한 학기는 3월 1일·9월 1일부터 182일에 고르게 펼침
+const SCHED = {
+  ms:  [semOf('CFCFCFCFMCFCFCFCFXVVVVVVV'), semOf('CFCFCFCFMCFCFCFCFXVVVVVVV')],   // 수업 8 · 중간 · 자유 8 · 기말 · 방학 7
+  hs:  [semOf('CFCFCMCFCFXVVVV'), semOf('CFCFCMCFCFXVVVV')],                       // 수업 5 · 중간 · 자유 4 · 기말 · 방학 4
+  hs3: [semOf('CKCFCMCKFFXVVVV'), semOf('CKCMCFNFFARVVVV')],                       // 고3: 3·6월 모의고사 / 9월 모의고사·수능·원서·발표
+};
+const TURN_AP = { free: 2, vac: 3 };   // 자유 턴은 방과 후, 방학은 조금 더
+const TURN_LABEL = { class: '수업', free: '자유', mid: '중간고사', final: '기말고사', vac: '방학', mock: '모의고사', csat: '수능', apply: '원서 접수', result: '결과 발표' };
+const DAY_AP = 12, LATE_AP = 6;       // 하루 12칸 + 새벽 6칸
+// 지금 단계
+function phase() {
+  if (S.age <= 12) return 'story';
+  if (S.age <= 15) return 'ms';
+  if (S.age <= 18 || (S.age === 19 && S.flags.retake && !S.flags.student)) return 'hs';
+  return 'adult';
+}
+const schedule = () => { const ph = phase(); return ph === 'ms' ? SCHED.ms : ph === 'hs' ? (S.age >= 18 ? SCHED.hs3 : SCHED.hs) : null; };
+const turnKind = i => { const sc = schedule(); if (!sc) return null; const L = sc[0].length; return sc[i < L ? 0 : 1][i % L]; };
+const turnsInYear = () => { const sc = schedule(); return sc ? sc[0].length * 2 : 0; };
+// 이 학년도(나이)의 3월 1일 / 그 턴의 날짜
+const yearStartDate = age => new Date(S.birthYear + age, 2, 1);
+function turnDate(i) {
+  const sc = schedule(), L = sc[0].length, base = new Date(S.birthYear + S.age, i < L ? 2 : 8, 1);
+  base.setDate(base.getDate() + Math.floor((i % L) * 182 / L));
+  return base;
+}
+const dateOf = () => new Date(S.date.y, S.date.m - 1, S.date.d);
+const dow = () => dateOf().getDay();
+const isWeekend = () => { const d = dow(); return d === 0 || d === 6; };
+function rollWeather() { const se = SEASONS[SEASON_OF(S.date ? S.date.m : 3)]; return weighted(Object.keys(se.weather), k => se.weather[k]); }
+// 하루 넘기기 — 달이 바뀌면 monthly, 3월 1일이면 한 살(advanceYear), 계절이 바뀌면 enterSeason
+function nextDay() {
+  const dt = dateOf(); dt.setDate(dt.getDate() + 1);
+  const pm = S.date.m;
+  S.date = { y: dt.getFullYear(), m: dt.getMonth() + 1, d: dt.getDate() };
+  S.dayN = (S.dayN || 0) + 1;
+  if (S.date.m === pm) return;
+  if (S.date.m === 3) { advanceYear(); if (S.ended) return; }
+  monthly();
+  const si = SEASON_OF(S.date.m);
+  if (si !== S.seasonIdx) enterSeason(si);
+}
+// 그 날짜까지 하루씩 (선택지가 걸리면 거기서 멈춤 — stop이 true면)
+function goToDate(dt, stop) {
+  let guard = 0;
+  while (dateOf() < dt && !S.ended && guard++ < 400) { nextDay(); if (stop && S.pending.length) return false; }
+  return true;
+}
+// 하루의 때 (배경·술집): 어른은 시계, 학교 다닐 땐 턴 종류, 어릴 땐 계절 안에서 천천히
 function updateTime() {
-  const i = Math.max(0, S.seasonIdx), se = SEASONS[i], next = SEASONS[i + 1];
-  const len = (next ? next.at : C.apPerYear) - se.at;
-  const k = clamp(S.used - se.at, 0, Math.max(0, len - 1));
-  S.time = len <= 1 ? 1 : Math.min(2, Math.round(k * 2 / (len - 1)));
+  const ph = phase();
+  if (ph === 'adult') { const h = 6 + (S.used || 0) * 1.5; S.sky = clamp((h - 6) / 6, 0, 2); S.time = h < 11 ? 0 : h < 17 ? 1 : 2; }
+  else if (ph === 'story') { S.sky = .4; S.time = 0; }
+  else { S.sky = S.tkind === 'vac' ? .6 : 1.3; S.time = 1; }
 }
-// 쓴 행동 수에 맞춰 계절을 넘김. 선택지 이벤트가 걸리면 거기서 멈춤
-function tickSeason() {
-  while (!S.pending.length && !S.ended) {
-    const next = S.seasonIdx + 1;
-    if (next < SEASONS.length && SEASONS[next].at <= S.used) enterSeason(next);
-    else break;
+// 시계 (어른): 아침 6시 + 쓴 칸 × 1.5시간
+const clockOf = used => { const m = Math.round((6 + used * 1.5) * 60) % (24 * 60); return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
+const SLOTS = [[2, '아침'], [4, '오전'], [5, '점심'], [9, '오후'], [11, '저녁'], [12, '밤'], [14, '새벽'], [18, '심야']];
+const slotOf = used => (SLOTS.find(([n]) => used < n) || SLOTS[SLOTS.length - 1])[1];
+
+/* ── 이야기 (0~12살) ── */
+// 다음 선택지가 나오거나 해가 바뀔 때까지 시간이 흐름 (한 번에 한 계절씩)
+function storyNext() {
+  if (busy() || phase() !== 'story') return;
+  const age0 = S.age;
+  let guard = 0;
+  while (!S.pending.length && !S.ended && S.age === age0 && guard++ < 400) {
+    const si = S.seasonIdx;
+    nextDay();
+    if (S.seasonIdx !== si && (S.pending.length || S.age !== age0)) break;
   }
+  if (S.age !== age0 && phase() !== 'story') beginPhase();
+  after();
 }
+
+/* ── 학교 턴 (13~18살) ── */
+function beginPhase() {
+  const ph = phase();
+  S.ph = ph;
+  S.place = null; S.here = [];
+  if (ph === 'ms' || ph === 'hs') { S.turn = 0; startTurn(); }
+  else if (ph === 'adult') startDay(true);
+  else { S.ap = 0; S.tkind = null; }
+  updateTime();
+}
+// 이 턴 시작: 수업·시험은 자동으로 처리, 자유·방학은 행동력
+function startTurn() {
+  const k = turnKind(S.turn);
+  S.tkind = k; S.used = 0; S.ap = jailed() ? 2 : TURN_AP[k] || 0;
+  S.place = null; S.here = [];
+  S.weather = rollWeather();
+  updateTime();
+  if (!jailed()) schoolTurn(k);
+}
+// 이번 턴을 끝내고(남은 행동은 쉬면서) 행동이 필요한 다음 턴까지 넘김 — 수업·시험 턴은 자동, 선택지가 걸리면 멈춤
+function nextTurn() {
+  if (busy() || !schedule()) return;
+  if (S.ap > 0 && TURN_AP[S.tkind]) log(S.tkind === 'vac' ? '남은 방학은 집에서 뒹굴며 보냈다.' : '남은 시간은 쉬면서 보냈다.', { t: 'info', deltas: applyEffect({ health: S.ap >= 2 ? 1 : 0, happy: 1 }) });
+  let guard = 0;
+  do {
+    advanceTurn();
+    if (S.ended || S.report) break;
+  } while (!S.pending.length && !S.ap && schedule() && guard++ < 60);
+  after();
+}
+function advanceTurn() {
+  const age0 = S.age;
+  S.turn++;
+  if (S.turn >= turnsInYear()) {   // 학년도 끝 → 다음 3월 1일 (나이가 오르며 다음 단계일 수도)
+    goToDate(yearStartDate(age0 + 1), false);
+    beginPhase();
+    return;
+  }
+  goToDate(turnDate(S.turn), false);
+  startTurn();
+}
+
+/* ── 하루 (19살~) ── */
+// 아침 6시: 전날 늦게 잤으면 그만큼 늦게 일어남. 주말 아침엔 피로가 풀림
+function startDay(first) {
+  const pen = S.wake || 0;
+  S.wake = 0; S.used = pen; S.dayStart = pen; S.ap = DAY_AP + LATE_AP - pen; S.meals = 0; S.worked = false;
+  S.place = null; S.here = []; S.zone = 'home'; S.drunk = 0;
+  if (!first) S.weather = rollWeather();
+  if (isWeekend() && (S.fatigue || 0) > 0) S.fatigue--;
+  updateTime();
+}
+// 평일에 해야 하는 일 (직장 6칸 / 대학 수업 4칸 / 군 복무 8칸)
+function dutyOf() {
+  if (phase() !== 'adult' || jailed() || isWeekend()) return null;
+  if (S.flags.inArmy) return { id: 'army', ap: 8, label: '훈련', zone: 'home' };
+  if (S.job) return { id: 'work', ap: 6, label: '출근', zone: 'work' };
+  if (S.flags.student && (S.school.start ?? 0) <= S.age) return { id: 'class', ap: 4, label: '수업', zone: 'school' };
+  return null;
+}
+const dutyPending = () => !!dutyOf() && !S.worked;
+// 출근·수업 (자동으로 칸을 씀). auto: 넘기는 중
+function doDuty(auto) {
+  const d = dutyOf();
+  if (!d || S.worked || (!auto && busy())) return;
+  S.worked = true;
+  const n = Math.min(d.ap, Math.max(0, S.ap));
+  S.ap -= n; S.used += n; S.zone = d.zone; S.place = null; S.here = [];
+  updateTime();
+  const tired = (S.fatigue || 0) >= 3 ? .6 : 1;
+  if (d.id === 'work') {
+    S.perf = clamp(S.perf + probRound((.12 + gIdx(S.stats.smart) * .02) * tired), 0, 100);
+    if (!auto) log(pick(['출근했다. 하루가 길었다.', '회의, 메일, 회의. 퇴근길 하늘이 벌써 어두웠다.', '일을 마치고 퇴근했다.', '점심시간만 기다리며 오전을 버텼다.']), { t: 'info' });
+    maybeRandom(['work', 'office', S.job], auto ? .01 : C.randomEventChance * .5);
+  } else if (d.id === 'class') {
+    S.school.studyYear += .02 * tired;
+    if (!auto) log(pick(['강의실 맨 뒷자리에서 수업을 들었다.', '전공 수업 두 개를 듣고 나왔다.', '조별 과제 회의가 길어졌다.']), { t: 'info' });
+    maybeRandom(['campus', 'study'], auto ? .01 : C.randomEventChance * .5);
+  } else if (!auto) log('하루 종일 훈련을 받았다.', { t: 'info' });
+}
+// 잠자기 — 하루 끝. 밥을 거르면 건강이 깎이고, 새벽까지 깨 있었으면 다음 날 늦게 일어나고 피로가 쌓임
+function endDay(auto) {
+  if (dutyPending()) {   // 출근·수업을 빼먹음
+    if (auto) doDuty(true);
+    else if (S.job) { S.perf = clamp(S.perf - 4, 0, 100); log('출근을 안 했다. 휴대폰에 부재중 전화가 쌓였다.', { t: 'info', deltas: applyEffect({ happy: -1 }) }); }
+    else log('수업을 빼먹었다.', { t: 'info' });
+  }
+  if (!auto) {
+    const m = S.meals || 0;
+    if (m < 2) log(m ? '오늘은 한 끼밖에 못 먹었다.' : '하루 종일 아무것도 안 먹었다.', { t: 'info', deltas: applyEffect({ health: m ? -1 : -2 }) });
+    if (S.used >= 16) { S.wake = 4; S.fatigue = (S.fatigue || 0) + 2; log('해가 뜰 무렵에야 잠들었다.', { t: 'info', deltas: applyEffect({ health: -3 }) }); }
+    else if (S.used >= 13) { S.wake = 2; S.fatigue = (S.fatigue || 0) + 1; log('새벽 늦게 잠들었다.', { t: 'info', deltas: applyEffect({ health: -1 }) }); }
+  }
+  libidoTick();
+  if (S.drunk) soberUp();
+  if ((S.fatigue || 0) >= 3) applyEffect({ health: -1 });
+  // 제때 먹고 제때 자면 건강이 조금씩 회복 (나이·체력에 따른 기준선까지만)
+  else if ((auto || (S.meals || 0) >= 2) && (S.used || 0) < 13 && S.stats.health < healthBase() && Math.random() < .3) S.stats.health++;
+  if ((S.fatigue || 0) >= 5 && EVENTS.burnedOut && (S.dayN || 0) - (S.vars.burnDay ?? -99) > 30) { S.vars.burnDay = S.dayN; fire(EVENTS.burnedOut); }
+  nextDay();
+  if (S.ended) return;
+  if (phase() === 'adult') startDay(); else beginPhase();
+}
+// 잘 먹고 잘 자면 돌아오는 건강 기준선: 30대부터 천천히 낮아지고, 체력 등급이 높으면 높음
+const healthBase = () => clamp(Math.round(86 - Math.max(0, S.age - 30) * .8 + gIdx(S.stats.fit) * 2), 40, 96);
+// 하루를 통째로 넘김 (출근·밥은 자동, 랜덤 이벤트는 하루에 조금)
+function autoDay() {
+  S.meals = 2;
+  if (dutyPending()) doDuty(true);
+  maybeRandom(['day'], C.dayEventChance);
+  endDay(true);
+}
+// 넘기기: today 오늘 끝내기 / week 다음 월요일까지 / month 다음 달 1일까지 / event 무슨 일이 생길 때까지
+// 멈추는 때: 선택지 이벤트(랜덤·계절·생일 다음 날·연인·가족·직장), 성욕 80 돌파, 건강 25 아래
+function skip(kind) {
+  if (busy() || phase() !== 'adult') return;
+  S.stop = null;
+  // 아직 아무것도 안 한 날이면 그날도 통째로 넘김 (밥·출근 자동), 뭔가 했으면 그 하루를 마무리
+  if (kind !== 'today' && (S.used || 0) <= (S.dayStart || 0)) autoDay(); else endDay(false);
+  if (kind !== 'today') {
+    const lib0 = S.stats.libido, m0 = S.date.m, h0 = S.stats.health;
+    let guard = 0;
+    while (!S.pending.length && !S.ended && !S.stop && phase() === 'adult' && guard++ < 400) {
+      if (kind === 'week' && dow() === 1) break;
+      if (kind === 'month' && S.date.m !== m0 && S.date.d === 1) break;
+      autoDay();
+      if (S.stats.libido >= 80 && lib0 < 80) { S.stop = 'libido'; if (EVENTS.libidoRestless && eligible(EVENTS.libidoRestless)) fire(EVENTS.libidoRestless); }
+      if (S.stats.health < 25 && h0 >= 25) S.stop = 'health';
+    }
+    if (S.stop === 'health') log('몸 상태가 심상치 않다.', { t: 'info' });
+  }
+  if (phase() !== 'adult') beginPhase();
+  after();
+}
+// 밥 먹기 (1칸) — 하루 두 끼를 안 먹으면 건강이 깎임
+function eat() {
+  if (busy() || phase() !== 'adult' || S.ap <= 0) return;
+  spend(1);
+  S.meals = (S.meals || 0) + 1;
+  const where = S.place ? PLACES[S.place].label : '집';
+  log(pick(S.used <= 3 ? ['토스트 한 장으로 아침을 때웠다.', '아침밥을 든든하게 먹었다.'] : S.used <= 7 ? ['점심을 먹었다.', `${where} 근처에서 점심을 먹었다.`, '김치찌개 한 그릇을 비웠다.'] : ['저녁을 먹었다.', '배달 음식을 시켜 먹었다.', '라면을 끓여 먹었다.']), { t: 'info', deltas: applyEffect({ health: 1 }) });
+  after();
+}
+// 한 달마다: 월급·생활비·피임약값
+function monthly() {
+  if (S.date.m === S.month) { birthday(); if (phase() === 'adult') S.stop = S.stop || 'birthday'; }
+  // 행복은 익숙해짐: 아주 높거나 낮으면 한 달에 1씩 가운데로
+  if (S.stats.happy > 75) S.stats.happy -= S.stats.happy > 88 ? 2 : 1; else if (S.stats.happy < 35) S.stats.happy++;
+  if (S.job && !jailed()) { const j = job(S.job); S.money += j.volatile ? Math.round(rand(Math.round(S.salary * .2), S.salary * 2) / 12) : Math.round(S.salary / 12); }
+  if (S.age >= 20 && !S.flags.student && !S.flags.inArmy && !jailed()) {
+    const kids = alive().filter(p => p.kind === 'child').length;
+    S.money -= Math.round((C.livingCost + (S.flags.married ? 600 : 0) + kids * 400) / 12);   // 가족이 늘면 생활비도 늘어남
+  }
+  if (S.flags.onPill) S.money -= rand(3, 5);   // 피임약값 (한 달 3~5만원)
+}
+// 화면용 시간 정보
+function timeInfo() {
+  const ph = phase(), d = S.date || { y: 2000, m: 3, d: 1 };
+  const info = { phase: ph, y: d.y, m: d.m, d: d.d, dow: DOW[dow()], weekend: isWeekend(), season: SEASONS[SEASON_OF(d.m)], age: S.age };
+  if (ph === 'adult') Object.assign(info, { clock: clockOf(S.used || 0), slot: slotOf(S.used || 0), used: S.used || 0, ap: S.ap, day: DAY_AP, lateMax: LATE_AP, late: (S.used || 0) >= DAY_AP,
+    duty: dutyPending() ? dutyOf() : null, meals: S.meals || 0, fatigue: S.fatigue || 0, zone: ZONE_LABEL[S.zone || 'home'] });
+  else if (ph === 'ms' || ph === 'hs') {
+    const sc = schedule(), L = sc[0].length, g = S.age - (ph === 'ms' ? 12 : 15);
+    Object.assign(info, { school: ph === 'ms' ? '중' : '고', grade: g > 3 ? '재수' : `${g}학년`, sem: S.turn < L ? 1 : 2, week: S.turn % L + 1, kind: S.tkind, kindLabel: TURN_LABEL[S.tkind] || '', ap: S.ap, apMax: TURN_AP[S.tkind] || (jailed() ? 2 : 0) });
+  }
+  return info;
+}
+// 확률 반올림: 1.3 → 70%로 1, 30%로 2
+const probRound = v => { const f = Math.floor(v); return f + (Math.random() < v - f ? 1 : 0); };
+// 행동으로 얻는 것의 배율 — 1년에 할 수 있는 행동이 단계마다 달라서 (예전 1년 10번 기준으로 맞춤)
+const gainK = () => ({ story: 1, ms: .3, hs: .35, adult: .25 })[phase()];
+
 // 랜덤 이벤트: on에 행동 id나 장소 id를 적으면 그때만 (맞는 태그가 있으면 두 배로 잘 뽑힘)
 function maybeRandom(tags, chance = C.randomEventChance) {
-  if (S.pending.length || Math.random() >= chance) return;
+  if (S.pending.length || Math.random() >= chance * ({ story: 0, ms: .8, hs: .8, adult: .45 })[phase()]) return;
   tags = asList(tags).filter(Boolean);
   const pool = D.events.filter(e => e.type === 'random' && (!e.on || e.on.some(t => tags.includes(t))) && eligible(e));
   if (pool.length) fire(weighted(pool, e => (e.weight ?? 1) * (e.on ? 2 : 1)));
@@ -944,20 +1195,32 @@ function examGrades(bonus) {
   return g;
 }
 const gradeLine = g => D.subjects.map(x => `${x.label} ${g[x.id]}`).join(', ');
-function schoolExam(sid) {
-  if (!inSchool()) return;
-  if (S.age >= 16 && (sid === '여름' || sid === '겨울')) {
-    const sem = (S.age - 16) * 2 + (sid === '여름' ? 1 : 2);
-    const g = examGrades(0);
-    const v = Math.round((g.avg + rand(-3, 3) / 10) * 10) / 10;
-    S.school.naesin.push(clamp(v, 1, 9));
-    log(`${Math.ceil(sem / 2)}학년 ${sem % 2 ? 1 : 2}학기 내신 ${clamp(v, 1, 9).toFixed(1)}등급 (${gradeLine(g)})`, { t: 'info' });
-  }
-  if ((S.age === 17 && sid === '겨울') || (S.age === 18 && sid === '여름')) {
+// 학교 턴 — 수업 주간은 진도(과목 실력 조금) + 가끔 학교 이벤트, 시험 턴은 성적, 고3은 모의고사·수능·원서·발표
+const CLASS_LINES = { ms: ['수업 주간. 졸린 5교시를 버텼다.', '수업 주간. 수행평가 공지가 떴다.', '수업 주간. 선생님 농담에 반 전체가 웃었다.', '수업 주간. 진도가 빠르게 나갔다.'],
+  hs: ['수업 주간. 야간 자율학습이 끝나니 밤 10시였다.', '수업 주간. 판서를 받아 적느라 손목이 아팠다.', '수업 주간. 매점 빵으로 버틴 한 주였다.', '수업 주간. 모두가 조금씩 지쳐 있었다.'] };
+function schoolTurn(k) {
+  const ph = phase();
+  if (k === 'class') {
+    SUBJ.forEach(x => subjAdd(x, rand(0, 1)));
+    log(pick(CLASS_LINES[ph] || CLASS_LINES.ms), { t: 'info' });
+    maybeRandom(['school', 'class'], C.randomEventChance);
+  } else if (k === 'mid' || k === 'final') {
+    const g = examGrades(0), L = schedule()[0].length, semNo = S.turn < L ? 1 : 2, grade = S.age - (ph === 'ms' ? 12 : 15);
+    S.school.semExam = S.school.semExam || [];
+    S.school.semExam.push(g.avg);
+    log(`${grade}학년 ${semNo}학기 ${TURN_LABEL[k]}: ${gradeLine(g)}. 평균 ${g.avg.toFixed(1)}등급.`, { t: 'info' });
+    if (k === 'final' && ph === 'hs') {
+      const v = Math.round(S.school.semExam.reduce((x, y) => x + y, 0) / S.school.semExam.length * 10) / 10;
+      S.school.naesin.push(clamp(v, 1, 9));
+      log(`${grade}학년 ${semNo}학기 내신 ${clamp(v, 1, 9).toFixed(1)}등급.`, { t: 'info' });
+    }
+    if (k === 'final') S.school.semExam = [];
+  } else if (k === 'mock') {
     const g = examGrades(0);
     S.school.mock = g;
     log(`모의고사: ${gradeLine(g)}. 평균 ${g.avg.toFixed(1)}등급.`, { t: 'info' });
-  }
+  } else if (k === 'csat') trigger(S.age >= 19 ? 'suneung2' : 'suneung');
+  else if (k === 'vac' && turnKind(S.turn - 1) !== 'vac') log(S.date.m >= 6 && S.date.m <= 8 ? '여름방학이 시작됐다.' : '겨울방학이 시작됐다.', { t: 'info', deltas: applyEffect({ happy: 2 }) });
 }
 const naesinAvg = () => S.school.naesin.length ? S.school.naesin.reduce((a, b) => a + b, 0) / S.school.naesin.length : null;
 function uniScore() {
@@ -1074,7 +1337,7 @@ function crimeOdds(c) {
   return clamp(o, .05, .95);
 }
 function canCrime(c) {
-  return !busy() && S.ap > 0 && !jailed() && S.age >= c.minAge && meets(c.req);
+  return !busy() && S.ap > 0 && !dutyPending() && phase() !== 'story' && !jailed() && S.age >= c.minAge && meets(c.req);
 }
 function commitCrime(id) {
   const c = D.crimes.find(x => x.id === id);
@@ -1100,7 +1363,6 @@ function commitCrime(id) {
     if (Math.random() < Math.min(.9, c.caught * 1.6 * caughtMult)) arrest(c.severity);
     else S.heat = clamp(S.heat + Math.round(c.heat / 2), 0, 100);
   }
-  tickSeason();
   after();
 }
 
@@ -1155,8 +1417,7 @@ function yearly() {
 
   // 일: 연봉, 성과, 승진
   if (S.job && !jailed()) {
-    const j = job(S.job);
-    S.money += j.volatile ? rand(Math.round(S.salary * .2), S.salary * 2) : S.salary;
+    const j = job(S.job);   // 월급은 매달(monthly)
     if (j.happy) applyEffect({ happy: j.happy });
     if (S.rank < j.ranks.length - 1 && Math.random() < .04 + S.perf / 220) {
       S.rank++; S.perf = Math.max(0, S.perf - 35);
@@ -1174,11 +1435,7 @@ function yearly() {
     if (!p.npcJob && npcAge(p) >= 23 && p.kind !== 'family') p.npcJob = pick(D.npcJobs);
     if (p.hangout && !ageFits(PLACES[p.hangout], npcAge(p))) p.hangout = pickHangout(p.hobby, npcAge(p));
   }
-  if (a >= 20 && !S.flags.student && !S.flags.inArmy && !jailed()) {
-    const kids = alive().filter(p => p.kind === 'child').length;
-    S.money -= C.livingCost + (S.flags.married ? 600 : 0) + kids * 400;   // 가족이 늘면 생활비도 늘어남
-  }
-  if (S.flags.onPill) S.money -= rand(36, 60);   // 피임약값 (한 달 3~5만원)
+  // 생활비·피임약값은 매달(monthly)
   if (S.money < 0 && a >= 20) log('통장 잔고가 마이너스다.', { deltas: applyEffect({ happy: -4 }) });
   if (!jailed()) rumorYear();
   // 내 성욕: 떠난 사람·더는 안 되는 사람은 지우고, 사귀는 사이가 아니면 한 해에 10%씩 식음
@@ -1213,30 +1470,38 @@ function after() {
     if (S.stats.health <= 0) { S.ended = 'death'; S.pending = []; }
     else if (S.age >= C.endAge && !S.pending.length) S.ended = 'fifty';
   }
+  // 단계가 바뀌면(예: 재수하다 대학에 붙음) 그 단계로 시작
+  if (!S.ended && S.date) { const ph = phase(); if (S.ph !== ph) { const was = S.ph; S.ph = ph; if (was) beginPhase(); } }
+  // 학교: 자유·방학 턴의 행동을 다 쓰면 다음 턴으로 / 어른: 18칸을 다 쓰면 쓰러지듯 잠듦
+  if (!S.ended && !S.pending.length && !S.report) {
+    const ph = phase();
+    if ((ph === 'ms' || ph === 'hs') && S.ap <= 0 && TURN_AP[S.tkind]) { nextTurn(); return; }
+    if (ph === 'adult' && S.ap <= 0) { log('더는 버틸 수 없어 그대로 잠들었다.', { t: 'info' }); endDay(false); }
+  }
   save(); emit();
 }
+// 3월 1일: 한 살 (학년도가 바뀜)
 function advanceYear() {
   S.age++;
-  S.ap = C.apPerYear; S.used = 0; S.seasonIdx = -1;
-  S.place = null; S.here = []; S.drunk = 0;
+  S.seasonIdx = -1;
+  S.drunk = 0;
   S.log.push({ n: ++S.seq, t: 'year', age: S.age });
+  if (S.age === 13) settleChildhood();
   yearly();
-  if (S.age >= C.endAge) return;
-  tickSeason();
 }
-// 남은 행동은 쉬면서 보내고(계절 이벤트는 그대로 터짐) 1살 먹기
-function ageUp() {
-  if (S.ended || S.pending.length) return;
-  let rested = 0;
-  while (S.ap > 0 && !S.pending.length) { spend(); rested++; tickSeason(); }
-  if (rested) log('남은 시간은 쉬면서 보냈다.', { t: 'info', deltas: applyEffect({ health: rested >= 4 ? 1 : 0, happy: rested >= 4 ? 1 : 0 }) });
-  if (S.ap === 0 && !S.pending.length) advanceYear();
-  after();
+// 13살: 어린 시절 선택들이 기운 쪽으로 성격·가치관이 굳어짐 (처음 고른 쪽은 3점에서 시작)
+function settleChildhood() {
+  const top = (map, cur) => { const w = Object.assign({}, map); w[cur] = (w[cur] || 0) + 3; return Object.keys(w).sort((a, b) => w[b] - w[a])[0]; };
+  const np = top(S.lean || {}, S.personality), nv = top(S.vlean || {}, S.value);
+  if (np !== S.personality) { S.personality = np; log(`어느새 ${labelOf(D.personalities, np)}이 됐다. 어릴 적 선택들이 쌓인 결과였다.`, { t: 'info' }); }
+  if (nv !== S.value) { S.value = nv; log(`'${labelOf(D.values, nv)}'이 제일 소중하다고 생각하게 됐다.`, { t: 'info' }); }
 }
 
 /* ═════════ 행동 ═════════ */
-const busy = () => !!S.ended || S.pending.length > 0;
-function spend() { S.ap--; S.used++; updateTime(); libidoTick(); }
+const busy = () => !!S.ended || S.pending.length > 0 || !!S.report;
+// 행동력 쓰기 (어른은 시계가 1.5시간씩 감)
+function spend(n = 1) { S.ap -= n; S.used = (S.used || 0) + n; updateTime(); if (phase() !== 'adult') libidoTick(); }
+const apOf = a => phase() === 'adult' ? (a.ap || 1) : 1;
 const costOf = a => a.cost && S.age >= 18 ? resolve(a.cost) : 0;
 // 지금 있는 장소에서 할 수 있는 행동 (수감 중엔 교도소 행동)
 function actionList() {
@@ -1245,46 +1510,58 @@ function actionList() {
   if (!pl) return [];
   return pl.actions.map(id => ACTIONS[id]).filter(a => a && S.age >= a.minAge && meets(a.req) && (!a.if || a.if(S)) && !(a.id === 'parttime' && S.flags.inArmy));
 }
-function canDo(a) { return !busy() && S.ap > 0 && (!costOf(a) || S.money >= costOf(a)); }
+function canDo(a) { return !busy() && S.ap >= apOf(a) && !dutyPending() && (!costOf(a) || S.money >= costOf(a)); }
 const needsSubject = a => a.id === 'study' && inSchool();
 function doAction(id, subj) {
   const a = actionList().find(x => x.id === id);
   if (!a || !canDo(a)) return;
-  spend();
+  spend(apOf(a));
+  const gk = gainK();
   if (a.id === 'study') {
-    const deltas = applyEffect(a.effect);
+    const deltas = applyEffect(a.effect, gk);
     if (inSchool()) {
       const list = subj && SUBJ.includes(subj) ? [subj] : SUBJ;
       const per = list.length > 1 ? 3 : 7;
-      list.forEach(k => { const g = subjGain(k, rand(per - 1, per + 1)); deltas.push([D.subjects.find(x => x.id === k).label, g]); });
+      list.forEach(k => { const g = subjGain(k, rand(per - 1, per + 1) * gk * 2); deltas.push([D.subjects.find(x => x.id === k).label, g]); });
     }
-    if (S.flags.student) S.school.studyYear++;
+    if (S.flags.student) S.school.studyYear += gk;
     log(fill(textOf(a.text)), { deltas });
-    maybeRandom([a.id, S.place]); tickSeason(); after(); return;
+    maybeRandom([a.id, S.place]); after(); return;
   }
-  if (a.work) S.perf = clamp(S.perf + val(a.perf || [6, 12]) + gIdx(S.stats.smart), 0, 100);
+  if (a.work) S.perf = clamp(S.perf + probRound((val(a.perf || [6, 12]) + gIdx(S.stats.smart)) * gk), 0, 100);
   if (a.escape) {
     const ok = S.stats.health + S.stats.smart + rand(-30, 30) >= 120;
     if (ok) { escape(true); log('한밤중에 담을 넘었다. 이제 쫓기는 몸이다.', { memory: true }); addKarma(-10); }
     else { escape(false); log('탈옥하다 붙잡혔다. 형기가 2년 늘었다.'); }
-    tickSeason(); after(); return;
+    after(); return;
   }
   if (a.id === 'exercise' || a.id === 'play') S.vars.exN = (S.vars.exN || 0) + 1;
   asList(a.set).forEach(f => { S.flags[f] = true; });
   asList(a.unset).forEach(f => { delete S.flags[f]; });
   if (a.drunk) drinkUp(a.drunk);
-  const deltas = libidoDelta(a.libido, null).concat(applyEffect(a.effect));
+  if (a.id === 'rest' && S.fatigue) S.fatigue--;   // 쉬면 피로가 풀림
+  const deltas = libidoDelta(a.libido, null).concat(applyEffect(a.effect, gk));
   const c = costOf(a);
   if (c) deltas.push(...applyEffect({ money: -c }));
-  if (a.subjAll && inSchool()) SUBJ.forEach(k => { const g = subjGain(k, val(a.subjAll)); deltas.push([D.subjects.find(x => x.id === k).label, g]); });
+  if (a.subjAll && inSchool()) SUBJ.forEach(k => { const g = subjGain(k, val(a.subjAll) * gk * 2); deltas.push([D.subjects.find(x => x.id === k).label, g]); });
   addKarma(a.karma);
   log(fill(textOf(a.text)), { deltas, memory: a.memoryChance ? Math.random() < a.memoryChance : false });
   maybeRandom([a.id, S.place]);
-  tickSeason();
   after();
 }
 
 /* ═════════ 장소 ═════════ */
+// 구역 (어른): 같은 구역 안은 공짜로 드나들고, 다른 구역은 1칸, 여행지(터미널)는 2칸
+const ZONE = { home: 'home', conveni: 'home', playground: 'home', school: 'school', academy: 'school', library: 'school', campus: 'school',
+  cafe: 'downtown', mall: 'downtown', gym: 'downtown', concert: 'downtown', bar: 'downtown', pcbang: 'downtown',
+  office: 'work', park: 'out', market: 'out', church: 'out', hospital: 'out', center: 'out', station: 'travel' };
+const ZONE_LABEL = { home: '집 근처', school: '학교 쪽', downtown: '번화가', work: '직장', out: '외곽', travel: '여행지' };
+function travelCost(pl) {
+  const ph = phase();
+  if (ph !== 'adult') return 1;
+  const z = ZONE[pl.id] || 'out';
+  return z === 'travel' ? 2 : z === (S.zone || 'home') ? 0 : 1;
+}
 const ageFits = (pl, age) => !!pl && age >= (pl.minAge || 0) && (pl.maxAge == null || age <= pl.maxAge);
 function pickHangout(hobby, age) {
   if (age < 13) return Math.random() < .6 ? (age >= 4 ? pick(['playground', 'park']) : null) : null;
@@ -1292,7 +1569,7 @@ function pickHangout(hobby, age) {
   return list.length && Math.random() < .75 ? pick(list) : null;
 }
 function placeOpen(pl) {
-  if (jailed() || !ageFits(pl, S.age)) return false;
+  if (jailed() || !ageFits(pl, S.age) || !phaseFits(pl)) return false;
   if (pl.night && S.time !== 2) return false;
   return !pl.open || !!pl.open(S, api);
 }
@@ -1302,12 +1579,15 @@ function closedWhy(pl) {
   return '';
 }
 // 장소 목록 (나이에 맞는 곳만). ok: 지금 갈 수 있는지
+// 중학생은 갈 수 있는 곳이 적음 (집·학교·공원·도서관·학원·편의점·시장), 어린 시절엔 장소 없이 이야기만
+const phaseFits = pl => { const ph = phase(); return ph !== 'story' && (ph !== 'ms' || !!pl.ms); };
 function placeList() {
-  if (jailed()) return [];
-  return D.places.filter(pl => ageFits(pl, S.age)).map(pl => ({
-    id: pl.id, label: pl.label, icon: pl.icon, why: closedWhy(pl), regular: !!S.regular[pl.id],
-    ok: !busy() && S.ap > 0 && placeOpen(pl),
-  }));
+  if (jailed() || phase() === 'story') return [];
+  return D.places.filter(pl => ageFits(pl, S.age) && phaseFits(pl)).map(pl => {
+    const cost = travelCost(pl);
+    return { id: pl.id, label: pl.label, icon: pl.icon, why: closedWhy(pl), regular: !!S.regular[pl.id], cost, zone: ZONE_LABEL[ZONE[pl.id] || 'out'],
+      ok: !busy() && S.ap >= cost && (cost || S.ap > 0) && !dutyPending() && placeOpen(pl) };
+  });
 }
 // 처음 보는 사람의 나이대
 function crowdRange(type) {
@@ -1361,18 +1641,19 @@ function enterPlace(pl, bring, night = S.time === 2) {
 // 장소에 가기 (행동 1). 거기 있는 사람에겐 행동 없이 한 번씩 말을 걸 수 있음
 function goPlace(id) {
   const pl = PLACES[id];
-  if (!pl || busy() || S.ap <= 0 || !placeOpen(pl)) return;
+  const cost = pl ? travelCost(pl) : 0;
+  if (!pl || busy() || S.ap < cost || S.ap <= 0 || dutyPending() || !placeOpen(pl)) return;
   const night = S.time === 2;   // 사람은 도착한 때(행동 쓰기 전) 기준으로 채움
-  if (S.drunk) soberUp();
-  spend();
+  if (S.drunk && ZONE[pl.id] !== ZONE[S.place]) soberUp();
+  if (cost) spend(cost);
+  S.zone = ZONE[pl.id] || 'out';
   enterPlace(pl, null, night);
   log(`${pl.icon} ` + fill(textOf(pl.arrive) || `${josa(pl.label, '으로')} 갔다.`), { t: 'place' });
   if (!pl.routine) {
     S.visits[id] = (S.visits[id] || 0) + 1;
     if (S.visits[id] >= D.regularVisits && !S.regular[id]) { S.regular[id] = true; log(`이제 ${pl.label} 단골이다. 얼굴을 알아보는 사람이 생겼다.`, { t: 'info' }); }
   }
-  maybeRandom([id], C.placeEventChance);
-  tickSeason();
+  maybeRandom([id], cost ? C.placeEventChance : C.placeEventChance / 2);
   after();
 }
 function leavePlace() {
@@ -1414,22 +1695,24 @@ function talkTo(key) {
 /* ═════════ 사람과 상호작용 ═════════ */
 // 관계 창에서는 행동 1. 지금 장소에 같이 있는 사람이면 한 번은 행동 없이 (noFree면 늘 행동 1)
 const socialCost = (it, p) => it.cost ? (resolve(it.cost) || 0) : 0;
+const INTIMATE_IDS = ['intimate', 'onenight'];   // 함께 밤을 보내는 건 2칸 (어른)
+const socialAp = it => phase() === 'adult' && INTIMATE_IDS.includes(it.id) ? 2 : 1;
 function interactions(pid) {
   const p = person(pid);
   if (!p) return [];
   const h = hereEntry(pid), here = !!h && !h.used;
   return D.social.filter(it => it.if(S, p, api)).map(it => {
-    const cost = socialCost(it, p), free = here && !it.noFree;
-    return { id: it.id, label: it.label, icon: it.icon, cost, free, ok: !busy() && (free || S.ap > 0) && (!cost || S.money >= cost) };
+    const cost = socialCost(it, p), free = here && !it.noFree && socialAp(it) === 1, ap = socialAp(it);
+    return { id: it.id, label: it.label, icon: it.icon, cost, free, ap, ok: !busy() && !dutyPending() && (free || S.ap >= ap) && (!cost || S.money >= cost) };
   });
 }
 function interact(pid, iid) {
   const p = person(pid), it = D.social.find(x => x.id === iid);
   if (!p || !it || !it.if(S, p, api)) return;
   const cost = socialCost(it, p);
-  const h = hereEntry(pid), free = !!h && !h.used && !it.noFree;
-  if (busy() || (!free && S.ap <= 0) || (cost && S.money < cost)) return;
-  if (!free) spend();
+  const ap = socialAp(it), h = hereEntry(pid), free = !!h && !h.used && !it.noFree && ap === 1;
+  if (busy() || dutyPending() || (!free && S.ap < ap) || (cost && S.money < cost)) return;
+  if (!free) spend(ap);
   if (h) h.used = true;
   const o = it.run(S, p, api) || {};
   const pm = personality(p).mod[iid] || 1, mm = personality(S).mod[iid] || 1;
@@ -1440,8 +1723,8 @@ function interact(pid, iid) {
   if (['talk', 'hang', 'date', 'flirt', 'gift', 'listen', 'drinkWith'].includes(iid)) nearby(p);
   if (cost) { const eff = Object.assign({}, resolve(o.effect)); eff.money = val(eff.money) - cost; o.effect = eff; }
   S.vars.fp = p.id;
+  if (!o.intimate) o.gk = gainK();
   applyOutcome(o, p);
-  tickSeason();
   after();
 }
 
@@ -1459,7 +1742,7 @@ function jobChecks(j) {
   return out;
 }
 const meetsJob = j => jobChecks(j).every(c => c[0]);
-const canJobHunt = () => !busy() && S.ap > 0 && S.age >= 19 && !S.flags.student && !S.flags.inArmy && !jailed() && !S.job;
+const canJobHunt = () => !busy() && S.ap > 0 && !dutyPending() && S.age >= 19 && !S.flags.student && !S.flags.inArmy && !jailed() && !S.job;
 const jobInfo = () => D.jobs.map(j => Object.assign({}, j, { ok: meetsJob(j), checks: jobChecks(j) }));
 function jobOdds(j) {
   let o = j.odds ?? .7;
@@ -1481,7 +1764,6 @@ function applyJob(id) {
   spend();
   if (meetsJob(j) && Math.random() < jobOdds(j)) hire(j);
   else log(S.record && Math.random() < .5 ? `${j.label} 면접에서 전과 이야기가 나왔다. 떨어졌다.` : `${j.label} 면접에서 떨어졌다.`, { deltas: applyEffect({ happy: -3 }) });
-  tickSeason();
   after();
 }
 function tryJob() {
@@ -1662,7 +1944,8 @@ function newLife(opt = {}) {
   const sib = D.siblings.find(x => x.id === opt.sibling) || (Math.random() < .35 ? D.siblings[0] : pick(D.siblings.slice(1)));
   S = {
     v: 5, id: Date.now(), seq: 0, pseq: 0, xseq: 0,
-    name, gender, age: 0, money: 0, ap: C.apPerYear, used: 0, seasonIdx: -1, trait: tr.id,
+    name, gender, age: 0, money: 0, ap: 0, used: 0, seasonIdx: -1, trait: tr.id,
+    birthYear: rand(2000, 2006), date: null, dayN: 0, turn: 0, tkind: null, zone: 'home', fatigue: 0, meals: 0, wake: 0, worked: false, report: null,
     personality: opt.personality || pick(D.personalities).id,
     hobby: opt.hobby || pick(D.hobbies).id,
     value: opt.value || pick(D.values).id,
@@ -1698,16 +1981,23 @@ function newLife(opt = {}) {
     if (S.vars.sibGap >= 0) addSibling();
   }
 
+  S.date = { y: S.birthYear, m: 3, d: 1 };   // 태어난 해의 학년도 시작(3월 1일)부터
   S.log.push({ n: ++S.seq, t: 'year', age: 0 });
   log(`${josa(S.name, '이')} ${S.month}월에 세상에 태어났다.`, { memory: true });
   log(`소질 ${tr.label}, 성격 ${labelOf(D.personalities, S.personality)}, 집안 ${labelOf(D.wealth, S.wealth)}, 형제 ${sib.label}, 꿈 ${dr.label}.`, { t: 'info' });
-  tickSeason();
+  enterSeason(0);
   S.memories[0].wx = S.weather; S.memories[0].season = season().id;
   after();
 }
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* 저장 불가 환경이면 넘어감 */ } }
+// 자동 저장: 행동·턴·하루가 끝날 때마다 지금 칸에
+function save() { if (!S) return; try { S.v = 6; localStorage.setItem(slotKey(slot), JSON.stringify(S)); localStorage.setItem(SLOT_KEY, String(slot)); } catch (e) { /* 저장 불가 환경이면 넘어감 */ } }
+function readSlot(n) { try { return JSON.parse(localStorage.getItem(slotKey(n))); } catch (e) { return null; } }
 function load() {
   try {
+    const cur = readSlot(slot);
+    if (cur && (cur.v === 6 || cur.v === 5)) return patch(cur);
+    // 예전 저장(v5 이하)이 있으면 1번 칸으로
+    if (slot !== 1 || readSlot(1)) return null;
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
     // v5 칸에 v4로 찍혀 저장된 것(새 인생이 v4로 만들어지던 버그)도 v5 그대로라 살려서 읽음
     if (s && (s.v === 5 || s.v === 4)) { s.v = 5; return patch(s); }
@@ -1723,6 +2013,20 @@ function patch(s) {
   for (const x of [s, ...s.people]) {
     if (x.gender === 'm' && x.penis == null) x.penis = cmFromSize(x.size);
     delete x.size;
+  }
+  // 1년 10행동 → 달력 (GAMEFLOW): 지금 계절의 첫날로 옮기고 단계에 맞게 시작
+  if (!s.date) {
+    const prev = S; S = s;
+    s.birthYear = 2003; s.dayN = s.age * 365; s.zone = 'home'; s.fatigue = 0; s.meals = 0; s.wake = 0; s.worked = false; s.report = null;
+    const si = Math.max(0, s.seasonIdx), m = [3, 6, 9, 12][si];
+    s.date = { y: s.birthYear + s.age, m, d: 1 };
+    s.place = null; s.here = [];
+    const ph = phase();
+    if (ph === 'ms' || ph === 'hs') { let i = 0; while (i < turnsInYear() - 1 && turnDate(i + 1) <= dateOf()) i++; s.turn = i; s.tkind = turnKind(i); s.ap = TURN_AP[s.tkind] || 0; s.used = 0; }
+    else if (ph === 'adult') startDay(true);
+    else { s.ap = 0; s.tkind = null; }
+    updateTime();
+    S = prev;
   }
   // 대상 없는 성욕 하나 → 대상별 성욕: 예전 값은 애인(없으면 설렘이 가장 큰 사람)에게, 함께 밤을 보낸 사람들은 조금씩
   if (!s.lust) {
@@ -1767,11 +2071,36 @@ function migrate(s) {
   for (const p of s.people) if (p.hangout === undefined) p.hangout = pickHangout(p.hobby, npcAge(p));
   return s;
 }
-function init() { S = load(); if (S) { emit(); return true; } return false; }
+function init() { S = load(); if (S) { after(); return true; } return false; }
+// 저장 칸 목록 (화면용 요약)
+function slotList() {
+  return Array.from({ length: SLOTS_N }, (_, i) => {
+    const n = i + 1, s = n === slot && S ? S : readSlot(n);
+    return { n, current: n === slot, empty: !s, name: s && s.name, age: s && s.age, gender: s && s.gender, date: s && s.date, ended: s && s.ended };
+  });
+}
+// 다른 칸으로: 비어 있으면 false (화면이 새 인생 만들기를 열고, newLife가 그 칸에 저장)
+function useSlot(n) {
+  n = clamp(+n || 1, 1, SLOTS_N);
+  if (S) save();
+  slot = n;
+  try { localStorage.setItem(SLOT_KEY, String(n)); } catch (e) { /* */ }
+  const s = readSlot(n);
+  if (!s) { S = null; return false; }
+  S = patch(s); held = null;
+  after();
+  return true;
+}
+// 지금 인생을 다른 칸에도 저장 (수동 저장 — 그 칸으로 옮겨감)
+function saveTo(n) { n = clamp(+n || 1, 1, SLOTS_N); if (!S) return; slot = n; save(); emit(); }
+function deleteSlot(n) { if (n === slot) return; try { localStorage.removeItem(slotKey(n)); } catch (e) { /* */ } emit(); }
 
 window.Game = {
   init, subscribe: f => subs.push(f), state: () => S,
-  newLife, ageUp, choose, currentEvent,
+  slots: slotList, useSlot, saveTo, deleteSlot, slot: () => slot,
+  newLife, choose, currentEvent,
+  // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
+  phase, timeInfo, storyNext, nextTurn, eat, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
   actionList, canDo, costOf, doAction, needsSubject,
   places: placeList, goPlace, leavePlace, here: hereList, talkTo, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
@@ -1786,6 +2115,6 @@ window.Game = {
   creation: { traits: D.traits, personalities: D.personalities, wealth: D.wealth, hobbies: D.hobbies, values: D.values, dreams: D.dreams, siblings: D.siblings },
   LABEL, config: C, seasons: SEASONS,
   // 개발·테스트용 (브라우저 콘솔이나 헤드리스 검사에서 이벤트를 직접 터뜨려볼 때)
-  dev: { fire: id => { fire(EVENTS[id]); tickSeason(); after(); }, eligible: id => eligible(EVENTS[id]), meet: spec => addPerson(spec), rumorYear, api },
+  dev: { fire: id => { fire(EVENTS[id]); after(); }, eligible: id => eligible(EVENTS[id]), meet: spec => addPerson(spec), rumorYear, api },
 };
 })();

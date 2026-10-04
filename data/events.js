@@ -63,9 +63,10 @@ GAME_DATA.events = [
     do: (s, a) => { a.meet({ kind: 'classmate', ageRange: [16, 16], close: 25 }); } },
   { id: 'schoolTrip', type: 'must', at: 17, text: '수학여행을 갔다. 밤새 떠드느라 한숨도 못 잤다.', memory: true, effect: { happy: 8 } },
   { id: 'dreamSpeech', type: 'must', at: 10, text: '장래희망 발표 시간. "{dreamSpeech}"', memory: true },
-  { id: 'suneung', type: 'must', at: 18, season: ['겨울'], req: { noFlags: ['inJail'] },
+  // 수능은 고3 학교 턴(csat)에서 터짐 (js/game.js schoolTurn)
+  { id: 'suneung', type: 'trigger', req: { noFlags: ['inJail'] },
     do: (s, a) => a.takeSuneung(0), text: s => s.vars.satText, memory: true, then: 'collegeApply' },
-  { id: 'suneung2', type: 'must', at: 19, season: ['겨울'], req: { flags: ['retake'], noFlags: ['inJail'] },
+  { id: 'suneung2', type: 'trigger', req: { flags: ['retake'], noFlags: ['inJail'] },
     do: (s, a) => a.takeSuneung(6), text: s => '두 번째 수능. ' + s.vars.satText, memory: true, then: 'collegeApply' },
   { id: 'enlist', type: 'must', at: 20, req: { gender: 'm', noFlags: ['inJail'] },
     text: '입영 통지서가 날아왔다. 머리를 짧게 깎았다.', memory: true, set: ['army', 'inArmy'], effect: { happy: -6, health: 4 },
@@ -97,6 +98,13 @@ GAME_DATA.events = [
       { label: '이혼하자고 한다', memory: true, effect: { happy: -6 }, do: (s, a) => a.divorce(a.focused()), text: '{fp|와} 갈라서기로 했다.' },
     ] },
   { id: 'fiftyEve', type: 'must', at: 49, season: ['겨울'], text: '내년이면 쉰이다. 시간이 참 빠르다.' },
+  // 만성 피로 (새벽까지 깨는 날이 쌓이면, js/game.js endDay에서 한 달에 한 번까지)
+  { id: 'burnedOut', type: 'trigger', once: false,
+    text: '요즘 너무 무리하고 있다. 아침에 눈을 떠도 개운하지가 않다.',
+    choices: [
+      { label: '하루 푹 쉰다', effect: { health: [3, 5], happy: [2, 4] }, do: s => { s.fatigue = 0; s.wake = 4; }, text: '알람을 끄고 점심때까지 잤다. 몸이 조금 가벼워졌다.' },
+      { label: '커피로 버틴다', effect: { health: -2 }, do: s => { s.fatigue = Math.max(0, s.fatigue - 1); }, text: '세 번째 커피를 마셨다. 손이 조금 떨렸다.' },
+    ] },
 
   /* ═════ 고정 — 어린 시절 ═════ */
   { id: 'kinderFight', type: 'fixed', age: [4, 6], text: '어린이집에서 장난감 때문에 친구랑 싸웠다.',

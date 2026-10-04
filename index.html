@@ -17,6 +17,7 @@
 <script defer src="data/social.js"></script>
 <script defer src="data/crime.js"></script>
 <script defer src="data/events.js"></script>
+<script defer src="data/story.js"></script>
 <script defer src="data/places.js"></script>
 <script defer src="js/weather.js"></script>
 <script defer src="js/avatar.js"></script>
@@ -33,6 +34,7 @@
     <div class="who">
       <span id="name"></span><span id="age"></span><span id="gender" class="dim"></span>
       <span class="tools">
+        <button type="button" id="slotsBtn" aria-label="저장 칸">💾</button>
         <button type="button" id="restart" aria-label="새 인생">↻</button>
         <button type="button" id="hide" aria-label="배경만 보기">👁</button>
       </span>
@@ -54,7 +56,8 @@
       <button type="button" id="crimeBtn">🕶 범죄</button>
     </div>
     <div class="where" id="where"></div>
-    <button type="button" class="age-btn" id="ageUp">＋ 1살 먹기</button>
+    <div class="flow" id="flow" hidden></div>
+    <button type="button" class="age-btn" id="ageUp">▶ 계속</button>
   </section>
 </main>
 

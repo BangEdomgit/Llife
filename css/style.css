@@ -93,9 +93,15 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
 /* 하단 행동 */
 .controls{padding:10px;display:grid;gap:8px;flex:none}
-.season-row{display:flex;align-items:baseline;gap:10px;font-size:13px}
+.season-row{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;font-size:13px}
 #season{font-weight:700}
-.dots{color:var(--accent);letter-spacing:1px;flex:1}
+.dots{color:var(--accent);letter-spacing:1px;flex:1;white-space:nowrap}
+.dots b{font-weight:400}
+.dots b.late{color:var(--minus)}
+.flow{display:flex;flex-wrap:wrap;gap:5px}
+.flow[hidden]{display:none}
+.flow button{flex:1 1 auto;padding:7px 6px;font-size:12.5px;white-space:nowrap}
+.flow button small{font-size:10.5px;color:var(--text-dim)}
 .menu-row{display:flex;gap:6px}
 .menu-row button{flex:1 1 0;white-space:nowrap}
 .menu-row button{padding:7px 4px;font-size:12.5px}
@@ -276,3 +282,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 @keyframes sp3{0%{transform:translate(0,86px);opacity:1}80%{opacity:.8}100%{transform:translate(140px,76px);opacity:0}}
 @keyframes wig{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
 @media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *,.sc-fore *,.sc-uterus *{animation:none!important}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}}
+
+/* 저장 칸 */
+.slot-btns{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.slot-btns button{padding:5px 9px;font-size:12.5px}

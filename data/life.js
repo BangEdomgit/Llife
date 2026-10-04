@@ -3,7 +3,8 @@ window.GAME_DATA = window.GAME_DATA || {};
 
 GAME_DATA.config = {
   endAge: 50,
-  apPerYear: 10,
+  apPerYear: 10,              // (예전 기준) 1년 행동 수 — 지금은 단계마다 다름: js/game.js 시간(GAMEFLOW)
+  dayEventChance: .012,       // 하루를 통째로 넘길 때 그날 랜덤 이벤트 확률
   livingCost: 1200,
   randomEventChance: .14,
   placeEventChance: .25,    // 장소에 도착했을 때 랜덤 이벤트 확률
@@ -282,7 +283,7 @@ GAME_DATA.namesM = ['민준','서준','도윤','예준','시우','하준','지�
 GAME_DATA.namesF = ['서연','서윤','지우','하은','민서','하윤','윤서','지유','채원','수아','지아','다은','예린','소율','은서','나윤','유나','하린','수빈','가은'];
 GAME_DATA.dogNames = ['초코','보리','콩이','두부','몽이','해피','구름','밤이'];
 
-/* ───── 행동 (장소에서 행동 1 사용, cost는 18살부터 내 돈에서) ───── */
+/* ───── 행동 (장소에서 행동 1 사용 — 어른은 ap만큼 칸을 씀(기본 1), cost는 18살부터 내 돈에서) ───── */
 // 어느 장소에서 할 수 있는지는 data/places.js의 actions에서 정함
 // perf: 일 성과 / subjAll: 중·고등학생이면 모든 과목 실력이 오름
 GAME_DATA.actions = [
@@ -316,7 +317,7 @@ GAME_DATA.actions = [
       : ['옷 가게에서 하루 종일 옷을 갰다.', '전단지를 돌렸다.', '물류센터에서 하루 일했다.'] },
   { id: 'work',      label: '일',     icon: '💼', minAge: 19, req: { job: true }, work: true, effect: { money: [50, 150], health: [-4, -1], happy: [-3, -1] },
     text: ['하루 종일 일에 매달렸다.', '맡은 일을 끝까지 해냈다.', '정신없이 하루가 지나갔다.'] },
-  { id: 'overtime',  label: '야근',   icon: '🌙', minAge: 19, req: { job: true }, work: true, perf: [10, 18], effect: { money: [80, 180], health: [-7, -3], happy: [-5, -2] },
+  { id: 'overtime',  label: '야근',   icon: '🌙', minAge: 19, ap: 2, req: { job: true }, work: true, perf: [10, 18], effect: { money: [80, 180], health: [-7, -3], happy: [-5, -2] },
     text: ['사무실 불을 마지막으로 껐다.', '막차를 놓쳐서 택시를 탔다.', '주말에도 나와서 일했다.'] },
   // 피임약 — 20살 이상 여자. 처방받으면 해마다 약값이 나감 (끊으면 플래그 해제)
   { id: 'pill',      label: '피임약 처방', icon: '💊', minAge: 20, cost: 5, if: s => s.gender === 'f' && !s.flags.onPill, set: 'onPill', effect: { happy: [0, 1] },
@@ -342,7 +343,7 @@ GAME_DATA.actions = [
     text: ['보육원에서 아이들과 놀아줬다.', '유기견 보호소 청소를 도왔다.', '무료 급식소에서 배식을 했다.'] },
   { id: 'donate',    label: '기부',   icon: '💝', minAge: 20, cost: 100, effect: { happy: [2, 4] }, karma: [8, 14],
     text: ['조금이지만 기부를 했다.', '정기 후원을 시작했다.', '모금함에 봉투를 넣었다.'] },
-  { id: 'travel',    label: '여행',   icon: '🧳', minAge: 20, cost: 150, effect: { happy: [6, 12], art: [0, 2] }, memoryChance: .35,
+  { id: 'travel',    label: '여행',   icon: '🧳', minAge: 20, ap: 4, cost: 150, effect: { happy: [6, 12], art: [0, 2] }, memoryChance: .35,
     text: ['훌쩍 바다를 보러 다녀왔다.', '처음 가보는 도시를 걸었다.', '기차 창밖만 보다가 돌아왔다.'] },
 ];
 

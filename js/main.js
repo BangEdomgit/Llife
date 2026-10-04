@@ -66,11 +66,21 @@ function renderLog(S) {
 }
 
 /* ---------- 전체 그리기 ---------- */
-function seasonDots(S) {
-  const cuts = G.seasons.map(s => s.at).filter(a => a > 0);
-  let out = '';
-  for (let i = 0; i < G.config.apPerYear; i++) { if (cuts.includes(i)) out += ' '; out += i < S.used ? '●' : '○'; }
-  return out;
+// 행동력 칸: 어른은 12칸 + 새벽 6칸(빨강), 학교 턴은 그 턴의 칸
+function apDots(ti) {
+  if (ti.phase === 'adult') {
+    let out = '';
+    for (let i = 0; i < ti.day + ti.lateMax; i++) { if (i === ti.day) out += ' '; out += `<b class="${i >= ti.day ? 'late' : ''}${i < ti.used ? ' u' : ''}">${i < ti.used ? '●' : '○'}</b>`; }
+    return out;
+  }
+  if (ti.apMax) return Array.from({ length: ti.apMax }, (_, i) => i < ti.apMax - ti.ap ? '●' : '○').join('');
+  return '';
+}
+function timeText(ti) {
+  const date = `${ti.y}년 ${ti.m}월`;
+  if (ti.phase === 'story') return `${ti.season.icon} ${ti.season.id} · ${date}`;
+  if (ti.phase === 'adult') return `📅 ${date} ${ti.d}일 (${ti.dow}) ${wxIcon(G.state().weather)} ⏰ ${ti.clock} · ${ti.slot}`;
+  return `📅 ${date} ${ti.d}일 (${ti.dow}) ${wxIcon(G.state().weather)} · ${ti.school}${ti.grade === '재수' ? ' 재수' : ti.grade.replace('학년', '')} ${ti.sem}학기 ${ti.week}주차 · ${ti.kindLabel}`;
 }
 function render(S) {
   $('#name').textContent = S.name;
@@ -91,23 +101,33 @@ function render(S) {
 
   renderLog(S);
 
-  const se = G.season();
-  $('#season').textContent = `${se.icon} ${se.id} · ${G.timeLabel()}`;
-  $('#ap').textContent = seasonDots(S);
-  $('#apNum').textContent = `${S.ap}/${G.config.apPerYear}`;
+  const ti = G.timeInfo();
+  $('#season').textContent = timeText(ti);
+  $('#ap').innerHTML = apDots(ti);
+  $('#apNum').textContent = ti.phase === 'adult' ? `⚡ ${Math.max(0, ti.day - ti.used)}/${ti.day}${ti.late ? ' 새벽' : ''}${ti.fatigue >= 3 ? ` · 피로 ${ti.fatigue}` : ''}` : ti.apMax ? `⚡ ${S.ap}/${ti.apMax}` : '';
   $("#peopleBtn").textContent = "👥 관계";
   $('#jobBtn').hidden = S.age < 16;
   $('#crimeBtn').hidden = G.crimes().length === 0 && S.jail === 0;
 
   renderWhere(S);
 
-  const ageBtn = $('#ageUp');
-  ageBtn.textContent = S.ended ? '↻ 새 인생 시작' : S.ap > 0 ? `⏭ 남은 ${S.ap}번 쉬고 1살 먹기` : '＋ 1살 먹기';
-  ageBtn.disabled = !S.ended && S.pending.length > 0;
+  // 아래 큰 버튼: 단계마다 다름 (이야기 계속 / 다음 주 / 잠자기) + 어른은 밥·출근·넘기기 줄
+  const ageBtn = $('#ageUp'), flow = $('#flow');
+  const wait = !S.ended && (S.pending.length > 0 || !!S.report);
+  ageBtn.textContent = S.ended ? '↻ 새 인생 시작' : ti.phase === 'story' ? '▶ 계속' : ti.phase === 'adult' ? `😴 잠자기 (오늘 끝내기)` : S.ap > 0 ? `⏭ 다음 주로 (남은 ${S.ap}칸은 쉬기)` : '▶ 다음 주';
+  ageBtn.disabled = wait;
+  if (ti.phase === 'adult' && !S.ended) {
+    const d = ti.duty;
+    flow.hidden = false;
+    flow.innerHTML = (d ? `<button type="button" data-flow="duty"${wait ? ' disabled' : ''}>${d.id === 'work' ? '💼' : d.id === 'class' ? '🎓' : '🪖'} ${d.label} <small>${d.ap}칸</small></button>` : '') +
+      `<button type="button" data-flow="eat"${wait || S.ap <= 0 || d ? ' disabled' : ''}>🍚 밥 먹기 <small>${ti.meals}끼</small></button>` +
+      `<button type="button" data-flow="week"${wait ? ' disabled' : ''}>⏭ 이번 주 넘기기</button><button type="button" data-flow="month"${wait ? ' disabled' : ''}>⏩ 이번 달 넘기기</button><button type="button" data-flow="event"${wait ? ' disabled' : ''}>⏬ 다음 일까지</button>`;
+  } else { flow.hidden = true; flow.innerHTML = ''; }
 
-  // 배경: 지금 계절의 날씨와 시간대
+  // 배경: 지금 날씨와 시간대 (어른은 시계를 따라 하늘이 바뀜)
   if (bg.w !== S.weather) { WeatherBG.setWeather(WX[S.weather].p, bg.w === null); bg.w = S.weather; }
-  if (bg.t !== S.time) { WeatherBG.setTime(S.time, bg.t === null); bg.t = S.time; }
+  const sky = S.sky ?? S.time;
+  if (bg.t !== sky) { WeatherBG.setTime(sky, bg.t === null); bg.t = sky; }
 
   maybeScene(S);
   // 모달
@@ -147,9 +167,15 @@ function renderWhere(S) {
   const pl = G.place();
   if (!pl) {
     const list = G.places();
+    const ti = G.timeInfo();
+    if (ti.phase === 'story') { box.innerHTML = '<p class="empty">어린 시절은 이야기로 흘러간다. <b>▶ 계속</b>을 누르면 다음 장면으로.</p>'; return; }
+    const adult = ti.phase === 'adult';
+    const head = adult ? `<p class="sec-t">지금 ${esc(ti.zone)} <span class="dim">· 같은 구역은 0칸, 다른 구역 1칸, 여행지 2칸</span></p>`
+      : ti.apMax ? `<p class="sec-t">${esc(ti.kindLabel)} 턴 <span class="dim">· 장소 1칸, 행동 1칸, 말 걸기는 0칸</span></p>` : '';
+    const duty = adult && ti.duty ? `<p class="hint">평일이다. 먼저 ${ti.duty.id === 'work' ? '출근' : ti.duty.id === 'class' ? '수업' : '훈련'}부터 (${ti.duty.ap}칸). 아침밥은 그 전에 먹을 수 있다.</p>` : '';
     box.innerHTML = list.length
-      ? `<div class="acts places">${list.map(p => `<button type="button" class="act" data-pl="${p.id}"${p.ok ? '' : ' disabled'}${p.why ? ` title="${esc(p.why)}"` : ''}><span class="ic" aria-hidden="true">${p.icon}</span>${esc(p.label)}${p.regular ? '<small>단골</small>' : p.why ? `<small>${esc(p.why)}</small>` : ''}</button>`).join('')}</div>`
-      : '<p class="empty">아직은 먹고 자는 게 전부다.</p>';
+      ? `${head}${duty}<div class="acts places">${list.map(p => `<button type="button" class="act" data-pl="${p.id}"${p.ok ? '' : ' disabled'}${p.why ? ` title="${esc(p.why)}"` : ''}><span class="ic" aria-hidden="true">${p.icon}</span>${esc(p.label)}${p.why ? `<small>${esc(p.why)}</small>` : adult ? `<small>${p.cost ? p.cost + '칸' : '0칸'}${p.regular ? ' · 단골' : ''}</small>` : p.regular ? '<small>단골</small>' : ''}</button>`).join('')}</div>`
+      : ti.apMax ? '<p class="empty">갈 수 있는 곳이 없다.</p>' : `<p class="empty">${esc(ti.kindLabel || '')} 주간이다. <b>▶ 다음 주</b>를 누르면 이어진다.</p>`;
     return;
   }
   const here = G.here(), acts = G.actionList();
@@ -535,6 +561,18 @@ function dreamDone(S) {
   if (dr.flag) return !!S.flags[dr.flag];
   return false;
 }
+/* 저장 칸 3개 — 지금 칸은 자동 저장. 다른 칸 불러오기, 지금 인생을 다른 칸에 저장, 빈 칸에서 새 인생 */
+function openSlots() {
+  const rows = G.slots().map(x => {
+    const info = x.empty ? '<span class="dim">비어 있음</span>'
+      : `<b>${esc(x.name)}</b> <span class="dim">${x.age}살 ${genderKo(x.gender)}${x.date ? ` · ${x.date.y}년 ${x.date.m}월` : ''}${x.ended ? ' · 끝난 인생' : ''}</span>`;
+    const btns = x.current ? '<span class="tag">지금 칸 · 자동 저장</span>'
+      : (x.empty ? `<button type="button" data-sv="${x.n}">여기에 저장</button><button type="button" data-snew="${x.n}">새 인생</button>`
+        : `<button type="button" data-sl="${x.n}">불러오기</button><button type="button" data-sv="${x.n}">덮어쓰기</button><button type="button" data-sdel="${x.n}">지우기</button>`);
+    return `<div class="row"><div>${x.n}번 칸 · ${info}</div><div class="slot-btns">${btns}</div></div>`;
+  }).join('');
+  showModal('slots', '💾 저장 칸', `${rows}<p class="hint">지금 칸에는 행동·턴·하루가 끝날 때마다 자동으로 저장돼. 다른 칸에 저장하면 그 칸으로 옮겨가서 이어서 저장돼.</p>`);
+}
 function confirmRestart() {
   showModal('confirm', '↻ 새 인생', `<p>지금 인생을 접고 처음부터 다시 시작할까?</p>
     <div class="choices"><button type="button" data-cancel>계속 살기</button><button type="button" data-new>새로 시작</button></div>`);
@@ -555,11 +593,23 @@ $('#where').addEventListener('click', e => {
   }
 });
 $('#meBtn').addEventListener('click', openMe);
-$('#ageUp').addEventListener('click', () => { const S = G.state(); if (S.ended) { draft = null; openCreate(true); } else G.ageUp(); });
+$('#ageUp').addEventListener('click', () => {
+  const S = G.state();
+  if (S.ended) { draft = null; openCreate(true); return; }
+  const ph = G.phase();
+  if (ph === 'story') G.storyNext(); else if (ph === 'adult') G.sleep(); else G.nextTurn();
+});
+$('#flow').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  const f = b.dataset.flow;
+  if (f === 'eat') G.eat(); else if (f === 'duty') G.doDuty(); else G.skip(f);
+});
 $('#peopleBtn').addEventListener('click', () => { personFrom = 'people'; openPeople(); });
 $('#jobBtn').addEventListener('click', openJobs);
 $('#crimeBtn').addEventListener('click', openCrime);
 $('#restart').addEventListener('click', confirmRestart);
+$('#slotsBtn').addEventListener('click', openSlots);
 $('#mClose').addEventListener('click', closeModal);
 modal.addEventListener('click', e => { if (e.target === modal && !$('#mClose').hidden) closeModal(); });
 mBody.addEventListener('click', e => {
@@ -567,6 +617,13 @@ mBody.addEventListener('click', e => {
   if (!b || b.disabled) return;
   const d = b.dataset;
   if (modalMode === 'create') { createClick(b); return; }
+  if (modalMode === 'slots') {
+    if (d.sl) { G.useSlot(+d.sl); closeModal(); logState = { id: null, n: 0 }; render(G.state()); }
+    else if (d.sv) { G.saveTo(+d.sv); openSlots(); }
+    else if (d.snew) { G.useSlot(+d.snew); draft = null; openCreate(false); }   // 빈 칸으로 옮겨서 새로 시작 (닫을 수 없음 — 이 칸엔 아직 인생이 없음)
+    else if (d.sdel) { G.deleteSlot(+d.sdel); openSlots(); }
+    return;
+  }
   if (d.s) { G.doAction('study', d.s === 'all' ? null : d.s); return; }
   if (d.c != null) G.choose(+d.c);
   else if (d.full) { fullView = fullView === d.full ? null : d.full; if (d.full === 'me') openMe(); else openPerson(d.full); }
