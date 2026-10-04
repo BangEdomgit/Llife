@@ -213,17 +213,10 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .sil{width:220px;height:auto;fill:var(--text);opacity:.85}
 .sil .sil-heart{fill:var(--minus)}
 .floor{width:200px;height:auto;opacity:.9}
-.sc-night{display:grid;justify-items:center;gap:6px;padding:16px 12px 10px;background:#0b0d14;border-radius:4px;cursor:pointer;animation:scFade .5s ease-out}
+.sc-night{display:grid;justify-items:center;gap:8px;padding:14px 10px 10px;background:#0b0d14;border-radius:4px;cursor:pointer;animation:scFade .5s ease-out}
 .sc-night .sc-t{margin:0}
-.bed{width:100%;max-width:300px;height:auto;overflow:visible}
-.bed .win{fill:#141a2a;stroke:#2a3350;stroke-width:1.5}
-.bed .moon{fill:#f4e7b8;opacity:.85}
-.bed .wood{fill:#5a4030}
-.bed .mat{fill:#d9d2c4}
-.bed .pillow{fill:#f1ebe0}
-.bed .quilt{fill:#c8a2c8;transform-box:fill-box;transform-origin:50% 100%;animation:quilt .46s ease-in-out infinite}
-.bed .quilt .fold{fill:none;stroke:#9c7aa0;stroke-width:1.4;stroke-linecap:round;opacity:.7}
-.bed .ht{fill:#ff6b8a;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:heartUp 1.8s ease-out infinite}
+.bed{display:block;width:100%;max-width:380px;height:auto;border-radius:3px}
+.bed .nt-star{animation:twinkle 2.6s ease-in-out infinite}
 .conceive{width:100%;max-width:300px;background:#0b0d14;border-radius:4px}
 .conceive .glow{opacity:0;animation:glow .5s ease-out 1.3s forwards}
 .conceive .sp{transform-box:fill-box}
@@ -232,11 +225,10 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .conceive .sp3{animation:sp3 1.5s ease-in forwards}
 .conceive .tail{animation:wig .18s ease-in-out infinite alternate;transform-origin:-5px 0}
 @keyframes scFade{from{opacity:0}to{opacity:1}}
-@keyframes quilt{0%,100%{transform:scale(1,1) skewX(0)}25%{transform:scale(1.015,.95) skewX(-2deg)}50%{transform:scale(.99,1.05) skewX(0)}75%{transform:scale(1.015,.96) skewX(2deg)}}
-@keyframes heartUp{0%{opacity:0;transform:translateY(6px) scale(.5)}20%{opacity:1;transform:translateY(-6px) scale(1.1)}100%{opacity:0;transform:translateY(-58px) scale(.8)}}
+@keyframes twinkle{0%,100%{opacity:.9}50%{opacity:.25}}
 @keyframes glow{to{opacity:.55}}
 @keyframes sp1{from{transform:translate(18px,60px)}to{transform:translate(196px,60px)}}
 @keyframes sp2{0%{transform:translate(6px,36px);opacity:1}80%{opacity:.8}100%{transform:translate(150px,46px);opacity:0}}
 @keyframes sp3{0%{transform:translate(0,86px);opacity:1}80%{opacity:.8}100%{transform:translate(140px,76px);opacity:0}}
 @keyframes wig{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
-@media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *{animation:none!important}.bed .ht{opacity:.8}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}}
+@media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *{animation:none!important}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}}

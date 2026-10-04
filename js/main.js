@@ -204,16 +204,143 @@ function morningCard(sc, p) {
   return `<p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
     <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
-// 그날 밤: 침대 위 이불이 들썩이고 하트가 피어오름. 행위 자체는 그리지 않음
+// 그날 밤: 달빛 드는 방의 침대. 이불이 점점 빠르게 들썩이다 두 번 크게 들썩이고 멈춤, 하트가 피어오름. 행위 자체는 그리지 않음
+// 이불 윗선은 용수철로 이어진 점들(천 시뮬레이션). 이불 아래 두 사람 윤곽(머리·몸통·엉덩이·다리·발)이 쉬는 모양
 const HEART = 'M0,5 C-7,0 -6,-6 -2.5,-6 C-1,-6 0,-5 0,-4 C0,-5 1,-6 2.5,-6 C6,-6 7,0 0,5 Z';
-const NIGHT = `<svg class="bed" viewBox="0 0 240 140" aria-hidden="true">
-  <rect x="178" y="14" width="40" height="34" rx="2" class="win"/><path d="M206,24 a8,8 0 1 0 4,14 a6.5,6.5 0 1 1 -4,-14 Z" class="moon"/>
-  <rect x="22" y="48" width="9" height="66" rx="2" class="wood"/><rect x="24" y="102" width="194" height="12" rx="2" class="wood"/>
-  <rect x="28" y="114" width="6" height="10" class="wood"/><rect x="208" y="114" width="6" height="10" class="wood"/>
-  <rect x="31" y="90" width="185" height="13" rx="4" class="mat"/><ellipse cx="52" cy="85" rx="19" ry="7" class="pillow"/>
-  <g class="quilt"><path d="M38,99 C36,78 58,66 82,72 C98,58 140,58 158,72 C180,66 214,76 216,99 Z"/>
-    <path d="M74,96 C78,86 82,78 86,74 M118,98 Q124,82 120,66 M166,96 C170,88 172,80 168,74" class="fold"/></g>
-  ${[[92, 0], [128, .35], [110, .7], [146, 1.05], [100, 1.4], [136, 1.75]].map(([x, d]) => `<g transform="translate(${x},62)"><path class="ht" d="${HEART}" style="animation-delay:${d}s"/></g>`).join('')}</svg>`;
+const QX = Array.from({ length: 28 }, (_, i) => 70 + 214 * i / 27);
+const QREST = QX.map(x => 127 - 5 * Math.log([[100, 15, 14], [152, 21, 36], [192, 26, 26], [180, 14, 78], [240, 12, 30], [271, 11, 10]]
+  .reduce((sum, [c, h, w]) => sum + Math.exp(h * Math.exp(-(((x - c) / w) ** 2)) / 5), 0) - 5));
+const FOLDS = [[112, -4, .8], [146, 3, 1], [176, -3, .7], [212, 4, 1], [250, -2, .8]];
+const NIGHT = `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
+  <linearGradient id="ntWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#161c33"/><stop offset="1" stop-color="#0d1120"/></linearGradient>
+  <linearGradient id="ntSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1533"/><stop offset="1" stop-color="#27356c"/></linearGradient>
+  <radialGradient id="ntMoon"><stop offset="0" stop-color="#fff4c8" stop-opacity=".5"/><stop offset="1" stop-color="#fff4c8" stop-opacity="0"/></radialGradient>
+  <mask id="ntCres"><circle cx="268" cy="44" r="8" fill="#fff"/><circle cx="272" cy="41" r="7" fill="#000"/></mask>
+  <linearGradient id="ntBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6ff" stop-opacity=".14"/><stop offset="1" stop-color="#c9d6ff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="ntLamp"><stop offset="0" stop-color="#ffc77a" stop-opacity=".4"/><stop offset="1" stop-color="#ffc77a" stop-opacity="0"/></radialGradient>
+  <linearGradient id="ntWood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6d4a33"/><stop offset="1" stop-color="#4a3122"/></linearGradient>
+  <linearGradient id="ntSheet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ece6dc"/><stop offset="1" stop-color="#b9b1a4"/></linearGradient>
+  <linearGradient id="ntQuilt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dcbde6"/><stop offset=".4" stop-color="#b48bc6"/><stop offset="1" stop-color="#76548c"/></linearGradient>
+  <radialGradient id="ntWarm"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".5"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient>
+  <radialGradient id="ntHeart" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ffc6d4"/><stop offset=".55" stop-color="#ff6f94"/><stop offset="1" stop-color="#df3467"/></radialGradient>
+  <g id="ntH"><path d="${HEART}" fill="url(#ntHeart)"/><ellipse cx="-2.8" cy="-3.2" rx="1.7" ry="1" fill="#fff" opacity=".7" transform="rotate(-35 -2.8 -3.2)"/></g>
+</defs><g class="nt-cam">
+  <rect width="320" height="171" fill="url(#ntWall)"/><rect y="170" width="320" height="20" fill="#090b13"/><path d="M0,170.5 H320" stroke="#242b46"/>
+  <rect x="214" y="24" width="76" height="68" rx="2" fill="url(#ntSky)"/>
+  ${[[224, 34, 0], [240, 48, .8], [233, 78, 1.6], [282, 70, .4], [258, 84, 1.2], [246, 31, 2]].map(([x, y, d]) => `<circle class="nt-star" cx="${x}" cy="${y}" r=".9" fill="#fff" style="animation-delay:${d}s"/>`).join('')}
+  <circle cx="268" cy="44" r="19" fill="url(#ntMoon)"/><circle cx="268" cy="44" r="8" fill="#f6ebc4" mask="url(#ntCres)"/>
+  <path d="M252,24 V92 M214,58 H290" stroke="#303a62" stroke-width="2.4"/>
+  <rect x="214" y="24" width="76" height="68" rx="2" fill="none" stroke="#3b4672" stroke-width="3.5"/><rect x="209" y="91" width="86" height="4" rx="1.5" fill="#3b4672"/>
+  <path d="M206,18 H222 C220,40 216,60 222,80 C224,90 218,100 214,106 C210,98 206,92 206,84 Z" fill="#2a3558"/><path d="M211,20 C210,40 210,62 212,84 M216,20 C215,44 214,62 217,82" fill="none" stroke="#1c2442" stroke-width="1.4"/>
+  <path d="M298,18 H282 C284,40 288,60 282,80 C280,90 286,100 290,106 C294,98 298,92 298,84 Z" fill="#2a3558"/><path d="M293,20 C294,40 294,62 292,84 M288,20 C289,44 290,62 287,82" fill="none" stroke="#1c2442" stroke-width="1.4"/>
+  <path d="M202,17 H302" stroke="#4d3b2c" stroke-width="2.4" stroke-linecap="round"/><circle cx="201" cy="17" r="2.4" fill="#4d3b2c"/><circle cx="303" cy="17" r="2.4" fill="#4d3b2c"/>
+  <rect x="112" y="40" width="44" height="32" rx="1.5" fill="#3a2a20"/><rect x="115" y="43" width="38" height="26" fill="#1c2340"/><path d="M115,69 L127,55 L134,61 L143,50 L153,62 V69 Z" fill="#2c3a5c"/><circle cx="145" cy="49" r="2.4" fill="#c8b98a" opacity=".6"/><path d="M120,36 L134,28 L148,36" fill="none" stroke="#3a3f55" stroke-width=".8"/>
+  <circle cx="18" cy="112" r="50" fill="url(#ntLamp)"/>
+  <rect x="3" y="134" width="30" height="36" rx="2" fill="url(#ntWood)"/><rect x="1" y="131" width="34" height="4" rx="1.5" fill="#5b3d2a"/><path d="M7,151 H29" stroke="#3a281c"/><circle cx="18" cy="143" r="1.3" fill="#c9a36a"/>
+  <ellipse cx="18" cy="130" rx="5" ry="1.6" fill="#8a6a48"/><rect x="17" y="116" width="2" height="14" fill="#8a6a48"/><path d="M9,117 H27 L23,103 H13 Z" fill="#f3d9a6"/><path d="M9,117 H27" stroke="#d9b97f" stroke-width="1.2"/>
+  <g class="nt-bed">
+    <ellipse cx="168" cy="171" rx="134" ry="4" fill="#000" opacity=".5"/>
+    <path d="M40,170 V88 Q40,80 45,80 Q50,80 50,88 V170 Z" fill="url(#ntWood)"/><path d="M42.5,90 V166" stroke="#8a6448" opacity=".55"/>
+    <path d="M286,170 V120 Q286,114 290,114 Q294,114 294,120 V170 Z" fill="url(#ntWood)"/><path d="M288.5,122 V166" stroke="#8a6448" opacity=".55"/>
+    <rect x="48" y="145" width="240" height="11" rx="2" fill="url(#ntWood)"/><path d="M50,147.5 H286" stroke="#8a6448" opacity=".4"/>
+    <rect x="50" y="129" width="236" height="17" rx="5" fill="url(#ntSheet)"/><path d="M54,137.5 H282" stroke="#a49b8d" stroke-dasharray="3 3" opacity=".5"/>
+    <path d="M66,129 C63,121 72,115 86,116 C100,115 107,120 105,128 C104,131 68,132 66,129 Z" fill="#ddd5c8"/>
+    <path d="M54,130 C51,123 60,117 73,118 C87,117 93,122 91,129 C90,132 56,133 54,130 Z" fill="#f4efe6"/><path d="M62,124 Q71,120 82,122" fill="none" stroke="#d3cbbd" stroke-width="1.2" stroke-linecap="round"/>
+    <path class="nt-q" fill="url(#ntQuilt)"/><path class="nt-st" fill="none" stroke="#efdcf5" stroke-width=".9" stroke-dasharray="2.2 2.6" opacity=".45"/>
+    <g fill="none" stroke-linecap="round">${FOLDS.map(([, , o]) => `<path class="nt-f" stroke="#5c3f70" stroke-width="2.2" opacity="${.26 * o}"/><path class="nt-f" stroke="#f1e0f7" stroke-width="1.1" opacity="${.18 * o}"/>`).join('')}</g>
+    <path class="nt-hem" fill="none" stroke="#5a3e6e" stroke-width="2.2" opacity=".55"/><path class="nt-rim" fill="none" stroke="#f3e6f8" stroke-width="1.3" stroke-linecap="round" opacity=".6"/>
+  </g>
+  <ellipse class="nt-warm" cx="182" cy="116" rx="122" ry="54" fill="url(#ntWarm)" opacity="0"/>
+  <path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>
+  <g class="nt-hearts"></g>
+</g></svg>`;
+let nightRaf = 0;
+function runNight(svg, done) {
+  const q = c => svg.querySelector(c), f = v => v.toFixed(1);
+  const cam = q('.nt-cam'), bed = q('.nt-bed'), quilt = q('.nt-q'), stitch = q('.nt-st'), hemEl = q('.nt-hem'), rim = q('.nt-rim'), warm = q('.nt-warm'), heartsEl = q('.nt-hearts');
+  const folds = svg.querySelectorAll('.nt-f'), n = QX.length, u = new Float64Array(n), v = new Float64Array(n), DT = 1 / 240;
+  // 박자: 점점 빨라지고 세짐 → 잠깐 멈칫 → 크게 두 번 → 멈춤
+  const beats = [];
+  let bt = .35, iv = .58;
+  while (bt < 3.5) { beats.push({ t: bt, a: .5 + .75 * Math.min(1, bt / 3.3) ** 1.3, iv, k: bt / 3.5 }); bt += iv; iv = Math.max(.18, iv * .86); }
+  const s1 = bt + .3, s2 = s1 + .62, END = s2 + 1.5;
+  beats.push({ t: s1, a: 3.3, iv: .6, strong: true }, { t: s2, a: 3.9, iv: .6, strong: true });
+  // 한 박자 = 엉덩이 쪽을 들어 올리는 힘 + 조금 늦게 몸통 쪽
+  const pushes = beats.flatMap(b => [{ t: b.t, x: 190 + (Math.random() - .5) * 8, w: 30, m: b.a, b }, { t: b.t + .3 * b.iv, x: 150, w: 34, m: .4 * b.a }]).sort((x, y) => x.t - y.t);
+  const hearts = [];
+  let t = 0, pi = 0, jolt = 0, joltV = 0, heat = 0, shakeAt = -9, finale = false, acc = 0, last = 0;
+  const at = (arr, x) => { const k = Math.max(0, Math.min(n - 1.001, (x - QX[0]) / (QX[n - 1] - QX[0]) * (n - 1))), i = Math.floor(k); return arr[i] + (arr[i + 1] - arr[i]) * (k - i); };
+  const hemY = x => 150 + .9 * Math.sin(x * .13 + .6) + FOLDS.reduce((d, [c, lean]) => d + 1.6 * Math.exp(-(((x - c - lean) / 6) ** 2)), 0) + .35 * at(u, x);
+  function heart(x, y, o = {}) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    el.setAttribute('href', '#ntH');
+    heartsEl.appendChild(el);
+    hearts.push({ el, t0: t, x, y, life: o.life || 1.7 + Math.random() * .6, rise: o.rise || 40 + Math.random() * 22, sway: (Math.random() < .5 ? -1 : 1) * (3 + Math.random() * 4), fq: .8 + Math.random() * .5, ph: Math.random() * 6.3, s: o.s || .7 + Math.random() * .35, big: !!o.big });
+  }
+  function step() {
+    t += DT;
+    while (pi < pushes.length && pushes[pi].t <= t) {
+      const p = pushes[pi++];
+      for (let i = 1; i < n - 1; i++) v[i] -= 110 * p.m * Math.exp(-(((QX[i] - p.x) / p.w) ** 2));
+      if (!p.b) continue;
+      const hx = () => 150 + Math.random() * 64;
+      if (p.b.strong) {
+        joltV += 60; shakeAt = t; heat = 1;
+        for (let j = 0; j < 5; j++) { const x = hx(); heart(x, at(QREST, x) - 8, { s: 1 + Math.random() * .4, rise: 62 + Math.random() * 20 }); }
+      } else {
+        heat = Math.max(heat, .25 + .45 * p.b.k);
+        if (Math.random() < .3 + .7 * p.b.k) { const x = hx(); heart(x, at(QREST, x) - 6); }
+      }
+    }
+    if (!finale && t > s2 + .45) { finale = true; heart(186, 92, { big: true, s: 2, life: 2, rise: 22 }); }
+    for (let i = 1; i < n - 1; i++) v[i] += (-(u[i] > 0 ? 1900 : 520) * u[i] - 9 * v[i] + 40 * (u[i - 1] - 2 * u[i] + u[i + 1])) * DT;
+    for (let i = 1; i < n - 1; i++) u[i] += v[i] * DT;
+    joltV += (-900 * jolt - 24 * joltV) * DT; jolt += joltV * DT;
+    heat = Math.max(heat * Math.exp(-DT * 1.6), t < s1 ? .08 + .45 * Math.min(1, t / 3.5) : 0);
+  }
+  const curve = P => P.slice(0, -1).map((b, i) => {
+    const a = P[i - 1] || b, c = P[i + 1], e = P[i + 2] || c;
+    return ` C${f(b[0] + (c[0] - a[0]) / 6)},${f(b[1] + (c[1] - a[1]) / 6)} ${f(c[0] - (e[0] - b[0]) / 6)},${f(c[1] - (e[1] - b[1]) / 6)} ${f(c[0])},${f(c[1])}`;
+  }).join('');
+  function draw() {
+    const top = QX.map((x, i) => [x, QREST[i] + u[i]]), hem = Array.from({ length: 9 }, (_, i) => { const x = 284 - 214 * i / 8; return [x, hemY(x)]; });
+    const [l, r] = [top[0], top[n - 1]], [hr, hl] = [hem[0], hem[8]];
+    quilt.setAttribute('d', `M${f(l[0])},${f(l[1])}${curve(top)} C285.5,${f(r[1] + 8)} 285.5,${f(hr[1] - 8)} ${f(hr[0])},${f(hr[1])}${curve(hem)} C66,${f(hl[1] - 8)} 66,${f(l[1] + 8)} ${f(l[0])},${f(l[1])} Z`);
+    rim.setAttribute('d', `M${f(l[0])},${f(l[1] + .8)}${curve(top.map(([x, y]) => [x, y + .8]))}`);
+    hemEl.setAttribute('d', `M${f(hr[0])},${f(hr[1] - 1)}${curve(hem.map(([x, y]) => [x, y - 1]))}`);
+    const sp = top.slice(2, -2).map(([x, y]) => [x, Math.min(143, y + 8)]);
+    stitch.setAttribute('d', `M${f(sp[0][0])},${f(sp[0][1])}${curve(sp)}`);
+    FOLDS.forEach(([x, lean], j) => {
+      const yt = at(QREST, x) + at(u, x), y0 = yt + Math.max(6, (147 - yt) * .3), y1 = hemY(x + lean) - 1.2, dyn = Math.max(-5, Math.min(5, -at(v, x) * .02));
+      for (let k = 0; k < 2; k++) {
+        const o = k * 1.8;
+        folds[j * 2 + k].setAttribute('d', `M${f(x + o)},${f(y0 + k)} C${f(x + o - dyn * .4)},${f(y0 + (y1 - y0) * .45)} ${f(x + o + lean * .6 - dyn * .7)},${f(y1 - 5)} ${f(x + o + lean + dyn)},${f(y1)}`);
+      }
+    });
+    const sk = t - shakeAt < .5 ? 1.8 * Math.exp(-(t - shakeAt) * 12) : 0;
+    cam.setAttribute('transform', sk ? `translate(${f(sk * Math.sin((t - shakeAt) * 95))},${f(sk * .6 * Math.sin((t - shakeAt) * 120 + 1))})` : '');
+    bed.setAttribute('transform', `translate(0,${jolt.toFixed(2)})`);
+    warm.setAttribute('opacity', (heat * .9).toFixed(3));
+    for (let i = hearts.length - 1; i >= 0; i--) {
+      const h = hearts[i], age = t - h.t0, k = age / h.life;
+      if (k >= 1) { h.el.remove(); hearts.splice(i, 1); continue; }
+      const pop = k < .12 ? .4 + .7 * k / .12 : k < .2 ? 1.1 - (k - .12) / .8 : 1;
+      const lub = h.big ? 1 + .16 * Math.exp(-((((age % .9) - .15) / .045) ** 2)) + .1 * Math.exp(-((((age % .9) - .35) / .045) ** 2)) : 1;
+      const w = Math.sin(6.283 * h.fq * age + h.ph);
+      h.el.setAttribute('transform', `translate(${f(h.x + h.sway * w)},${f(h.y - h.rise * (1 - (1 - k) ** 2))}) rotate(${f(h.sway * 1.6 * Math.cos(6.283 * h.fq * age + h.ph))}) scale(${(h.s * pop * lub).toFixed(3)})`);
+      h.el.setAttribute('opacity', (k < .1 ? k / .1 : k > .6 ? (1 - k) / .4 : 1).toFixed(2));
+    }
+  }
+  function frame(now) {
+    acc += last ? Math.min(.05, (now - last) / 1000) : 0; last = now;
+    while (acc >= DT) { step(); acc -= DT; }
+    draw();
+    if (t < END) nightRaf = requestAnimationFrame(frame);
+    else done();
+  }
+  draw();
+  nightRaf = requestAnimationFrame(frame);
+}
 function playScene(sc) {
   const p = G.person(sc.pid);
   if (!p || !window.Avatar) { G.clearScene(); return; }
@@ -230,11 +357,12 @@ function playScene(sc) {
   nextScene();
 }
 function nextScene() {
-  clearTimeout(sceneTimer);
+  clearTimeout(sceneTimer); cancelAnimationFrame(nightRaf);
   if (sceneQueue.length) {
     const html = sceneQueue.shift();
     sceneCard(html);
-    if (sceneBox.querySelector('.sc-night')) sceneTimer = setTimeout(nextScene, 2800);
+    const night = sceneBox.querySelector('.sc-night svg');
+    if (night) runNight(night, () => { sceneTimer = setTimeout(nextScene, 500); });
     return;
   }
   sceneEl.hidden = true; sceneBox.innerHTML = '';
