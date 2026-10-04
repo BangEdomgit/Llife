@@ -567,7 +567,8 @@ function sexScene(p, o) {
   p.lastSat = sat; p.bestSat = Math.max(prevBest, sat);
   S.flags.hadSex = true;
   const fig = figure(p);
-  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, personality: p.personality, fig, cm: pcm, build: herBuild, n: (S.sceneN = (S.sceneN || 0) + 1) };   // cm·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
+  if (S.companion === p.id) S.companion = null;
+  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, direct: !!o.direct, personality: p.personality, fig, cm: pcm, build: herBuild, n: (S.sceneN = (S.sceneN || 0) + 1) };   // cm·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
   if (first) { S.vars.fp = p.id; trigger('firstTime'); }   // 내 첫 경험 — 상대 성격마다 다른 한 줄, 추억
   return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90, contra, pregMul: cm.preg, awkward };
 }
@@ -1100,6 +1101,7 @@ function doDuty(auto) {
 // 잠자기 — 하루 끝. 밥을 거르면 건강이 깎이고, 새벽까지 깨 있었으면 다음 날 늦게 일어나고 피로가 쌓임
 function endDay(auto) {
   const h0 = S.stats.health;
+  S.companion = null;   // 동행은 그날까지
   if (dutyPending()) {   // 출근·수업을 빼먹음
     if (auto) doDuty(true);
     else if (S.job) { S.perf = clamp(S.perf - 4, 0, 100); log('출근을 안 했다. 휴대폰에 부재중 전화가 쌓였다.', { t: 'info', deltas: applyEffect({ happy: -1 }) }); }
@@ -1695,7 +1697,7 @@ function doAction(id, subj) {
 /* ═════════ 장소 ═════════ */
 // 구역 (어른): 같은 구역 안은 공짜로 드나들고, 다른 구역은 1칸, 여행지(터미널)는 2칸
 const ZONE = { home: 'home', conveni: 'home', playground: 'home', school: 'school', academy: 'school', library: 'school', campus: 'school',
-  cafe: 'downtown', mall: 'downtown', gym: 'downtown', concert: 'downtown', bar: 'downtown', pcbang: 'downtown',
+  cafe: 'downtown', mall: 'downtown', gym: 'downtown', concert: 'downtown', bar: 'downtown', pcbang: 'downtown', motel: 'downtown',
   office: 'work', park: 'out', market: 'out', church: 'out', hospital: 'out', center: 'out', station: 'travel' };
 const ZONE_LABEL = { home: '집 근처', school: '학교 쪽', downtown: '번화가', work: '직장', out: '외곽', travel: '여행지' };
 function travelCost(pl) {
@@ -1809,6 +1811,9 @@ function enterPlace(pl, bring, night = S.time === 2) {
   S.vars.placeLabel = pl.label;
 }
 // 장소에 가기 (행동 1). 거기 있는 사람에겐 행동 없이 한 번씩 말을 걸 수 있음
+// 동행 — 잠자리 제안·가볍게 즐기기를 받아준 사람이 오늘 하루 같이 다님 (모텔·집으로). 하루가 끝나거나 그날 밤을 보내면 헤어짐
+const companion = () => { const p = S.companion && person(S.companion); return p && canSex(p) ? p : null; };
+function setCompanion(p) { S.companion = p ? p.id : null; }
 function goPlace(id) {
   const pl = PLACES[id];
   const cost = pl ? travelCost(pl) : 0;
@@ -1817,7 +1822,7 @@ function goPlace(id) {
   if (S.drunk && ZONE[pl.id] !== ZONE[S.place]) soberUp();
   if (cost) spend(cost);
   S.zone = ZONE[pl.id] || 'out';
-  enterPlace(pl, null, night);
+  enterPlace(pl, companion(), night);   // 동행은 같이 옴
   log(`${pl.icon} ` + fill(textOf(pl.arrive) || `${josa(pl.label, '으로')} 갔다.`), { t: 'place' });
   if (!pl.routine) {
     S.visits[id] = (S.visits[id] || 0) + 1;
@@ -2004,7 +2009,7 @@ function ensurePools() {
 /* ═════════ 사람과 상호작용 ═════════ */
 // 관계 창에서는 행동 1. 지금 장소에 같이 있는 사람이면 한 번은 행동 없이 (noFree면 늘 행동 1)
 const socialCost = (it, p) => it.cost ? (resolve(it.cost) || 0) : 0;
-const INTIMATE_IDS = ['intimate', 'onenight'];   // 함께 밤을 보내는 건 2칸 (어른)
+const INTIMATE_IDS = ['intimate', 'onenight', 'enjoy'];   // 함께 밤을 보내는 건 2칸 (어른)
 const socialAp = it => phase() === 'adult' && INTIMATE_IDS.includes(it.id) ? 2 : 1;
 function interactions(pid) {
   const p = person(pid);
@@ -2243,7 +2248,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, onPill, fertile, refusal, turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, refusal, turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,
@@ -2690,7 +2695,7 @@ window.Game = {
   myLust: p => canSex(p) ? lustOf(p) : null, lustTarget: () => { const t = lustTop(); return t.p ? { name: pname(t.p), v: t.v, id: t.p.id } : null; },
   people: () => alive(), person, interactions,
   // NPC 출현: 이름 옆 결혼 마커, 지금 반지가 보이는지, 얼굴만 아는 사람(관계 목록엔 따로), 소원해짐
-  marker, ringVisible, acquaintance: p => !!p.acq, faded: p => faded(p), interact, canSex, clearScene: () => { if (S.scene) { S.scene = null; save(); } }, look: lookOf, myLook: () => S.look, figure, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,
+  marker, ringVisible, acquaintance: p => !!p.acq, faded: p => faded(p), companion, endCompany: () => { S.companion = null; save(); emit(); }, interact, canSex, clearScene: () => { if (S.scene) { S.scene = null; save(); } }, look: lookOf, myLook: () => S.look, figure, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,
   crimes: () => D.crimes.filter(c => S.age >= c.minAge && meets(c.req)), canCrime, crimeOdds, commitCrime,
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,
   roleText, karmaLabel, trait, job, mainPartner, season, fmtMoney, josa,

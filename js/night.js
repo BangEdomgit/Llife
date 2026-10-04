@@ -142,7 +142,7 @@ function room(kind) {
 
 // 오른쪽 위 ♂♀ 패널. ♀ 고리는 옆으로 40°쯤 돌아선 고리(뒤쪽 반은 화살 뒤, 앞쪽 반은 화살 앞)라 화살이 고리를 꿰뚫어 보임
 //   그리는 순서: 빛 → 고리 안 → 물결 → 고리 뒤쪽 반 → 잔상 → ♂ 화살 → 고리 앞쪽 반·하이라이트·십자 → 부딪힘 선·반짝 → 하트
-const SYM = `<div class="nt-sym"><svg viewBox="0 0 140 64" aria-hidden="true"><defs>
+const SYM = `<div class="nt-sym"><svg viewBox="0 0 150 64" aria-hidden="true"><defs>
   <radialGradient id="ntSG"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".6"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient>
   <radialGradient id="syIn"><stop offset="0" stop-color="#ff9fbd" stop-opacity=".75"/><stop offset="1" stop-color="#ff6f9a" stop-opacity=".1"/></radialGradient>
   <linearGradient id="syBack" gradientUnits="userSpaceOnUse" x1="94" y1="0" x2="106" y2="0"><stop offset="0" stop-color="#8e3156"/><stop offset="1" stop-color="#cf4f79"/></linearGradient>
@@ -152,15 +152,15 @@ const SYM = `<div class="nt-sym"><svg viewBox="0 0 140 64" aria-hidden="true"><d
   <linearGradient id="syHead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9e5ff"/><stop offset=".5" stop-color="#4f9cf3"/><stop offset="1" stop-color="#2455b4"/></linearGradient>
   <filter id="sySh" x="-20%" y="-30%" width="140%" height="160%"><feDropShadow dx="0" dy="1.1" stdDeviation=".9" flood-color="#000" flood-opacity=".5"/></filter>
 </defs>
-  <circle class="sy-glow" cx="106" cy="28" r="28" fill="url(#ntSG)" opacity="0"/>
-  <ellipse class="sy-fill" cx="106" cy="28" rx="11" ry="15" fill="url(#syIn)" opacity="0"/>
+  <circle class="sy-glow" cx="106" cy="28" r="23" fill="url(#ntSG)" opacity="0"/>
+  <ellipse class="sy-fill" cx="106" cy="28" rx="9" ry="12" fill="url(#syIn)" opacity="0"/>
   <ellipse class="sy-rip" fill="none" stroke="#ff9fbd" opacity="0"/>
-  <path class="sy-back" fill="none" stroke="url(#syBack)" stroke-width="3.8" stroke-linecap="round"/>
-  <g class="sy-trail" fill="none" stroke="#5aa8ff" stroke-width="3"><circle class="sy-g1" r="12.5" opacity="0"/><circle class="sy-g2" r="12.5" opacity="0"/></g>
-  <g class="sy-m" transform="translate(40,28)" filter="url(#sySh)"><circle r="12.5" fill="none" stroke="url(#syMg)" stroke-width="4.4"/><path d="M-9.6,-5.6 A11.2,11.2 0 0 1 -1.2,-11.2" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".55"/>
-    <rect class="sy-shaft" x="12.5" y="-2.4" height="4.8" rx="2.4" fill="url(#syShaft)"/><path class="sy-head" fill="url(#syHead)" stroke="#2457b5" stroke-width=".7" stroke-linejoin="round"/><path class="sy-hh" fill="none" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity=".55"/></g>
-  <g class="sy-front" filter="url(#sySh)"><path class="sy-fr" fill="none" stroke="url(#syFront)" stroke-width="4.8" stroke-linecap="round"/><path class="sy-spec" fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round" opacity=".6"/>
-    <path class="sy-cross" fill="none" stroke="#f0618f" stroke-width="4.4" stroke-linecap="round"/></g>
+  <path class="sy-back" fill="none" stroke="url(#syBack)" stroke-width="3.4" stroke-linecap="round"/>
+  <g class="sy-trail" fill="none" stroke="#5aa8ff" stroke-width="3.6"><circle class="sy-g1" r="13.5" opacity="0"/><circle class="sy-g2" r="13.5" opacity="0"/></g>
+  <g class="sy-m" transform="translate(40,28)" filter="url(#sySh)"><circle r="13.5" fill="none" stroke="url(#syMg)" stroke-width="5.2"/><path d="M-10.4,-6 A12.1,12.1 0 0 1 -1.3,-12.1" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".55"/>
+    <rect class="sy-shaft" x="13.5" y="-3.5" height="7" rx="3.5" fill="url(#syShaft)"/><path class="sy-head" fill="url(#syHead)" stroke="#2457b5" stroke-width=".7" stroke-linejoin="round"/><path class="sy-hh" fill="none" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity=".55"/></g>
+  <g class="sy-front" filter="url(#sySh)"><path class="sy-fr" fill="none" stroke="url(#syFront)" stroke-width="4.2" stroke-linecap="round"/><path class="sy-spec" fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round" opacity=".6"/>
+    <path class="sy-cross" fill="none" stroke="#f0618f" stroke-width="3.6" stroke-linecap="round"/></g>
   <path class="sy-tak" fill="none" stroke="#ffe08a" stroke-width="1.6" stroke-linecap="round" opacity="0"/>
   <path class="sy-spark" fill="#fff6c8" opacity="0"/>
   <g class="sy-ouch" opacity="0"><path d="M126,6 Q123,11 126,13 Q129,11 126,6 Z" fill="#cfeeff" stroke="#86bfdc" stroke-width=".7"/><path d="M134,4 V12 M134,15.5 V16" stroke="#ffd36b" stroke-width="2.4" stroke-linecap="round"/></g>
@@ -423,14 +423,14 @@ function run(stage, job, done) {
   // 오른쪽 위 ♂♀: ♂ 화살표는 d를 따라 드나들고, ♀ 원은 부딪힐 때 눌렸다 튕김(symE), 밀림(symX)
   const sym = stage.querySelector('.nt-sym'), sq = c => sym.querySelector(c), symM = sq('.sy-m'), symC = sq('.sy-fill'), symG = sq('.sy-glow'), symH = sq('.sy-h');
   // 화살 길이는 남자 크기(cm)에 비례: 보통(14cm)부터 고리를 꿰뚫고 나감
-  const cm = sc.cm || { small: 11, avg: 14, large: 17, xlarge: 20 }[sc.size] || 14, grade = sizeGrade(cm), shaft = 12 + 1.6 * cm;
-  // ♂ 화살: 원(반지름 12.5) → 대 → 촉 (촉 밑동 hb, 끝 ht). 길이는 크기(cm)에 비례
-  const hb = 12.5 + shaft - 10, ht = 12.5 + shaft;
-  sq('.sy-shaft').setAttribute('width', f(hb - 12));
-  sq('.sy-head').setAttribute('d', `M${f(hb - 1.5)},-7.2 L${f(ht)},0 L${f(hb - 1.5)},7.2 Q${f(hb + 2)},0 ${f(hb - 1.5)},-7.2 Z`);
-  sq('.sy-hh').setAttribute('d', `M${f(hb)},-5.2 L${f(ht - 2.6)},-1`);
+  const cm = sc.cm || { small: 11, avg: 14, large: 17, xlarge: 20 }[sc.size] || 14, grade = sizeGrade(cm), shaft = 10 + 1.7 * cm;
+  // ♂ 화살: 원(반지름 13.5, 굵기 5.2) → 굵은 대(7) → 큰 촉(높이 20) (촉 밑동 hb, 끝 ht). 길이는 크기(cm)에 비례
+  const MR = 13.5, MO = MR + 2.6, hb = MR + shaft - 13, ht = MR + shaft;
+  sq('.sy-shaft').setAttribute('width', f(hb - MR + .5));
+  sq('.sy-head').setAttribute('d', `M${f(hb - 2)},-10 L${f(ht)},0 L${f(hb - 2)},10 Q${f(hb + 2.6)},0 ${f(hb - 2)},-10 Z`);
+  sq('.sy-hh').setAttribute('d', `M${f(hb)},-7 L${f(ht - 3.4)},-1.3`);
   // ♀ 고리: 반지름 15를 옆으로 돌려 가로 폭은 0.78배. 맞닿음 = ♂ 원 바깥이 고리 왼쪽(뒤쪽) 끝에 걸림
-  const RX0 = 15 * .78, GX0 = 106 - RX0 - 14.7 + 1;
+  const FR = 12, RX0 = FR * .78, GX0 = 106 - RX0 - MO + 1;   // ♀ 고리 반지름 12 (예전 15의 0.8배)
   const E = Object.fromEntries(['back', 'fr', 'spec', 'cross', 'rip', 'tak', 'spark', 'g1', 'g2', 'ouch'].map(k => [k, sq('.sy-' + k)])), GB = sym.querySelector('#syBack'), GF = sym.querySelector('#syFront');
   // 받아들일 수 있는 세기: 체형이 가늘수록 낮음. 크기 × 세기가 넘으면 움찔, 아니면 하트
   const limit = { slim: 1.85, avg: 2.15, fit: 2.25, chubby: 2.35 }[sc.build] || 2.15, symHearts = [], symHS = sq('.sy-hs');
@@ -491,7 +491,7 @@ function run(stage, job, done) {
   }
   function impact(s) {
     const str = s.kind === 'final' ? 2.2 : s.kind === 'strong' ? 1.8 : Math.min(1.2, .45 + .75 * s.A / 7);
-    sinkV += 40 * str; bsV -= 24 * str; symEV += 13 * str; symXV += 45 * str; beatKV += 9 * str; faceYV += 40 * str;
+    sinkV += 40 * str; bsV -= 24 * str; symEV += 17 * str; symXV += 55 * str; beatKV += 9 * str; faceYV += 40 * str;
     impT = t; impS = Math.min(1.4, str); impExit = GX0 + ht > 106 + RX0 + 1;   // 탁: 부딪힘 선·물결, 촉이 고리 밖으로 나가면 반짝
     const force = str * (.55 + .1 * grade);
     if (force > limit) { ouchAt = t; symXV += 60 * str; symEV -= 8; }   // 움찔
@@ -550,8 +550,8 @@ function run(stage, job, done) {
     buzz = 0;
     if (HB && t >= S[S.length - 1].t0 && t < end) { fount += HB.fount * DT; while (fount >= 1) { fount--; burstAt(1, { s: .8 + Math.random() * .5, dy: -(55 + Math.random() * 35) }); } }
     heat = Math.max(heat * Math.exp(-DT * 1.4), t < end ? (good ? .1 + .4 * Math.min(1, t / end) : .05) : 0);
-    symEV += (-900 * symE - 14 * symEV) * DT; symE += symEV * DT;
-    symXV += (-600 * symX - 16 * symXV) * DT; symX += symXV * DT;
+    symEV += (-650 * symE - 6 * symEV) * DT; symE += symEV * DT;      // ♀ 고리: 말랑하게 눌렸다 여러 번 출렁이며 돌아옴
+    symXV += (-480 * symX - 9 * symXV) * DT; symX += symXV * DT;
     beatKV += (-700 * beatK - 18 * beatKV) * DT; beatK += beatKV * DT;
     faceYV += (-500 * faceY - 18 * faceYV) * DT; faceY += faceYV * DT;
     if (!finale && t > end + .45) {
@@ -625,10 +625,10 @@ function run(stage, job, done) {
     }
     // ♂ 화살은 d를 따라 드나들고 맞닿으면 ♂ 원이 고리 뒤쪽 끝에 탁 걸림(더 밀면 고리째 밀려남). 만족감이 낮으면 끝나고 빠지며 고개를 숙임
     const intro = ease(Math.min(1, t / .8)), u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0;
-    const gx = GX0 - 1.6 * Math.max(-2.5, ms.d + (good ? 0 : 14 * ease(u))) - (1 - intro) * 80;
+    const gx = Math.max(MO + 2, GX0 - 2.6 * Math.max(-2.5, ms.d + (good ? 0 : 14 * ease(u)))) - (1 - intro) * 80;   // 크게 빼고, 걸릴 때까지 밀어붙임
     const ouch = t - ouchAt < .6 ? 1 - (t - ouchAt) / .6 : 0, jit = ouch * 1.6 * Math.sin((t - ouchAt) * 190);
-    const rx = RX0 * (1 - .25 * symE) * (1 - .1 * ouch), ry = 15 * (1 + .2 * symE) * (1 - .1 * ouch);
-    const press = Math.max(0, gx + 14.7 - (106 + symX - rx));   // ♂ 원이 고리를 누르는 만큼 고리가 밀림
+    const rx = RX0 * (1 - .32 * symE) * (1 - .1 * ouch), ry = FR * (1 + .28 * symE) * (1 - .1 * ouch);
+    const press = Math.max(0, gx + MO - (106 + symX - rx));   // ♂ 원이 고리를 누르는 만큼 고리가 밀림
     const cx0 = 106 + symX + jit + press + (1 - intro) * 50, cy0 = 28 + ms.tr * .8;
     // 화살 속도(잔상)·촉 밑동이 고리 끝을 지날 때 고리가 꿀렁 벌어짐·안에 있을 땐 화살이 고리를 끌고 감
     const fdt = lastGx == null ? 0 : 1 / 60;
@@ -645,7 +645,7 @@ function run(stage, job, done) {
     E.fr.setAttribute('d', `M${P(rad(-90))} A${f(rx)},${f(ry)} 0 0 1 ${P(rad(90))}`);
     E.spec.setAttribute('d', `M${Pi(rad(-62), 1)} A${f(rx - 1)},${f(ry - 1)} 0 0 1 ${Pi(rad(-18), 1)}`);
     for (const [g, x1, x2] of [[GB, cx0 - rx, cx0], [GF, cx0, cx0 + rx]]) { g.setAttribute('x1', f(x1)); g.setAttribute('x2', f(x2)); }
-    E.cross.setAttribute('d', `M${f(cx0)},${f(cy0 + ry)} V${f(cy0 + ry + 16)} M${f(cx0 - 7.5)},${f(cy0 + ry + 8.5)} H${f(cx0 + 7.5)}`);
+    E.cross.setAttribute('d', `M${f(cx0)},${f(cy0 + ry)} V${f(cy0 + ry + 13)} M${f(cx0 - 6)},${f(cy0 + ry + 6.8)} H${f(cx0 + 6)}`);
     symC.setAttribute('cx', f(cx0)); symC.setAttribute('cy', f(cy0)); symC.setAttribute('rx', f(rx)); symC.setAttribute('ry', f(ry));
     symC.setAttribute('opacity', (good ? .15 + heat * .85 : .1).toFixed(2)); symG.setAttribute('opacity', (good ? heat : heat * .3).toFixed(2));
     // 탁: 맞닿은 곳에서 위아래로 튀는 선 + 고리가 퍼지는 물결 + (꿰뚫었으면) 촉 끝 반짝

@@ -370,3 +370,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 @keyframes alHeart{0%{opacity:0;transform:translate(126px,30px) scale(.6)}35%{opacity:1;transform:translate(126px,22px) scale(1)}100%{opacity:0;transform:translate(126px,4px) scale(1)}}
 @keyframes neon{0%,100%{opacity:1}46%{opacity:1}47%{opacity:.35}49%{opacity:1}51%{opacity:.5}53%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.sc-alley *,.bed .nt-neon{animation:none!important}}
+/* 동행 · 관계 목록 분류 */
+.comp{margin:0;font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.comp .go{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
+.comp button{padding:3px 8px;font-size:11.5px}
+.comp button.hot{border-color:var(--accent);color:var(--accent)}
+.pfilter{margin-bottom:8px}
+.pfilter button{padding:4px 8px;font-size:11.5px}
+.prow .tag{font-size:10.5px;padding:1px 5px;vertical-align:1px}

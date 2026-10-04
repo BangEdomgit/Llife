@@ -191,10 +191,22 @@ function renderWhere(S) {
   const nKnown = here.filter(h => !h.stranger).length, nNew = here.filter(h => h.stranger).reduce((t, h) => t + 1 + (h.grp || 0), 0);
   box.innerHTML = `
     <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}${S.drunk ? ` <small class="drunk d${S.drunk}">🍺 ${G.drunkLabel()}</small>` : ''}</span><button type="button" data-leave>← 돌아가기</button></div>
+    ${compBar(pl)}
     <p class="sec-t">여기 있는 사람들 <span class="dim">· 아는 사람 ${nKnown}명 / 모르는 사람 ${nNew}명 · 말 걸기는 행동을 안 씀</span></p>
     <div class="here">${here.map(hereRow).join('') || '<p class="empty">아무도 없다.</p>'}</div>
     <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· 행동 1</span></p>
     <div class="acts">${actButtons(acts) || '<p class="empty">여기선 딱히 할 게 없다.</p>'}</div>`;
+}
+
+// 동행 — 밖이면 모텔·집으로 바로 가는 버튼, 모텔·집이면 바로 즐기기
+function compBar(pl) {
+  const c = G.companion();
+  if (!c) return '';
+  const inside = pl.id === 'motel' || pl.id === 'home';
+  const go = inside ? '' : G.places().filter(x => x.id === 'motel' || x.id === 'home').map(x =>
+    `<button type="button" data-pl="${x.id}"${x.ok ? '' : ' disabled'}>${x.icon} ${esc(G.josa(x.label, '으로'))}${x.cost ? ` <small>${x.cost}칸</small>` : ''}</button>`).join('');
+  const enjoy = inside && G.interactions(c.id).some(i => i.id === 'enjoy') ? `<button type="button" class="hot" data-enjoy="${c.id}">♂♀ 즐기기</button>` : '';
+  return `<p class="comp">🤝 동행: <b>${esc(G.pname(c))}</b> <span class="dim">${inside ? '— 단둘이' : '— 같이 간다'}</span><span class="go">${go}${enjoy}<button type="button" data-endco>헤어지기</button></span></p>`;
 }
 
 /* ---------- 연출 (S.scene) ---------- */
@@ -262,7 +274,7 @@ function playScene(sc) {
   // 서서 다가감 → 그날 밤 → (콘돔 없이면) 자궁 그림 → 다음 날 아침 → (임신이면) 몇 주 뒤
   const S = G.state(), inside = sc.contra === 'none' || sc.contra === 'pill';
   const tops = [Avatar.topColor(S.gender === 'm' ? G.myLook() : G.look(p)), Avatar.topColor(S.gender === 'm' ? G.look(p) : G.myLook())];
-  const nightQ = calm || !window.Night ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`, `<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}</div>`]
+  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`]).concat([`<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}</div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
     .concat(inside ? [`<div class="sc-card sc-ut">${Night.uterus(!!sc.preg)}</div>`] : []);
   sceneQueue = nightQ.concat(morningQ, pregQ);
   nextScene();
@@ -384,25 +396,33 @@ function order(p) {
   if (p.kind === 'child') return 5;
   return 10;
 }
-let showAcq = false;
+let showAcq = false, peopleFilter = 'all';
+const kin = p => p.kind === 'family' || p.kind === 'child';
+const mine = p => p.partner || p.spouse || p.secret || p.fwb || p.fling;
+// 상태: 유부녀·유부남(결혼한 걸 알 때) / 애인 있음 (내 연인이 아닌데)
+const statusTag = p => kin(p) || p.spouse ? '' : p.married && p.marriedKnown ? (p.gender === 'f' ? '유부녀' : '유부남') : p.taken && !p.married && !(p.partner || p.secret) ? '애인 있음' : '';
+const PFILTER = [['all', '전체', () => true], ['love', '연인·섹파', mine], ['friend', '친구·지인', p => !kin(p) && !mine(p)], ['family', '가족', kin],
+  ['married', '유부녀·유부남', p => p.married && p.marriedKnown], ['taken', '애인 있음', p => p.taken && !p.married && !kin(p)]];
 function openPeople() {
   const S = G.state();
   const all = G.people().slice().sort((a, b) => order(a) - order(b) || b.close - a.close);
-  const list = all.filter(p => !G.acquaintance(p)), acq = all.filter(p => G.acquaintance(p));
+  const fl = (PFILTER.find(f => f[0] === peopleFilter) || PFILTER[0])[2];
+  const known = all.filter(p => !G.acquaintance(p)), list = known.filter(fl), acq = all.filter(p => G.acquaintance(p));
+  const chips = `<div class="chips pfilter">${PFILTER.map(([id, label, fn]) => { const n = known.filter(fn).length; return `<button type="button" data-pf="${id}" aria-pressed="${peopleFilter === id}"${n || id === 'all' ? '' : ' disabled'}>${label} <small>${n}</small></button>`; }).join('')}</div>`;
   const row = p => {
     const extra = [];
     if (G.heartOk(p) || p.heart > 0) extra.push(`설렘 <b>${mini(p.heart)}</b>`);
     if (p.grudge >= 15) extra.push(`원한 <b class="r">${mini(p.grudge)}</b>`);
-    const mk = G.marker(p);
+    const mk = G.marker(p), st = statusTag(p);
     return `<button type="button" class="prow${G.faded(p) ? ' faded' : ''}" data-pv="${p.id}">${av(p, 32)}
-      <span><b>${esc(G.pname(p))}</b>${mk ? ` <span class="mk">${mk}</span>` : ''} <span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}${G.faded(p) ? ' · 소원해짐' : ''}</span></span>
+      <span><b>${esc(G.pname(p))}</b>${mk ? ` <span class="mk">${mk}</span>` : ''} <span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}${G.faded(p) ? ' · 소원해짐' : ''}</span>${st ? ` <span class="tag${st === '애인 있음' ? '' : ' warn'}">${st}</span>` : ''}</span>
       <span class="pl">${esc(G.relLabel(p))}</span>
       <span class="pm">친밀 <b>${mini(p.close)}</b>  ${extra.join('  ')}</span>
     </button>`;
   };
   const acqBox = acq.length ? `<button type="button" class="acq-t" data-acq aria-expanded="${showAcq}">${showAcq ? '▾' : '▸'} 얼굴만 아는 사람 ${acq.length}명 <span class="dim">같은 반·과·팀·이웃·단골 — 말을 걸면 관계가 된다</span></button>${showAcq ? `<div class="plist">${acq.map(row).join('')}</div>` : ''}` : '';
-  showModal('people', `👥 관계 ${list.length}명`,
-    `<div class="plist">${list.map(row).join('') || '<p>곁에 아무도 없다.</p>'}</div>${acqBox}<p class="hint">사람을 누르면 할 수 있는 게 나와. 관계는 가만두면 조금씩 멀어져. (남은 행동 ${S.ap})</p>`);
+  showModal('people', `👥 관계 ${known.length}명`,
+    `${chips}<div class="plist">${list.map(row).join('') || '<p class="hint">여기에 해당하는 사람이 없다.</p>'}</div>${peopleFilter === 'all' ? acqBox : ''}<p class="hint">사람을 누르면 할 수 있는 게 나와. 관계는 가만두면 조금씩 멀어져. (남은 행동 ${S.ap})</p>`);
 }
 
 /* 사람 한 명 */
@@ -423,9 +443,10 @@ function openPerson(id) {
       <span>만족감</span><span class="bar">${bar(im.sat || 0)}</span><span class="num">${im.sat ?? '—'}</span>` : ''}</div>` : '';
   const tags = [];
   const mine = p.partner || p.spouse || p.secret;
-  if (p.married && p.marriedKnown) tags.push('<span class="tag warn">기혼</span>');
+  if (p.married && p.marriedKnown) tags.push(`<span class="tag warn">${p.gender === 'f' ? '유부녀' : '유부남'} · 들키면 ${p.gender === 'f' ? '남편' : '아내'}이 찾아옴</span>`);
   else if (p.married && p.close >= 20 && G.ringVisible(p)) tags.push('<span class="tag">반지를 끼고 있다</span>');
-  else if (p.taken && !mine && p.kind !== 'family' && p.kind !== 'child') tags.push('<span class="tag">애인 있음</span>');
+  else if (p.taken && !mine && p.kind !== 'family' && p.kind !== 'child') tags.push(`<span class="tag">애인 있음 · 들키면 ${p.gender === 'f' ? '남자친구' : '여자친구'}가 찾아옴</span>`);
+  if (G.companion() === p) tags.push('<span class="tag">🤝 동행 중</span>');
   if (p.fwb) tags.push('<span class="tag">섹파</span>');
   if (p.secret) tags.push('<span class="tag warn">들키면 안 됨</span>');
   if (p.debt) tags.push(`<span class="tag warn">빌린 돈 ${G.fmtMoney(p.debt)}</span>`);
@@ -902,6 +923,8 @@ $('#where').addEventListener('click', e => {
   if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) openStudy(); else G.doAction(d.a); }
   else if (d.pl) G.goPlace(d.pl);
   else if ('leave' in d) G.leavePlace();
+  else if ('endco' in d) G.endCompany();
+  else if (d.enjoy) G.interact(d.enjoy, 'enjoy');
   else if (d.hp) {
     const h = G.here().find(x => x.key === d.hp);
     if (!h) return;
@@ -954,6 +977,7 @@ mBody.addEventListener('click', e => {
   else if (d.full) { fullView = fullView === d.full ? null : d.full; if (d.full === 'me') openMe(); else openPerson(d.full); }
   else if (d.pv) { personFrom = 'people'; openPerson(d.pv); }
   else if ('acq' in d) { showAcq = !showAcq; openPeople(); }
+  else if (d.pf) { peopleFilter = d.pf; openPeople(); }
   else if (d.i) G.interact(modalArg, d.i);
   else if (d.talk) { const id = G.talkTo(d.talk); if (id && !G.state().pending.length) { personFrom = 'here'; openPerson(id); } }
   else if ('back' in d) { if (modalMode === 'stranger' || personFrom === 'here') closeModal(); else openPeople(); }

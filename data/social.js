@@ -117,7 +117,17 @@ function heat(s, p, a, gain, alley) {
   s.vars.heatUp = before < 60 && p.libido >= 60;
   if (alley) p.alleyDay = today;
 }
+// 상대 상태별 문턱 (꼬심 점수에 더함): 유부녀·유부남 +12(술집에서 반지를 빼는 사람은 +4) / 애인 있음 +5 / 솔로 0
+const statusNeed = p => p.married ? (p.ringOff ? 4 : 12) : p.taken ? 5 : 0;
+// 들킬 위험: 유부녀·유부남은 배우자에게(spouseCaught), 애인 있음은 애인에게(rivalFound)
+const statusRisk = (p, k = 1) => (p.married ? .12 : p.taken ? .08 : 0) * k;
+const PRIVATE = ['home', 'motel'];
+// 동행으로 데려옴: 여기 없으면 내 옆으로 (모텔·집으로 가면 같이 감)
+function comeAlong(s, p, a) { a.setCompanion(p); if (s.place && !s.here.some(h => h.key === p.id)) s.here.push({ key: p.id, doing: '내 옆에 붙어 있다', used: true }); }
 const ALLEY_LINE = ' {p|이} 내 손목을 잡고 가게 옆 골목으로 이끌었다. 네온 불빛 아래에서 숨이 먼저 닿았다.';
+
+const nightText = (a, p) => lover(p) ? a.pick(GAME_DATA.nightLines.intro) + ' ' + pickLine(a, 'lover', p)
+  : a.pick(GAME_DATA.nightLines.flingIntro) + ' ' + (p.taken && Math.random() < .6 ? takenLine(a, p, 'takenMorning') : pickLine(a, 'fling', p));
 
 GAME_DATA.social = [
   { id: 'talk', label: '대화하기', icon: '💬',
@@ -195,12 +205,41 @@ GAME_DATA.social = [
         text: () => act + (T.touchOk[p.personality] || T.touchOk.warm) + (p.taken && Math.random() < .3 ? ' ' + takenLine(a, p, 'taken') : '') + (alley ? ALLEY_LINE : s.vars.heatUp ? T.heatUp : '') };
     } },
 
+  // 잠자리 제안 — 언제 어디서든. 사귀는 사이·섹파는 거절(피곤·싸움·생리)만, 그 외엔 꼬심 점수(외모·매력·성욕) + 상대 상태 문턱
+  //   집·모텔이면 바로 그날 밤, 밖이면 동행이 되어 같이 감 (밖이면 골목 키스 카드)
+  { id: 'sexAsk', label: '잠자리 제안', icon: '🛏',
+    if: (s, p, a) => a.canSex(p) && a.companion() !== p && !a.jailed(),
+    run: (s, p, a) => {
+      if (lover(p) || p.fwb) { const no = a.refusal(p); if (no) return { do: () => { s.vars.why = no; }, then: 'nightRefused' }; }
+      else if (!a.charmed(p, 'bed', a.need('bed') + statusNeed(p) + (p.close < 20 ? 12 : 0)))
+        return { p: { heart: [-6, -3], close: [-5, -2], grudge: p.close < 20 ? [4, 8] : [0, 2] }, effect: { happy: -2 },
+          text: p.married ? '{p|이} 왼손 반지를 만지작거렸다. "나 결혼한 사람이야."' : p.taken ? `"나 ${mateOf(p)} 있어." {p|이} 선을 그었다.`
+            : ['{p|이} 어이없다는 듯 웃었다. "갑자기?"', '{p|이} 고개를 저었다. "우리 그런 사이 아니잖아."'] };
+      if (PRIVATE.includes(s.place)) return {
+        intimate: true, fling: true, direct: true, spot: s.place, mood: 8, p: { heart: [6, 10], close: [3, 6] }, effect: { happy: [3, 6] },
+        memory: !p.nights, pregnant: lover(p) ? .08 : .05, risk: a.main() && a.main() !== p ? .2 : 0, riskTaken: statusRisk(p),
+        text: () => nightText(a, p) };
+      return { do: () => comeAlong(s, p, a), p: { heart: [2, 4] }, effect: { happy: [1, 3] },
+        scene: !ALLEY_NO.includes(s.place) ? 'alley' : undefined,
+        text: '"…어디로 갈까?" {p|이} 내 팔짱을 꼈다. (동행 — 모텔이나 집으로 가면 같이 간다)' };
+    } },
+
+  { id: 'enjoy', label: '즐기기', icon: '♂♀',
+    if: (s, p, a) => a.canSex(p) && a.companion() === p && PRIVATE.includes(s.place) && !a.jailed(),
+    cost: s => s.place === 'motel' ? 5 : 0,
+    run: (s, p, a) => ({
+      intimate: true, fling: true, direct: true, spot: s.place, mood: 12, p: { heart: [6, 10], close: [3, 6] }, effect: { happy: [3, 6] },
+      memory: !p.nights, pregnant: lover(p) ? .08 : .05, risk: a.main() && a.main() !== p ? .2 : 0, riskTaken: statusRisk(p),
+      text: () => (s.place === 'motel' ? '방 문이 닫히자마자 서로를 끌어당겼다. ' : '') + nightText(a, p) }) },
+
   // 그저 즐기는 사이 (섹파) 제안 — 애인이 있는 상대도 헤어지지 않은 채로. 외모·매력이 높을수록 잘 받아줌
   { id: 'casualAsk', label: '가볍게 즐기자고 하기', icon: '🔥',
     if: (s, p, a) => a.canSex(p) && !lover(p) && !p.fwb && ((p.nights || 0) >= 1 || a.casualReady(p)) && !a.jailed(),
-    run: (s, p, a) => a.charmed(p, 'bed', a.need('bed'))
-      ? { do: () => { p.fwb = true; p.fling = true; }, p: { close: [2, 4] }, effect: { happy: [2, 4] },
-          text: p.taken ? `"${mateOf(p)}한테는 비밀이야." {p|이} 웃으며 새끼손가락을 걸었다. 서로 즐기기만 하기로 했다.` : '"서로 부담 갖지 말자." {p|이} 웃었다. 즐기기만 하는 사이로 하기로 했다.' }
+    run: (s, p, a) => a.charmed(p, 'bed', a.need('bed') + statusNeed(p))
+      ? { do: () => { p.fwb = true; p.fling = true; comeAlong(s, p, a); }, p: { close: [2, 4] }, effect: { happy: [2, 4] },
+          scene: s.place && !PRIVATE.includes(s.place) && !ALLEY_NO.includes(s.place) ? 'alley' : undefined,
+          text: (p.taken || p.married ? `"${mateOf(p)}한테는 비밀이야." {p|이} 웃으며 새끼손가락을 걸었다. 서로 즐기기만 하기로 했다.` : '"서로 부담 갖지 말자." {p|이} 웃었다. 즐기기만 하는 사이로 하기로 했다.')
+            + (PRIVATE.includes(s.place) ? '' : ' 오늘은 같이 있기로 했다. (동행 — 모텔이나 집으로 가면 같이 간다)') }
       : { p: { heart: [-6, -3], close: [-4, -2] }, effect: { happy: -2 }, text: ['{p|이} 고개를 저었다. "난 그런 거 못 해."', '{p|이} 잠깐 생각하더니 "그건 좀 아닌 것 같아."라고 했다.'] } },
 
   { id: 'confess', label: '고백하기', icon: '💌',
@@ -239,7 +278,7 @@ GAME_DATA.social = [
 
   /* ── 친밀한 관계 (집에서만) ── */
   { id: 'intimate', label: '함께 밤을 보내다', icon: '♂♀',
-    if: (s, p, a) => adultPair(s, p, a) && lover(p) && p.heart >= 60 && p.trust >= 40 && s.place === 'home' && !a.jailed(),
+    if: (s, p, a) => adultPair(s, p, a) && lover(p) && p.heart >= 60 && p.trust >= 40 && PRIVATE.includes(s.place) && !a.jailed(),
     run: (s, p, a) => {
       const m = a.main();
       // 사귀는 사이라도 내키지 않을 때가 있음 (피곤함·싸운 뒤·생리 중·잦았을 때 더, 성욕이 높으면 덜) → 내 반응이 신뢰를 가름
@@ -259,7 +298,7 @@ GAME_DATA.social = [
     } },
 
   { id: 'onenight', label: '하룻밤', icon: '♂♀',
-    if: (s, p, a) => adultPair(s, p, a) && !lover(p) && s.place === 'home' && !a.jailed()
+    if: (s, p, a) => adultPair(s, p, a) && !lover(p) && PRIVATE.includes(s.place) && !a.jailed()
       && ((p.close >= 40 && (p.heart >= 50 || (p.fwb && p.heart >= 25))) || (p.fwb && p.close >= 20) || a.casualReady(p)),   // 설렘 없이도: 섹파, 또는 나를 향한 성욕이 찬 상대
     run: (s, p, a) => {
       if (!p.fwb && !a.charmed(p, 'bed', a.need('bed')))
