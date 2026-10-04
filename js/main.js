@@ -430,6 +430,7 @@ function openPerson(id) {
   if (p.ex) tags.push('<span class="tag">예전에 사귐</span>');
   if (S.preg && S.preg.pid === p.id && S.preg.mode && S.gender === 'm') tags.push('<span class="tag">아이를 가짐</span>');
   if (p.livesWith) tags.push('<span class="tag">같이 삶</span>');
+  if (p.taken && mine && !p.married && !p.spouse) tags.push('<span class="tag warn">애인이 따로 있음</span>');   // 헤어지지 않은 채 나를 만나는 사람
   const prof = G.profile(p).map(f => `<dt>${f.label}</dt><dd${f.value == null ? ' class="unk"' : ''}>${f.value == null ? '???' : esc(f.value)}</dd>`).join('');
   const its = G.interactions(id), anyFree = its.some(it => it.free);
   const acts = its.map(it =>

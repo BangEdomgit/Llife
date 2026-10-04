@@ -2125,6 +2125,17 @@ GAME_DATA.events = [
         success: { text: '겨우 넘어갔다. 하지만 눈빛이 달라졌다.', do: (s, a) => { const m = a.person(s.vars.mainId); if (m) a.changeP(m, { trust: -15 }); } },
         fail: { text: '거짓말까지 들통났다. {mainName|은} 짐을 쌌다.', memory: true, do: (s, a) => a.endMain(50) } },
     ] },
+  // 애인이 있는 상대가 고백을 받아줬을 때: 정리하고 만날지, 헤어지지 않은 채 몰래 만날지, 사귀지 않고 즐기기만 할지
+  { id: 'takenConfess', type: 'trigger',
+    text: (s, a) => { const p = a.focused(); return `{fp|이} 내 손을 잡은 채 망설였다. "근데 나… 아직 ${p && p.gender === 'm' ? '여자친구' : '남자친구'}가 있어."`; },
+    choices: [
+      { label: '정리하고 나랑 만나자', do: (s, a) => { const p = a.focused(); a.startRelation(p, !!a.main() && a.main() !== p); }, memory: true, scene: 'kiss', effect: { happy: [6, 10] },
+        text: '{fp|은} 만나던 사람과 정리하고 내 손을 잡았다.' },
+      { label: '지금처럼, 몰래 만나자', do: (s, a) => { const p = a.focused(); a.startRelation(p, true); p.taken = true; }, memory: true, scene: 'kiss', effect: { happy: [4, 8] }, risk: .1, riskTaken: .1,
+        text: '{fp|은} 애인과 헤어지지 않은 채 나를 만나기로 했다. 둘만의 비밀이다.' },
+      { label: '사귀진 말고 즐기기만 하자', if: (s, a) => a.canSex(a.focused()), do: (s, a) => { const p = a.focused(); p.fwb = true; p.fling = true; }, p: { heart: [-5, -2], close: [2, 4] },
+        text: '"그게 서로 편하겠다." {fp|이} 피식 웃었다. 애인과는 그대로, 나와는 즐기기만 하기로 했다.' },
+    ] },
   { id: 'rivalFound', type: 'trigger', text: '{fp}의 애인이 나를 찾아왔다. 표정이 심상치 않았다.',
     choices: [
       { label: '사과하고 물러난다', p: { heart: [-25, -15] }, karma: 3, text: '고개를 숙였다. {fp|와는} 거리를 두기로 했다.' },

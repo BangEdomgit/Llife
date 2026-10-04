@@ -422,11 +422,19 @@ function allure(p, sit) {
   if (S.age >= C.sexMinAge && lustOf(p) >= 60) m += lustOf(p) / 8;   // 이 사람을 향한 내 성욕
   if ((p.libido || 0) >= 60 && npcAge(p) >= C.sexMinAge) m += p.libido / 10;   // 나를 향한 상대 성욕
   if (p.married) m -= p.ringOff ? rand(0, 5) : rand(15, 20);   // 술집에서 반지를 빼는 기혼자는 덜 망설임
+  if (sit === 'bed' && !lover(p)) m += casualBonus();   // 가벼운 관계(하룻밤·집으로 데려가기·즐기자는 제안)는 외모·매력이 크게 먹힘
   if (S.rumorType === 'bad' && (S.rumor || 0) >= 30 && sit !== 'close' && sit !== 'bed') m -= rand(10, 20);   // 나쁜 소문 — 새 사람이 경계함
   m += [0, 3, rand(10, 12), 5][d];
   return looks + human + rel + m;
 }
 const charmed = (p, sit, need) => allure(p, sit) + rand(-15, 15) >= need;
+// 그저 즐기는 관계: 외모(생김새·몸·꾸밈)와 매력이 높을수록 훨씬 쉬움 — 0(F·F) ~ 40(S·S)
+function casualBonus() {
+  const st = S.stats, looks = g100(st.face) * .6 + g100(st.fit) * .2 + g100(st.style) * .2;
+  return Math.round((looks + g100(st.charm)) / 2 * .4);
+}
+// 설렘이 없어도 나를 향한 성욕이 차면 하룻밤까지 갈 수 있음 (외모·매력이 높을수록 문턱이 낮음: 성욕 60 → 40)
+const casualReady = p => !!p && canSex(p) && !lover(p) && p.close >= 20 && (p.libido || 0) >= 60 - casualBonus() / 2;
 // 첫인상 등급 (생김새·꾸밈 위주)
 const firstLook = () => clamp(Math.round(gIdx(S.stats.face) * .5 + gIdx(S.stats.style) * .35 + gIdx(S.stats.fit) * .15), 0, 6);
 
@@ -576,7 +584,7 @@ function guiltCheck(p, sx, ctx) {
   const G = D.guiltLines, c = Object.assign({ p: pname(p) }, ctx);
   // 상대의 죄책감
   if (npcIllicit(p)) {
-    const pt = personality(p), base = pt.guilt ?? 40, g = guiltOf(p.personality, sx.sat);
+    const pt = personality(p), base = pt.guilt ?? 40, g = Math.round(guiltOf(p.personality, sx.sat) * (p.fwb && !p.married ? .6 : 1));   // 즐기기만 하기로 한 사이면 죄책감이 덜함
     p.guiltN = (p.guiltN || 0) + 1;
     let line = null, end = false;
     if (g >= 86) { end = true; line = G.breakNow; }
@@ -2234,7 +2242,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, onPill, fertile, refusal, turn: () => turnNo(), lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, refusal, turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,
@@ -2676,7 +2684,7 @@ window.Game = {
   actionList, canDo, costOf, doAction, needsSubject,
   places: placeList, goPlace, leavePlace, here: hereList, talkTo, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
-  intimacy: p => canSex(p) && (p.nights || lover(p)) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
+  intimacy: p => canSex(p) && (p.nights || lover(p) || p.teased) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
   // 이 사람을 향한 내 성욕 (내 마음이라 늘 보임) / 지금 가장 높은 대상
   myLust: p => canSex(p) ? lustOf(p) : null, lustTarget: () => { const t = lustTop(); return t.p ? { name: pname(t.p), v: t.v, id: t.p.id } : null; },
   people: () => alive(), person, interactions,

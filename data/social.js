@@ -56,6 +56,56 @@ GAME_DATA.nightLines = {
   },
 };
 
+// 섹드립·스킨십 — 플러팅(설렘)과 달리 나를 향한 상대 성욕을 올림. 받아주면 성욕↑, 선을 넘으면 신뢰·원한으로 돌아옴
+// 문장은 암시까지만 (행위 묘사 없음). {p}: 상대
+GAME_DATA.teaseLines = {
+  say: {
+    m: ['"오늘따라 왜 이렇게 예뻐? 집에 보내기 아까운데."', '"그 립스틱, 진짜 안 지워지는지 확인해봐도 돼?"', '"너랑 있으면 밤이 너무 짧을 것 같아."',
+      '"잘 때는 뭐 입고 자? …그냥 궁금해서."', '"그 단추 하나만 더 풀면 반칙이야."', '"너 그렇게 웃으면 나 오늘 집에 못 간다."'],
+    f: ['"팔뚝 한번 만져봐도 돼? …생각보다 단단하네."', '"오늘 우리 집에 아무도 없는데."', '"너 그렇게 쳐다보면 나 오해한다?"',
+      '"그 셔츠, 단추 몇 개까지 풀어봤어?"', '"키스 잘하게 생겼다는 말 많이 듣지?"', '"너 목소리, 밤에 들으면 위험하겠다."'],
+  },
+  sayOk: {
+    bold: '{p|이} 피식 웃더니 더 센 농담으로 받아쳤다.', shy: '{p|이} 얼굴이 새빨개져서 고개를 숙였다. 그래도 싫지는 않은 눈치다.',
+    playful: '{p|이} "변태!" 하며 내 팔을 때리더니 한참 웃었다.', cool: '{p|은} 대꾸 없이 잔을 비웠다. 귀 끝이 빨갰다.',
+    warm: '{p|이} "못 말려" 하면서도 내 쪽으로 몸을 기울였다.', sharp: '{p|이} 한쪽 눈썹을 올렸다. "말만 그렇게 하는 거 아니지?"',
+    sunny: '{p|이} 깔깔 웃더니 "나도 방금 그 생각 했는데!"라고 했다.', sensitive: '{p|이} 잠깐 말이 없다가 "…그런 말 하면 신경 쓰이잖아."라고 했다.',
+  },
+  sayNo: ['{p}의 표정이 싸늘하게 식었다. "선 넘지 마."', '{p|이} 못 들은 척 휴대폰을 봤다. 공기가 차가워졌다.', '{p|이} 어이없다는 듯 웃고는 화제를 돌렸다.'],
+  sayNoSharp: '"그거 지금 농담이라고 한 거야?" {p|이} 정색했다.',
+  touch: {
+    light: ['{p}의 손등에 슬쩍 손을 겹쳤다.', '{p}의 어깨에 붙은 머리카락을 떼어주며 손끝을 잠깐 머물렀다.', '걷다가 {p}의 손을 살짝 잡았다.'],
+    mid: ['{p}의 허리에 가볍게 손을 둘렀다.', '나란히 앉아 {p}의 무릎에 손을 얹었다.', '{p}의 귓가에 대고 작게 이름을 불렀다.'],
+    close: ['뒤에서 {p}를 끌어안고 목덜미에 얼굴을 묻었다.', '{p}의 허리를 끌어당겨 이마를 맞댔다.', '{p}의 손가락 사이로 내 손가락을 천천히 끼웠다.'],
+  },
+  touchOk: {
+    bold: '{p|이} 오히려 더 가까이 붙어왔다. "이게 다야?"', shy: '{p}의 귀가 새빨개졌다. 그래도 손을 빼지 않았다.',
+    playful: '{p|이} 간지럽다며 웃더니 내 손가락에 깍지를 꼈다.', cool: '{p|은} 아무 말 없이 그대로 있었다. 숨이 조금 빨라져 있었다.',
+    warm: '{p|이} 내 손 위에 자기 손을 포갰다.', sharp: '{p|이} 내 눈을 똑바로 봤다. "책임질 수 있어?"',
+    sunny: '{p|이} 활짝 웃으며 내 어깨에 머리를 기댔다.', sensitive: '{p}의 숨이 살짝 떨렸다. "…심장 소리 들리겠다."',
+  },
+  touchNo: ['{p|이} 손을 빼며 한 발 물러섰다. "이러지 마."', '{p|이} 정색했다. 분위기가 순식간에 얼어붙었다.', '{p|이} 내 손을 치우며 "우리 그런 사이 아니잖아."라고 했다.'],
+  // 애인이 있는 상대 (헤어지지 않은 채)
+  taken: ['"나 {mate} 있는 거 알지?" {p|이} 그렇게 말하면서도 자리를 뜨지 않았다.', '{p}의 휴대폰에 {mate} 이름이 떴다. {p|은} 화면을 엎어놓았다.'],
+  takenMorning: ['{p}의 휴대폰에 {mate} 이름이 몇 번이나 떠 있었다. {p|은} 화면을 엎어놓고 내 쪽으로 돌아누웠다.', '"{mate}한테는 친구 집에서 잤다고 할게." {p|이} 옷을 챙기며 말했다.', '{p|이} 문 앞에서 돌아봤다. "우리 둘만 아는 거야."'],
+  heatUp: ' {p}의 눈빛이 달라졌다.',
+};
+const mateOf = p => p.married ? (p.gender === 'f' ? '남편' : '아내') : p.gender === 'f' ? '남자친구' : '여자친구';
+const takenLine = (a, p, set) => a.pick(GAME_DATA.teaseLines[set]).replace(/\{mate\}/g, mateOf(p));
+// 섹드립·스킨십 성공 여부: 꼬심 점수(외모·매력·관계) + 상대 성격 + 나를 향한 성욕 + 술기운. 같은 날 또 하면 덜 먹힘
+const TEASE_MOD = { bold: 10, playful: 12, sunny: 6, cool: 0, warm: 2, sharp: -10, shy: -8, sensitive: -6 };
+function teaseOk(s, p, a, need) {
+  const same = p.teaseDay === a.today();
+  return a.allure(p) + (TEASE_MOD[p.personality] || 0) + (p.libido || 0) / 5 + (lover(p) || p.fwb ? 25 : 0) + [0, 5, 10, 0][a.drunk()] - (same ? 12 : 0) + a.rand(-15, 15) >= need;
+}
+// 나를 향한 성욕을 올리고, 60을 넘는 순간이면 한 줄 덧붙임
+function heat(s, p, a, lo, hi) {
+  const before = p.libido || 0, k = p.teaseDay === a.today() ? .5 : 1;
+  p.libido = Math.min(100, before + Math.round(a.rand(lo, hi) * k));
+  p.teaseDay = a.today(); p.teased = true;
+  s.vars.heatUp = before < 60 && p.libido >= 60;
+}
+
 GAME_DATA.social = [
   { id: 'talk', label: '대화하기', icon: '💬',
     if: (s, p, a) => s.age >= 3 && !a.jailed(),
@@ -103,12 +153,48 @@ GAME_DATA.social = [
             text: () => say + (['D', 'E', 'F'].includes(g) ? react : a.pick(['분위기가 어색해졌다.', '{p|이} 못 들은 척했다.'])) };
     } },
 
+  { id: 'dirtyTalk', label: '섹드립', icon: '😏',
+    if: (s, p, a) => a.canSex(p) && p.close >= 15 && !a.jailed(),
+    run: (s, p, a) => {
+      const T = GAME_DATA.teaseLines, say = a.pick(T.say[s.gender === 'f' ? 'f' : 'm']) + ' ';
+      const risk = a.main() && a.main() !== p ? .05 : 0;
+      if (!teaseOk(s, p, a, 42)) return { p: p.personality === 'sharp' ? { trust: [-8, -5], grudge: [5, 9], close: [-5, -3] } : { trust: [-6, -3], grudge: [2, 5], close: [-4, -2] },
+        effect: { happy: -2 }, do: () => { p.teaseDay = a.today(); }, risk,
+        text: say + (p.personality === 'sharp' ? T.sayNoSharp : a.pick(T.sayNo)) };
+      return { p: { heart: [1, 3], close: [1, 2] }, libido: [3, 6], effect: { happy: [1, 2] }, risk, riskTaken: p.taken ? .04 : 0,
+        do: () => heat(s, p, a, 6, 12),
+        text: () => say + (T.sayOk[p.personality] || T.sayOk.warm) + (p.taken && Math.random() < .4 ? ' ' + takenLine(a, p, 'taken') : '') + (s.vars.heatUp ? T.heatUp : '') };
+    } },
+
+  { id: 'touch', label: '스킨십', icon: '🤝',
+    if: (s, p, a) => a.canSex(p) && (lover(p) || p.fwb || p.close >= 30) && !a.jailed(),
+    run: (s, p, a) => {
+      const T = GAME_DATA.teaseLines, lv = lover(p) || p.fwb || p.nights ? 'close' : p.heart >= 40 ? 'mid' : 'light';
+      const act = a.pick(T.touch[lv]) + ' ';
+      const pub = s.place && s.place !== 'home', risk = a.main() && a.main() !== p ? (pub ? .08 : .03) : 0;
+      if (!teaseOk(s, p, a, 52)) return { p: { trust: [-10, -6], grudge: [5, 10], close: [-6, -3] }, karma: -1, effect: { happy: -3 },
+        do: () => { p.teaseDay = a.today(); }, risk, text: act + a.pick(T.touchNo) };
+      return { p: { heart: [2, 5], close: [1, 3] }, libido: [4, 8], effect: { happy: [1, 3] }, risk, riskTaken: p.taken ? (pub ? .08 : .03) : 0,
+        scene: lv === 'close' ? 'hug' : undefined,
+        do: () => heat(s, p, a, 8, 15),
+        text: () => act + (T.touchOk[p.personality] || T.touchOk.warm) + (p.taken && Math.random() < .3 ? ' ' + takenLine(a, p, 'taken') : '') + (s.vars.heatUp ? T.heatUp : '') };
+    } },
+
+  // 그저 즐기는 사이 (섹파) 제안 — 애인이 있는 상대도 헤어지지 않은 채로. 외모·매력이 높을수록 잘 받아줌
+  { id: 'casualAsk', label: '가볍게 즐기자고 하기', icon: '🔥',
+    if: (s, p, a) => a.canSex(p) && !lover(p) && !p.fwb && ((p.nights || 0) >= 1 || a.casualReady(p)) && !a.jailed(),
+    run: (s, p, a) => a.charmed(p, 'bed', a.need('bed'))
+      ? { do: () => { p.fwb = true; p.fling = true; }, p: { close: [2, 4] }, effect: { happy: [2, 4] },
+          text: p.taken ? `"${mateOf(p)}한테는 비밀이야." {p|이} 웃으며 새끼손가락을 걸었다. 서로 즐기기만 하기로 했다.` : '"서로 부담 갖지 말자." {p|이} 웃었다. 즐기기만 하는 사이로 하기로 했다.' }
+      : { p: { heart: [-6, -3], close: [-4, -2] }, effect: { happy: -2 }, text: ['{p|이} 고개를 저었다. "난 그런 거 못 해."', '{p|이} 잠깐 생각하더니 "그건 좀 아닌 것 같아."라고 했다.'] } },
+
   { id: 'confess', label: '고백하기', icon: '💌',
     if: (s, p, a) => a.canRomance(p) && p.heart >= 40 && !lover(p) && !a.jailed(),
     run: (s, p, a) => {
       const ok = p.heart + p.close / 4 + a.rand(-15, 15) - (p.taken ? 15 : 0) >= 55;
       if (!ok) return { p: { heart: [-18, -12], close: [-8, -4] }, effect: { happy: [-8, -4] },
         text: ['{p|이} 미안하다고 했다.', '{p|은} 친구로 지내고 싶다고 했다.'] };
+      if (p.taken && !p.married) return { then: 'takenConfess' };   // 애인이 있는 상대: 정리할지, 몰래 만날지, 즐기기만 할지
       const sneaky = !!a.main();
       return { do: () => a.startRelation(p, sneaky), memory: true, scene: 'kiss', effect: { happy: [6, 10] }, risk: sneaky ? .15 : 0,
         text: sneaky ? '{p|와} 몰래 만나기 시작했다. 아무도 몰라야 한다.'
@@ -158,7 +244,8 @@ GAME_DATA.social = [
     } },
 
   { id: 'onenight', label: '하룻밤', icon: '♂♀',
-    if: (s, p, a) => adultPair(s, p, a) && !lover(p) && p.close >= 40 && (p.heart >= 50 || (p.fwb && p.heart >= 25)) && s.place === 'home' && !a.jailed(),
+    if: (s, p, a) => adultPair(s, p, a) && !lover(p) && s.place === 'home' && !a.jailed()
+      && ((p.close >= 40 && (p.heart >= 50 || (p.fwb && p.heart >= 25))) || (p.fwb && p.close >= 20) || a.casualReady(p)),   // 설렘 없이도: 섹파, 또는 나를 향한 성욕이 찬 상대
     run: (s, p, a) => {
       if (!p.fwb && !a.charmed(p, 'bed', a.need('bed')))
         return { p: { heart: [-3, -1] }, effect: { happy: -2 }, text: a.pick(['{p|이} 웃으며 고개를 저었다. "오늘은 여기까지."', '{p|이} 잠깐 망설이더니 택시를 불렀다.']) };
@@ -173,7 +260,7 @@ GAME_DATA.social = [
         memory: !p.nights,
         pregnant: .05,
         risk, riskTaken: theirRisk,
-        text: () => a.pick(GAME_DATA.nightLines.flingIntro) + ' ' + pickLine(a, 'fling', p),
+        text: () => a.pick(GAME_DATA.nightLines.flingIntro) + ' ' + (p.taken && Math.random() < .6 ? takenLine(a, p, 'takenMorning') : pickLine(a, 'fling', p)),   // 애인 있는 상대는 헤어지지 않은 채
       };
     } },
 
@@ -190,7 +277,7 @@ GAME_DATA.social = [
     } },
 
   { id: 'takeHome', label: '집으로 데려가기', icon: '🏠', noFree: true,
-    if: (s, p, a) => ['bar', 'concert'].includes(s.place) && a.isHere(p) && !s.flags.married && adultPair(s, p, a) && p.heart >= 45 && p.close >= 30 && !a.jailed(),
+    if: (s, p, a) => ['bar', 'concert'].includes(s.place) && a.isHere(p) && !s.flags.married && adultPair(s, p, a) && ((p.heart >= 45 && p.close >= 30) || p.fwb || a.casualReady(p)) && !a.jailed(),
     run: (s, p, a) => a.charmed(p, 'bed', a.need('takeHome')) ? {
       moveTo: 'home', bring: true, scene: 'pull', p: { heart: [2, 4] },
       risk: a.main() && a.main() !== p ? .1 : 0,
