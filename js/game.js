@@ -118,9 +118,11 @@ function relLabel(p) {
   if (p.fling) return mainPartner() || p.taken || p.heart < 40 ? '복잡한 사이' : '썸';   // 사귀지 않고 밤을 보낸 사이
   if (p.ex) return '전 연인';
   if (p.heart >= 40 && heartOk(p)) return '썸';
+  if (p.role) return p.role;   // 교수님·옆집 할머니처럼 역할이 있는 사람
   if (p.close >= 75) return '절친';
   if (p.close >= 45) return '친구';
-  if (p.tag) return p.tag;   // 20세 시작: 과 친구·과 선배
+  if (p.rtag) return p.rtag;   // 20세 시작: 과 친구·과 선배 / 사람 풀: 같은 과·선후배·단골·동네 상인
+  if (p.tag && D.castLabel && D.castLabel[p.tag]) return D.castLabel[p.tag];   // 대학 1학년 고정 인물 (data/freshman.js — p.tag는 그쪽 이름표)
   if (p.kind === 'classmate') return S.age >= 19 ? '동창' : '같은 반';
   return KIND_LABEL[p.kind] || '아는 사람';
 }
@@ -1227,9 +1229,11 @@ const gainK = () => ({ story: 1, ms: .3, hs: .35, adult: .25 })[phase()];
 
 // 랜덤 이벤트: on에 행동 id나 장소 id를 적으면 그때만 (맞는 태그가 있으면 두 배로 잘 뽑힘)
 function maybeRandom(tags, chance = C.randomEventChance) {
+  if (S.flags.student && S.school && S.age === S.school.start) chance = Math.max(chance, .5);   // 대학 1학년은 이벤트를 촘촘하게 (data/freshman.js)
   if (S.pending.length || Math.random() >= chance * ({ story: 0, ms: .8, hs: .8, adult: .45 })[phase()]) return;
   tags = asList(tags).filter(Boolean);
-  const pool = D.events.filter(e => e.type === 'random' && (!e.on || e.on.some(t => tags.includes(t))) && eligible(e));
+  const sid = (SEASONS[S.date ? SEASON_OF(S.date.m) : Math.max(0, S.seasonIdx)] || SEASONS[0]).id;   // 지금 계절 — season이 있는 이벤트는 그 계절에만
+  const pool = D.events.filter(e => e.type === 'random' && (!e.season || e.season.includes(sid)) && (!e.on || e.on.some(t => tags.includes(t))) && eligible(e));
   if (pool.length) fire(weighted(pool, e => (e.weight ?? 1) * (e.on ? 2 : 1)));
 }
 
@@ -1980,7 +1984,7 @@ const groupRoll = pl => weighted(D.encounter.groupSize.filter(([n]) => n < 4 || 
 function poolPerson(spec, org, tag) {
   const p = addPerson(Object.assign({ close: rand(2, 10), trust: rand(2, 10) }, spec));
   p.org = org; p.acq = true;
-  if (tag) p.tag = tag;
+  if (tag) p.rtag = tag;
   return p;
 }
 const ageSpec = (lo, hi) => ({ ageDiff: rand(lo, hi) - S.age });
@@ -2520,14 +2524,14 @@ function newLife20(q = {}) {
   lines.unshift(['🏠', fam]);
 
   // 친구 (같은 대학이면 캠퍼스에서 자주 마주침) — 명문대는 인맥 보너스: 더 가깝고 과 선배 한 명
-  const campus = p => { if (uniEdu) { p.uni = sc.univ; p.hangout = 'campus'; p.tag = p.tag || '과 친구'; } };
+  const campus = p => { if (uniEdu) { p.uni = sc.univ; p.hangout = 'campus'; p.rtag = p.rtag || '과 친구'; } };
   const friends = [];
   for (let i = 0; i < clamp(+q.friends || 0, 0, 3); i++) {
     const f = addPerson({ kind: 'friend', ageDiff: rand(-1, 1), close: rand(40, 60) + (edu.id === 'elite' ? 8 : 0), trust: rand(35, 55) });
     if (i < 2) campus(f);
     friends.push(f);
   }
-  if (edu.id === 'elite') { const sr = addPerson({ kind: 'friend', ageDiff: rand(1, 3), close: rand(28, 38), trust: rand(30, 42) }); sr.tag = '과 선배'; campus(sr); }
+  if (edu.id === 'elite') { const sr = addPerson({ kind: 'friend', ageDiff: rand(1, 3), close: rand(28, 38), trust: rand(30, 42) }); sr.rtag = '과 선배'; campus(sr); }
 
   // 연인 / 전 연인
   const exp = !!q.exp || (q.love === 'yes' && !!q.lsex);
@@ -2539,7 +2543,7 @@ function newLife20(q = {}) {
     startRelation(lover, false); lover.since = S.age - y;
     if (canSex(lover)) lover.libido = clamp(rand(25, 45) + y * 5, 0, 100);
     if (sx && canSex(lover)) { lover.nights = rand(6, 14) * y; lover.compat = clamp(startCompat(lover) + rand(5, 10) * y, 0, 100); }
-    if (uniEdu && Math.random() < .5) { campus(lover); lover.tag = null; }
+    if (uniEdu && Math.random() < .5) { campus(lover); lover.rtag = null; }
     if (sandbox && q.lst) for (const [k] of Q.loverStats) if (q.lst[k] != null && q.lst[k] !== '') lover[k] = clamp(Math.round(+q.lst[k]), 0, 100);   // 샌드박스: 연인 스탯 직접
     love = `${josa(lover.name, '와')} 사귄 지 ${y}년째.`;
   } else if (q.love === 'ex') {
@@ -2663,6 +2667,7 @@ function upgrade(s) {
   if (s.look && !s.look.body && window.Avatar) s.look.body = Avatar.make(`${s.id}:me`, s.gender).body;
   if (!s.frame) s.frame = s.look && s.look.body && s.look.body.build !== 'fit' ? s.look.body.build : 'avg';
   for (const p of s.people) {
+    if (p.tag && !(D.castLabel && D.castLabel[p.tag])) { p.rtag = p.tag; delete p.tag; }   // 예전 저장: 관계 이름표는 rtag로 (tag는 1학년 고정 인물 이름표)
     if (p.face == null) p.face = LETTERS.indexOf(pickKey(D.npcFace));
     if (p.style == null) p.style = npcStyle(p.hobby, npcAge(p));
     if (p.pref === undefined) p.pref = npcAge(p) >= 19 && Math.random() < .6 ? randomPref() : null;

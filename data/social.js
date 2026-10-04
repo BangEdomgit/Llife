@@ -130,10 +130,14 @@ const nightText = (a, p) => lover(p) ? a.pick(GAME_DATA.nightLines.intro) + ' ' 
   : a.pick(GAME_DATA.nightLines.flingIntro) + ' ' + (p.taken && Math.random() < .6 ? takenLine(a, p, 'takenMorning') : pickLine(a, 'fling', p));
 
 GAME_DATA.social = [
+  // 대화 대사는 data/freshman.js의 pickTalk (함께한 기억 → 날씨·계절 → 교수님·옆집 할머니 → 성격 × 관계 단계)
+  //   대사가 캠퍼스 이야기라 1학년 고정 인물(p.tag)과 대학 다니는 동안 만난 또래에게만. 나머지(가족·아이·동료 …)는 예전 한 줄
   { id: 'talk', label: '대화하기', icon: '💬',
     if: (s, p, a) => s.age >= 3 && !a.jailed(),
-    run: () => ({ p: { close: [3, 6], trust: [0, 2] },
-      text: ['{p|와} 이런저런 얘기를 나눴다.', '{p|와} 수다를 떨다 시간 가는 줄 몰랐다.', '{p|와} 별것 아닌 일로 한참 웃었다.'] }) },
+    run: (s, p, a) => ({ p: { close: [3, 6], trust: [0, 2] },
+      text: GAME_DATA.pickTalk && ((p.tag && GAME_DATA.castLabel && GAME_DATA.castLabel[p.tag]) || (s.flags.student && s.age >= 19 && p.kind !== 'family' && p.kind !== 'child' && Math.abs(a.npcAge(p) - s.age) <= 6))
+        ? GAME_DATA.pickTalk(s, p, a)
+        : ['{p|와} 이런저런 얘기를 나눴다.', '{p|와} 수다를 떨다 시간 가는 줄 몰랐다.', '{p|와} 별것 아닌 일로 한참 웃었다.'] }) },
 
   { id: 'family', label: '함께 시간 보내기', icon: '🏠',
     if: (s, p, a) => p.kind === 'family' && s.age >= 4 && !a.jailed(),
