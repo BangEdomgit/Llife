@@ -2125,6 +2125,16 @@ GAME_DATA.events = [
         success: { text: '겨우 넘어갔다. 하지만 눈빛이 달라졌다.', do: (s, a) => { const m = a.person(s.vars.mainId); if (m) a.changeP(m, { trust: -15 }); } },
         fail: { text: '거짓말까지 들통났다. {mainName|은} 짐을 쌌다.', memory: true, do: (s, a) => a.endMain(50) } },
     ] },
+  // 골목 (섹드립·스킨십으로 짧은 시간에 끌어올렸을 때, 엔진이 바로 부름) → 모텔에서 그날 밤 / 여기까지. 골목 연출은 키스까지
+  { id: 'alleyHeat', type: 'trigger', text: '골목 끝에서 모텔 간판이 깜빡였다. {fp|이} 내 셔츠 깃을 잡은 채 숨을 골랐다.',
+    choices: [
+      { label: '모텔로 간다', intimate: true, fling: true, spot: 'motel', mood: 15, effect: { happy: [3, 6], money: -6 }, p: { heart: [6, 10], close: [3, 5] },
+        memory: firstNight, pregnant: .05,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .2 : 0, riskTaken: (s, a) => (a.focused() || {}).taken ? .12 : 0,
+        text: (s, a) => '모텔 엘리베이터 문이 닫히기도 전이었다. ' + nightLine(a, lover(a.focused()) ? 'lover' : 'fling') },
+      { label: '오늘은 여기까지', p: { heart: [3, 6] }, effect: { happy: 1 },
+        text: '이마를 맞댄 채 숨을 골랐다. "다음엔 안 놔줄 거야." {fp|이} 웃으며 먼저 골목을 나갔다.' },
+    ] },
   // 애인이 있는 상대가 고백을 받아줬을 때: 정리하고 만날지, 헤어지지 않은 채 몰래 만날지, 사귀지 않고 즐기기만 할지
   { id: 'takenConfess', type: 'trigger',
     text: (s, a) => { const p = a.focused(); return `{fp|이} 내 손을 잡은 채 망설였다. "근데 나… 아직 ${p && p.gender === 'm' ? '여자친구' : '남자친구'}가 있어."`; },

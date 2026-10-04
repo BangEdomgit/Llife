@@ -519,6 +519,7 @@ function takeContra(p) {
 }
 const satTier = v => v >= 90 ? 4 : v >= 70 ? 3 : v >= 50 ? 2 : v >= 30 ? 1 : 0;
 // 함께 밤을 보냄: 성욕 해소, 기술·궁합 상승, 만족감에 따라 상대 마음이 달라짐 (첫 경험은 감정이 덮어줌)
+// 연출 번호(S.sceneN)는 인생 내내 계속 올라감 — 연출을 지운 뒤 1부터 다시 세면 화면이 이미 본 연출로 여겨 건너뛰었음
 function sexScene(p, o) {
   if (!canSex(p)) return null;
   const first = !S.flags.hadSex, firstWith = !p.nights;
@@ -566,7 +567,7 @@ function sexScene(p, o) {
   p.lastSat = sat; p.bestSat = Math.max(prevBest, sat);
   S.flags.hadSex = true;
   const fig = figure(p);
-  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, personality: p.personality, fig, cm: pcm, build: herBuild, n: (S.scene ? S.scene.n : 0) + 1 };   // cm·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
+  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, personality: p.personality, fig, cm: pcm, build: herBuild, n: (S.sceneN = (S.sceneN || 0) + 1) };   // cm·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
   if (first) { S.vars.fp = p.id; trigger('firstTime'); }   // 내 첫 경험 — 상대 성격마다 다른 한 줄, 추억
   return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90, contra, pregMul: cm.preg, awkward };
 }
@@ -734,7 +735,7 @@ function applyOutcome(o, target, resumed) {
   else if (deltas.length) log('', { t: 'info', deltas });
   if (sx) { if (S.scene) S.scene.text = text; afterSex(tp, sx, ctx); guiltCheck(tp, sx, ctx); }
   // 키스·포옹·끌어당기기 실루엣 연출 (화면이 S.scene을 보고 그림)
-  if (o.scene && tp && S.age >= C.romanceMinAge && npcAge(tp) >= C.romanceMinAge) S.scene = { kind: o.scene, pid: tp.id, text, n: (S.scene ? S.scene.n : 0) + 1 };
+  if (o.scene && tp && S.age >= C.romanceMinAge && npcAge(tp) >= C.romanceMinAge) S.scene = { kind: o.scene, pid: tp.id, text, n: (S.sceneN = (S.sceneN || 0) + 1) };
   const conceived = !!(o.pregnant && tp && (!o.intimate || sx) && conceive(tp, resolve(o.pregnant) * (sx ? sx.pregMul : 1)));
   if (conceived && S.scene) S.scene.preg = true;
   // 피임 없이 보냈는데 아이가 안 생겼으면, 70% 확률로 다음 계절에 불안이 찾아옴 (배우자는 제외)

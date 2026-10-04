@@ -251,7 +251,9 @@ function playScene(sc) {
   clearTimeout(sceneTimer);
   if (sc.kind !== 'night') {
     sceneQueue = [];
-    sceneCard(`<div class="sc-card">${SIL[sc.kind] || ''}<p>${esc(sc.text || '')}</p><button type="button" data-sc-next>계속</button></div>`);
+    // 골목: 벽에 기댄 상대가 깃을 잡아끌고 입맞춤 (night.js) — 키스까지만
+    const art = sc.kind === 'alley' && window.Night ? Night.alley(G.state().gender === 'm', p.gender === 'm') : SIL[sc.kind] || '';
+    sceneCard(`<div class="sc-card">${art}<p>${esc(sc.text || '')}</p><button type="button" data-sc-next>계속</button></div>`);
     return;
   }
   const morningQ = [`<div class="sc-card sc-morning">${morningCard(sc, p)}</div>`];

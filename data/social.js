@@ -98,13 +98,26 @@ function teaseOk(s, p, a, need) {
   const same = p.teaseDay === a.today();
   return a.allure(p) + (TEASE_MOD[p.personality] || 0) + (p.libido || 0) / 5 + (lover(p) || p.fwb ? 25 : 0) + [0, 5, 10, 0][a.drunk()] - (same ? 12 : 0) + a.rand(-15, 15) >= need;
 }
-// 나를 향한 성욕을 올리고, 60을 넘는 순간이면 한 줄 덧붙임
-function heat(s, p, a, lo, hi) {
-  const before = p.libido || 0, k = p.teaseDay === a.today() ? .5 : 1;
-  p.libido = Math.min(100, before + Math.round(a.rand(lo, hi) * k));
-  p.teaseDay = a.today(); p.teased = true;
-  s.vars.heatUp = before < 60 && p.libido >= 60;
+// 나를 향한 성욕을 얼마나 올릴지 (같은 날 또 하면 절반)
+const heatRoll = (p, a, lo, hi) => Math.round(a.rand(lo, hi) * (p.teaseDay === a.today() ? .5 : 1));
+// 골목: 짧은 시간(이틀 안)에 섹드립·스킨십으로 25 넘게 끌어올려 70을 넘겼고, 외모·매력이 받쳐주면(꼬심 보너스 24+) 밖에서 상대가 먼저 골목으로 이끔
+const ALLEY_NO = ['home', 'office', 'campus', 'school', 'academy', 'hospital', 'church', 'library', 'center'];
+function alleyReady(s, p, a, gain) {
+  if (!a.canSex(p) || !s.place || ALLEY_NO.includes(s.place) || a.casualBonus() < 24) return false;
+  if (p.alleyDay != null && a.today() - p.alleyDay < 7) return false;
+  const streak = p.heatDay != null && a.today() - p.heatDay <= 1 ? (p.heatGain || 0) : 0;
+  return streak + gain >= 25 && (p.libido || 0) + gain >= 70;
 }
+// 올림: 60을 넘는 순간이면 한 줄, 이틀 안에 올린 양을 쌓아둠
+function heat(s, p, a, gain, alley) {
+  const before = p.libido || 0, today = a.today();
+  p.libido = Math.min(100, before + gain);
+  p.heatGain = (p.heatDay != null && today - p.heatDay <= 1 ? p.heatGain || 0 : 0) + gain; p.heatDay = today;
+  p.teaseDay = today; p.teased = true;
+  s.vars.heatUp = before < 60 && p.libido >= 60;
+  if (alley) p.alleyDay = today;
+}
+const ALLEY_LINE = ' {p|이} 내 손목을 잡고 가게 옆 골목으로 이끌었다. 네온 불빛 아래에서 숨이 먼저 닿았다.';
 
 GAME_DATA.social = [
   { id: 'talk', label: '대화하기', icon: '💬',
@@ -161,9 +174,10 @@ GAME_DATA.social = [
       if (!teaseOk(s, p, a, 42)) return { p: p.personality === 'sharp' ? { trust: [-8, -5], grudge: [5, 9], close: [-5, -3] } : { trust: [-6, -3], grudge: [2, 5], close: [-4, -2] },
         effect: { happy: -2 }, do: () => { p.teaseDay = a.today(); }, risk,
         text: say + (p.personality === 'sharp' ? T.sayNoSharp : a.pick(T.sayNo)) };
+      const gain = heatRoll(p, a, 6, 12), alley = alleyReady(s, p, a, gain);
       return { p: { heart: [1, 3], close: [1, 2] }, libido: [3, 6], effect: { happy: [1, 2] }, risk, riskTaken: p.taken ? .04 : 0,
-        do: () => heat(s, p, a, 6, 12),
-        text: () => say + (T.sayOk[p.personality] || T.sayOk.warm) + (p.taken && Math.random() < .4 ? ' ' + takenLine(a, p, 'taken') : '') + (s.vars.heatUp ? T.heatUp : '') };
+        do: () => heat(s, p, a, gain, alley), scene: alley ? 'alley' : undefined, then: alley ? 'alleyHeat' : undefined,
+        text: () => say + (T.sayOk[p.personality] || T.sayOk.warm) + (p.taken && Math.random() < .4 ? ' ' + takenLine(a, p, 'taken') : '') + (alley ? ALLEY_LINE : s.vars.heatUp ? T.heatUp : '') };
     } },
 
   { id: 'touch', label: '스킨십', icon: '🤝',
@@ -174,10 +188,11 @@ GAME_DATA.social = [
       const pub = s.place && s.place !== 'home', risk = a.main() && a.main() !== p ? (pub ? .08 : .03) : 0;
       if (!teaseOk(s, p, a, 52)) return { p: { trust: [-10, -6], grudge: [5, 10], close: [-6, -3] }, karma: -1, effect: { happy: -3 },
         do: () => { p.teaseDay = a.today(); }, risk, text: act + a.pick(T.touchNo) };
+      const gain = heatRoll(p, a, 8, 15), alley = alleyReady(s, p, a, gain);
       return { p: { heart: [2, 5], close: [1, 3] }, libido: [4, 8], effect: { happy: [1, 3] }, risk, riskTaken: p.taken ? (pub ? .08 : .03) : 0,
-        scene: lv === 'close' ? 'hug' : undefined,
-        do: () => heat(s, p, a, 8, 15),
-        text: () => act + (T.touchOk[p.personality] || T.touchOk.warm) + (p.taken && Math.random() < .3 ? ' ' + takenLine(a, p, 'taken') : '') + (s.vars.heatUp ? T.heatUp : '') };
+        scene: alley ? 'alley' : lv === 'close' ? 'hug' : undefined, then: alley ? 'alleyHeat' : undefined,
+        do: () => heat(s, p, a, gain, alley),
+        text: () => act + (T.touchOk[p.personality] || T.touchOk.warm) + (p.taken && Math.random() < .3 ? ' ' + takenLine(a, p, 'taken') : '') + (alley ? ALLEY_LINE : s.vars.heatUp ? T.heatUp : '') };
     } },
 
   // 그저 즐기는 사이 (섹파) 제안 — 애인이 있는 상대도 헤어지지 않은 채로. 외모·매력이 높을수록 잘 받아줌

@@ -14,15 +14,17 @@ const CX = Array.from({ length: 44 }, (_, i) => 68 + 216 * i / 43);   // 이불 
 const FOLDS = [[112, -4, .8], [146, 3, 1], [176, -3, .7], [212, 4, 1], [250, -2, .8]];
 const MY = 129;                                                       // 매트리스 윗면
 // 장소별 방: home 집 침실 / hotel 호텔(도시 야경) / sea 여행지 숙소(바다) / park 공원(이불 대신 덤불, 침대 대신 풀밭)
-const KIND = spot => spot === 'hotel' ? 'hotel' : spot === 'travel' ? 'sea' : spot === 'park' ? 'park' : 'home';
+// motel 모텔(골목에서 이어짐): 블라인드 사이로 새는 분홍 네온, 누빔 헤드보드, 새틴 이불
+const KIND = spot => spot === 'hotel' ? 'hotel' : spot === 'travel' ? 'sea' : spot === 'park' ? 'park' : spot === 'motel' ? 'motel' : 'home';
 const QSTYLE = {
   home: { g: ['#dcbde6', '#b48bc6', '#76548c'], st: '#efdcf5', stO: .45, fd: '#5c3f70', fl: '#f1e0f7', hem: '#5a3e6e', rim: '#f3e6f8', sil: .4 },
   hotel: { g: ['#fdfbf6', '#e7e1d6', '#b3a998'], st: '#fff', stO: 0, fd: '#8f8576', fl: '#fff', hem: '#a99f90', rim: '#fff', sil: .34 },
   park: { g: ['#5d8f4f', '#3a6936', '#1d3a1f'], st: '#8fbf72', stO: 0, fd: '#132a17', fl: '#9fd07e', hem: '#132a17', rim: '#8fc77a', sil: .3, leafy: true },
 };
 QSTYLE.sea = QSTYLE.hotel;
-const SKY = { home: ['#0d1533', '#27356c'], hotel: ['#0f1430', '#3d2f58'], sea: ['#0b1532', '#25386a'], park: ['#060b20', '#1d2a52'] };
-const WALL = { home: ['#161c33', '#0d1120'], hotel: ['#2b211c', '#15100d'], sea: ['#2b211c', '#15100d'], park: ['#060b20', '#1d2a52'] };
+QSTYLE.motel = { g: ['#d65b78', '#9c2c4b', '#561428'], st: '#ffb3c6', stO: .35, fd: '#3d0b1c', fl: '#ffc4d4', hem: '#4a1023', rim: '#ffd0dc', sil: .36 };
+const SKY = { home: ['#0d1533', '#27356c'], hotel: ['#0f1430', '#3d2f58'], sea: ['#0b1532', '#25386a'], park: ['#060b20', '#1d2a52'], motel: ['#1c0a26', '#46123f'] };
+const WALL = { home: ['#161c33', '#0d1120'], hotel: ['#2b211c', '#15100d'], sea: ['#2b211c', '#15100d'], park: ['#060b20', '#1d2a52'], motel: ['#2b1430', '#120816'] };
 const stars = (list, cls = 'nt-star', fill = '#fff') => list.map(([x, y, d]) => `<circle class="${cls}" cx="${x}" cy="${y}" r=".9" fill="${fill}" style="animation-delay:${d}s"/>`).join('');
 const crescent = (x, y) => `<circle cx="${x}" cy="${y}" r="19" fill="url(#ntMoon)"/><circle cx="${x}" cy="${y}" r="8" fill="#f6ebc4" mask="url(#ntCres)"/>`;
 // 호텔·바다 숙소 공통: 큰 창(안쪽 풍경은 따로), 얇은 커튼, 벽등, 룸서비스 쟁반이 놓인 협탁
@@ -54,6 +56,20 @@ const BACK = {
   <ellipse cx="18" cy="130" rx="5" ry="1.6" fill="#8a6a48"/><rect x="17" y="116" width="2" height="14" fill="#8a6a48"/><path d="M9,117 H27 L23,103 H13 Z" fill="#f3d9a6"/><path d="M9,117 H27" stroke="#d9b97f" stroke-width="1.2"/>
 `,
   hotel: suite(city()),
+  motel: `<rect width="320" height="171" fill="url(#ntWall)"/><rect y="170" width="320" height="20" fill="#0d0610"/><path d="M0,170.5 H320" stroke="#3a1a3c"/>
+  <path d="M0,3 H320" stroke="#ff5fa2" stroke-width="2.2" opacity=".55"/><path d="M0,5 H320" stroke="#ff5fa2" stroke-width="7" opacity=".08"/>
+  <rect x="110" y="22" width="70" height="70" fill="url(#ntSky)"/>
+  <g class="nt-neon"><text x="145" y="56" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="#ff7ab6" font-family="sans-serif">MOTEL</text>
+    <text x="145" y="56" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="none" stroke="#ff7ab6" stroke-width="3" opacity=".25" font-family="sans-serif">MOTEL</text>
+    <path d="M122,64 H168" stroke="#7af0ff" stroke-width="1.4" opacity=".8"/></g>
+  ${Array.from({ length: 9 }, (_, i) => `<rect x="110" y="${23 + i * 7.7}" width="70" height="3.2" fill="#3a2440" opacity=".92"/>`).join('')}
+  <rect x="110" y="22" width="70" height="70" fill="none" stroke="#4a2a4c" stroke-width="3"/><rect x="105" y="91" width="80" height="4" rx="1.5" fill="#4a2a4c"/>
+  <g class="nt-neon" opacity=".5">${Array.from({ length: 5 }, (_, i) => `<path d="M${190 + i * 3},${30 + i * 9} L${262 + i * 6},${36 + i * 9} L${262 + i * 6},${38.5 + i * 9} L${190 + i * 3},${32.5 + i * 9} Z" fill="#ff6fae" opacity="${.22 - i * .03}"/>`).join('')}</g>
+  <rect x="226" y="66" width="56" height="32" rx="2" fill="#0b0b10" stroke="#2a2030" stroke-width="2"/><path d="M230,70 H278 V94 H230 Z" fill="#141826" opacity=".9"/>
+  <circle cx="18" cy="112" r="46" fill="url(#ntLamp)"/>
+  <rect x="3" y="134" width="30" height="36" rx="2" fill="#3a1f2c"/><rect x="1" y="131" width="34" height="4" rx="1.5" fill="#4d2a3a"/><path d="M7,151 H29" stroke="#26131c"/>
+  <ellipse cx="18" cy="130" rx="5" ry="1.6" fill="#8a4a68"/><rect x="17" y="117" width="2" height="13" fill="#8a4a68"/><path d="M10,118 H26 L22,105 H14 Z" fill="#ffb1c9"/>
+  <path d="M27,129.5 h5 l1.5,-3 h-2.4 Z" fill="#d8b45a"/><rect x="28" y="125.5" width="5" height="2.4" rx=".6" fill="#ff6fae"/>`,
   sea: suite(sea()),
   park: `<rect width="320" height="190" fill="url(#ntSky)"/>${stars([[20, 20, 0], [44, 44, 1], [92, 16, .5], [120, 40, 1.4], [150, 12, .2], [180, 52, 1.8], [205, 74, .7], [248, 88, 1.1], [300, 78, 1.6], [70, 64, .9]])}${crescent(176, 26)}
   <path d="M0,124 L0,112 H14 V104 H22 V112 H40 V98 H48 V112 H210 V106 H222 V100 H230 V110 H258 V102 H268 V112 H320 V124 Z" fill="#0b1230" opacity=".9"/>
@@ -82,6 +98,13 @@ const BED = {
   park: `<ellipse cx="168" cy="146" rx="120" ry="4" fill="#000" opacity=".35"/>`,
 };
 BED.sea = BED.hotel;
+// 모텔: 누빔 헤드보드(단추), 낮은 침대 틀
+BED.motel = `<ellipse cx="168" cy="171" rx="134" ry="4" fill="#000" opacity=".55"/>
+    <rect x="26" y="80" width="28" height="90" rx="9" fill="#6e2238"/>${[90, 104, 118, 132].map(y => `<circle cx="34" cy="${y}" r="1.4" fill="#3d0e1d"/><circle cx="46" cy="${y + 7}" r="1.4" fill="#3d0e1d"/>`).join('')}<path d="M29,86 V164" stroke="#8f3450" opacity=".5"/>
+    <rect x="48" y="146" width="242" height="12" rx="2" fill="#24101a"/><path d="M50,158 H288" stroke="#ff5fa2" stroke-width="1" opacity=".35"/>
+    <rect x="50" y="127" width="238" height="20" rx="5" fill="url(#ntSheet)"/>
+    <path d="M66,128 C63,120 72,114 86,115 C100,114 107,119 105,127 C104,130 68,131 66,128 Z" fill="#ead8e0"/>
+    <path d="M54,129 C51,122 60,116 73,117 C87,116 93,121 91,128 C90,131 56,132 54,129 Z" fill="#f8eef2"/>`;
 function room(kind) {
   const q = QSTYLE[kind], [s0, s1] = SKY[kind], [w0, w1] = WALL[kind];
   return `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
@@ -91,6 +114,7 @@ function room(kind) {
   <radialGradient id="ntMoon"><stop offset="0" stop-color="#fff4c8" stop-opacity=".5"/><stop offset="1" stop-color="#fff4c8" stop-opacity="0"/></radialGradient>
   <mask id="ntCres" maskUnits="userSpaceOnUse"><rect width="320" height="190" fill="#000"/>${[[236, 76], [222, 70], [176, 26]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="8" fill="#fff"/><circle cx="${x + 4}" cy="${y - 3}" r="7" fill="#000"/>`).join('')}</mask>
   <linearGradient id="ntBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6ff" stop-opacity=".14"/><stop offset="1" stop-color="#c9d6ff" stop-opacity="0"/></linearGradient>
+  <linearGradient id="ntPinkBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6fae" stop-opacity=".2"/><stop offset="1" stop-color="#ff6fae" stop-opacity="0"/></linearGradient>
   <radialGradient id="ntLamp"><stop offset="0" stop-color="#ffc77a" stop-opacity=".4"/><stop offset="1" stop-color="#ffc77a" stop-opacity="0"/></radialGradient>
   <linearGradient id="ntWood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6d4a33"/><stop offset="1" stop-color="#4a3122"/></linearGradient>
   <linearGradient id="ntSheet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ece6dc"/><stop offset="1" stop-color="#b9b1a4"/></linearGradient>
@@ -111,7 +135,7 @@ function room(kind) {
     <g class="nt-dummy" hidden><path class="nt-df" fill="#ff9ec4" opacity=".8"/><path class="nt-dm" fill="#6bb5ff" opacity=".8"/><path class="nt-dj" fill="none" stroke="#222" stroke-width=".8"/></g>
   </g>
   <ellipse class="nt-warm" cx="182" cy="116" rx="122" ry="54" fill="url(#ntWarm)" opacity="0"/>
-  ${kind === 'home' ? '<path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>' : kind === 'park' ? '' : '<path d="M198,128 L304,128 L230,170 L120,170 Z" fill="url(#ntBeam)"/>'}
+  ${kind === 'home' ? '<path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>' : kind === 'park' ? '' : kind === 'motel' ? '<path class="nt-neon" d="M110,92 L180,92 L250,170 L120,170 Z" fill="url(#ntPinkBeam)"/>' : '<path d="M198,128 L304,128 L230,170 L120,170 Z" fill="url(#ntBeam)"/>'}
   <g class="nt-hearts"></g><g class="nt-fx"></g>
 </g></svg>`;
 }
@@ -167,6 +191,32 @@ function foreplay(colors) {
   </g>
   <g transform="translate(146,96)">${cloth(colors[0], 'c1')}</g><g transform="translate(174,94)">${cloth(colors[1], 'c2')}</g>
   <rect class="fp-dark" width="320" height="190" fill="#000"/></svg></div>`;
+}
+function alley(meMale, themMale) {
+  const bricks = Array.from({ length: 15 }, (_, r) => { const y = 14 + r * 11, o = r % 2 ? 9 : 0; return `M0,${y} H${118 - r * 1.5}` + Array.from({ length: 7 }, (_, c) => ` M${o + c * 18},${y} V${y + 11}`).join(''); }).join(' ');
+  return `<div class="sc-alley"><svg viewBox="0 0 320 190" aria-hidden="true">
+  <defs><linearGradient id="alSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a0c2a"/><stop offset="1" stop-color="#3b1440"/></linearGradient>
+    <radialGradient id="alLamp" cx=".5" cy="0" r="1"><stop offset="0" stop-color="#ffd9a0" stop-opacity=".42"/><stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/></radialGradient>
+    <radialGradient id="alNeon"><stop offset="0" stop-color="#ff6fae" stop-opacity=".55"/><stop offset="1" stop-color="#ff6fae" stop-opacity="0"/></radialGradient>
+    <linearGradient id="alFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1020"/><stop offset="1" stop-color="#07050a"/></linearGradient></defs>
+  <rect width="320" height="190" fill="url(#alSky)"/>
+  <path d="M184,40 L232,40 L236,150 L180,150 Z" fill="#120a18"/>
+  <g class="al-neon"><circle cx="208" cy="78" r="40" fill="url(#alNeon)"/>
+    <rect x="196" y="50" width="24" height="56" rx="3" fill="#1a0a1c" stroke="#ff7ab6" stroke-width="1.6"/>
+    ${'MOTEL'.split('').map((ch, i) => `<text x="208" y="${62 + i * 10}" text-anchor="middle" font-size="9" font-weight="700" fill="#ff8cc0" font-family="sans-serif">${ch}</text>`).join('')}</g>
+  <path d="M0,0 H124 L120,172 H0 Z" fill="#2a1622"/><path d="${bricks}" stroke="#170b12" stroke-width="1.2" fill="none"/>
+  <path d="M124,0 L120,172" stroke="#3d2030" stroke-width="2"/>
+  <path d="M320,0 H262 L258,172 H320 Z" fill="#1d1018"/><rect x="276" y="40" width="26" height="34" fill="#2f1a24"/><rect x="279" y="43" width="20" height="28" fill="#4a2c18" opacity=".7"/>
+  <path d="M0,172 H320 V190 H0 Z" fill="url(#alFloor)"/><path d="M120,172 L184,150 H236 L258,172" fill="#120a14"/>
+  <ellipse class="al-neon" cx="214" cy="178" rx="26" ry="3.2" fill="#ff6fae" opacity=".28"/>
+  <path d="M248,0 V60 Q248,66 242,66 H228" fill="none" stroke="#0c070e" stroke-width="3"/><path d="M222,66 h12 l-2,4 h-8 Z" fill="#2a1a1a"/>
+  <path d="M224,70 L196,172 H262 L232,70 Z" fill="url(#alLamp)"/>
+  <g fill="#08060b" stroke="#ff7ab6" stroke-width=".8" stroke-opacity=".5">
+    <g class="al-a"><g transform="translate(112,172) rotate(-4)">${standing(themMale)}<g transform="translate(4,-122)"><g class="al-arm">${arm()}</g></g></g></g>
+    <g class="al-b"><g transform="translate(140,172) scale(-1,1)">${standing(meMale)}<g transform="translate(4,-122)"><g class="al-arm-b">${arm()}</g></g></g></g>
+  </g>
+  <g class="al-heart" transform="translate(126,22)"><path d="${HEART}" fill="#ff6f94" transform="scale(1.6)"/></g>
+  </svg></div>`;
 }
 // 교과서식 자궁·난관·난소 단면. 정자는 자궁경부에서 올라오다 대부분 멈추고, 임신이면 하나가 왼쪽 난관 끝 난자에 닿아 빛남
 function uterus(preg) {
@@ -642,7 +692,7 @@ function run(stage, job, done) {
 
 window.Night = {
   html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div>${SYM}</div>`,
-  foreplay, uterus,
+  foreplay, uterus, alley,
   run, stop: () => cancelAnimationFrame(raf),
   // 실험용: 체위 이름과 움직임 상태 → 관절 좌표
   pose: (name, st = {}) => POSES[name](Object.assign({ d: 0, tr: 0, slump: 0, sink: 0, bs: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } }, st), BODY.m, BODY.f),

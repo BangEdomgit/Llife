@@ -354,3 +354,19 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .qs-left.sandbox{color:var(--accent);font-weight:700}
 .qs-left.sandbox small{display:block;font-weight:400;color:var(--minus);font-size:11.5px}
 .qs input[type=number]{font:inherit;color:var(--text);background:var(--btn-bg);border:1px solid var(--panel-border);border-radius:3px;padding:7px 9px;font-size:14px;width:100%;max-width:220px}
+/* 골목 카드: 다가서기 → 깃을 잡아끎 → 입맞춤 → 하트, 골목 끝 모텔 네온이 깜빡임 */
+.sc-alley svg{display:block;width:100%;max-width:380px;height:auto;border-radius:3px}
+.sc-alley .al-b{animation:alB 1.3s cubic-bezier(.3,.1,.3,1) .25s both}
+.sc-alley .al-a{transform-box:fill-box;transform-origin:50% 100%;animation:alA 1s ease-in-out 1.2s both}
+.sc-alley .al-arm,.sc-alley .al-arm-b{transform-box:fill-box;transform-origin:50% 0}
+.sc-alley .al-arm{animation:alArm .6s ease-out .9s both}
+.sc-alley .al-arm-b{animation:alArmB .6s ease-out 1.5s both}
+.sc-alley .al-heart{opacity:0;animation:alHeart 1.6s ease-out 2.1s both}
+.sc-alley .al-neon,.bed .nt-neon{animation:neon 3.4s steps(1) infinite}
+@keyframes alB{from{transform:translateX(26px)}to{transform:translateX(0)}}
+@keyframes alA{from{transform:rotate(0)}to{transform:rotate(5deg)}}
+@keyframes alArm{from{transform:rotate(-8deg)}to{transform:rotate(-62deg)}}
+@keyframes alArmB{from{transform:rotate(-6deg)}to{transform:rotate(-48deg)}}
+@keyframes alHeart{0%{opacity:0;transform:translate(126px,30px) scale(.6)}35%{opacity:1;transform:translate(126px,22px) scale(1)}100%{opacity:0;transform:translate(126px,4px) scale(1)}}
+@keyframes neon{0%,100%{opacity:1}46%{opacity:1}47%{opacity:.35}49%{opacity:1}51%{opacity:.5}53%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.sc-alley *,.bed .nt-neon{animation:none!important}}
