@@ -466,7 +466,7 @@ function sexScene(p, o) {
   p.lastSat = sat; p.bestSat = Math.max(prevBest, sat);
   S.flags.hadSex = true;
   const fig = figure(p);
-  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, personality: p.personality, fig, n: (S.scene ? S.scene.n : 0) + 1 };
+  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, personality: p.personality, fig, size: sz, build: herBuild, n: (S.scene ? S.scene.n : 0) + 1 };   // size·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
   if (first) { S.vars.fp = p.id; trigger('firstTime'); }   // 내 첫 경험 — 상대 성격마다 다른 한 줄, 추억
   return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90, contra, pregMul: cm.preg, awkward };
 }

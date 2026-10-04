@@ -61,12 +61,16 @@ const ROOM = `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
   <g class="nt-hearts"></g><g class="nt-fx"></g>
 </g></svg>`;
 
-// 오른쪽 위 ♂♀ 패널 (♂를 먼저 그리고 ♀ 고리를 위에: 화살이 고리를 지나 들어가 보이게)
-const SYM = `<div class="nt-sym"><svg viewBox="0 0 120 64" aria-hidden="true"><defs><radialGradient id="ntSG"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".6"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient></defs>
-  <circle class="sy-glow" cx="88" cy="28" r="28" fill="url(#ntSG)" opacity="0"/>
-  <g class="sy-m" transform="translate(28,28)"><circle r="13" fill="none" stroke="#5aa8ff" stroke-width="4.2"/><path d="M13,0 H31 M23.5,-7.5 L31,0 L23.5,7.5" fill="none" stroke="#5aa8ff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></g>
-  <g class="sy-f"><ellipse class="sy-fc" cx="88" cy="28" rx="15" ry="15" fill="#ff6f9a" fill-opacity="0" stroke="#ff6f9a" stroke-width="4.2"/><path d="M88,43 V59 M80.5,51.5 H95.5" stroke="#ff6f9a" stroke-width="4.2" stroke-linecap="round"/></g>
-  <g transform="translate(73,9)"><path class="sy-h" d="${HEART}" fill="#ff4f86"/></g></svg></div>`;
+// 오른쪽 위 ♂♀ 패널. ♀ 고리는 두 반원: 오른쪽 반원 → ♂ 화살 → 왼쪽 반원 순서로 그려 화살이 고리를 꿰뚫고 나가 보임
+const SYM = `<div class="nt-sym"><svg viewBox="0 0 140 64" aria-hidden="true"><defs><radialGradient id="ntSG"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".6"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient></defs>
+  <circle class="sy-glow" cx="106" cy="28" r="28" fill="url(#ntSG)" opacity="0"/><ellipse class="sy-fill" cx="106" cy="28" rx="15" ry="15" fill="#ff6f9a" fill-opacity="0"/>
+  <path class="sy-rr" fill="none" stroke="#ff6f9a" stroke-width="4.2" stroke-linecap="round"/>
+  <g class="sy-m" transform="translate(40,28)"><circle r="13" fill="none" stroke="#5aa8ff" stroke-width="4.2"/><path class="sy-shaft" fill="none" stroke="#5aa8ff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g class="sy-f"><path class="sy-rl" fill="none" stroke="#ff6f9a" stroke-width="4.2" stroke-linecap="round"/><path class="sy-cross" fill="none" stroke="#ff6f9a" stroke-width="4.2" stroke-linecap="round"/></g>
+  <g class="sy-ouch" opacity="0"><path d="M126,6 Q123,11 126,13 Q129,11 126,6 Z" fill="#cfeeff" stroke="#86bfdc" stroke-width=".7"/><path d="M134,4 V12 M134,15.5 V16" stroke="#ffd36b" stroke-width="2.4" stroke-linecap="round"/></g>
+  <g class="sy-hs"></g><g transform="translate(88,10)"><path class="sy-h" d="${HEART}" fill="#ff4f86"/></g></svg></div>`;
+// 크기(cm) → 등급 1~6 (단소·소형·보통·큰 편·대물·흉기)
+const sizeGrade = cm => cm < 10 ? 1 : cm < 13 ? 2 : cm < 16 ? 3 : cm < 18 ? 4 : cm < 20 ? 5 : 6;
 
 /* ---------- 더미 ---------- */
 // 길이와 반지름(옆에서 본 두께의 절반). [a, b]는 뿌리 → 끝으로 가늘어짐
@@ -248,8 +252,13 @@ function run(stage, job, done) {
   // 출렁이는 살: 붙은 관절이 갑자기 서거나 움직이면 관성으로 어긋났다가 용수철처럼 돌아옴
   const blobs = [['f', 'butt', 'hip'], ['f', 'breast', 'chest'], ['m', 'butt', 'hip']].map(([w, k, at]) => ({ w, k, at, o: [0, 0], v: [0, 0], p1: null, p2: null }));
   // 오른쪽 위 ♂♀: ♂ 화살표는 d를 따라 드나들고, ♀ 원은 부딪힐 때 눌렸다 튕김(symE), 밀림(symX)
-  const sym = stage.querySelector('.nt-sym'), sq = c => sym.querySelector(c), symM = sq('.sy-m'), symF = sq('.sy-f'), symC = sq('.sy-fc'), symG = sq('.sy-glow'), symH = sq('.sy-h');
-  let symE = 0, symEV = 0, symX = 0, symXV = 0;
+  const sym = stage.querySelector('.nt-sym'), sq = c => sym.querySelector(c), symM = sq('.sy-m'), symC = sq('.sy-fill'), symG = sq('.sy-glow'), symH = sq('.sy-h');
+  // 화살 길이는 남자 크기(cm)에 비례: 보통(14cm)부터 고리를 꿰뚫고 나감
+  const cm = sc.cm || { small: 11, avg: 14, large: 17, xlarge: 20 }[sc.size] || 14, grade = sizeGrade(cm), shaft = 12 + 1.6 * cm;
+  sq('.sy-shaft').setAttribute('d', `M13,0 H${f(13 + shaft)} M${f(5.5 + shaft)},-7.5 L${f(13 + shaft)},0 L${f(5.5 + shaft)},7.5`);
+  // 받아들일 수 있는 세기: 체형이 가늘수록 낮음. 크기 × 세기가 넘으면 움찔, 아니면 하트
+  const limit = { slim: 1.85, avg: 2.15, fit: 2.25, chubby: 2.35 }[sc.build] || 2.15, symHearts = [], symHS = sq('.sy-hs');
+  let symE = 0, symEV = 0, symX = 0, symXV = 0, ouchAt = -9;
   let t = 0, si = 0, hi = 0, sinkV = 0, bsV = 0, jy = 0, jyV = 0, jx = 0, jxV = 0, heat = 0, shakeAt = -9, shakeK = 0, buzz = 0, fount = 0;
   let P = null, capsM = [], capsF = [], lastD = 0, dEnd = null, faceKey = '', finale = false, acc = 0, last = 0;
   const hearts = [];
@@ -295,9 +304,20 @@ function run(stage, job, done) {
   const at = (arr, x) => { const k = Math.max(0, Math.min(n - 1.001, (x - CX[0]) / (CX[n - 1] - CX[0]) * (n - 1))), i = Math.floor(k); return arr[i] + (arr[i + 1] - arr[i]) * (k - i); };
   const actHip = () => P[P.act].hip;
   const burstAt = (cnt, o) => { for (let j = 0; j < cnt; j++) { const x = actHip()[0] - 30 + Math.random() * 60; heart(x, at(y, x) - 6, typeof o === 'function' ? o(j) : o); } };
+  // ♀ 고리 위로 튀어나오는 작은 하트
+  function symHeart() {
+    const el = document.createElementNS(NS, 'use');
+    el.setAttribute('href', '#ntH');
+    symHS.appendChild(el);
+    const side = Math.random() < .5 ? -1 : 1;
+    symHearts.push({ el, t0: t, x: 106 + side * (4 + Math.random() * 6), dx: side * (10 + Math.random() * 18), dy: -(4 + Math.random() * 7), s: .36 + Math.random() * .2 });   // 고리 위에서 양옆으로 퐁퐁
+  }
   function impact(s) {
     const str = s.kind === 'final' ? 2.2 : s.kind === 'strong' ? 1.8 : Math.min(1.2, .45 + .75 * s.A / 7);
     sinkV += 40 * str; bsV -= 24 * str; symEV += 13 * str; symXV += 45 * str;
+    const force = str * (.55 + .1 * grade);
+    if (force > limit) { ouchAt = t; symXV += 60 * str; symEV -= 8; }   // 움찔
+    else if (good) for (let j = Math.round(force / 1.2 * [0, 0, 1, 1.6, 2.3][tier]); j > 0; j--) symHeart();
     jyV += (s.kind === 'n' ? 7 : 22) * str; jxV -= (s.kind === 'n' ? 2.5 : 9) * str;
     if (s.kind !== 'n') { shakeAt = t; shakeK = str * .8; }
     // 받는 쪽 살을 찰싹 침
@@ -420,12 +440,24 @@ function run(stage, job, done) {
       }
       face.style.transform = sk > .02 ? `translate(${f(cx * 1.2)}px,${f(cy * 1.2)}px)` : '';
     }
-    // ♂ 끝(tip)이 ♀ 원 안으로 드나듦. 깊이 들어갈수록 ♀ 원이 조금 늘어남. 만족감이 낮으면 끝나고 빠지며 고개를 숙임
-    const u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0, tip = 86 - 1.4 * Math.max(-2, ms.d + (good ? 0 : 14 * ease(u))), depth = Math.max(0, tip - 73);
-    symM.setAttribute('transform', `translate(${f(tip - 31)},${f(28 + ms.tr * 1.6)}) rotate(${f(good ? 0 : 35 * ease(u))})`);
-    symF.setAttribute('transform', `translate(${f(symX)},${f(ms.tr * .8)})`);
-    symC.setAttribute('rx', f(15 + .15 * depth - 4.5 * symE)); symC.setAttribute('ry', f(15 - .07 * depth + 4 * symE));
+    // ♂ 화살은 d를 따라 드나듦(맞닿으면 ♂ 원이 고리 바로 앞). 깊이 들어갈수록 고리가 조금 늘어남. 만족감이 낮으면 끝나고 빠지며 고개를 숙임
+    const u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0, gx = 76 - 1.6 * Math.max(-2, ms.d + (good ? 0 : 14 * ease(u))), depth = Math.max(0, gx + 13 + shaft - 91);
+    symM.setAttribute('transform', `translate(${f(gx)},${f(28 + ms.tr * 1.6)}) rotate(${f(good ? 0 : 35 * ease(u))})`);
+    const ouch = t - ouchAt < .6 ? 1 - (t - ouchAt) / .6 : 0, jit = ouch * 1.6 * Math.sin((t - ouchAt) * 190);
+    const cx0 = 106 + symX + jit, cy0 = 28 + ms.tr * .8, rx = (15 + .1 * Math.min(depth, 30) - 4.5 * symE) * (1 - .1 * ouch), ry = (15 - .05 * Math.min(depth, 30) + 4 * symE) * (1 - .1 * ouch);
+    const arc = sw => `M${f(cx0)},${f(cy0 - ry)} A${f(rx)},${f(ry)} 0 0 ${sw} ${f(cx0)},${f(cy0 + ry)}`;
+    sq('.sy-rr').setAttribute('d', arc(1)); sq('.sy-rl').setAttribute('d', arc(0));
+    sq('.sy-cross').setAttribute('d', `M${f(cx0)},${f(cy0 + ry)} V${f(cy0 + ry + 16)} M${f(cx0 - 7.5)},${f(cy0 + ry + 8.5)} H${f(cx0 + 7.5)}`);
+    symC.setAttribute('cx', f(cx0)); symC.setAttribute('cy', f(cy0)); symC.setAttribute('rx', f(rx)); symC.setAttribute('ry', f(ry));
     symC.setAttribute('fill-opacity', (good ? heat * .35 : 0).toFixed(2)); symG.setAttribute('opacity', (good ? heat : heat * .3).toFixed(2));
+    sq('.sy-ouch').setAttribute('opacity', ouch.toFixed(2));
+    for (let i = symHearts.length - 1; i >= 0; i--) {
+      const h = symHearts[i], k = (t - h.t0) / .9;
+      if (k >= 1) { h.el.remove(); symHearts.splice(i, 1); continue; }
+      const m = 1 - (1 - k) ** 2;
+      h.el.setAttribute('transform', `translate(${f(h.x + h.dx * m)},${f(cy0 - ry + h.dy * m)}) scale(${(h.s * (k < .15 ? k / .15 : 1)).toFixed(3)})`);
+      h.el.setAttribute('opacity', (k > .6 ? (1 - k) / .4 : 1).toFixed(2));
+    }
     sym.style.transform = face && face.style.transform || '';
   }
   function frame(now) {

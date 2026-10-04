@@ -220,7 +220,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .bed .nt-star{animation:twinkle 2.6s ease-in-out infinite}
 .nt-face{position:absolute;left:1.8%;top:3.2%;width:15.6%;border-radius:8px;overflow:hidden;box-shadow:0 0 0 1.5px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.55);pointer-events:none}
 .nt-face svg{display:block;width:100%;height:auto}
-.nt-sym{position:absolute;right:1.8%;top:3.2%;width:31%;border-radius:10px;background:rgba(10,12,26,.6);box-shadow:0 0 0 1.5px rgba(255,255,255,.18),0 4px 14px rgba(0,0,0,.5);pointer-events:none;transition:filter .6s}
+.nt-sym{position:absolute;right:1.8%;top:3.2%;width:36%;border-radius:10px;background:rgba(10,12,26,.6);box-shadow:0 0 0 1.5px rgba(255,255,255,.18),0 4px 14px rgba(0,0,0,.5);pointer-events:none;transition:filter .6s}
 .nt-sym svg{display:block;width:100%;height:auto}
 .nt-sym.sad{filter:grayscale(.85) brightness(.85)}
 .nt-sym .sy-h{transform-box:fill-box;transform-origin:50% 50%;transform:scale(0)}
