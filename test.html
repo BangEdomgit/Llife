@@ -44,6 +44,7 @@
 <div id="hcb"></div>
 <div id="fgal"></div>
 <div id="beauty"></div>
+<div id="fparts"></div>
 <script src="js/face.js"></script>
 <script src="js/outfit.js"></script>
 <script src="js/avatar.js"></script>
@@ -209,6 +210,24 @@ function drawBeauty() {
   box.innerHTML = `<section><h2>최고 미녀 · 미남 — 유형별로 설계한 얼굴 (모두 S, 상위 0.01% 안)</h2>${rows}<div class="row" style="flex-wrap:wrap;margin-top:8px">${full}</div></section>`;
 }
 drawBeauty();
+
+// ── 얼굴 파츠 시트 ── 같은 얼굴에서 한 가지만 바꿈: 얼굴형 12 / 눈 20 / 눈썹 18 (여·남) / 속눈썹 3단계 × 눈썹 진하기 3단계
+function drawParts() {
+  const box = document.getElementById('fparts'), cell = (svg, lab) => `<div class="fig">${svg}<span class="lab">${lab}</span></div>`;
+  const BASE = { asym: 0, arch: null, marks: { freckles: false, exag: null, scar: null }, eyeY: .01, eyeGap: 1, eyeSize: 1.1, eyeTilt: 3, noseLen: .92, mouthY: -.01, mouthW: .95, faceLen: .98, jawW: .86, chinPoint: .6, cheekW: .99,
+    nose: 5, mouth: 'bow', brow: 1, browThick: 1.02, lipFull: 1.15, noseW: .9, browY: .01, browAngle: 2, irisK: 1.05, lashLv: 1, shape: 3, eye: 6 };
+  const one = (sex, go, o = {}) => { const a = A.make('parts-' + sex, sex); Object.assign(a, { skin: 1, glasses: 0, hacc: null, hair: sex === 'f' ? 0 : 5, hv: 2, hc: 1, hcN: 1, front: 'none_side', xseed: 'parts' });
+    a.go = Object.assign({}, BASE, sex === 'm' ? { browThick: 1.36, jawW: .97, eyeSize: .98, mouth: 'line', nose: 2, shape: 1 } : {}, go); if (go.eye != null) a.eyes = go.eye; return A.render(a, o.size || 130, { age: 24, mask: !!o.mask }); };
+  const shapes = Face.SHAPE_LABEL.map((l, i) => cell(one('f', { shape: i }, { mask: true, size: 110 }), `${i} ${l}`)).join('');
+  const eyes = Face.EYES.map((e, i) => cell(one('f', { eye: i }), `${i} ${e.name}`)).join('');
+  const brows = ['f', 'm'].map(sx => Face.BROW_LABEL.map((l, i) => cell(one(sx, { brow: i }), `${sx === 'f' ? '여' : '남'} ${i} ${l}`)).join('')).join('');
+  const lv = [0, 1, 2].flatMap(la => [0, 1, 2].map(bl => cell(one('f', { lashLv: la, browThick: Face.BROW_LV.f[bl] }), `속눈썹 ${Face.LASH_LABEL[la]} · 눈썹 ${Face.BROWLV_LABEL[bl]}`))).join('');
+  box.innerHTML = `<section><h2>얼굴형 12 (머리 가림)</h2><div class="row" style="flex-wrap:wrap">${shapes}</div></section>`
+    + `<section><h2>눈 20</h2><div class="row" style="flex-wrap:wrap">${eyes}</div></section>`
+    + `<section><h2>눈썹 18 — 여 / 남</h2><div class="row" style="flex-wrap:wrap">${brows}</div></section>`
+    + `<section><h2>속눈썹 3단계 × 눈썹 진하기 3단계</h2><div class="row" style="flex-wrap:wrap">${lv}</div></section>`;
+}
+drawParts();
 </script>
 </body>
 </html>

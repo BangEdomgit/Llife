@@ -17,9 +17,10 @@ function rng(seed) {
 const range = (r, a, b) => a + (b - a) * r();
 const wpick = (r, list) => { let t = r() * list.reduce((x, y) => x + y[1], 0); for (const [k, w] of list) { t -= w; if (t <= 0) return k; } return list[0][0]; };
 
-// 얼굴형 (avatar.js FACES 순서): 0 둥근 1 각진 2 갸름 3 계란 4 긴 5 하트
+// 얼굴형 (avatar.js FACES 순서): 0 둥근 1 각진 2 갸름 3 계란 4 긴 5 하트 + 세분화(유전자 2판) 6 동안 7 둥근 사각 8 V라인 9 다이아몬드 10 둥근 계란 11 역삼각
 const SHAPE = { round: 0, square: 1, slim: 2, oval: 3, long: 4, heart: 5 };
-const SHAPE_LABEL = ['둥근형', '각진형', '갸름형', '계란형', '긴 얼굴', '하트형'];
+const SHAPE_LABEL = ['둥근형', '각진형', '갸름형', '계란형', '긴 얼굴', '하트형', '동안형', '둥근 사각형', 'V라인', '다이아몬드형', '둥근 계란형', '역삼각형'];
+const SHAPE_SUB = { 0: [6], 1: [7], 2: [8, 9], 3: [10], 5: [11] };   // 큰 얼굴형 → 세분화한 얼굴형
 // 눈 (avatar.js eyeShape): 0 동그란 1 날카로운 2 처진(강아지) 3 가는 4 무쌍 5 큰 눈(사슴) 6 아몬드 7 고양이 8 여우 9 졸린 10 덮인
 // 코: 0 꺾인 선 1 동그란 코끝 2 높은 콧대 3 넓은 콧볼 4 작은(버튼) 5 점 6 곧은 7 들린
 // 입(다문 기본 표정): line smile flat down small wide bow pout cat
@@ -36,7 +37,7 @@ const ARCH = {
   deer:   { label: '사슴상', eye: [5], eyeY: [.02, .06], len: [1.04, 1.12], nose: [6], mouth: ['small'] },
 };
 
-function genes(key, gender, npc) {
+function genes(key, gender, npc, ver = 1) {
   const r = rng('fg:' + key), male = gender === 'm';
   const g = {
     shape: SHAPE[wpick(r, male ? [['oval', 2], ['round', .5], ['slim', 1], ['square', 2], ['heart', .6], ['long', 2]]
@@ -89,6 +90,15 @@ function genes(key, gender, npc) {
   const nx = r();
   if (nx < .14 && !g.arch) g.nose = nx < .07 ? 8 : 9;
   g.asym = Math.pow(r(), 2.6) * .7;   // 대부분 0 근처, 가끔 눈·눈썹 높이가 조금 다름
+  // 유전자 2판 (새로 만든 얼굴만 — 예전 얼굴은 그대로): 얼굴형 세분화 40%, 새 눈썹 10종 절반, 속눈썹 3단계
+  if (ver >= 2) {
+    const sx = r(), SUB = SHAPE_SUB[g.shape];
+    if (SUB && sx < .4) g.shape = SUB[Math.min(SUB.length - 1, Math.floor(sx / .4 * SUB.length))];
+    const bx = r(), nb = male ? [[8, .6], [9, 1], [10, .5], [11, .3], [12, 1.2], [13, 1.4], [14, .5], [15, 1], [16, 1.1], [17, .6]]
+      : [[8, 1.2], [9, 1.5], [10, .8], [11, 1], [12, .6], [13, .3], [14, 1.2], [15, .6], [16, .3], [17, .8]];
+    if (bx < .5) g.brow = wpick(r, nb);
+    g.lashLv = male ? wpick(r, [[0, 4], [1, 4], [2, 1]]) : wpick(r, [[0, 2], [1, 4], [2, 3]]);
+  }
   return g;
 }
 
@@ -138,15 +148,24 @@ const EYES = [
   { id: 'round', name: '동그란', w: .95, h: 1.12, peak: .5, tilt: 0, lower: .9, iris: 1.05, lid: .08, base: { f: 72, m: 64 }, adn: '눈이 동글동글한', con: '눈이 동글동글하고' },
   { id: 'sharp', name: '날카로운', w: 1.05, h: .85, peak: .55, tilt: 5, lower: .2, iris: .9, lid: .25, base: { f: 66, m: 80 }, adn: '눈빛이 날카로운', con: '눈빛이 날카롭고' },
   { id: 'droop', name: '처진', w: 1, h: .95, peak: .35, tilt: -9, lower: .6, iris: .95, lid: .2, base: { f: 62, m: 62 }, adn: '눈꼬리가 처진', con: '눈꼬리가 처지고' },
-  { id: 'narrow', name: '가는', w: 1, h: .75, peak: .5, tilt: 3, lower: .3, iris: .85, lid: .2, base: { f: 60, m: 66 }, adn: '눈이 가늘고 차분한', con: '눈이 가늘고 차분하며' },
+  { id: 'narrow', name: '가는', mono: true, w: 1, h: .75, peak: .5, tilt: 3, lower: .3, iris: .85, lid: .2, base: { f: 60, m: 66 }, adn: '눈이 가늘고 차분한', con: '눈이 가늘고 차분하며' },
   { id: 'puppy', name: '강아지', w: 1, h: 1.05, peak: .4, tilt: -6, lower: .7, iris: 1.05, lid: .12, base: { f: 78, m: 72 }, adn: '눈매가 순한', con: '눈매가 순하고' },
-  { id: 'doe', name: '사슴', w: 1.05, h: 1.18, peak: .45, tilt: 0, lower: .8, iris: 1.1, lid: .1, base: { f: 84, m: 70 }, adn: '눈이 맑고 큰', con: '눈이 맑고 크며' },
+  { id: 'doe', name: '사슴', crease: 2, w: 1.05, h: 1.18, peak: .45, tilt: 0, lower: .8, iris: 1.1, lid: .1, base: { f: 84, m: 70 }, adn: '눈이 맑고 큰', con: '눈이 맑고 크며' },
   { id: 'almond', name: '아몬드', w: 1, h: 1, peak: .5, tilt: 2, lower: .5, iris: 1, lid: .15, base: { f: 78, m: 78 }, adn: '눈매가 또렷한', con: '눈매가 또렷하고' },
   { id: 'cat', name: '고양이', w: 1.02, h: .95, peak: .6, tilt: 9, lower: .4, iris: .98, lid: .18, base: { f: 80, m: 74 }, adn: '눈꼬리가 올라간', con: '눈꼬리가 올라가고' },
   { id: 'fox', name: '여우', w: 1.1, h: .82, peak: .62, tilt: 11, lower: .3, iris: .92, lid: .22, base: { f: 76, m: 72 }, adn: '눈매가 길고 가는', con: '눈매가 길고 가늘며' },
   { id: 'sleepy', name: '나른한', w: 1, h: .88, peak: .45, tilt: -2, lower: .5, iris: .95, lid: .35, base: { f: 66, m: 64 }, adn: '눈이 졸린 듯한', con: '눈이 졸린 듯하고' },
   { id: 'deep', name: '깊은', w: 1, h: .92, peak: .5, tilt: 3, lower: .5, iris: .95, lid: .3, base: { f: 70, m: 78 }, adn: '눈이 그윽한', con: '눈이 그윽하고' },
   { id: 'small', name: '작은', w: .85, h: .85, peak: .5, tilt: 0, lower: .5, iris: .9, lid: .15, base: { f: 56, m: 60 }, adn: '눈이 작은 편인', con: '눈이 작은 편이고' },
+  // 유전자 2판에서 늘어난 8종 (mono: 쌍꺼풀 선 없음 — 점수와 무관)
+  { id: 'crescent', name: '반달', w: 1.04, h: .82, peak: .5, tilt: 2, lower: .05, iris: .98, lid: .14, base: { f: 74, m: 72 }, adn: '눈매가 반달 같은', con: '눈매가 반달 같고' },
+  { id: 'wide', name: '시원한', w: 1.15, h: 1.02, peak: .5, tilt: 3, lower: .5, iris: 1.02, lid: .12, base: { f: 80, m: 78 }, adn: '눈매가 시원한', con: '눈매가 시원하고' },
+  { id: 'sparkly', name: '초롱초롱한', w: .98, h: 1.15, peak: .5, tilt: 1, lower: .85, iris: 1.15, lid: .06, base: { f: 80, m: 66 }, adn: '눈이 초롱초롱한', con: '눈이 초롱초롱하고' },
+  { id: 'teary', name: '촉촉한', w: 1.02, h: 1.08, peak: .42, tilt: -4, lower: .75, iris: 1.08, lid: .1, base: { f: 78, m: 68 }, adn: '눈이 촉촉한', con: '눈이 촉촉하고' },
+  { id: 'fierce', name: '매서운', w: 1.08, h: .85, peak: .58, tilt: 7, lower: .35, iris: .8, lid: .2, base: { f: 60, m: 72 }, adn: '눈빛이 매서운', con: '눈빛이 매섭고' },
+  { id: 'monoBig', name: '큰 무쌍', w: 1.05, h: .92, peak: .5, tilt: 4, lower: .5, iris: 1, lid: .22, mono: true, base: { f: 74, m: 76 }, adn: '눈매가 깔끔한', con: '눈매가 깔끔하고' },
+  { id: 'gentle', name: '선한', w: 1, h: 1, peak: .42, tilt: -3, lower: .65, iris: 1.02, lid: .12, base: { f: 74, m: 74 }, adn: '눈매가 선한', con: '눈매가 선하고' },
+  { id: 'upBig', name: '올라간 큰', w: 1.05, h: 1.1, peak: .55, tilt: 8, lower: .6, iris: 1.06, lid: .12, base: { f: 82, m: 72 }, adn: '눈이 크고 눈꼬리가 올라간', con: '눈이 크고 눈꼬리가 올라가며' },
 ];
 // 코 10종 (번호는 유전자 nose와 맞춤: 예전 0~7 + 낮은·큼직한). 매력 차이는 일부러 좁게(56~82)
 const NOSES = [
@@ -164,10 +183,21 @@ const NOSES = [
 // 입 8종 (유전자 mouth 문자열 → 카탈로그), 눈썹 6종 (유전자 brow 0~7 → 카탈로그)
 const MOUTHS = { bow: { f: 80, m: 72 }, full: { f: 78, m: 68 }, smile: { f: 74, m: 76 }, small: { f: 74, m: 62 }, neutral: { f: 66, m: 72 }, thin: { f: 58, m: 66 }, wide: { f: 62, m: 66 }, down: { f: 56, m: 62 } };
 const MOUTH_OF = { line: 'neutral', flat: 'thin', pout: 'full', cat: 'smile' };
-const BROWS = { softArch: { f: 80, m: 66 }, straight: { f: 72, m: 78 }, thick: { f: 58, m: 80 }, rising: { f: 70, m: 74 }, falling: { f: 64, m: 62 }, thin: { f: 68, m: 56 } };
-const BROW_OF = ['straight', 'softArch', 'rising', 'thick', 'thin', 'softArch', 'falling', 'rising'];
+const BROWS = { softArch: { f: 80, m: 66 }, straight: { f: 72, m: 78 }, thick: { f: 58, m: 80 }, rising: { f: 70, m: 74 }, falling: { f: 64, m: 62 }, thin: { f: 68, m: 56 },
+  thinStraight: { f: 70, m: 60 }, semiArch: { f: 78, m: 72 }, highAngled: { f: 72, m: 70 }, roundShort: { f: 66, m: 56 }, seagull: { f: 70, m: 78 },
+  bushy: { f: 56, m: 78 }, longTail: { f: 76, m: 66 }, thickArch: { f: 66, m: 74 }, shortThick: { f: 54, m: 70 }, sadArch: { f: 64, m: 62 } };
+// 유전자 눈썹 번호 → 카탈로그 (0~7 예전 8종 + 8~17 새 10종)
+const BROW_OF = ['straight', 'softArch', 'rising', 'thick', 'thin', 'softArch', 'falling', 'rising',
+  'thinStraight', 'semiArch', 'highAngled', 'roundShort', 'seagull', 'bushy', 'longTail', 'thickArch', 'shortThick', 'sadArch'];
+const BROW_LABEL = ['일자', '완만한 아치', '각진', '두꺼운 일자', '짧은', '높은 아치', '처진', '올라간',
+  '가는 일자', '자연 아치', '높은 각진 아치', '짧고 둥근', '갈매기', '숱 많은', '꼬리 긴', '두꺼운 아치', '짧고 굵은', '처진 아치'];
+// 속눈썹·눈썹 진하기 3단계 (0 적게·옅게 / 1 보통 / 2 풍성·진하게). 눈썹 진하기는 굵기 유전자(browThick)로 그림
+const LASH_LABEL = ['적게', '보통', '풍성하게'], BROWLV_LABEL = ['옅게', '보통', '진하게'];
+const BROW_LV = { f: [.78, 1.02, 1.32], m: [1.05, 1.36, 1.72] };
+const lashLevel = (g, sex) => g.lashLv != null ? g.lashLv : sex === 'm' ? 1 : g.lashN >= 3 ? 2 : g.lashN ? 1 : 0;   // 예전 얼굴: 여자는 꼬리 가닥 수로, 남자는 보통
+const browLevel = (g, sex) => { const L = BROW_LV[sex === 'm' ? 'm' : 'f'], t = g.browThick ?? L[1]; return t < (L[0] + L[1]) / 2 ? 0 : t < (L[1] + L[2]) / 2 ? 1 : 2; };
 const mouthId = m => MOUTH_OF[m] || m;
-const SHAPE_ID = ['round', 'square', 'slim', 'oval', 'long', 'heart'];
+const SHAPE_ID = ['round', 'square', 'slim', 'oval', 'long', 'heart', 'baby', 'softSquare', 'vline', 'diamond', 'roundOval', 'invTri'];
 
 /* ---------- 외모 매력 기준 (BEAUTY) ----------
    웹툰 속 미인·미남의 공통점을 다섯 축으로 나눔. 합 100점 → 성별마다 백분위로 등급 (S 1% … F)
@@ -186,36 +216,37 @@ const IDEAL = {
   eyeSize: [1.15, .98, .09, 25, 'eyes'], eyeTilt: [4, 3, 6, 10, 'eyes'], irisK: [1.06, 1.04, .05, 10, 'eyes'],
   noseW: [.87, .98, .1, 0, 'parts'], lipFull: [1.18, .95, .15, 0, 'parts'], browThick: [.9, 1.35, .28, 0, 'parts'],
 };
-const SHAPE_SCORE = { f: { oval: 1, slim: 1, heart: .95, round: .78, long: .62, square: .56 }, m: { square: 1, oval: .96, slim: .9, long: .86, heart: .74, round: .66 } };
+const SHAPE_SCORE = { f: { oval: 1, slim: 1, heart: .95, round: .78, long: .62, square: .56, vline: 1, roundOval: .92, invTri: .9, diamond: .82, baby: .82, softSquare: .7 },
+  m: { square: 1, oval: .96, slim: .9, long: .86, heart: .74, round: .66, softSquare: .95, diamond: .9, vline: .86, roundOval: .86, invTri: .8, baby: .7 } };
 // 인상 유형: 파츠 다섯(눈·눈썹·코·입·얼굴형)이 한 유형에 몇 개 모였는지
 const TYPES = {
   f: {
-    청순: { word: '청순한', eye: ['doe', 'round', 'puppy', 'almond', 'droop'], brow: ['softArch', 'straight'], nose: ['neat', 'button', 'soft', 'straight'], mouth: ['small', 'bow', 'smile'], shape: ['oval', 'slim', 'round'] },
-    고혹: { word: '고혹적인', eye: ['cat', 'fox', 'almond', 'deep', 'sleepy'], brow: ['rising', 'softArch'], nose: ['bridge', 'neat', 'straight'], mouth: ['full', 'bow', 'wide'], shape: ['slim', 'heart', 'oval'] },
-    귀염: { word: '귀여운', eye: ['round', 'puppy', 'doe', 'small', 'droop'], brow: ['softArch', 'thin', 'falling'], nose: ['button', 'upturned', 'soft', 'wide'], mouth: ['small', 'smile', 'full'], shape: ['round', 'heart', 'oval'] },
-    시크: { word: '시크한', eye: ['sharp', 'narrow', 'fox', 'almond', 'deep', 'sleepy'], brow: ['straight', 'rising', 'thick'], nose: ['bridge', 'straight', 'long', 'low'], mouth: ['neutral', 'thin', 'small', 'down'], shape: ['slim', 'long', 'oval', 'square'] },
+    청순: { word: '청순한', eye: ['doe', 'round', 'puppy', 'almond', 'droop', 'sparkly', 'gentle', 'teary'], brow: ['softArch', 'straight', 'semiArch', 'thinStraight', 'longTail'], nose: ['neat', 'button', 'soft', 'straight'], mouth: ['small', 'bow', 'smile'], shape: ['oval', 'slim', 'round', 'roundOval', 'baby'] },
+    고혹: { word: '고혹적인', eye: ['cat', 'fox', 'almond', 'deep', 'sleepy', 'wide', 'upBig'], brow: ['rising', 'softArch', 'highAngled', 'longTail', 'seagull'], nose: ['bridge', 'neat', 'straight'], mouth: ['full', 'bow', 'wide'], shape: ['slim', 'heart', 'oval', 'vline', 'diamond', 'invTri'] },
+    귀염: { word: '귀여운', eye: ['round', 'puppy', 'doe', 'small', 'droop', 'crescent', 'sparkly', 'teary'], brow: ['softArch', 'thin', 'falling', 'roundShort', 'sadArch', 'thinStraight'], nose: ['button', 'upturned', 'soft', 'wide'], mouth: ['small', 'smile', 'full'], shape: ['round', 'heart', 'oval', 'baby', 'roundOval'] },
+    시크: { word: '시크한', eye: ['sharp', 'narrow', 'fox', 'almond', 'deep', 'sleepy', 'fierce', 'monoBig', 'wide'], brow: ['straight', 'rising', 'thick', 'highAngled', 'seagull', 'thinStraight'], nose: ['bridge', 'straight', 'long', 'low'], mouth: ['neutral', 'thin', 'small', 'down'], shape: ['slim', 'long', 'oval', 'square', 'diamond', 'softSquare', 'vline'] },
   },
   m: {
-    훈남: { word: '훈훈한', eye: ['puppy', 'droop', 'round', 'almond', 'doe'], brow: ['straight', 'softArch', 'falling'], nose: ['straight', 'soft', 'wide', 'button'], mouth: ['smile', 'neutral', 'wide'], shape: ['oval', 'round', 'square'] },
-    조각: { word: '조각 같은', eye: ['sharp', 'deep', 'almond'], brow: ['thick', 'straight', 'rising'], nose: ['bridge', 'strong', 'straight'], mouth: ['neutral', 'thin', 'down'], shape: ['square', 'long', 'oval'] },
-    꽃미남: { word: '곱상한', eye: ['doe', 'almond', 'cat', 'round', 'small'], brow: ['softArch', 'straight', 'thin'], nose: ['neat', 'bridge', 'upturned'], mouth: ['bow', 'small', 'full'], shape: ['slim', 'oval', 'heart'] },
-    시크: { word: '시크한', eye: ['fox', 'narrow', 'sharp', 'sleepy', 'cat'], brow: ['straight', 'rising'], nose: ['bridge', 'long', 'low', 'straight'], mouth: ['thin', 'neutral', 'small'], shape: ['long', 'slim', 'square'] },
+    훈남: { word: '훈훈한', eye: ['puppy', 'droop', 'round', 'almond', 'doe', 'crescent', 'gentle'], brow: ['straight', 'softArch', 'falling', 'semiArch', 'sadArch', 'bushy'], nose: ['straight', 'soft', 'wide', 'button'], mouth: ['smile', 'neutral', 'wide'], shape: ['oval', 'round', 'square', 'softSquare', 'roundOval', 'baby'] },
+    조각: { word: '조각 같은', eye: ['sharp', 'deep', 'almond', 'fierce', 'wide', 'monoBig'], brow: ['thick', 'straight', 'rising', 'bushy', 'shortThick', 'thickArch', 'seagull'], nose: ['bridge', 'strong', 'straight'], mouth: ['neutral', 'thin', 'down'], shape: ['square', 'long', 'oval', 'diamond', 'softSquare'] },
+    꽃미남: { word: '곱상한', eye: ['doe', 'almond', 'cat', 'round', 'small', 'sparkly', 'teary', 'upBig'], brow: ['softArch', 'straight', 'thin', 'semiArch', 'thinStraight'], nose: ['neat', 'bridge', 'upturned'], mouth: ['bow', 'small', 'full'], shape: ['slim', 'oval', 'heart', 'vline', 'invTri'] },
+    시크: { word: '시크한', eye: ['fox', 'narrow', 'sharp', 'sleepy', 'cat', 'fierce', 'monoBig'], brow: ['straight', 'rising', 'seagull', 'highAngled'], nose: ['bridge', 'long', 'low', 'straight'], mouth: ['thin', 'neutral', 'small'], shape: ['long', 'slim', 'square', 'diamond', 'invTri'] },
   },
 };
 // 최고 미녀·미남 설계 (BEAUTY): 유형마다 파츠 후보 + 배치 이상값 근처의 범위 — beauty()가 시드로 하나씩 골라 S 상위 얼굴을 만듦
 //   eye: 눈 번호(EYES), brow: 유전자 눈썹 번호(BROW_OF), nose: 코 번호, mouth: 유전자 입, shape: 얼굴형 번호(0 둥근 1 각진 2 갸름 3 계란 4 긴 5 하트)
 const BEAUTY = {
   f: {
-    청순: { eye: [5, 6, 4], brow: [1, 5], nose: [5, 4], mouth: ['bow', 'small'], shape: [3, 2], tilt: [1, 4], size: [1.15, 1.2], lipFull: [1.12, 1.22] },
-    고혹: { eye: [7, 8, 6], brow: [5, 1, 7], nose: [2, 5], mouth: ['pout', 'bow'], shape: [2, 5], tilt: [5, 8], size: [1.1, 1.16], lipFull: [1.28, 1.38] },
-    귀염: { eye: [4, 0, 5], brow: [1, 4], nose: [4, 7], mouth: ['small', 'smile', 'pout'], shape: [5, 3], tilt: [-2, 2], size: [1.17, 1.22], lipFull: [1.15, 1.25], eyeY: [.018, .026] },
-    시크: { eye: [6, 8, 1], brow: [0, 7], nose: [2, 0], mouth: ['line', 'small'], shape: [2, 3], tilt: [4, 7], size: [1.08, 1.14], lipFull: [1.02, 1.12] },
+    청순: { eye: [5, 6, 4, 14, 18], brow: [1, 5, 9], nose: [5, 4], mouth: ['bow', 'small'], shape: [3, 2, 10], tilt: [1, 4], size: [1.15, 1.2], lipFull: [1.12, 1.22] },
+    고혹: { eye: [7, 8, 6, 13, 19], brow: [5, 1, 7, 10, 14], nose: [2, 5], mouth: ['pout', 'bow'], shape: [2, 5, 8, 11], tilt: [5, 8], size: [1.1, 1.16], lipFull: [1.28, 1.38] },
+    귀염: { eye: [4, 0, 5, 12, 14, 15], brow: [1, 4, 11], nose: [4, 7], mouth: ['small', 'smile', 'pout'], shape: [5, 3, 6, 10], tilt: [-2, 2], size: [1.17, 1.22], lipFull: [1.15, 1.25], eyeY: [.018, .026] },
+    시크: { eye: [6, 8, 1, 16, 17, 13], brow: [0, 7, 8, 10], nose: [2, 0], mouth: ['line', 'small'], shape: [2, 3, 8, 9], tilt: [4, 7], size: [1.08, 1.14], lipFull: [1.02, 1.12] },
   },
   m: {
-    훈남: { eye: [4, 6, 0], brow: [0, 1], nose: [0, 1], mouth: ['smile', 'line'], shape: [3, 1], tilt: [-2, 2], size: [.98, 1.03], lipFull: [.92, 1] },
-    조각: { eye: [1, 10, 6], brow: [3, 0], nose: [2, 9], mouth: ['line', 'flat'], shape: [1, 4], tilt: [3, 6], size: [.94, 1], lipFull: [.86, .95] },
-    꽃미남: { eye: [5, 6, 7], brow: [1, 0], nose: [5, 2], mouth: ['bow', 'small'], shape: [2, 3], tilt: [1, 4], size: [1, 1.05], lipFull: [.98, 1.08] },
-    시크: { eye: [8, 3, 1], brow: [0, 7], nose: [2, 6], mouth: ['flat', 'line'], shape: [4, 2], tilt: [5, 8], size: [.94, .99], lipFull: [.86, .94] },
+    훈남: { eye: [4, 6, 0, 12, 18], brow: [0, 1, 9, 13], nose: [0, 1], mouth: ['smile', 'line'], shape: [3, 1, 7, 10], tilt: [-2, 2], size: [.98, 1.03], lipFull: [.92, 1] },
+    조각: { eye: [1, 10, 6, 16, 13], brow: [3, 0, 13, 16, 15], nose: [2, 9], mouth: ['line', 'flat'], shape: [1, 4, 9, 7], tilt: [3, 6], size: [.94, 1], lipFull: [.86, .95] },
+    꽃미남: { eye: [5, 6, 7, 14, 19], brow: [1, 0, 9, 8], nose: [5, 2], mouth: ['bow', 'small'], shape: [2, 3, 8], tilt: [1, 4], size: [1, 1.05], lipFull: [.98, 1.08] },
+    시크: { eye: [8, 3, 1, 16, 17], brow: [0, 7, 12, 10], nose: [2, 6], mouth: ['flat', 'line'], shape: [4, 2, 9, 11], tilt: [5, 8], size: [.94, .99], lipFull: [.86, .94] },
   },
 };
 const near = (v, ideal, tol) => Math.exp(-.5 * ((v - ideal) / tol) ** 2);
@@ -237,7 +268,7 @@ const idealNear = (g, sex, k) => { const [f, m, tol] = IDEAL[k]; return near(g[k
 function contourScore(g, sex) { return (SHAPE_SCORE[sex][SHAPE_ID[g.shape] || 'oval'] || .7) * 30 + axisScore(g, sex, 'contour') * .7; }
 function eyeScore(g, sex, o = {}) {
   const E = EYES[o.eye ?? 6] || EYES[6];
-  return clamp(E.base[sex] * .55 + axisScore(g, sex, 'eyes') * .45 + (sex === 'f' && o.aegyo ? 3 : 0) + (sex === 'f' && g.lashN ? 1.5 : 0), 0, 100);
+  return clamp(E.base[sex] * .55 + axisScore(g, sex, 'eyes') * .45 + (sex === 'f' && o.aegyo ? 3 : 0) + (sex === 'f' ? lashLevel(g, 'f') : 0), 0, 100);
 }
 function featureScore(g, sex) {   // 코·입·눈썹: 종류 60% + 폭·두께 40%
   const N = NOSES[g.nose] || NOSES[0], M = MOUTHS[mouthId(g.mouth)] || MOUTHS.neutral, B = BROWS[BROW_OF[g.brow] || 'straight'];
@@ -266,7 +297,7 @@ function cutoffs() {
   for (const sex of ['f', 'm']) {
     const r = rng('calib:' + sex), raws = [];
     for (let i = 0; i < 10000; i++) {
-      const g = genes('calib:' + sex + ':' + i, sex, true), eye = g.eye != null ? g.eye : Math.floor(r() * EYES.length);
+      const g = genes('calib:' + sex + ':' + i, sex, true, 2), eye = g.eye != null ? g.eye : Math.floor(r() * EYES.length);
       raws.push(faceScore(g, sex, { eye, aegyo: r() < .35 }).raw);
     }
     raws.sort((a, b) => b - a);
@@ -296,7 +327,7 @@ function biasGenes(g, sex, bias) {
 function beautyGenes(type, sex, seed) {
   sex = sex === 'm' ? 'm' : 'f';
   const B = BEAUTY[sex][type] || Object.values(BEAUTY[sex])[0], r = rng('beauty:' + sex + ':' + type + ':' + seed), pk = l => l[Math.floor(r() * l.length)], rg = ([a, b]) => a + (b - a) * r();
-  const g = { asym: 0, lashN: sex === 'f' ? 3 : 0, marks: {} };
+  const g = { asym: 0, lashN: sex === 'f' ? 3 : 0, lashLv: sex === 'f' ? 2 : 1, marks: {} };
   for (const k in IDEAL) { const [f, m, tol] = IDEAL[k]; g[k] = (sex === 'f' ? f : m) + (r() - .5) * tol * .5; }
   Object.assign(g, { eye: pk(B.eye), brow: pk(B.brow), nose: pk(B.nose), mouth: pk(B.mouth), shape: pk(B.shape), eyeTilt: rg(B.tilt), eyeSize: rg(B.size), lipFull: rg(B.lipFull) });
   if (B.eyeY) g.eyeY = rg(B.eyeY);
@@ -325,6 +356,6 @@ function sentence(g, o = {}) {
   return `${head} ${t ? t(o.type.word, o.sex === 'm') : GRADE_LINE[o.grade]}`;
 }
 
-window.Face = { genes, forAge, distance, traits, RANGE, SHAPE_LABEL, SHAPE_ID, ARCH, EYES, NOSES, MOUTHS, BROWS, BROW_OF, mouthId, IDEAL, SHAPE_SCORE, TYPES, typeOf, BEAUTY, beautyGenes,
+window.Face = { genes, forAge, distance, traits, RANGE, SHAPE_LABEL, SHAPE_ID, SHAPE_SUB, BROW_LABEL, LASH_LABEL, BROWLV_LABEL, BROW_LV, lashLevel, browLevel, ARCH, EYES, NOSES, MOUTHS, BROWS, BROW_OF, mouthId, IDEAL, SHAPE_SCORE, TYPES, typeOf, BEAUTY, beautyGenes,
   faceScore, layoutScore, partScore, harmony, cutoffs, gradeOf, gradePos, biasGenes, words, sentence, GRADE_LINE };
 })();

@@ -243,7 +243,7 @@ function lookOf(p) {
   }
   return p.appearance || null;
 }
-const FACE_V = 2;   // 얼굴 점수 기준 판 (2: BEAUTY 기준) — 예전 판으로 매긴 등급은 한 번 다시 맞춤
+const FACE_V = 3;   // 얼굴 점수 기준 판 (2: BEAUTY 기준, 3: 눈 20·눈썹 18·얼굴형 12) — 예전 판으로 매긴 등급은 한 번 다시 맞춤
 const BEAUTY_TYPE = { f: { warm: '청순', shy: '청순', sensitive: '청순', bold: '고혹', sharp: '시크', cool: '시크', playful: '귀염', sunny: '귀염' },
   m: { warm: '훈남', sunny: '훈남', bold: '조각', sharp: '조각', shy: '꽃미남', sensitive: '꽃미남', playful: '꽃미남', cool: '시크' } };
 // 생김새 등급 = 얼굴 점수 (FACE_UPGRADE 4절). 정해 둔 등급(고정 인물 등)이 있으면 그 등급의 얼굴을 찾음
@@ -2574,6 +2574,13 @@ function quickLook(q) {
   const g = q.gender === 'f' ? 'f' : 'm', a = Avatar.make(`${q.seed || 'qs'}:me`, g);
   a.xseed = String(q.seed || 'qs');
   for (const k of ['hair', 'hc', 'skin', 'eyes']) if (q[k] != null && q[k] !== '') a[k] = +q[k];
+  // 직접 고른 얼굴형·눈썹·속눈썹·눈썹 진하기 (안 고르면 얼굴 유전자대로) — 생김새 등급을 맞출 때도 그대로 남음
+  const has = k => q[k] != null && q[k] !== '', go = {};
+  if (has('shape')) go.shape = +q.shape;
+  if (has('brow')) go.brow = +q.brow;
+  if (has('lashLv')) go.lashLv = +q.lashLv;
+  if (has('browLv') && window.Face) go.browThick = Face.BROW_LV[g][+q.browLv];
+  if (Object.keys(go).length) a.go = go;
   const h = +q.height || (g === 'm' ? 173 : 162), R = g === 'm' ? [168, 179] : [157, 167];
   a.body = { height: h < R[0] ? 'short' : h > R[1] ? 'tall' : 'avg', build: QD().builds.some(b => b.id === q.build) ? q.build : 'avg' };
   if (g === 'f') { const ci = QD().cups.indexOf(q.cup); a.body.chest = ci <= 1 ? 'small' : ci >= 4 ? 'large' : 'avg'; }
@@ -2875,7 +2882,7 @@ function migrate(s) {
 // 예전 저장: 내 얼굴을 생김새 등급에 맞추고(한 번), NPC 생김새 등급은 얼굴 점수로 (FACE_UPGRADE)
 function migrateFaces() {
   if (!S || !window.Avatar || !Avatar.faceInfo) return;
-  if (S.look && (S.look.gfit || 0) < FACE_V) fitMyFace();
+  if (S.look && (S.look.gfit || 0) < FACE_V) { const inf = Avatar.faceInfo(S.look); if (inf && inf.grade === gradeOf(S.stats.face)) S.look.gfit = FACE_V; else fitMyFace(); }   // 등급이 그대로면 얼굴도 그대로
   for (const p of S.people) if (p.appearance && (p.faceG || 0) < FACE_V) faceFromLook(p);
 }
 function init() { S = load(); if (S) { migrateFaces(); after(); return true; } return false; }

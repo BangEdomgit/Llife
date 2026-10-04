@@ -701,9 +701,21 @@ function createClick(b) {
   mBody.scrollTop = top;
 }
 
+// 얼굴: 얼굴형 12 · 눈 20 · 눈썹 18 · 속눈썹 3단계 · 눈썹 진하기 3단계 (안 고른 칸은 지금 얼굴 유전자 값에 불이 들어옴)
+function qFace(q, P) {
+  if (!P || !P.shape) return '';
+  const cur = window.Avatar && window.Face ? Avatar.genes(G.quick.look(q), 20) : null, g = q.gender;
+  const val = (f, gv) => q[f] != null && q[f] !== '' ? +q[f] : gv;
+  const chips = (f, list, v) => `<div class="chips">${list.map(o => qChip(f, o.id, esc(o.label), o.id === v)).join('')}</div>`;
+  return qFld('얼굴형', chips('shape', P.shape, val('shape', cur && cur.shape)))
+    + qFld('눈', chips('eyes', P.eyes, q.eyes))
+    + qFld('눈썹', chips('brow', P.brow, val('brow', cur && cur.brow)))
+    + qFld('속눈썹', chips('lashLv', P.lash, val('lashLv', cur && Face.lashLevel(cur, g))))
+    + qFld('눈썹 진하기', chips('browLv', P.browLv, val('browLv', cur && Face.browLevel(cur, g))));
+}
 /* ── 20세 시작: 배경 → 능력치 → 외모·신체 → 성격·취향 → 관계 → 확인 (뒤로 가기 가능, 오른쪽에 전신 미리보기) ── */
 const QSTEPS = ['배경', '능력치', '외모·신체', '성격·취향', '관계', '확인'];
-const QNUM = ['hair', 'hc', 'skin', 'eyes', 'friends', 'ly'], QBOOL = ['exp', 'lsex'];
+const QNUM = ['hair', 'hc', 'skin', 'eyes', 'shape', 'brow', 'lashLv', 'browLv', 'friends', 'ly'], QBOOL = ['exp', 'lsex'];
 const QD = () => G.quick.data();
 // 처음 들어올 때(또는 성별을 바꿨을 때) 기본값: 첫 화면에서 뽑힌 성격·집안·취미·꿈·형제를 이어받음
 function quickSync() {
@@ -762,7 +774,7 @@ function qLabel(k) {
 }
 function qPreview() {
   const q = draft.q, f = qFig(q), look = G.quick.look(q);
-  const svg = window.Avatar && look ? Avatar.render(look, 132, { age: 20, full: f, personality: q.personality }) : '';
+  const svg = window.Avatar && look ? (draft.step === 3 ? Avatar.render(look, 132, { age: 20 }) : '') + Avatar.render(look, 132, { age: 20, full: f, personality: q.personality }) : '';   // 외모 단계: 얼굴 확대 + 전신
   const bl = (QD().builds.find(b => b.id === q.build) || {}).label || '';
   const cap = q.gender === 'f' ? `${f.under}${f.cup} · ${f.bust}-${f.waist}-${f.hip}` : `어깨 ${f.shoulder}cm`;
   return `${svg}<p class="qs-cap">${f.height}cm · ${esc(bl)} 체형<br>${esc(cap)}</p>`;
@@ -818,7 +830,7 @@ function quickStep(n) {
       + qFld('체형', qChips('build', Q.builds, q.build)) + body
       + qFld('머리 스타일', `<div class="chips">${P.hair[g].map((l, i) => qChip('hair', i, esc(l), i === q.hair)).join('')}</div>`)
       + qFld('머리색', sw('hc', P.hc)) + qFld('피부', sw('skin', P.skin))
-      + qFld('눈', `<div class="chips">${P.eyes.map(o => qChip('eyes', o.id, esc(o.label), o.id === q.eyes)).join('')}</div>`)
+      + qFace(q, P)
       + `<div class="chips"><button type="button" data-qreface>🎲 얼굴 다시 뽑기</button></div>`;
   }
   if (n === 4) {
@@ -851,7 +863,7 @@ function quickStep(n) {
     ['능력치', Q.stats.map(k => `${G.LABEL[k]} ${G.quick.grade(q.st[k])}`).join(' · ') + ` · 꾸밈 ${G.quick.grade(q.style)}`],
     ['소질', L(C.traits, q.trait) + (qSandbox(q) ? ((q.sexg || 'F') !== 'F' ? ` · 섹스 기술 ${q.sexg}` : '') : q.exp ? ' · 경험 있음' : '')],
     ['몸', `${f.height}cm · ${L(Q.builds, q.build)} · ${q.gender === 'f' ? `${f.under}${f.cup} · ${f.bust}-${f.waist}-${f.hip}` : `어깨 ${f.shoulder}cm · ${q.penis}cm`}`],
-    ['생김새', P ? `${P.hair[q.gender][q.hair] || ''} · ${(P.hc.find(x => x.id === q.hc) || {}).label || ''} · 피부 ${(P.skin[q.skin] || {}).label || ''} · ${(P.eyes[q.eyes] || {}).label || ''} 눈` : ''],
+    ['생김새', P ? `${P.hair[q.gender][q.hair] || ''} · ${(P.hc.find(x => x.id === q.hc) || {}).label || ''} · 피부 ${(P.skin[q.skin] || {}).label || ''} · ${(P.eyes[q.eyes] || {}).label || ''} 눈${q.shape != null && P.shape ? ` · ${P.shape[q.shape].label}` : ''}${q.brow != null && P.brow ? ` · ${P.brow[q.brow].label} 눈썹` : ''}` : ''],
     ['성격·취향', `${L(C.personalities, q.personality)} · ${q.hobbies.map(h => L(C.hobbies, h)).join('·')} · ${L(C.values, q.value)} · 꿈 ${L(C.dreams, q.dream)}`],
     ['관계', `부모님 ${L(Q.parents, q.parents)} · ${L(C.siblings, q.sibling)} · 친구 ${q.friends}명 · ${q.love === 'yes' ? `연인 (${L(C.personalities, q.lp)}, ${q.ly}년)` : q.love === 'ex' ? `전 연인 (${L(Q.exWhy, q.exWhy)})` : '솔로'}`],
   ];
