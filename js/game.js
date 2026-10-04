@@ -10,7 +10,7 @@ const SLOT_KEY = 'llife-slot', slotKey = n => `llife-save-v6-${n}`, SLOTS_N = 3;
 const SAVE_KEY = 'llife-save-v5';
 const OLD_KEYS = ['llife-save-v4', 'llife-save-v3'];
 let slot = 1;
-try { slot = clamp(+localStorage.getItem(SLOT_KEY) || 1, 1, SLOTS_N); } catch (e) { /* 저장 불가 */ }
+try { slot = Math.max(1, Math.min(SLOTS_N, Math.round(+localStorage.getItem(SLOT_KEY)) || 1)); } catch (e) { /* 저장 불가 */ }   // clamp는 아래에 있어서 여기선 못 씀
 const COND = ['happy', 'health', 'libido'];   // 상태: 0~100. 성욕은 대상마다 따로(S.lust) — stats.libido는 그중 가장 높은 값(화면·조건용)
 const ABIL = D.abilities;                     // 능력: 상한 없음, 등급
 const STATS = COND.concat(ABIL);
@@ -19,7 +19,7 @@ const LABEL = Object.assign({}, D.statLabel, { close: '친밀', trust: '신뢰',
 const GR = D.grades;
 const SUBJ = D.subjects.map(x => x.id);   // 모든 과목 id (지금 듣는 과목은 subjectsNow)
 const KIND_LABEL = { classmate: '같은 반', friend: '친구', coworker: '동료', rival: '앙숙', child: '아이', family: '가족' };
-const EVENTS = Object.fromEntries(D.events.map(e => [e.id, e]));
+const EVENTS = Object.fromEntries(D.events.concat(D.classEvents || []).map(e => [e.id, e]));   // 수업 이벤트도 id로 찾음 (뽑는 건 classTurn만)
 const PLACES = Object.fromEntries(D.places.map(p => [p.id, p]));
 const ACTIONS = Object.fromEntries(D.actions.map(a => [a.id, a]));
 const TIMES = ['아침', '낮', '저녁'];
@@ -1079,6 +1079,7 @@ function doDuty(auto) {
 }
 // 잠자기 — 하루 끝. 밥을 거르면 건강이 깎이고, 새벽까지 깨 있었으면 다음 날 늦게 일어나고 피로가 쌓임
 function endDay(auto) {
+  const h0 = S.stats.health;
   if (dutyPending()) {   // 출근·수업을 빼먹음
     if (auto) doDuty(true);
     else if (S.job) { S.perf = clamp(S.perf - 4, 0, 100); log('출근을 안 했다. 휴대폰에 부재중 전화가 쌓였다.', { t: 'info', deltas: applyEffect({ happy: -1 }) }); }
@@ -1096,6 +1097,8 @@ function endDay(auto) {
   // 제때 먹고 제때 자면 건강이 조금씩 회복 (나이·체력에 따른 기준선까지만)
   else if ((auto || (S.meals || 0) >= 2) && (S.used || 0) < 13 && S.stats.health < healthBase() && Math.random() < .3) S.stats.health++;
   if ((S.fatigue || 0) >= 5 && EVENTS.burnedOut && (S.dayN || 0) - (S.vars.burnDay ?? -99) > 30) { S.vars.burnDay = S.dayN; fire(EVENTS.burnedOut); }
+  // 건강이 위험선 아래로 떨어진 날: 넘기기와 똑같이 경고 (밥·잠을 챙기라는 신호)
+  if (!auto && h0 >= 30 && S.stats.health < 30) log('몸 상태가 심상치 않다. 밥을 챙겨 먹고 푹 자야 한다.', { t: 'info' });
   nextDay();
   if (S.ended) return;
   if (phase() === 'adult') startDay(); else beginPhase();

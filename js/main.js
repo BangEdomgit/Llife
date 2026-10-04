@@ -136,7 +136,7 @@ function render(S) {
   else if (S.report) openReport();
   else if (S.apply) openApply();
   else if (S.ended && endingFor !== S.id) { endingFor = S.id; openEnding(); }
-  else if (modalMode === 'event') closeModal();
+  else if (['event', 'report', 'apply', 'intro'].includes(modalMode)) closeModal();   // 상태가 사라진 창(확인한 성적표·낸 원서·20년 요약)은 닫음
   else if (modalMode === 'people') openPeople();
   else if (modalMode === 'person') openPerson(modalArg);
   else if (modalMode === 'stranger') openStranger(modalArg);
@@ -308,7 +308,7 @@ function closeModal() {
 
 function openEvent() {
   const ev = G.currentEvent();
-  if (!ev) return;
+  if (!ev) { if (modalMode === 'event') closeModal(); return; }   // 사라진 이벤트 창이 남지 않게
   const S = G.state(), se = G.season();
   const who = ev.who && window.Avatar ? `<div class="ev-who">${Avatar.render(ev.who.look, 60, { age: ev.who.age, fig: ev.who.fig, libido: ev.who.libido || 0 })}<span><b>${esc(ev.who.name)}</b><br><span class="dim">${ev.who.age}살, ${esc(ev.who.rel)}</span></span></div>` : '';
   showModal('event', `${S.age}살 ${se.icon} ${se.id} ${wxIcon(S.weather)}`,
