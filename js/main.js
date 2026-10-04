@@ -22,7 +22,7 @@ const genderKo = g => g === 'm' ? '남' : '여';
 const isMoney = k => k === 'money';
 const pbar = p => { const n = Math.round(p * 5); return '▰'.repeat(n) + '▱'.repeat(5 - n); };
 // 아바타 크기: 관계 목록 32×42 / 장소 48×64 / 상세·이벤트 60×80
-const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, { age: G.npcAge(p), libido: G.canSex(p) ? p.libido || 0 : 0 }) : '';   // 성욕이 높으면 볼이 붉어짐 (어른만)
+const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, { age: G.npcAge(p), libido: G.canSex(p) ? p.libido || 0 : 0, fig: G.figure(p) }) : '';   // 성욕이 높으면 볼이 붉어짐 (어른만). 체형 수치 → 전신과 같은 어깨·가슴
 // 누르면 전신으로 펼쳐지는 초상화 (20살부터 키·허리·골반 수치가 실루엣에 반영)
 const avBtn = (key, html) => `<button type="button" class="av-btn" data-full="${key}" aria-label="${fullView === key ? '접기' : '전신 보기'}" title="${fullView === key ? '접기' : '전신 보기'}">${html}</button>`;
 // 전신: 성격에 따라 기본 자세가 다름 (직진형·낙천형 한 손 허리, 냉철형·무심형 팔짱)
@@ -278,7 +278,7 @@ function openEvent() {
   const ev = G.currentEvent();
   if (!ev) return;
   const S = G.state(), se = G.season();
-  const who = ev.who && window.Avatar ? `<div class="ev-who">${Avatar.render(ev.who.look, 60, ev.who.age)}<span><b>${esc(ev.who.name)}</b><br><span class="dim">${ev.who.age}살, ${esc(ev.who.rel)}</span></span></div>` : '';
+  const who = ev.who && window.Avatar ? `<div class="ev-who">${Avatar.render(ev.who.look, 60, { age: ev.who.age, fig: ev.who.fig })}<span><b>${esc(ev.who.name)}</b><br><span class="dim">${ev.who.age}살, ${esc(ev.who.rel)}</span></span></div>` : '';
   showModal('event', `${S.age}살 ${se.icon} ${se.id} ${wxIcon(S.weather)}`,
     `${who}<p>${esc(ev.text)}</p><div class="choices">${ev.choices.map((c, i) => `<button type="button" data-c="${i}">[${i + 1}] ${esc(c)}</button>`).join('')}</div>`, false, ev.text);
 }
@@ -434,7 +434,7 @@ function openMe() {
     if (G.univLabel()) lines.push(`${G.univLabel()} ${G.majorLabel() || ''}${sc.gpaN ? `, 학점 ${sc.gpa.toFixed(2)}` : ''}${sc.degree ? ' 졸업' : ''}`);
     school = `<p class="sec-t">성적표</p>${S.age <= 18 && !sc.sat ? `<div class="subj">${subj}</div>` : ''}${lines.map(l => `<p class="dim" style="font-size:13px">${esc(l)}</p>`).join('')}`;
   }
-  const me = G.myLook() && window.Avatar ? avBtn('me', Avatar.render(G.myLook(), 60, S.age)) : '';
+  const me = G.myLook() && window.Avatar ? avBtn('me', Avatar.render(G.myLook(), 60, { age: S.age, fig: G.figure(null) })) : '';
   showModal('me', `📋 ${S.name}`, `
     <div class="me-top">${me}<dl class="prof">${prof}</dl></div>
     ${fullView === 'me' && G.myLook() ? fullAv(G.myLook(), S.age, G.figure(null), S.personality) : ''}

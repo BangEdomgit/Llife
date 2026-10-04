@@ -780,7 +780,7 @@ function currentEvent() {
   if (!ev) { S.pending.shift(); return currentEvent(); }
   Object.assign(S.vars, p.tv);
   const wp = p.who && person(p.who);
-  const who = wp ? { look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp) } : null;
+  const who = wp ? { look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp), fig: figure(wp) } : null;
   return { text: p.text, who, choices: choicesOf(ev).map(c => fill(resolve(c.label))) };
 }
 function choose(i) {
