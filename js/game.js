@@ -63,6 +63,16 @@ function gradeInfo(v) {
   return { letter: GR[i][0], idx: i, pct: Math.min(1, (v - lo) / (hi - lo)), value: v };
 }
 const LETTERS = GR.map(g => g[0]);
+// 섹스 기술 (F ~ SSS): 등급, 0~150 점수(S = 100, SS 117, SSS 133~150)
+const SG = D.sexGrades;
+function sIdx(v) { let i = 0; while (i + 1 < SG.length && (v || 0) >= SG[i + 1][1]) i++; return i; }
+const sexGrade = v => SG[sIdx(v)][0];
+function sexInfo(v) {
+  const i = sIdx(v), lo = SG[i][1], hi = SG[i + 1] ? SG[i + 1][1] : lo + 100;
+  return { letter: SG[i][0], idx: i, pct: Math.min(1, ((v || 0) - lo) / (hi - lo)), value: v || 0 };
+}
+const sk100 = v => { const g = sexInfo(v); return (g.idx + g.pct) * 100 / 6; };
+const SSS = () => sIdx(S.sexSkill) >= 8;
 const pickKey = obj => weighted(Object.keys(obj), k => obj[k]);
 // 등급 글자 → 그 등급 안의 아무 값
 function gradeValue(letter) {
@@ -422,7 +432,8 @@ function allure(p, sit) {
   if (S.age >= C.sexMinAge && lustOf(p) >= 60) m += lustOf(p) / 8;   // 이 사람을 향한 내 성욕
   if ((p.libido || 0) >= 60 && npcAge(p) >= C.sexMinAge) m += p.libido / 10;   // 나를 향한 상대 성욕
   if (p.married) m -= p.ringOff ? rand(0, 5) : rand(15, 20);   // 술집에서 반지를 빼는 기혼자는 덜 망설임
-  if (sit === 'bed' && !lover(p)) m += casualBonus();   // 가벼운 관계(하룻밤·집으로 데려가기·즐기자는 제안)는 외모·매력이 크게 먹힘
+  if (sit === 'bed' && !lover(p)) m += casualBonus();
+  if (sit === 'bed' && SSS()) m += p.hooked ? 40 : 10;   // 섹스 기술 SSS: 한 번 같이 잔 사람은 빠져나오지 못함 (애인·남편이 있어도)   // 가벼운 관계(하룻밤·집으로 데려가기·즐기자는 제안)는 외모·매력이 크게 먹힘
   if (S.rumorType === 'bad' && (S.rumor || 0) >= 30 && sit !== 'close' && sit !== 'bed') m -= rand(10, 20);   // 나쁜 소문 — 새 사람이 경계함
   m += [0, 3, rand(10, 12), 5][d];
   return looks + human + rel + m;
@@ -459,7 +470,7 @@ function startCompat(p) {
 }
 function satisfaction(p, mood, adj) {
   const md = clamp(50 + (mood || 0) + [0, 10, 15, -10][S.drunk || 0], 0, 100);
-  return clamp(Math.round(g100(S.sexSkill || 0) * .4 + (p.compat ?? 30) * .25 + sizeTerm(p) + p.heart * .15 + md * .1 + rand(-8, 8) + (adj || 0)), 0, 100);
+  return clamp(Math.round(sk100(S.sexSkill) * .4 + (p.compat ?? 30) * .25 + sizeTerm(p) + p.heart * .15 + md * .1 + rand(-8, 8) + (adj || 0)), 0, SSS() ? 130 : 100);   // SSS면 100을 넘을 수 있음
 }
 // 지금이 인생에서 몇 번째 행동인지 (싸운 뒤 몇 턴, 오랜만인지 계산용)
 // '턴' = 옛 기준 한 행동(1년의 1/10 ≈ 36.5일). 싸운 뒤 몇 턴·오랜만인지 등은 날짜로 셈
@@ -485,7 +496,7 @@ function rumorYear() {
   const chance = ps.length * .05 * f * (S.caughtN ? 1 : .5);
   if (Math.random() >= chance) return;
   const avgSat = ps.reduce((t, p) => t + (p.bestSat || 0), 0) / ps.length;
-  const type = !S.caughtN && !ps.some(p => p.grudge >= 40) && gIdx(S.sexSkill || 0) >= 5 && avgSat >= 75 ? 'skill' : 'bad';
+  const type = !S.caughtN && !ps.some(p => p.grudge >= 40) && sIdx(S.sexSkill) >= 5 && avgSat >= 75 ? 'skill' : 'bad';
   S.rumor = clamp((S.rumor || 0) + rand(30, 50), 0, 100); S.rumorType = type;
   log(type === 'skill' ? '어디선가 내 이야기가 돌고 있다. 나쁜 얘기는 아닌 것 같은데… 얼굴이 화끈거렸다.' : '어디선가 내 이야기가 돌고 있다는 걸 알았다. 수군거리는 소리가 들렸다.', { t: 'info' });
 }
@@ -520,14 +531,28 @@ function takeContra(p) {
 const satTier = v => v >= 90 ? 4 : v >= 70 ? 3 : v >= 50 ? 2 : v >= 30 ? 1 : 0;
 // 함께 밤을 보냄: 성욕 해소, 기술·궁합 상승, 만족감에 따라 상대 마음이 달라짐 (첫 경험은 감정이 덮어줌)
 // 연출 번호(S.sceneN)는 인생 내내 계속 올라감 — 연출을 지운 뒤 1부터 다시 세면 화면이 이미 본 연출로 여겨 건너뛰었음
+// 그날 밤의 흐름: 남자 쪽 종합(섹스 기술이 가장 큼 + 크기 + 매력 + 체력)으로 길이(분)·상대 절정 횟수(소·중·대)가 정해짐
+//   너무 낮으면(종합 40 아래) 1~3분 만에 일찍 끝날 수 있고, 높을수록 길어져 SSS면 15~20분에 절정이 훨씬 많음. 상대 만족감이 30 아래면 절정 없음
+function nightFlow(sat, cm) {
+  const pow = sk100(S.sexSkill) * .55 + clamp((cm - 8) / 12 * 100, 0, 110) * .15 + g100(S.stats.charm) * .15 + g100(S.stats.fit) * .15;
+  const early = pow < 40 && Math.random() < (40 - pow) / 30;
+  const dur = early ? rand(1, 3) : clamp(Math.round(1 + Math.max(0, pow - 20) * .19 + rand(-1, 1)), 2, 20);
+  const k = sat < 30 ? 0 : sat < 50 ? .5 : 1, per = dur / 5;   // 5분마다
+  const n = rate => probRound(Math.max(0, rate) * per * k);
+  const f = { dur, early, pow: Math.round(pow), grade: sIdx(S.sexSkill),
+    minor: n((pow - 30) / 40), mid: sat < 50 ? 0 : n((pow - 50) / 50), major: sat < 50 ? 0 : n((pow - 75) / 45) };
+  if (early) f.minor = f.mid = f.major = 0;
+  return f;
+}
+const flowLine = f => f.early ? `${f.dur}분 만에 끝나 버렸다.` : `${f.dur}분 동안.` + (f.minor + f.mid + f.major ? ` 상대가 ${[['소절정', f.minor], ['중절정', f.mid], ['대절정', f.major]].filter(x => x[1]).map(([l, v]) => `${l} ${v}번`).join(' · ')}.` : ' 상대는 끝까지 가지 못했다.');
 function sexScene(p, o) {
   if (!canSex(p)) return null;
   const first = !S.flags.hadSex, firstWith = !p.nights;
   if (p.compat == null) p.compat = startCompat(p);
   const contra = takeContra(p), cm = D.contra.methods[contra || 'none'];
-  let adj = cm.sat && gIdx(S.sexSkill || 0) >= gIdx(gradeMin('B')) ? Math.round(cm.sat / 2) : cm.sat;   // 콘돔은 익숙해지면 덜 깎임
+  let adj = cm.sat && sIdx(S.sexSkill) >= 4 ? Math.round(cm.sat / 2) : cm.sat;   // 콘돔은 익숙해지면 덜 깎임
   adj += resolve(o.satBonus) || 0;
-  const awkward = gIdx(S.sexSkill || 0) === 0;   // 밤의 기술 F — 어색한 순간이 끼어듦
+  const awkward = sIdx(S.sexSkill) === 0;   // 섹스 기술 F — 어색한 순간이 끼어듦
   // 권태와 신선함: 같은 상대와 4번째부터 3씩 깎임(최대 -24). 새 장소 +8~12, 오랜만(5턴 이상) +5~10, 새 상대 +10~15, 여행지 +8
   const t = turnNo(), spot = o.away ? 'travel' : o.spot || o.moveTo || S.place || 'home';
   if (PUBLIC.includes(S.place)) p.flaunt = true;
@@ -551,16 +576,19 @@ function sexScene(p, o) {
   if (pg === 1) sat = Math.min(sat, 85);
   else if (pg === 2) sat = Math.min(sat, 92);
   else if (pg >= 5) { sat = Math.max(sat, rand(25, 35)); if (pg === 6 && herBuild === 'slim') sat = clamp(sat - rand(10, 15), 0, 100); }
+  const flow = nightFlow(sat, pcm || 14);
+  sat = clamp(sat + flow.major * 2 + flow.mid, 0, SSS() ? 130 : Math.max(100, sat));   // 절정이 많으면 조금 더
   const tier = satTier(sat);
   // 해소: 이 사람을 향한 성욕은 크게, 다른 대상들은 조금 (몸이 채워져서)
   if (S.lust[p.id] == null) S.lust[p.id] = 0;
   addLust(p, -rand(70, 90));
   for (const id in S.lust) if (id !== p.id) S.lust[id] = clamp(S.lust[id] - rand(10, 20), 0, 100);
-  p.libido = clamp((p.libido || 0) - rand(70, 90), 0, 100);
+  p.libido = clamp((p.libido || 0) - (SSS() ? rand(15, 30) : rand(70, 90)), 0, 100);   // SSS: 끝나도 또 원함
+  if (SSS()) { p.hooked = true; p.heart = clamp(p.heart + rand(4, 8), 0, 100); }
   // 대물·흉기는 보는 것만으로 상대 성욕 +10~15 (그래서 더 자주 먼저 원함)
   if (pg >= 5) { if (S.gender === 'm') p.libido = clamp(p.libido + rand(10, 15), 0, 100); else addLust(p, rand(10, 15)); }
   syncLibido();
-  S.sexSkill = (S.sexSkill || 0) + Math.max(1, Math.round(rand(6, 10) * GR[gIdx(S.sexSkill || 0)][2]));
+  S.sexSkill = (S.sexSkill || 0) + Math.max(1, Math.round(rand(6, 10) * SG[sIdx(S.sexSkill)][2]));
   p.compat = clamp(p.compat + rand(5, 10), 0, 100);
   night(p, !!o.fling);
   const prevBest = p.bestSat || 0;
@@ -568,9 +596,9 @@ function sexScene(p, o) {
   S.flags.hadSex = true;
   const fig = figure(p);
   if (S.companion === p.id) S.companion = null;
-  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, direct: !!o.direct, personality: p.personality, fig, cm: pcm, build: herBuild, n: (S.sceneN = (S.sceneN || 0) + 1) };   // cm·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
+  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, direct: !!o.direct, personality: p.personality, fig, cm: pcm, build: herBuild, flow, n: (S.sceneN = (S.sceneN || 0) + 1) };   // cm·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
   if (first) { S.vars.fp = p.id; trigger('firstTime'); }   // 내 첫 경험 — 상대 성격마다 다른 한 줄, 추억
-  return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90, contra, pregMul: cm.preg, awkward };
+  return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90, contra, pregMul: cm.preg, awkward, flow };
 }
 /* ── 죄책감: 성격 기본값에서 만족감이 70을 넘은 만큼(×1.5) 깎임 ── */
 const guiltOf = (pers, sat) => Math.max(0, ((D.personalities.find(x => x.id === pers) || {}).guilt ?? 40) - Math.max(0, sat - 70) * 1.5);
@@ -586,7 +614,7 @@ function guiltCheck(p, sx, ctx) {
   const G = D.guiltLines, c = Object.assign({ p: pname(p) }, ctx);
   // 상대의 죄책감
   if (npcIllicit(p)) {
-    const pt = personality(p), base = pt.guilt ?? 40, g = Math.round(guiltOf(p.personality, sx.sat) * (p.fwb && !p.married ? .6 : 1));   // 즐기기만 하기로 한 사이면 죄책감이 덜함
+    const pt = personality(p), base = pt.guilt ?? 40, g = SSS() ? 0 : Math.round(guiltOf(p.personality, sx.sat) * (p.fwb && !p.married ? .6 : 1));   // SSS: 죄책감을 못 느낌   // 즐기기만 하기로 한 사이면 죄책감이 덜함
     p.guiltN = (p.guiltN || 0) + 1;
     let line = null, end = false;
     if (g >= 86) { end = true; line = G.breakNow; }
@@ -751,6 +779,7 @@ function applyOutcome(o, target, resumed) {
 // 함께 밤을 보낸 뒤: 만족감에 따른 상대 반응 한 줄
 function afterSex(p, sx, ctx) {
   const L = D.satLines, c = Object.assign({ p: pname(p) }, ctx);
+  if (sx.flow) log(flowLine(sx.flow), { t: 'info' });
   if (sx.awkward) log(pick(L.awkward), { t: 'info' });
   // 그 사람과 처음 보낸 밤, 내 크기에 대한 반응 (내가 남자일 때, 대물·흉기 / 단소·소형)
   const sr = sx.firstWith && S.gender === 'm' && (pGrade(S.penis) >= 5 ? D.sizeReaction.big : pGrade(S.penis) <= 2 ? D.sizeReaction.small : null);
@@ -778,7 +807,7 @@ function pillowTalk(p, sx, c) {
 function compareEx(p, sx, c) {
   if (p.exSkill == null) p.exSkill = rand(10, 90);   // 이 사람의 전 상대 (숨은 값)
   if (p.compared || (p.nights || 0) > 2) return;
-  const diff = g100(S.sexSkill || 0) - p.exSkill;
+  const diff = Math.min(100, sk100(S.sexSkill)) - p.exSkill;
   if (!(['bold', 'sharp'].includes(p.personality) || Math.abs(diff) >= 30) || Math.abs(diff) < 10 || Math.random() >= .4) return;
   p.compared = true;
   const better = diff > 0, L = D.compareLines[better ? 'better' : 'worse'];
@@ -936,7 +965,7 @@ function enterSeason(i) {
    story  0~12살  선택지 이야기 — 행동 없음. '계속'을 누르면 다음 선택지(이야기·이벤트)나 해가 바뀔 때까지 시간이 흐름
    ms     13~15살 중학교 — 1년 50턴(1턴 ≈ 1주): 수업 주간(자동)·중간·기말·자유 턴·방학
    hs     16~18살 고등학교 — 1년 30턴: 수업·시험·자유·방학, 고3은 모의고사·수능·원서 접수·결과 발표 (재수하면 19살에 고3 턴을 한 번 더)
-   adult  19살~   하루 단위 — 행동력 12칸(1칸 = 1.5시간, 아침 6시부터), 새벽까지 깨면 18칸까지. 평일엔 출근·수업이 자동으로 칸을 씀
+   adult  19살~   하루 단위 — 행동력 18칸(1칸 = 1시간, 아침 6시부터 자정까지), 새벽까지 깨면 24칸까지. 평일엔 출근·수업이 자동으로 칸을 씀
    학년도는 3월 1일에 시작하고 그때 나이가 하나 늘어남. 계절은 달에서, 생일은 태어난 달에 */
 const SEASON_OF = m => m >= 3 && m <= 5 ? 0 : m >= 6 && m <= 8 ? 1 : m >= 9 && m <= 11 ? 2 : 3;
 const DOW = ['일', '월', '화', '수', '목', '금', '토'];
@@ -951,7 +980,9 @@ const SCHED = {
 };
 const TURN_AP = { free: 2, vac: 3 };   // 자유 턴은 방과 후, 방학은 조금 더
 const TURN_LABEL = { class: '수업', free: '자유', mid: '중간고사', final: '기말고사', vac: '방학', mock: '모의고사', csat: '수능', apply: '원서 접수', result: '결과 발표' };
-const DAY_AP = 12, LATE_AP = 6;       // 하루 12칸 + 새벽 6칸
+const DAY_AP = 18, LATE_AP = 6;       // 하루 18칸 + 새벽 6칸 (1칸 = 1시간)
+const HPA = 18 / DAY_AP;              // 1칸이 몇 시간인지 (아침 6시 → 자정이 하루 칸)
+const hourOf = used => 6 + (used || 0) * HPA;
 // 지금 단계
 function phase() {
   if (S.age <= 12) return 'story';
@@ -994,14 +1025,14 @@ function goToDate(dt, stop) {
 // 하루의 때 (배경·술집): 어른은 시계, 학교 다닐 땐 턴 종류, 어릴 땐 계절 안에서 천천히
 function updateTime() {
   const ph = phase();
-  if (ph === 'adult') { const h = 6 + (S.used || 0) * 1.5; S.sky = clamp((h - 6) / 6, 0, 2); S.time = h < 11 ? 0 : h < 17 ? 1 : 2; }
+  if (ph === 'adult') { const h = hourOf(S.used); S.sky = clamp((h - 6) / 6, 0, 2); S.time = h < 11 ? 0 : h < 17 ? 1 : 2; }
   else if (ph === 'story') { S.sky = .4; S.time = 0; }
   else { S.sky = S.tkind === 'vac' ? .6 : 1.3; S.time = 1; }
 }
 // 시계 (어른): 아침 6시 + 쓴 칸 × 1.5시간
-const clockOf = used => { const m = Math.round((6 + used * 1.5) * 60) % (24 * 60); return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
-const SLOTS = [[2, '아침'], [4, '오전'], [5, '점심'], [9, '오후'], [11, '저녁'], [12, '밤'], [14, '새벽'], [18, '심야']];
-const slotOf = used => (SLOTS.find(([n]) => used < n) || SLOTS[SLOTS.length - 1])[1];
+const clockOf = used => { const m = Math.round(hourOf(used) * 60) % (24 * 60); return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
+const SLOTS = [[9, '아침'], [12, '오전'], [13.5, '점심'], [19.5, '오후'], [22.5, '저녁'], [24, '밤'], [27, '새벽'], [99, '심야']];   // [몇 시 전까지, 때]
+const slotOf = used => (SLOTS.find(([h]) => hourOf(used) < h) || SLOTS[SLOTS.length - 1])[1];
 
 /* ── 이야기 (0~12살) ── */
 // 다음 선택지가 나오거나 해가 바뀔 때까지 시간이 흐름 (한 번에 한 계절씩)
@@ -1110,14 +1141,14 @@ function endDay(auto) {
   if (!auto) {
     const m = S.meals || 0;
     if (m < 2) log(m ? '오늘은 한 끼밖에 못 먹었다.' : '하루 종일 아무것도 안 먹었다.', { t: 'info', deltas: applyEffect({ health: m ? -1 : -2 }) });
-    if (S.used >= 16) { S.wake = 4; S.fatigue = (S.fatigue || 0) + 2; log('해가 뜰 무렵에야 잠들었다.', { t: 'info', deltas: applyEffect({ health: -3 }) }); }
-    else if (S.used >= 13) { S.wake = 2; S.fatigue = (S.fatigue || 0) + 1; log('새벽 늦게 잠들었다.', { t: 'info', deltas: applyEffect({ health: -1 }) }); }
+    if (hourOf(S.used) >= 29) { S.wake = Math.round(6 / HPA); S.fatigue = (S.fatigue || 0) + 2; log('해가 뜰 무렵에야 잠들었다.', { t: 'info', deltas: applyEffect({ health: -3 }) }); }
+    else if (hourOf(S.used) >= 25.5) { S.wake = Math.round(3 / HPA); S.fatigue = (S.fatigue || 0) + 1; log('새벽 늦게 잠들었다.', { t: 'info', deltas: applyEffect({ health: -1 }) }); }
   }
   libidoTick();
   if (S.drunk) soberUp();
   if ((S.fatigue || 0) >= 3) applyEffect({ health: -1 });
   // 제때 먹고 제때 자면 건강이 조금씩 회복 (나이·체력에 따른 기준선까지만)
-  else if ((auto || (S.meals || 0) >= 2) && (S.used || 0) < 13 && S.stats.health < healthBase() && Math.random() < .3) S.stats.health++;
+  else if ((auto || (S.meals || 0) >= 2) && hourOf(S.used) < 25.5 && S.stats.health < healthBase() && Math.random() < .3) S.stats.health++;
   if ((S.fatigue || 0) >= 5 && EVENTS.burnedOut && (S.dayN || 0) - (S.vars.burnDay ?? -99) > 30) { S.vars.burnDay = S.dayN; fire(EVENTS.burnedOut); }
   // 건강이 위험선 아래로 떨어진 날: 넘기기와 똑같이 경고 (밥·잠을 챙기라는 신호)
   if (!auto && h0 >= 30 && S.stats.health < 30) log('몸 상태가 심상치 않다. 밥을 챙겨 먹고 푹 자야 한다.', { t: 'info' });
@@ -1162,7 +1193,7 @@ function eat() {
   spend(1);
   S.meals = (S.meals || 0) + 1;
   const where = S.place ? PLACES[S.place].label : '집';
-  log(pick(S.used <= 3 ? ['토스트 한 장으로 아침을 때웠다.', '아침밥을 든든하게 먹었다.'] : S.used <= 7 ? ['점심을 먹었다.', `${where} 근처에서 점심을 먹었다.`, '김치찌개 한 그릇을 비웠다.'] : ['저녁을 먹었다.', '배달 음식을 시켜 먹었다.', '라면을 끓여 먹었다.']), { t: 'info', deltas: applyEffect({ health: 1 }) });
+  log(pick(hourOf(S.used) <= 10.5 ? ['토스트 한 장으로 아침을 때웠다.', '아침밥을 든든하게 먹었다.'] : hourOf(S.used) <= 16.5 ? ['점심을 먹었다.', `${where} 근처에서 점심을 먹었다.`, '김치찌개 한 그릇을 비웠다.'] : ['저녁을 먹었다.', '배달 음식을 시켜 먹었다.', '라면을 끓여 먹었다.']), { t: 'info', deltas: applyEffect({ health: 1 }) });
   after();
 }
 // 한 달마다: 월급·생활비·피임약값
@@ -1925,7 +1956,7 @@ function encounterChance(p, pl) {
   if (faded(p)) b *= .05;   // 소원해짐 — 우연히 마주치면 다시 이어짐
   return Math.min(b, .95);
 }
-const clockHour = () => 6 + (S.used || 0) * 1.5;
+const clockHour = () => hourOf(S.used);
 // 학교 수업 / 점심·방과 후, 직장 근무 / 점심·퇴근 (중·고등학교 자유 턴은 방과 후)
 function countKey(pl) {
   const h = clockHour(), adult = phase() === 'adult';
@@ -2224,7 +2255,7 @@ function myProfile() {
     ...shape,
     ...(S.flags.unnatural ? [['특징', '어딘가 부자연스럽다']] : []),
     ...(S.age >= C.sexMinAge && S.penis ? [['성기', penisLabel(S.penis)]] : []),
-    ...(S.flags.hadSex ? [['밤의 기술', gradeOf(S.sexSkill)]] : []),
+    ...(S.flags.hadSex ? [['섹스 기술', sexGrade(S.sexSkill)]] : []),
     ...((S.rumor || 0) >= 30 && S.rumorType ? [['소문', RUMOR_LINE[S.rumorType]]] : []),
     ['가치관', L(D.values, S.value)], ['집안', L(D.wealth, S.wealth)], ['꿈', L(D.dreams, S.dream) + (S.flags.dreamDone ? ' (이룸)' : '')],
     ['형제', L(D.siblings, S.sibling)], ['생일', `${S.month}월`],
@@ -2248,7 +2279,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, onPill, fertile, refusal, turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, refusal, sss: () => SSS(), sexGrade: () => sexGrade(S.sexSkill), turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,
@@ -2521,8 +2552,10 @@ function newLife20(q = {}) {
     if (why.karma) addKarma(why.karma);
     love = `${josa(ex.name, '와')}는 ${why.line}.`;
   }
-  // 밤의 기술: 경험 있음이면 20~40 (0~100 기준) / 성욕(20~60)은 대상별 — 연인에게, 전 연인에게는 조금
+  // 섹스 기술: 경험 있음이면 20~40 (0~100 기준) / 성욕(20~60)은 대상별 — 연인에게, 전 연인에게는 조금
   if (exp) { S.sexSkill = qsStat(rand(20, 40)); S.flags.hadSex = true; S.flags.intimate = true; }
+  const sg = sandbox && SG.find(g => g[0] === q.sexg);   // 샌드박스: 섹스 기술 등급 직접 (F면 경험 없음)
+  if (sg && sg[0] !== 'F') { S.sexSkill = sg[1] + rand(0, 15); S.flags.hadSex = true; S.flags.intimate = true; }
   const lib = rand(20, 60);
   if (lover && canSex(lover)) S.lust[lover.id] = lib;
   if (ex && canSex(ex)) S.lust[ex.id] = Math.round(lib * .35);
@@ -2699,12 +2732,12 @@ window.Game = {
   crimes: () => D.crimes.filter(c => S.age >= c.minAge && meets(c.req)), canCrime, crimeOdds, commitCrime,
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,
   roleText, karmaLabel, trait, job, mainPartner, season, fmtMoney, josa,
-  gradeInfo, abilities: ABIL, conds: COND, subjects: D.subjects, naesinAvg, mockAvg, univLabel, majorLabel, studyInfo, subjectsNow: () => subjectsNow().map(SUB),
+  gradeInfo, sexInfo: () => sexInfo(S.sexSkill), sexGrades: SG.map(g => g[0]), abilities: ABIL, conds: COND, subjects: D.subjects, naesinAvg, mockAvg, univLabel, majorLabel, studyInfo, subjectsNow: () => subjectsNow().map(SUB),
   // 학교 화면: 성적표 확인, 원서 (대학·학과 목록, 합격 확률, 내기)
   ackReport: () => { S.report = null; after(); }, universities: D.universities, departments: D.departments, tracks: D.tracks, tierLabel: t => D.tierLabel[t], admitP, submitApply, gradeLabel: () => gradeLabel(),
   creation: { traits: D.traits, personalities: D.personalities, wealth: D.wealth, hobbies: D.hobbies, values: D.values, dreams: D.dreams, siblings: D.siblings },
   LABEL, config: C, seasons: SEASONS,
   // 개발·테스트용 (브라우저 콘솔이나 헤드리스 검사에서 이벤트를 직접 터뜨려볼 때)
-  dev: { fire: id => { fire(EVENTS[id]); after(); }, eligible: id => eligible(EVENTS[id]), meet: spec => addPerson(spec), rumorYear, api },
+  dev: { flow: (sat, cm) => nightFlow(sat, cm), fire: id => { fire(EVENTS[id]); after(); }, eligible: id => eligible(EVENTS[id]), meet: spec => addPerson(spec), rumorYear, api },
 };
 })();

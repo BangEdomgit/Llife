@@ -118,7 +118,7 @@ function heat(s, p, a, gain, alley) {
   if (alley) p.alleyDay = today;
 }
 // 상대 상태별 문턱 (꼬심 점수에 더함): 유부녀·유부남 +12(술집에서 반지를 빼는 사람은 +4) / 애인 있음 +5 / 솔로 0
-const statusNeed = p => p.married ? (p.ringOff ? 4 : 12) : p.taken ? 5 : 0;
+const statusNeed = p => p.hooked ? 0 : p.married ? (p.ringOff ? 4 : 12) : p.taken ? 5 : 0;   // 섹스 기술 SSS에 빠진 사람은 상관없음
 // 들킬 위험: 유부녀·유부남은 배우자에게(spouseCaught), 애인 있음은 애인에게(rivalFound)
 const statusRisk = (p, k = 1) => (p.married ? .12 : p.taken ? .08 : 0) * k;
 const PRIVATE = ['home', 'motel'];

@@ -378,13 +378,87 @@ const POSES = {
     Object.assign(m, { elbow, hand: [elbow[0] - M.farm, MY - M.r.farm[1]] });
     return { m, f, act: 'm', dir: unit([.25, 1]) };
   },
+  // 역기승위: 남자는 등을 대고 누움(무릎 살짝 세움), 여자는 남자 골반 위에 발 쪽을 보고 무릎 꿇고 앉아 앞으로 숙여 남자 무릎을 짚음. 남자 손은 여자 엉덩이
+  reverse(s, M, F) {
+    const [msh, mhip] = lie(M, 96, s.sink, s.bs * .3);
+    const m = trunk(M, msh, mhip, [0, -1], .28, s.jig.m);
+    m.knee = [mhip[0] + M.thigh * .9, MY - M.r.thigh[1] - 8]; m.ankle = [m.knee[0] + M.shin * .95, MY - M.r.shin[1]]; m.toe = [m.ankle[0] + 3, m.ankle[1] - M.foot * .8];
+    const knee = [mhip[0] + 30, MY - F.r.shin[0] + 1 + s.sink * .5], hip = add(polar(knee, -2.6 + .6 * s.d / F.thigh, F.thigh), [0, s.tr + 4 * s.slump + s.sink]);
+    const hand = [m.knee[0] - 6, m.knee[1] - M.r.thigh[1] - 3 + s.sink], sh = meet(hip, F.torso, hand, (F.uarm + F.farm) * (.56 - .08 * s.slump), [0, -1]);
+    const f = trunk(F, sh, hip, perp(sub(sh, hip), [0, 1]), .25, s.jig.f);
+    Object.assign(f, { knee, ankle: [knee[0] - F.shin, MY - F.r.shin[1]], hand, elbow: meet(sh, F.uarm, hand, F.farm, [-1, 0]) });
+    f.toe = [f.ankle[0] - F.foot * .8, MY - 2];
+    m.hand = add(hip, [-3, 4]); m.elbow = meet(msh, M.uarm, m.hand, M.farm, [.2, 1]);
+    return { m, f, act: 'f', dir: [0, 1] };
+  },
+  // 좌위: 남자는 책상다리로 앉아 살짝 뒤로 기댐, 여자는 남자 무릎 위에 마주 앉아 팔로 목을 감고 다리로 허리를 감음. 여자가 오르내림
+  lotus(s, M, F) {
+    const mhip = [132, MY - M.r.butt + 3 + s.sink * .5], msh = polar(mhip, -1.75 - .1 * s.slump, M.torso);
+    const m = trunk(M, msh, mhip, perp(sub(msh, mhip), [1, 0]), .2, s.jig.m);
+    Object.assign(m, { knee: [mhip[0] + 40, MY - M.r.thigh[1] - 6], ankle: [mhip[0] + 16, MY - M.r.shin[1] - 1], toe: [mhip[0] + 8, MY - 3] });
+    const lift = Math.max(0, s.d) * .55 + s.tr, fhip = [mhip[0] + 20, mhip[1] - 16 - lift + s.sink * .5 + 3 * s.slump], fsh = polar(fhip, -1.45 + .12 * s.slump, F.torso);
+    const f = trunk(F, fsh, fhip, perp(sub(fsh, fhip), [-1, 0]), .22, s.jig.f);
+    f.hand = add(m.neck, [-7, 3]); f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [0, -1]);
+    f.ankle = [mhip[0] - 30, mhip[1] - 4]; f.knee = meet(fhip, F.thigh, f.ankle, F.shin, [0, -1]); f.toe = [f.ankle[0] - 6, f.ankle[1] + 5];   // 다리로 허리를 감음 (발목은 남자 등 뒤)
+    m.hand = add(f.waist, f.front, -F.r.waist * .9); m.elbow = meet(msh, M.uarm, m.hand, M.farm, [0, 1]);
+    return { m, f, act: 'f', dir: [0, 1] };
+  },
+  // 굴곡위: 여자는 등을 대고 골반을 말아 올리고 다리를 남자 어깨에 걸침, 남자는 무릎 꿇고 팔을 펴 여자 어깨 옆을 짚음. 팔은 머리 위 베개로
+  legsUp(s, M, F) {
+    let [fsh, fhip] = lie(F, 100, s.sink, s.bs);
+    fhip = [fhip[0] - 4, fhip[1] - 7];
+    const f = trunk(F, fsh, fhip, [0, -1], .28, s.jig.f);
+    const knee = [fhip[0] + 28, MY - M.r.shin[0] + 1], hip = add(polar(knee, -2.4 + s.d / M.thigh, M.thigh), [0, s.tr + 4 * s.slump + s.sink]);
+    const hand = [fsh[0] - 10, MY - M.r.farm[1]], sh = meet(hip, M.torso, hand, (M.uarm + M.farm) * (.92 - .12 * s.slump), [0, -1]);
+    const m = legsBack(M, trunk(M, sh, hip, perp(sub(sh, hip), [0, 1]), .35, s.jig.m), knee);
+    Object.assign(m, { hand, elbow: meet(sh, M.uarm, hand, M.farm, [1, 0]) });
+    f.ankle = add(sh, [3, -5]); f.knee = meet(fhip, F.thigh, f.ankle, F.shin, [1, -.3]); f.toe = polar(f.ankle, -1.9, F.foot * .8);
+    f.hand = [fsh[0] - 26, MY - 18]; f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [0, -1]);
+    return { m, f, act: 'm', dir: unit(sub(fhip, hip)) };
+  },
+  // 뒤로 앉기: 남자는 다리를 뻗고 앉아 뒤로 기댐, 여자는 남자 무릎 위에 등을 대고 앞(발 쪽)을 보고 앉아 남자 무릎을 짚고 오르내림. 남자 팔은 여자 배를 감음
+  seated(s, M, F) {
+    const mhip = [118, MY - M.r.butt + 3 + s.sink * .5], msh = polar(mhip, -1.95 - .1 * s.slump, M.torso);
+    const m = trunk(M, msh, mhip, perp(sub(msh, mhip), [1, 0]), .2, s.jig.m);
+    m.knee = [mhip[0] + M.thigh * .96, MY - M.r.thigh[1] - 5]; m.ankle = [m.knee[0] + M.shin * .97, MY - M.r.shin[1]]; m.toe = [m.ankle[0] + 3, m.ankle[1] - M.foot * .8];
+    const lift = Math.max(0, s.d) * .55 + s.tr, fhip = [mhip[0] + 24, mhip[1] - 14 - lift + s.sink * .5 + 3 * s.slump];
+    const hand = [m.knee[0] - 4, m.knee[1] - M.r.thigh[1] - 2], fsh = meet(fhip, F.torso, hand, (F.uarm + F.farm) * (.8 - .1 * s.slump), [0, -1]);
+    const f = trunk(F, fsh, fhip, perp(sub(fsh, fhip), [1, 0]), .25, s.jig.f);
+    Object.assign(f, { hand, elbow: meet(fsh, F.uarm, hand, F.farm, [-1, 0]), knee: add(fhip, polar([0, 0], -.35, F.thigh)) });
+    f.ankle = [f.knee[0] + 10, MY - F.r.shin[1]]; f.toe = [f.ankle[0] + F.foot * .8, MY - 2];
+    m.hand = add(f.waist, f.front, F.r.waist * .8); m.elbow = meet(msh, M.uarm, m.hand, M.farm, [0, 1]);
+    return { m, f, act: 'f', dir: [0, 1] };
+  },
 };
+// 체위 바꿀 때: 두 체위의 관절을 k만큼 섞음
+function blendPose(A, B, k) {
+  const mix = (a, b) => { const o = {}; for (const key in b) o[key] = Array.isArray(a[key]) && Array.isArray(b[key]) ? lerp(a[key], b[key], k) : b[key]; return o; };
+  const m = mix(A.m, B.m), f = mix(A.f, B.f);
+  m.front = unit(m.front); f.front = unit(f.front);
+  return { m, f, act: k < .5 ? A.act : B.act, dir: k < .5 ? A.dir : B.dir };
+}
+// 절정 반응: 머리(목 위)를 어깨 기준으로 돌림 — 젖힘(몸 뒤쪽으로, 등도 살짝 휨) / 파묻음(몸 앞쪽·바닥으로). jx·jy: 떨림
+function headReact(J, k, bury, jx, jy) {
+  const v = sub(J.head, J.sh), side = bury ? J.front : scale(J.front, -1), sg = -v[1] * side[0] + v[0] * side[1] >= 0 ? 1 : -1;
+  const a = sg * k * (bury ? .5 : .62), c = Math.cos(a), sn = Math.sin(a);
+  const rot = pt => { const d = sub(pt, J.sh); return [J.sh[0] + d[0] * c - d[1] * sn + jx, J.sh[1] + d[0] * sn + d[1] * c + jy]; };
+  J.head = rot(J.head); J.neck = rot(J.neck);
+  if (!bury) J.waist = add(J.waist, J.front, 2.6 * k);
+  if (J.breast) J.breast = add(J.breast, [jx * .5, jy * .5]);
+}
+const POSE_LABEL = { missionary: '정상위', doggy: '후배위', cowgirl: '기승위', prone: '엎드려서', reverse: '역기승위', lotus: '좌위', legsUp: '굴곡위', seated: '뒤로 앉기' };
+// 절정 때 상대 고개: 엎드린 체위는 베개에 파묻고, 나머지는 뒤로 젖힘
+const BURY = { doggy: 1, prone: 1 };
 // 성격별로 고를 확률
-const POSE_W = { shy: { missionary: 4, prone: 1, doggy: 1, cowgirl: .5 }, bold: { cowgirl: 3, doggy: 2.5, missionary: 1, prone: 1.5 }, playful: { cowgirl: 2.5, doggy: 2, missionary: 1, prone: 1 } };
-function pickPose(personality) {
+const POSE_W = { shy: { missionary: 4, prone: 1, doggy: 1, cowgirl: .5, lotus: 2, legsUp: .6, reverse: .3, seated: .8 },
+  bold: { cowgirl: 3, doggy: 2.5, missionary: 1, prone: 1.5, reverse: 2.5, legsUp: 2, lotus: 1, seated: 1.5 },
+  playful: { cowgirl: 2.5, doggy: 2, missionary: 1, prone: 1, reverse: 2, seated: 2, lotus: 1.5, legsUp: 1 } };
+const POSE_W0 = { missionary: 2, doggy: 1.5, cowgirl: 1.5, prone: 1, lotus: 1.2, legsUp: 1, reverse: 1, seated: 1 };
+// 체위 고르기 (not: 방금 한 체위는 빼고). 주소에 ?pose=doggy 처럼 고정 가능
+function pickPose(personality, not) {
   const forced = (location.search.match(/[?&]pose=(\w+)/) || [])[1];
   if (forced && POSES[forced]) return forced;
-  const w = POSE_W[personality] || { missionary: 2, doggy: 1.5, cowgirl: 1.5, prone: 1 }, ks = Object.keys(w);
+  const w = POSE_W[personality] || POSE_W0, ks = Object.keys(w).filter(k => k !== not);
   let r = Math.random() * ks.reduce((a, k) => a + w[k], 0);
   return ks.find(k => (r -= w[k]) < 0) || ks[0];
 }
@@ -423,61 +497,84 @@ function capsPath(list) {
 
 /* ---------- 박자표 ---------- */
 const ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
-// { t0, T, A(세기), kind: n 보통 | strong 세게 | final 누른 채 떨림, her: 상대 절정, fin: 마무리 }. 엉덩이는 0(맞닿음) ~ top = 2A(뺀 거리) 사이를 오감
-// 한 박자 = (세게·떨림이면) 크게 뺐다가 wu → 밀어 넣기 sl(점점 빨라져 끝에 부딪힘 hit) → (떨림이면) 누른 채 떨림 → 다음 박자 시작점(to)으로
-// 만족감이 높으면(tier 2+) 종료 버튼을 누를 때까지 계속: 한 판 = 점점 빨라짐(중간중간 깊게 한 번) → 상대 절정(세게 두 번 → 누른 채 떨림 둘) → 잠깐 느리게
-//   1분에 상대 절정 tier 2: 1번(판 60초), 3: 2번(30초), 4: 3번(20초). 종료 → 몇 번 빠르게 → 세게 두 번 → 떨림 둘 → 축 늘어짐
-// 만족감이 낮으면 짧게 혼자 끝남 (tier 1 12초쯤, tier 0 5초쯤)
-function nightPlan(tier) {
-  const S = [], good = tier >= 2, round = good ? 60 / [0, 0, 1, 2, 3][tier] : 0;
-  let t = .9, k = 0, end = Infinity;   // 처음 0.9초: ♂♀가 양쪽에서 들어와 맞물림
+// { t0, T, A(세기), kind: n 보통 | strong 세게 | final 누른 채 떨림 | shift 체위 바꾸기, her: 상대 절정(minor·mid·major), fin: 마무리 }
+//   엉덩이는 0(맞닿음) ~ top = 2A(뺀 거리) 사이를 오감. 한 박자 = (세게·떨림이면) 크게 뺐다가 wu → 밀어 넣기 sl(점점 빨라져 끝에 부딪힘 hit)
+//   → (떨림이면) 누른 채 떨림 → 다음 박자 시작점(to)으로
+// 길이·절정 횟수는 엔진이 정함(sc.flow: 분, 소·중·대절정, 일찍 끝남, 섹스 기술 등급). 시계는 화면 1초 = 6초 (20분이 3분 20초)
+//   절정(대체로 뒤로 갈수록 커짐)을 고르게 펼치고 그 사이 4분쯤마다 체위를 바꿈. 절정 앞은 점점 빨라지고 뒤는 잠깐 느려짐
+// 박자 성격은 섹스 기술 등급: 높을수록 빠르고 깊고 고르며 '얕게 셋·깊게 하나', 낮으면 들쭉날쭉하고 가끔 멈칫. 부딪힘의 찰짐도 등급을 따름
+const SPEED = 6;
+const CLIMAX = { minor: { W: 3, strong: 1, finals: [.6], rest: 1.2 }, mid: { W: 4.5, strong: 2, finals: [.95], rest: 2 }, major: { W: 6, strong: 3, finals: [1.15, .9], rest: 3.2 } };
+const CLIMAX_LABEL = { minor: '소절정', mid: '중절정', major: '대절정' };
+function nightPlan(sc, tier, personality) {
+  const good = tier >= 2;
+  const fl = sc.flow || { dur: [2, 4, 7, 10, 13][tier], early: tier === 0, grade: 3, minor: Math.max(0, tier - 1), mid: tier >= 3 ? 1 : 0, major: tier >= 4 ? 1 : 0 };
+  const gi = fl.grade ?? 3, T = Math.max(fl.early ? 5 : 8, fl.dur * 60 / SPEED);
+  const Tb = .64 - .028 * gi, Tf = .38 - .018 * gi, jit = gi <= 2 ? .22 : gi <= 5 ? .1 : .05, A0 = 2.6 + .45 * gi;
+  const S = [], poses = [{ name: pickPose(personality), at: 0 }];
+  let t = .9, end = Infinity, bc = 0;   // 처음 0.9초: ♂♀가 양쪽에서 들어와 맞물림
   const add = (T, A, kind = 'n', o) => { S.push(Object.assign({ t0: t, T, A, kind }, o)); t += T; };
   // 박자의 세부 시간 (from 이후만 새로 계산 — 진행 중인 박자는 건드리지 않음)
   const fix = from => {
     for (let i = Math.max(0, from); i < S.length; i++) {
       const s = S[i], nx = S[i + 1];
       s.top = 2 * s.A;
-      s.wu = s.kind === 'n' ? 0 : s.kind === 'strong' ? .22 : .24;
-      s.sl = s.kind === 'n' ? s.T * .32 : .13;
+      s.wu = s.kind === 'n' || s.kind === 'shift' ? 0 : s.kind === 'strong' ? .22 : .24;
+      s.sl = s.kind === 'shift' ? s.T : s.kind === 'n' ? s.T * .32 : .13;
       s.hit = s.t0 + s.wu + s.sl;
       s.to = !nx || s.kind === 'final' ? 3 : nx.kind === 'n' ? 2 * nx.A : 6;
       s.from = i ? S[i - 1].to : 0;
     }
   };
+  // 평소 박자 (u: 0~1 절정을 앞두고 빨라지는 정도)
+  function beat(u) {
+    const T0 = (Tb + (Tf - Tb) * u) * (1 + (Math.random() * 2 - 1) * jit) * (1 + .08 * Math.sin(t * .7));
+    bc++;
+    if (gi <= 1 && u < .5 && Math.random() < .07) return add(.45, .6);   // 멈칫
+    if (gi >= 6 && bc % 4 === 0) return add(Math.max(.5, T0 * 1.6), A0 + 4 + 2 * u, 'strong');   // 얕게 셋, 깊게 하나
+    if (gi >= 3 && gi < 6 && bc % 8 === 0) return add(.62, A0 + 3, 'strong');
+    add(T0, Math.max(1, A0 * (.8 + .5 * u) + (Math.random() - .5) * jit * 4));
+  }
+  const cruise = until => { while (t < until) beat(0); };
+  const build = until => { const t0 = t, W = Math.max(.5, until - t0); while (t < until) beat(ease(Math.min(1, (t - t0) / W))); };
+  function climax(ty) {
+    const c = CLIMAX[ty];
+    for (let i = 0; i < c.strong; i++) add(.62 + .04 * i, A0 + 5 + 1.5 * i, 'strong');
+    c.finals.forEach((d, i) => add(d, 11 + i, 'final', { her: ty, count: !i }));
+    const r0 = t; while (t - r0 < c.rest) add(Tb * 1.25, A0 * .7);   // 숨 고르기
+  }
   function finale(fast) {
-    if (fast) for (let r = 0; r < 4; r++) add(.27, 6.5);
+    if (fast) for (let r = 0; r < 4; r++) add(.27, A0 + 2);
+    if (fl.early) { add(.5, 6, 'strong', { fin: true }); add(.48, 5.5, 'final', { fin: true }); end = t; return; }
     if (tier >= 1) { add(.7, good ? 10 : 7, 'strong', { fin: true }); if (good) add(.7, 11, 'strong', { fin: true }); }
     add(good ? .95 : .48, good ? 12 : 5.5, 'final', { fin: true }); if (good) add(.9, 12.5, 'final', { fin: true });
     end = t;
   }
-  function more() {
-    const n0 = S.length;
-    if (!good) {
-      const L = tier === 1 ? 10 : 3.4;
-      for (let T = .62; t < L; T = Math.max(.3, T * .9)) add(T, 3 + 1.5 * t / L);
-      finale(false);
-    } else {
-      const first = !k++, t0 = t, L = Math.max(6, round - 3.3 - 2.4 - (first ? .9 : 0)), T0 = first ? .62 : .48;
-      let c = 0;
-      while (t - t0 < L) {
-        const u = (t - t0) / L;
-        if (u > .3 && ++c % 7 === 0) add(.66, 7 + 3 * u, 'strong');   // 중간중간 깊게 한 번
-        else add((T0 + (.22 - T0) * ease(Math.min(1, u * 1.15))) * (.94 + Math.random() * .12), 3.5 + 3.5 * u + (first ? 0 : .8));
-      }
-      add(.7, 10, 'strong'); add(.7, 11, 'strong'); add(.95, 12, 'final', { her: true }); add(.9, 12.5, 'final', { her: true });
-      for (let r = 0; r < 4; r++) add(.62 + r * .02, 3);   // 절정 뒤 잠깐 느리게
-    }
-    fix(n0 - 1);
+  // 일정
+  const types = [].concat(Array(fl.minor || 0).fill('minor'), Array(fl.mid || 0).fill('mid'), Array(fl.major || 0).fill('major'))
+    .map(ty => ({ ty, k: { minor: 0, mid: 1, major: 2 }[ty] + Math.random() * 1.6 })).sort((a, b) => a.k - b.k);
+  const N = types.length, a0 = T * .14, a1 = T * .94, gap = (a1 - a0) / Math.max(1, N - 1);
+  const ev = types.map((x, i) => ({ kind: 'climax', ty: x.ty, at: N === 1 ? T * .7 : a0 + gap * i + (Math.random() - .5) * gap * .4 }));
+  const np = fl.early ? 1 : Math.max(1, Math.min(5, 1 + Math.floor(fl.dur / 4)));
+  for (let i = 1; i < np; i++) ev.push({ kind: 'pose', at: T * i / np });
+  ev.sort((a, b) => a.at - b.at);
+  for (const e of ev) {
+    if (e.kind === 'pose') { cruise(e.at); e.start = t; poses.push({ name: pickPose(personality, poses[poses.length - 1].name), at: t }); add(1.3, 4, 'shift'); continue; }
+    cruise(e.at - CLIMAX[e.ty].W); e.start = t; build(e.at); climax(e.ty);
   }
-  more();
+  cruise(T - 2.5); const fe = { kind: 'end', start: t }; ev.push(fe); build(T); finale(false);
+  fix(0);
+  let done = false;
   return {
-    S, end: () => end,
-    // 남은 박자가 둘뿐이면 다음 판을 미리 붙임
-    need: si => { if (end === Infinity && si >= S.length - 3) more(); },
-    // 종료: 지금 박자는 마저 하고 나머지를 지운 뒤 마무리
+    S, poses, fl, end: () => end, total: () => end,
+    // ⏩ 건너뛰기: 다음 일(절정 앞에서 빨라지기 시작·체위 바꾸기·마무리) 직전까지
+    next: tt => { if (done) return null; const e = ev.find(x => x.start > tt + 1.2); return e ? e.start - .6 : null; },
+    // 종료: 지금 박자는 마저 하고 나머지(절정·체위 바꾸기)를 지운 뒤 마무리
     finish: si => {
-      if (end !== Infinity && S[si] && S[si].fin) return false;
+      if (done || (S[si] && S[si].fin)) return false;
+      done = true;
       S.length = Math.min(S.length, si + 1); t = S[si].t0 + S[si].T;
+      while (poses.length > 1 && poses[poses.length - 1].at > t) poses.pop();
       finale(true); fix(si + 1);
       return true;
     },
@@ -485,17 +582,28 @@ function nightPlan(tier) {
 }
 
 /* ---------- 재생 ---------- */
-let raf = 0, ender = null;
+let raf = 0, ender = null, skipper = null;
 function run(stage, job, done) {
   const svg = stage.querySelector('svg'), q = c => svg.querySelector(c), f = v => v.toFixed(1), NS = 'http://www.w3.org/2000/svg';
   const cam = q('.nt-cam'), bed = q('.nt-bed'), quilt = q('.nt-q'), qclip = q('.nt-qc'), stitch = q('.nt-st'), hemEl = q('.nt-hem'), rim = q('.nt-rim'), warm = q('.nt-warm');
   const silF = q('.nt-sf'), silM = q('.nt-sm'), heartsEl = q('.nt-hearts'), fx = q('.nt-fx'), face = stage.querySelector('.nt-face'), folds = svg.querySelectorAll('.nt-f');
   const G = window.Game, { sc, p } = job, tier = [30, 50, 70, 90].filter(v => (sc.sat ?? 50) >= v).length, good = tier >= 2;
-  const debug = /[?&#]dummy/.test(location.href), poseName = pickPose(p.personality), POSE = POSES[poseName], M = BODY.m, F = BODY.f;
-  stage.dataset.pose = poseName;
+  const debug = /[?&#]dummy/.test(location.href), M = BODY.m, F = BODY.f;
   const park = stage.dataset.kind === 'park';
-  const plan = nightPlan(tier), S = plan.S, SLUMP = .7, AFTER = SLUMP + (good ? 1.9 : 2.3);
-  let end = plan.end(), END = end + AFTER;   // 만족감이 높으면 종료 버튼을 누를 때까지 Infinity
+  const plan = nightPlan(sc, tier, p.personality), S = plan.S, SLUMP = .7, AFTER = SLUMP + (good ? 1.9 : 2.3);
+  let end = plan.end(), END = end + AFTER;
+  // 섹스 기술 등급: 부딪힘의 찰짐(snap), 절정 반응의 크기
+  const gi = plan.fl.grade ?? 3, snap = .7 + .07 * gi;
+  // 체위: 일정대로 바뀌고, 바뀔 때 1.1초 동안 관절을 이어 옮김
+  let pi = 0, poseName = plan.poses[0].name;
+  stage.dataset.pose = poseName;
+  // 그날 밤 아래 줄: 시계(화면 1초 = 6초), 지금 체위, 상대 절정 횟수
+  const card = stage.closest('.sc-night'), clockEl = card && card.querySelector('.nt-clock'), poseEl = card && card.querySelector('.nt-pose'), cntEl = card && card.querySelector('.nt-cnt');
+  const counts = { minor: 0, mid: 0, major: 0 };
+  let clockTxt = '', warpTo = 0, react = null, quiv = null, flashK = 0;
+  const showPose = () => { if (poseEl) poseEl.textContent = POSE_LABEL[poseName] || ''; };
+  const showCnt = () => { if (cntEl) cntEl.innerHTML = Object.keys(counts).filter(k => counts[k]).map(k => `<span class="c-${k}">${CLIMAX_LABEL[k]} ${counts[k]}</span>`).join(''); };
+  showPose();
   const HB = [null, null, { n: .6, strong: 4, fount: 7 }, { n: 1.5, strong: 7, fount: 14 }, { n: 2.6, strong: 10, fount: 22, ring: 12 }][tier];
   const n = CX.length, y = new Float64Array(n), v = new Float64Array(n), surf = new Float64Array(n), sv = new Float64Array(n), rest = new Float64Array(n), hemL = new Float64Array(n), DT = 1 / 240;
   const ms = { d: 0, tr: 0, slump: 0, sink: 0, bs: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } };
@@ -517,13 +625,18 @@ function run(stage, job, done) {
   const limit = { slim: 1.85, avg: 2.15, fit: 2.25, chubby: 2.35 }[sc.build] || 2.15, symHearts = [], symHS = sq('.sy-hs');
   let symE = 0, symEV = 0, symX = 0, symXV = 0, ouchAt = -9, beatK = 0, beatKV = 0, faceY = 0, faceYV = 0, beatTxt = '', impT = -9, impS = 0, impExit = false, lastGx = null, lastHb = null, gv = 0;
   const beatEl = sq('.sy-beat'), sqEl = sq('.sy-sq'), drops = [];
-  let peakUntil = -9, sqUntil = -9, lastSq = -9, ringX = 106, ringY = 28, ringRX = 9, ringRY = 12;   // 상대 절정: 초상화·♀ 물
+  let peakUntil = -9, peakKind = '', sqBig = false, sqUntil = -9, lastSq = -9, ringX = 106, ringY = 28, ringRX = 9, ringRY = 12;   // 상대 절정: 초상화·♀ 물
   let t = 0, si = 0, hi = 0, sinkV = 0, bsV = 0, jy = 0, jyV = 0, jx = 0, jxV = 0, heat = 0, shakeAt = -9, shakeK = 0, buzz = 0, fount = 0;
   let P = null, capsM = [], capsF = [], lastD = 0, dEnd = null, faceKey = '', finale = false, acc = 0, last = 0;
   const hearts = [];
+  function poseNow() {
+    pi = Math.min(pi, plan.poses.length - 1);
+    while (pi < plan.poses.length - 1 && t >= plan.poses[pi + 1].at) { pi++; poseName = plan.poses[pi].name; stage.dataset.pose = poseName; showPose(); }
+    const cur = POSES[poseName](ms, M, F), at0 = plan.poses[pi].at;
+    return pi && t - at0 < 1.1 ? blendPose(POSES[plan.poses[pi - 1].name](ms, M, F), cur, ease((t - at0) / 1.1)) : cur;
+  }
   // 움직이는 쪽 엉덩이 d, 떨림 tr, 축 늘어짐
   function drive() {
-    plan.need(si);
     while (si < S.length - 1 && t >= S[si].t0 + S[si].T) si++;
     const s = S[si];
     if (t >= end) {
@@ -533,6 +646,7 @@ function run(stage, job, done) {
     }
     if (t < s.t0) return [0, 0, 0];
     const tau = t - s.t0, rel = s.t0 + s.T - (s.kind === 'final' ? .14 : 0), u = t - s.hit;
+    if (s.kind === 'shift') { const k = Math.min(1, tau / s.T); lastD = s.from + (s.to - s.from) * ease(k) + 9 * Math.sin(Math.PI * k); return [lastD, 0, 0]; }   // 체위 바꾸기: 잠깐 떨어졌다가
     const squish = s.top * .08 * Math.exp(-u * 18) * Math.sin(6.283 * 7 * u);   // 부딪힌 뒤 살이 눌렸다 튕김
     let d, tr = 0;
     if (tau < s.wu) d = s.from + (s.top - s.from) * ease(tau / s.wu);
@@ -583,8 +697,23 @@ function run(stage, job, done) {
       drops.push({ el, t0: t, x: ringX + ringRX * .6, y: ringY + ringRY * .2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: .6 + Math.random() * .5, s: .85 + Math.random() * .7 });
     }
   }
+  // 상대 절정 (소·중·대): 초상화·고개·떨림·♀ 고리·물·하트가 크기마다 다름
+  function climax(s) {
+    const ty = s.her, big = ty === 'major', mid = ty === 'mid', amp = .65 + .045 * gi;   // 등급이 높을수록 반응이 큼
+    react = { t0: t, hold: s.t0 + s.T + (big ? .9 : mid ? .4 : 0), k: (big ? 1 : mid ? .62 : .3) * amp };
+    peakUntil = Math.max(peakUntil, s.t0 + s.T + (big ? 1.6 : mid ? 1.1 : .5));
+    peakKind = ty;
+    if (s.count) { counts[ty]++; showCnt(); }
+    quiv = { until: s.t0 + s.T + (big ? .8 : .3), amp: big ? .17 : mid ? .09 : .05 };
+    symEV += big ? 34 : mid ? 22 : 14; heat = 1;
+    if (ty !== 'minor') { sqUntil = s.t0 + s.T - .1; sqBig = big; squirt(big ? 22 : 11, big ? 1.3 : 1.05); }
+    if (big) { flashK = 1; shakeAt = t; shakeK = Math.max(shakeK, 1.5); }
+    for (let j = big ? 4 : mid ? 2 : 1; j > 0; j--) symHeart();
+    if (HB || ty !== 'minor') burstAt(big ? 6 : mid ? 4 : 2, () => ({ s: .8 + Math.random() * .5, dy: -(50 + Math.random() * 30) }));
+    if (big && s.count) for (let j = 0; j < 12; j++) { const a = Math.PI * (1.05 + .9 * j / 11), r = 46 + Math.random() * 16, hx = actHip()[0]; heart(hx, at(y, hx) - 4, { dx: Math.cos(a) * r, dy: Math.sin(a) * r * .8 - 10, s: .8 + Math.random() * .3, life: 1.3 }); }
+  }
   function impact(s) {
-    const str = s.kind === 'final' ? 2.2 : s.kind === 'strong' ? 1.8 : Math.min(1.2, .45 + .75 * s.A / 7);
+    const str = (s.kind === 'final' ? 2.2 : s.kind === 'strong' ? 1.8 : Math.min(1.2, .45 + .75 * s.A / 7)) * (s.her || s.fin ? 1 : snap);   // 찰짐: 섹스 기술 등급
     sinkV += 40 * str; bsV -= 24 * str; symEV += 17 * str; symXV += 55 * str; beatKV += 9 * str; faceYV += 40 * str;
     impT = t; impS = Math.min(1.4, str); impExit = GX0 + ht > 106 + RX0 + 1;   // 탁: 부딪힘 선·물결, 촉이 고리 밖으로 나가면 반짝
     const force = str * (.55 + .1 * grade);
@@ -596,7 +725,7 @@ function run(stage, job, done) {
     const rcv = P.act === 'm' ? 'f' : 'm', kick = 70 * str;
     for (const b of blobs) if (b.w === rcv) { b.v[0] += P.dir[0] * kick * (b.k === 'butt' ? 1 : .5); b.v[1] += P.dir[1] * kick * (b.k === 'butt' ? 1 : .5); }
     heat = Math.max(heat, good ? Math.min(1, .3 + .3 * str) : .12);
-    if (s.her) { peakUntil = Math.max(peakUntil, s.t0 + s.T + 1.3); sqUntil = s.t0 + s.T - .1; squirt(13, 1.15); heat = 1; }   // 상대 절정: 절정 얼굴, ♀에서 물이 뿜어짐
+    if (s.her) { climax(s); return; }
     if (!HB) return;
     if (s.kind === 'n') { const m = HB.n * (Math.min(1, s.t0 / 30) * .6 + .4); burstAt(Math.floor(m) + (Math.random() < m % 1 ? 1 : 0), {}); }
     else burstAt(HB.strong, () => ({ s: .95 + Math.random() * .45, dy: -(60 + Math.random() * 26) }));
@@ -612,13 +741,19 @@ function run(stage, job, done) {
   function step(settle) {
     t += DT;
     const [d, tr, slump] = settle ? [0, 0, 0] : drive();
-    while (!settle && hi < S.length && S[hi].hit <= t) impact(S[hi++]);
+    while (!settle && hi < S.length && S[hi].hit <= t) { const b = S[hi++]; if (b.kind !== 'shift') impact(b); }
     sinkV += (-500 * ms.sink - 22 * sinkV) * DT; ms.sink += sinkV * DT;
     bsV += (-300 * ms.bs - 18 * bsV) * DT; ms.bs += bsV * DT;
     jyV += (-900 * jy - 24 * jyV) * DT; jy += jyV * DT;
     jxV += (-700 * jx - 20 * jxV) * DT; jx += jxV * DT;
     Object.assign(ms, { d, tr, slump });
-    P = POSE(ms, M, F); capsM = caps(M, P.m); capsF = caps(F, P.f);
+    P = poseNow();
+    if (react && !settle) {   // 상대 절정: 고개를 젖히거나 베개에 파묻고 부들부들
+      const a = t - react.t0, env = Math.min(1, a / .15) * (t < react.hold ? 1 : Math.max(0, 1 - (t - react.hold) / .7));
+      if (env <= 0 && t > react.hold) react = null;
+      else headReact(P.f, react.k * env, BURY[poseName], react.k * env * 1.3 * Math.sin(a * 92), react.k * env * .9 * Math.cos(a * 117));
+    }
+    capsM = caps(M, P.m); capsF = caps(F, P.f);
     for (const b of blobs) {
       const pj = P[b.w][b.at];
       if (b.p2) for (let k = 0; k < 2; k++) b.v[k] += (-1200 * b.o[k] - 7 * b.v[k] - (pj[k] - 2 * b.p1[k] + b.p2[k]) / (DT * DT) * .45) * DT;
@@ -647,7 +782,8 @@ function run(stage, job, done) {
     if (HB && cur.kind === 'final' && (cur.her || cur.fin) && t >= cur.t0 && t < Math.min(end, cur.t0 + cur.T)) { fount += HB.fount * DT; while (fount >= 1) { fount--; burstAt(1, { s: .8 + Math.random() * .5, dy: -(55 + Math.random() * 35) }); } }
     heat = Math.max(heat * Math.exp(-DT * 1.4), t < end ? (good ? .1 + .4 * Math.min(1, t / 20) : .05) : 0);
     // ♀ 물: 절정 떨림 동안 짧게 여러 번 뿜음
-    if (t < sqUntil && t - lastSq > .2 + Math.random() * .08) { lastSq = t; squirt(4 + Math.floor(Math.random() * 4), .7 + Math.random() * .45); }
+    if (t < sqUntil && t - lastSq > (sqBig ? .13 : .22) + Math.random() * .08) { lastSq = t; squirt((sqBig ? 6 : 3) + Math.floor(Math.random() * 4), (sqBig ? .9 : .7) + Math.random() * .45); }
+    flashK = Math.max(0, flashK - DT * 2.2);
     symEV += (-650 * symE - 6 * symEV) * DT; symE += symEV * DT;      // ♀ 고리: 말랑하게 눌렸다 여러 번 출렁이며 돌아옴
     symXV += (-480 * symX - 9 * symXV) * DT; symX += symXV * DT;
     beatKV += (-700 * beatK - 18 * beatKV) * DT; beatK += beatKV * DT;
@@ -662,9 +798,10 @@ function run(stage, job, done) {
   // 상대 표정 (관계 중 초상화)
   function faceNow() {
     if (t >= end + .3) return good ? (tier >= 3 ? 'bliss' : 'content') : 'disappointed';
+    if (t < peakUntil) return peakKind === 'major' ? 'major' : peakKind === 'mid' ? 'p3' : 'p2';   // 절정: 소 = 풀린 눈, 중 = 성격별 절정 얼굴, 대 = 질끈 감은 눈·벌어진 입
     if (!good) return t / end < (tier ? .4 : .25) ? 'p0' : 'bored';
     const cur = S[si];
-    if (t < peakUntil || (cur.fin && cur.kind !== 'n')) return 'p3';   // 절정 (마무리 땐 같이)
+    if (cur.fin && cur.kind !== 'n') return 'p3';   // 마무리 (같이)
     if (t < 4) return 'p0';
     return cur.T > .44 ? 'p1' : 'p2';
   }
@@ -703,7 +840,9 @@ function run(stage, job, done) {
     const cx = sk * Math.sin(ago * 95), cy = sk * .6 * Math.sin(ago * 120 + 1);
     cam.setAttribute('transform', sk > .02 ? `translate(${f(cx)},${f(cy)})` : '');
     bed.setAttribute('transform', `translate(${jx.toFixed(2)},${jy.toFixed(2)})`);
-    warm.setAttribute('opacity', (heat * .9).toFixed(3));
+    warm.setAttribute('opacity', Math.min(1, Math.max(heat * .9, flashK)).toFixed(3));
+    // 시계 (화면 1초 = 6초)
+    if (clockEl) { const gs = Math.floor(Math.min(t, end) * SPEED), txt = `⏱ ${Math.floor(gs / 60)}:${String(gs % 60).padStart(2, '0')}${warpTo > t ? ' ⏩' : ''}`; if (txt !== clockTxt) { clockTxt = txt; clockEl.textContent = txt; } }
     for (let i = hearts.length - 1; i >= 0; i--) {
       const h = hearts[i], age = t - h.t0, k = age / h.life;
       if (k >= 1) { h.el.remove(); hearts.splice(i, 1); continue; }
@@ -717,17 +856,19 @@ function run(stage, job, done) {
       const key = faceNow();
       if (key !== faceKey) {
         faceKey = key;
-        const du = key[0] === 'p' && key.length === 2 ? { lv: +key[1] } : { mood: key };
+        const du = key === 'major' ? { lv: 3, major: true, tongue: gi >= 7 } : key[0] === 'p' && key.length === 2 ? { lv: +key[1] } : { mood: key };   // 대절정: SS 이상이면 혀까지
         face.innerHTML = Avatar.render(G.look(p), 64, { age: G.npcAge(p), during: Object.assign(du, { personality: p.personality, fig: sc.fig }) });
-        face.classList.toggle('peak', key === 'p3' && good);   // 절정: 초상화가 확 바뀌며 분홍빛으로 반짝
       }
+      face.classList.toggle('peak', t < peakUntil || (key === 'p3' && good));   // 절정: 초상화가 확 바뀌며 분홍빛으로 반짝
+      face.classList.toggle('big', key === 'major');
       face.style.transform = `translate(${f(cx * 1.2)}px,${f(cy * 1.2 + faceY)}px)`;   // 부딪힐 때마다 초상화도 출렁
     }
     // ♂ 화살은 d를 따라 드나들고 맞닿으면 ♂ 원이 고리 뒤쪽 끝에 탁 걸림(더 밀면 고리째 밀려남). 만족감이 낮으면 끝나고 빠지며 고개를 숙임
     const intro = ease(Math.min(1, t / .8)), u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0;
     const gx = Math.max(MO + 2, GX0 - 2.6 * Math.max(-2.5, ms.d + (good ? 0 : 14 * ease(u)))) - (1 - intro) * 80;   // 크게 빼고, 걸릴 때까지 밀어붙임
     const ouch = t - ouchAt < .6 ? 1 - (t - ouchAt) / .6 : 0, jit = ouch * 1.6 * Math.sin((t - ouchAt) * 190);
-    const rx = RX0 * (1 - .32 * symE) * (1 - .1 * ouch), ry = FR * (1 + .28 * symE) * (1 - .1 * ouch);
+    const qv = quiv && t < quiv.until ? quiv.amp * Math.sin(t * 82) : 0;   // 절정: ♀ 고리가 바르르 (대절정은 크게)
+    const rx = RX0 * (1 - .32 * symE) * (1 - .1 * ouch) * (1 + qv), ry = FR * (1 + .28 * symE) * (1 - .1 * ouch) * (1 - qv);
     const press = Math.max(0, gx + MO - (106 + symX - rx));   // ♂ 원이 고리를 누르는 만큼 고리가 밀림
     const cx0 = 106 + symX + jit + press + (1 - intro) * 50, cy0 = 28 + ms.tr * .8;
     // 화살 속도(잔상)·촉 밑동이 고리 끝을 지날 때 고리가 꿀렁 벌어짐·안에 있을 땐 화살이 고리를 끌고 감
@@ -756,7 +897,7 @@ function run(stage, job, done) {
       d.el.setAttribute('transform', `translate(${f(x)},${f(yy)}) rotate(${f(Math.atan2(vy, vx) * 57.3)}) scale(${(d.s * (1 + Math.min(.6, Math.hypot(vx, vy) / 260))).toFixed(2)},${d.s.toFixed(2)})`);
       d.el.setAttribute('opacity', (k < .08 ? k / .08 : k > .55 ? (1 - k) / .45 : 1).toFixed(2));
     }
-    symC.setAttribute('opacity', (good ? .15 + heat * .85 : .1).toFixed(2)); symG.setAttribute('opacity', (good ? heat : heat * .3).toFixed(2));
+    symC.setAttribute('opacity', (good ? .15 + heat * .85 : .1).toFixed(2)); symG.setAttribute('opacity', Math.min(1, Math.max(good ? heat : heat * .3, flashK)).toFixed(2));
     // 탁: 맞닿은 곳에서 위아래로 튀는 선 + 고리가 퍼지는 물결 + (꿰뚫었으면) 촉 끝 반짝
     const ia = t - impT, rip = E.rip, tak = E.tak, spk = E.spark;
     if (ia < .42) {
@@ -783,7 +924,8 @@ function run(stage, job, done) {
     sym.style.transform = sk > .02 ? `translate(${f(cx * 1.2)}px,${f(cy * 1.2)}px)` : '';
   }
   function frame(now) {
-    acc += last ? Math.min(.05, (now - last) / 1000) : 0; last = now;
+    if (warpTo && t >= warpTo) warpTo = 0;
+    acc += (last ? Math.min(.05, (now - last) / 1000) : 0) * (warpTo ? 8 : 1); last = now;   // ⏩ 건너뛰는 중엔 8배
     while (acc >= DT) { step(); acc -= DT; }
     draw();
     if (t < END) raf = requestAnimationFrame(frame);
@@ -791,21 +933,24 @@ function run(stage, job, done) {
   }
   if (debug) { quilt.setAttribute('opacity', '.35'); q('.nt-sil').setAttribute('hidden', ''); q('.nt-dummy').removeAttribute('hidden'); }
   // 처음엔 이불을 몸 위에 내려놓고 가라앉힘
-  P = POSE(ms, M, F); capsM = caps(M, P.m); capsF = caps(F, P.f);
+  P = poseNow(); capsM = caps(M, P.m); capsF = caps(F, P.f);
   for (let i = 0; i < n; i++) { surf[i] = surface(i); y[i] = surf[i]; }
   for (let j = 0; j < 300; j++) step(true);
   t = 0; rest.set(y); hemL.fill(0); v.fill(0);
   draw();
   // 종료 버튼: 지금 박자는 마저 하고 마무리로 (이미 마무리 중이면 false → 화면이 바로 넘김)
   let ending = false;
-  ender = () => { if (ending || !plan.finish(si)) return false; ending = true; end = plan.end(); END = end + AFTER; return true; };
+  ender = () => { if (ending || !plan.finish(si)) return false; ending = true; warpTo = 0; end = plan.end(); END = end + AFTER; return true; };
+  // ⏩ 건너뛰기: 다음 일(절정·체위 바꾸기·마무리) 직전까지 빨리 감기
+  skipper = () => { const tg = ending ? null : plan.next(t); if (tg == null || tg <= t) return false; warpTo = tg; return true; };
   raf = requestAnimationFrame(frame);
 }
 
 window.Night = {
   html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div>${SYM}</div>`,
   foreplay, uterus, alley,
-  run, stop: () => { cancelAnimationFrame(raf); ender = null; }, finish: () => !!ender && ender(),
+  run, stop: () => { cancelAnimationFrame(raf); ender = skipper = null; }, finish: () => !!ender && ender(), skip: () => !!skipper && skipper(),
+  poseLabel: POSE_LABEL,
   // 실험용: 체위 이름과 움직임 상태 → 관절 좌표
   pose: (name, st = {}) => POSES[name](Object.assign({ d: 0, tr: 0, slump: 0, sink: 0, bs: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } }, st), BODY.m, BODY.f),
 };

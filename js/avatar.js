@@ -1349,7 +1349,8 @@ const POSE = { bold: 'hip', sunny: 'hip', sharp: 'cross', cool: 'cross' };
 function headSVG(a, X, age, st, g) {
   const { skin, hc, hp, nh, neckBot, af, tier, du } = g, skinD = shade(skin, .86);
   // du(관계 중): { lv 0~3 (pleasure), mood: pleasure | bliss | content | bored | disappointed }
-  const mood = du && (du.mood || 'pleasure'), lv = du ? du.lv || 0 : 0, pk = du && mood === 'pleasure' && lv >= 3 ? PEAK[du.personality] : null;
+  // du.major: 대절정 — 질끈 감은 눈 + 벌어진 입(섹스 기술 SS 이상이면 혀까지) + 눈물·얼굴 전체 홍조 (성격과 상관없이)
+  const mood = du && (du.mood || 'pleasure'), lv = du ? du.lv || 0 : 0, pk = du && mood === 'pleasure' && lv >= 3 ? (du.major ? { eye: 'squeeze', mouth: du.tongue ? 'ahT' : 'ah', blush: .95, flush: 1, tears: du.personality === 'sensitive' || du.personality === 'warm' ? 2 : 1, sweat: 2 } : PEAK[du.personality]) : null;
   const kid = age <= 12, adult = age >= 20, female = a.g === 'f', ey = 72, ex = [48, 72];
   // 턱 아래·목 옆 그림자
   let o = `<ellipse cx="60" cy="101.5" rx="${f1(nh - .5)}" ry="6" fill="${shade(skin, .6)}" opacity=".26"/>`;
@@ -1418,7 +1419,7 @@ function headSVG(a, X, age, st, g) {
   o += noseSVG(X.nose, skin, kid);
   // 입 (어른 여자는 립 색, 여자아이는 연분홍, 남자는 자연스러운 입술색). 입술 두께, 어른 여자는 아랫입술 윤기
   const lip = { c: female && age >= 18 ? LIPS[X.lip] : female ? '#e39aa0' : NATURAL_LIP[a.skin] || NATURAL_LIP[1], teeth: X.teeth, f: X.lipF, gloss: female && adult };
-  o += pk ? { joy2: JOY(2, lip, female), joy1: JOY(1, lip, female), o: mouthSVG(3, lip, female), tongue: JOY(1, lip, female) + TONGUE, smile: mouthSVG(1, lip, female), smirk: SMIRK(lip), tremble: TREMBLE(lip, female) }[pk.mouth]
+  o += pk ? { joy2: JOY(2, lip, female), joy1: JOY(1, lip, female), o: mouthSVG(3, lip, female), tongue: JOY(1, lip, female) + TONGUE, smile: mouthSVG(1, lip, female), smirk: SMIRK(lip), tremble: TREMBLE(lip, female), ah: AH(2, lip, female), ahT: AH(1.4, lip, female) + TONGUE }[pk.mouth]
     : du ? ({ bliss: JOY(0, lip, female), content: mouthSVG(1, lip, female), bored: mouthSVG(2, lip, female), disappointed: POUT(lip) }[mood] || (lv ? JOY(lv - 1, lip, female) : mouthSVG(1, lip, female)))
     : af ? (tier === 0 ? FROWN : tier === 1 ? mouthSVG(2, lip, female) : tier >= 3 && af.personality !== 'cool' ? mouthSVG(1, lip, female) : mouthSVG(0, lip, female))
     : aro >= 71 ? mouthSVG(1, lip, female) : aro >= 51 ? mouthSVG(3, lip, female)
@@ -1445,6 +1446,7 @@ function headSVG(a, X, age, st, g) {
     if ((mood === 'pleasure' && lv >= 2) || mood === 'bliss') o += MINI_HEARTS;
     if (pk && pk.tears) o += TEARS(pk.tears);
     if (pk && pk.flush) o += '<ellipse cx="60" cy="81" rx="21" ry="6" fill="#e8857a" opacity=".38"/>';
+    if (pk && pk.sweat) o += SWEAT(84, 54, .75) + (pk.sweat > 1 ? SWEAT(35, 60, .6) : '');
     if (mood === 'bliss') o += SPARKLE(30, 40, 1.1) + SPARKLE(92, 64, .8);
     if (mood === 'disappointed') o += SWEAT(88, 44, 1.7);
   }

@@ -32,6 +32,12 @@ function abHTML(k, v) {
   return `<span class="ab" title="${v}"><span>${G.LABEL[k]}</span><span class="g g-${g.letter}">${g.letter}</span><span class="pb">${pbar(g.pct)}</span></span>`;
 }
 
+// 섹스 기술 (F ~ SSS) — 어른만, 능력치 줄 끝에
+function sexAbHTML() {
+  const g = G.sexInfo();
+  return `<span class="ab" title="섹스 기술 ${g.value}"><span>섹스 기술</span><span class="g g-${g.letter}">${g.letter}</span><span class="pb">${pbar(g.pct)}</span></span>`;
+}
+
 function deltaHTML(d) {
   if (!d || !d.length) return '';
   const parts = d.map(([k, v]) => {
@@ -66,7 +72,7 @@ function renderLog(S) {
 }
 
 /* ---------- 전체 그리기 ---------- */
-// 행동력 칸: 어른은 12칸 + 새벽 6칸(빨강), 학교 턴은 그 턴의 칸
+// 행동력 칸: 어른은 18칸 + 새벽 6칸(빨강), 학교 턴은 그 턴의 칸
 function apDots(ti) {
   if (ti.phase === 'adult') {
     let out = '';
@@ -97,7 +103,7 @@ function render(S) {
   const lt = G.lustTarget();
   $('#conds').innerHTML = G.conds.filter(k => k !== 'libido' || (S.age >= G.config.sexMinAge && lt)).map(k =>
     `<span>${G.LABEL[k]}${k === 'libido' ? `<small class="lt">→${esc(lt.name)}</small>` : ''}</span><span class="bar${(k === 'libido' ? S.stats[k] >= 60 : S.stats[k] < 25) ? ' low' : ''}">${bar(S.stats[k])}</span><span class="num">${S.stats[k]}</span>`).join('');
-  $('#abils').innerHTML = G.abilities.map(k => abHTML(k, S.stats[k])).join('');
+  $('#abils').innerHTML = G.abilities.map(k => abHTML(k, S.stats[k])).join('') + (S.age >= G.config.sexMinAge ? sexAbHTML() : '');
 
   renderLog(S);
 
@@ -274,7 +280,7 @@ function playScene(sc) {
   // 서서 다가감 → 그날 밤 → (콘돔 없이면) 자궁 그림 → 다음 날 아침 → (임신이면) 몇 주 뒤
   const S = G.state(), inside = sc.contra === 'none' || sc.contra === 'pill';
   const tops = [Avatar.topColor(S.gender === 'm' ? G.myLook() : G.look(p)), Avatar.topColor(S.gender === 'm' ? G.look(p) : G.myLook())];
-  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`]).concat([`<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}<button type="button" class="nt-end" data-nt-end>종료</button></div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
+  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`]).concat([`<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}<div class="nt-bar"><span class="nt-clock">⏱ 0:00</span><span class="nt-pose"></span><span class="nt-cnt"></span></div><div class="nt-btns"><button type="button" class="nt-skip" data-nt-skip>⏩ 건너뛰기</button><button type="button" class="nt-end" data-nt-end>종료</button></div></div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
     .concat(inside ? [`<div class="sc-card sc-ut">${Night.uterus(!!sc.preg)}</div>`] : []);
   sceneQueue = nightQ.concat(morningQ, pregQ);
   nextScene();
@@ -302,6 +308,7 @@ function maybeScene(S) {
 sceneEl.addEventListener('click', e => {
   if (e.target.closest('[data-sc-next]')) { nextScene(); return; }
   // 그날 밤은 종료 버튼을 누를 때까지 계속 (누르면 마무리, 마무리 중에 또 누르면 바로 넘김)
+  if (e.target.closest('[data-nt-skip]')) { if (window.Night) Night.skip(); return; }   // 다음 일(절정·체위 바꾸기·마무리) 직전까지 빨리 감기
   const end = e.target.closest('[data-nt-end]');
   if (end) { if (window.Night && Night.finish()) end.textContent = '넘기기'; else nextScene(); return; }
   if (sceneBox.querySelector('.sc-fp, .sc-ut')) nextScene();
@@ -732,7 +739,8 @@ function quickStep(n) {
       <p class="hint">0~20 F · 21~40 E~D · 41~60 C · 61~80 B~A · 81~100 S.${qSandbox(q) ? ' 샌드박스는 포인트 제한이 없다.' : ' 남은 포인트가 0이면 더 올릴 수 없다.'}</p>
       <div class="qs-rs">${qRange('style', 0, 50, q.style, '꾸밈 <small class="dim">옷·머리 상태</small>')}</div>
       ${qFld('소질 <small class="dim">앞으로 잘 오르는 것</small>', qChips('trait', C.traits, q.trait), esc(tr.desc || ''))}
-      ${qFld('경험', `<div class="chips">${qChip('exp', 0, '없음', !q.exp)}${qChip('exp', 1, '있음', q.exp)}</div>`, q.exp ? '밤의 기술이 조금 있는 채로 시작한다.' : '아직 경험 없이 시작한다.')}`;
+      ${qSandbox(q) ? qFld('섹스 기술 <small class="dim">샌드박스</small>', `<div class="chips">${G.sexGrades.map(l => qChip('sexg', l, l, (q.sexg || 'F') === l)).join('')}</div>`, (q.sexg || 'F') === 'F' ? '경험 없이 시작한다.' : q.sexg === 'SSS' ? 'SSS — 애인이 있든 결혼했든 한 번 자면 빠져들고 죄책감을 못 느낀다. 만족감이 100을 넘을 수 있다.' : `${q.sexg} 등급으로 시작한다. 높을수록 그날 밤이 길고 상대가 더 많이 절정한다.`)
+        : qFld('경험', `<div class="chips">${qChip('exp', 0, '없음', !q.exp)}${qChip('exp', 1, '있음', q.exp)}</div>`, q.exp ? '섹스 기술이 조금 있는 채로 시작한다.' : '아직 경험 없이 시작한다.')}`;
   }
   if (n === 3) {
     const P = window.Avatar ? Avatar.parts : { hair: { m: [], f: [] }, hc: [], skin: [], eyes: [] }, g = q.gender, R = qRanges(q);
@@ -776,7 +784,7 @@ function quickStep(n) {
     ['학력', e.tiers && u ? `${e.label} — ${u.name} ${d ? d.name : ''}` : q.edu === 'work' ? `${e.label} — ${(G.quick.jobs().find(j => j.id === q.job) || {}).label || ''}` : e.label],
     ['집안', `${L(C.wealth, q.wealth)} · ${L(Q.home, q.home)}${q.gender === 'm' ? ` · ${L(Q.army, q.edu === 'retake' && q.army === 'now' ? 'next' : q.army)}` : ''}`],
     ['능력치', Q.stats.map(k => `${G.LABEL[k]} ${G.quick.grade(q.st[k])}`).join(' · ') + ` · 꾸밈 ${G.quick.grade(q.style)}`],
-    ['소질', L(C.traits, q.trait) + (q.exp ? ' · 경험 있음' : '')],
+    ['소질', L(C.traits, q.trait) + (qSandbox(q) ? ((q.sexg || 'F') !== 'F' ? ` · 섹스 기술 ${q.sexg}` : '') : q.exp ? ' · 경험 있음' : '')],
     ['몸', `${f.height}cm · ${L(Q.builds, q.build)} · ${q.gender === 'f' ? `${f.under}${f.cup} · ${f.bust}-${f.waist}-${f.hip}` : `어깨 ${f.shoulder}cm · ${q.penis}cm`}`],
     ['생김새', P ? `${P.hair[q.gender][q.hair] || ''} · ${(P.hc.find(x => x.id === q.hc) || {}).label || ''} · 피부 ${(P.skin[q.skin] || {}).label || ''} · ${(P.eyes[q.eyes] || {}).label || ''} 눈` : ''],
     ['성격·취향', `${L(C.personalities, q.personality)} · ${q.hobbies.map(h => L(C.hobbies, h)).join('·')} · ${L(C.values, q.value)} · 꿈 ${L(C.dreams, q.dream)}`],
