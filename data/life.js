@@ -51,15 +51,15 @@ GAME_DATA.traits = [
 GAME_DATA.faceStart = { F: 15, E: 25, D: 25, C: 20, B: 10, A: 5 };
 GAME_DATA.npcFace = { F: 15, E: 25, D: 25, C: 20, B: 10, A: 4, S: 1 };
 GAME_DATA.styleDecay = [20, 30];        // 꾸밈은 안 하면 매년 이만큼 떨어짐
-GAME_DATA.surgeryCost = 1500;
-GAME_DATA.sizeWeights = { small: 20, avg: 50, large: 25, xlarge: 5 };
-// 체형 — 아바타의 appearance.body (키·체격·가슴·어깨), 남자는 크기(size)도 있음
+GAME_DATA.surgeryCost = [1000, 3000];   // 성형 상담 때마다 이 사이에서 견적
+// 남자 성기 크기 등급: [최소 cm, 최대 cm, 라벨, 확률, 만족감 보정]. 함께 밤을 보낸 뒤에만 보임
+GAME_DATA.penisGrades = [[8, 9, '단소', 5, -5], [10, 12, '소형', 20, -2], [13, 15, '보통', 45, 0], [16, 17, '큰 편', 20, 3], [18, 19, '대물', 8, 6], [20, 22, '흉기', 2, 8]];
+// 체형 — 아바타의 appearance.body (키·체격·가슴·어깨), 남자는 성기 크기(penis, cm)도 있음
 GAME_DATA.bodyLabel = {
   height:   { short: '작은 키', avg: '보통 키', tall: '큰 키' },
   build:    { slim: '마른 체형', avg: '보통 체형', fit: '탄탄한 체형', chubby: '통통한 체형' },
   chest:    { small: '아담한 가슴', avg: '보통 가슴', large: '풍만한 가슴' },
   shoulder: { narrow: '좁은 어깨', avg: '보통 어깨', wide: '넓은 어깨' },
-  size:     { small: '작은 편', avg: '보통', large: '큰 편', xlarge: '아주 큰 편' },
 };
 // 친밀 30부터 보이는 인상 (20살 이상)
 GAME_DATA.bodyImpression = {
@@ -329,7 +329,7 @@ GAME_DATA.actions = [
     text: ['창가 자리에서 커피를 마셨다.', '처음 보는 메뉴를 시켜봤다.', '커피 한 잔을 두고 멍하니 있었다.'] },
   { id: 'shop',      label: '쇼핑',   icon: '🛍', minAge: 10, cost: 30, effect: { happy: [3, 6], style: [4, 8] },
     text: ['충동구매를 했다. 후회는 없다.', '구경만 하려다 두 손이 무거워졌다.', '오래 고민하던 신발을 샀다.'] },
-  { id: 'drink',     label: '한잔',   icon: '🍺', minAge: 19, cost: 20, drunk: 1, effect: { happy: [3, 6], health: [-2, -1] },
+  { id: 'drink',     label: '한잔',   icon: '🍺', minAge: 19, cost: s => 10 + 10 * Math.min(2, s.drunk || 0), drunk: 1,   // 술값은 취할수록 비싸짐 (단계당 10~30만원) effect: { happy: [3, 6], health: [-2, -1] },
     text: s => [, ['시원한 생맥주 한 잔에 하루가 풀렸다.', '첫 잔이 목을 타고 내려갔다.'], ['볼이 뜨끈해졌다. 말이 많아졌다.', '안주가 맛있어서 술이 술술 들어갔다.'],
       ['세상이 빙글빙글 돈다.', '한 잔만 하려다 두 병을 비웠다. 기억이 군데군데 끊겼다.']][s.drunk] },
   { id: 'pray',      label: '기도',   icon: '🙏', minAge: 4,  effect: { happy: [1, 3] }, karma: [1, 3],

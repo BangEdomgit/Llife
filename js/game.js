@@ -159,7 +159,7 @@ function makePerson(spec) {
     style: spec.style ?? npcStyle(hobby, age),
     bodyPlus: Math.random() < .4,
     libido: age >= C.sexMinAge ? spec.libido ?? rand(10, 50) : 0,
-    size: gender === 'm' ? pickKey(D.sizeWeights) : null,   // 함께 밤을 보낸 뒤에만 보임
+    penis: gender === 'm' ? rollPenis() : null,   // 성기 크기(cm). 함께 밤을 보낸 뒤에만 보임
     pref: age >= 19 && Math.random() < .6 ? randomPref(gender) : null,   // 좋아하는 체형 (null이면 상관없음)
   };
   if (p.kind === 'child') p.role = '아이';
@@ -175,11 +175,11 @@ function npcStyle(hobby, age) {
   if (age < 13) return rand(0, 1);
   return clamp(rand(1, 3) + (hobby === 'fashion' ? 2 : 0) + (age >= 40 ? -1 : 0), 0, 6);
 }
-// 좋아하는 타입: 키·체격 + 남자는 가슴(컵 등급)·골반 등급, 여자는 어깨 등급 (그 등급 이상이면 좋아함)
+// 좋아하는 타입: 키·체격 + 남자는 가슴(컵 등급)·골반 등급, 여자는 어깨 등급·크기 등급 (그 등급 이상이면 좋아함)
 function randomPref(gender) {
   const pr = { height: Math.random() < .5 ? pick(['short', 'avg', 'tall', 'tall']) : null, build: Math.random() < .6 ? pick(['slim', 'avg', 'fit', 'fit', 'chubby']) : null };
   if (gender === 'm') { if (Math.random() < .35) pr.cup = rand(3, 5); if (Math.random() < .25) pr.hip = rand(3, 5); }
-  else if (Math.random() < .35) pr.shoulder = rand(2, 4);
+  else { if (Math.random() < .35) pr.shoulder = rand(2, 4); if (Math.random() < .3) pr.penis = rand(3, 5); }
   for (const k in pr) if (pr[k] == null) delete pr[k];
   return Object.keys(pr).length ? pr : null;
 }
@@ -314,7 +314,7 @@ function libidoTick() {
 // 같이 있으면 서로 자극됨: 상대 성욕은 내 몸 등급만큼, 내 성욕은 상대 몸 등급만큼 빨리 오름
 function nearby(p) {
   if (!canSex(p)) return;
-  p.libido = clamp((p.libido || 0) + Math.round(rand(1, 3) * (1 + gIdx(S.stats.fit) * .08) * (S.gender === 'm' && S.size === 'xlarge' && p.nights ? 1.3 : 1)), 0, 100);
+  p.libido = clamp((p.libido || 0) + Math.round(rand(1, 3) * (1 + gIdx(S.stats.fit) * .08 + (figPref(p) ? .05 : 0)) * (S.gender === 'm' && pGrade(S.penis) >= 5 && p.nights ? 1.3 : 1)), 0, 100);
   S.stats.libido = clamp(S.stats.libido + Math.round(rand(0, 2) * (1 + bodyIdx(p) * .08)), 0, 100);
 }
 // 꼬심 — 외모(생김새·몸·꾸밈) + 인간(매력·감성) + 관계(설렘·친밀) + 보정. 상황마다 가중치가 다름
@@ -328,14 +328,21 @@ function prefBonus(p) {
   if (pr.height && pr.height !== b.height) return 0;
   if (pr.build && pr.build !== myBuild()) return 0;
   let over = false;
-  for (const [k, mine] of [['cup', fg.cGrade], ['hip', fg.hipGrade], ['shoulder', fg.sGrade]]) {
-    if (!pr[k]) continue;
+  for (const [k, mine] of [['cup', fg.cGrade], ['hip', fg.hipGrade], ['shoulder', fg.sGrade], ['penis', p.nights && S.penis ? [pGrade(S.penis)] : 'unknown']]) {
+    if (!pr[k] || mine === 'unknown') continue;   // 크기는 함께 밤을 보낸 뒤에야 앎
     if (!mine || mine[0] < pr[k]) return 0;
     if (mine[0] >= pr[k] + 2) over = true;
   }
   return over ? 20 : rand(10, 15);
 }
 const prefMatch = p => prefBonus(p) > 0;
+// 내 가슴·골반이 상대 취향 등급 이상인지 (상대 성욕이 조금 더 빨리 오름)
+function figPref(p) {
+  const pr = p.pref;
+  if (!pr || !(pr.cup || pr.hip)) return false;
+  const fg = figure(null);
+  return (!pr.cup || (fg.cGrade && fg.cGrade[0] >= pr.cup)) && (!pr.hip || (fg.hipGrade && fg.hipGrade[0] >= pr.hip));
+}
 function allure(p, sit) {
   sit = sit || (p.close >= 60 ? 'close' : p.close >= 30 ? 'known' : 'first');
   const [wf, wb, ws, wc, wa] = ALLURE_W[sit], d = S.drunk || 0, st = S.stats;
@@ -359,14 +366,27 @@ const charmed = (p, sit, need) => allure(p, sit) + rand(-15, 15) >= need;
 const firstLook = () => clamp(Math.round(gIdx(S.stats.face) * .5 + gIdx(S.stats.style) * .35 + gIdx(S.stats.fit) * .15), 0, 6);
 
 // 만족감 = 기술 40% + 궁합 25% + 크기 10% + 설렘 15% + 분위기 10%  (상대가 느끼는 것)
-const SIZE_V = { small: 35, avg: 60, large: 85, xlarge: 100 };
+// 성기 크기: cm → 등급 1~6, 라벨 '18cm(대물)'. 크기 보정은 등급표 값(흉기인데 여자 쪽이 마르면 -3)
+const PG = () => D.penisGrades;
+function rollPenis() { const g = weighted(PG(), r => r[3]); return rand(g[0], g[1]); }
+const pGrade = cm => cm ? PG().findIndex(r => cm <= r[1]) + 1 || 6 : 0;
+const penisLabel = cm => `${cm}cm(${PG()[pGrade(cm) - 1][2]})`;
+const cmFromSize = sz => ({ small: rand(9, 12), avg: rand(13, 15), large: rand(16, 17), xlarge: rand(18, 21) })[sz] || rollPenis();
+// 이 둘 사이: 남자 쪽 크기와 여자 쪽 체격
+function pairOf(p) {
+  const cm = S.gender === 'm' ? S.penis : p.penis;
+  return { cm, g: pGrade(cm), herBuild: S.gender === 'm' ? ((lookOf(p) || {}).body || {}).build : myBuild() };
+}
+function sizeTerm(p) {
+  const { g, herBuild } = pairOf(p);
+  return 6 + (g === 6 && herBuild === 'slim' ? -3 : g ? PG()[g - 1][4] : 0);
+}
 function startCompat(p) {
   return clamp(rand(20, 45) + (p.hobby === S.hobby ? 10 : 0) + (p.value === S.value ? 5 : valueClash(p) ? -5 : 0) + (prefMatch(p) ? 10 : 0), 0, 100);
 }
 function satisfaction(p, mood, adj) {
-  const sz = SIZE_V[S.gender === 'm' ? S.size : p.size] ?? 60;
   const md = clamp(50 + (mood || 0) + [0, 10, 15, -10][S.drunk || 0], 0, 100);
-  return clamp(Math.round(g100(S.sexSkill || 0) * .4 + (p.compat ?? 30) * .25 + sz * .1 + p.heart * .15 + md * .1 + rand(-8, 8) + (adj || 0)), 0, 100);
+  return clamp(Math.round(g100(S.sexSkill || 0) * .4 + (p.compat ?? 30) * .25 + sizeTerm(p) + p.heart * .15 + md * .1 + rand(-8, 8) + (adj || 0)), 0, 100);
 }
 // 지금이 인생에서 몇 번째 행동인지 (싸운 뒤 몇 턴, 오랜만인지 계산용)
 const turnNo = () => S.age * C.apPerYear + S.used;
@@ -451,14 +471,16 @@ function sexScene(p, o) {
   p.routine = (p.routine || 0) + 1; p.lastNightT = t;
   if (!p.spots.includes(spot)) p.spots.push(spot);
   let sat = satisfaction(p, resolve(o.mood), adj);
-  // 크기: 작은 편이면 상한 90, 큰 편 이상이면 바닥 25~30. 아주 큰 편인데 여자 쪽이 마른 체형이면 오히려 아픔
-  const sz = S.gender === 'm' ? S.size : p.size, herBuild = S.gender === 'm' ? ((lookOf(p) || {}).body || {}).build : myBuild();
-  if (sz === 'small') sat = Math.min(sat, 90);
-  else if (sz === 'large') sat = Math.max(sat, 25);
-  else if (sz === 'xlarge') { sat = Math.max(sat, 30); if (herBuild === 'slim') sat = clamp(sat - rand(10, 15), 0, 100); }
+  // 크기: 단소는 만족감 85, 소형은 92까지가 한계. 대물 이상은 기술이 낮아도 바닥 25~35. 흉기인데 여자 쪽이 마른 체형이면 아픔
+  const { cm: pcm, g: pg, herBuild } = pairOf(p);
+  if (pg === 1) sat = Math.min(sat, 85);
+  else if (pg === 2) sat = Math.min(sat, 92);
+  else if (pg >= 5) { sat = Math.max(sat, rand(25, 35)); if (pg === 6 && herBuild === 'slim') sat = clamp(sat - rand(10, 15), 0, 100); }
   const tier = satTier(sat);
   S.stats.libido = clamp(S.stats.libido - rand(70, 90), 0, 100);
   p.libido = clamp((p.libido || 0) - rand(70, 90), 0, 100);
+  // 대물·흉기는 보는 것만으로 상대 성욕 +10~15 (그래서 더 자주 먼저 원함)
+  if (pg >= 5) { if (S.gender === 'm') p.libido = clamp(p.libido + rand(10, 15), 0, 100); else S.stats.libido = clamp(S.stats.libido + rand(10, 15), 0, 100); }
   S.sexSkill = (S.sexSkill || 0) + Math.max(1, Math.round(rand(6, 10) * GR[gIdx(S.sexSkill || 0)][2]));
   p.compat = clamp(p.compat + rand(5, 10), 0, 100);
   night(p, !!o.fling);
@@ -466,7 +488,7 @@ function sexScene(p, o) {
   p.lastSat = sat; p.bestSat = Math.max(prevBest, sat);
   S.flags.hadSex = true;
   const fig = figure(p);
-  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, personality: p.personality, fig, size: sz, build: herBuild, n: (S.scene ? S.scene.n : 0) + 1 };   // size·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
+  S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, personality: p.personality, fig, cm: pcm, build: herBuild, n: (S.scene ? S.scene.n : 0) + 1 };   // cm·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
   if (first) { S.vars.fp = p.id; trigger('firstTime'); }   // 내 첫 경험 — 상대 성격마다 다른 한 줄, 추억
   return { sat, tier, first, firstWith, lover: lover(p), legend: tier === 4 && prevBest < 90, contra, pregMul: cm.preg, awkward };
 }
@@ -641,8 +663,8 @@ function applyOutcome(o, target, resumed) {
 function afterSex(p, sx, ctx) {
   const L = D.satLines, c = Object.assign({ p: pname(p) }, ctx);
   if (sx.awkward) log(pick(L.awkward), { t: 'info' });
-  // 그 사람과 처음 보낸 밤, 내 크기에 대한 반응 (내가 남자일 때, 아주 큰 편 / 작은 편)
-  const sr = sx.firstWith && S.gender === 'm' && (S.size === 'xlarge' ? D.sizeReaction.big : S.size === 'small' ? D.sizeReaction.small : null);
+  // 그 사람과 처음 보낸 밤, 내 크기에 대한 반응 (내가 남자일 때, 대물·흉기 / 단소·소형)
+  const sr = sx.firstWith && S.gender === 'm' && (pGrade(S.penis) >= 5 ? D.sizeReaction.big : pGrade(S.penis) <= 2 ? D.sizeReaction.small : null);
   if (sr && sr[p.personality]) log(fill(sr[p.personality], c), { t: 'info' });
   compareEx(p, sx, c);
   if (sx.first && sx.tier <= 1) { log(fill(pick(L.firstLow), c), { t: 'info' }); return; }
@@ -672,7 +694,13 @@ function compareEx(p, sx, c) {
   p.compared = true;
   const better = diff > 0, L = D.compareLines[better ? 'better' : 'worse'];
   const text = fill(L[p.personality] || L._, Object.assign({ ex: S.gender === 'm' ? '전 남자친구' : '전 여자친구' }, c));
-  if (better) log(text, { deltas: applyP(p, { heart: [5, 10] }) });
+  if (better) {
+    // 전 상대보다 낫다는 걸 알게 되면 만족감도 조금 더
+    const bonus = rand(3, 6);
+    p.lastSat = Math.min(100, p.lastSat + bonus); p.bestSat = Math.max(p.bestSat || 0, p.lastSat);
+    if (S.scene && S.scene.kind === 'night' && S.scene.pid === p.id) S.scene.sat = p.lastSat;
+    log(text, { deltas: applyP(p, { heart: [5, 10] }) });
+  }
   else { S.vars.worseN = (S.vars.worseN || 0) + 1; log(text, { t: 'info', deltas: applyP(p, { heart: [-5, -3] }).concat(applyEffect({ happy: -3 })) }); }
 }
 // 얽힌 사이: 들키지 않으면 괜찮지만… (risk: 내 애인에게 / riskTaken: 상대 애인에게)
@@ -1158,7 +1186,7 @@ function ageUp() {
 /* ═════════ 행동 ═════════ */
 const busy = () => !!S.ended || S.pending.length > 0;
 function spend() { S.ap--; S.used++; updateTime(); libidoTick(); }
-const costOf = a => a.cost && S.age >= 18 ? a.cost : 0;
+const costOf = a => a.cost && S.age >= 18 ? resolve(a.cost) : 0;
 // 지금 있는 장소에서 할 수 있는 행동 (수감 중엔 교도소 행동)
 function actionList() {
   if (jailed()) return D.jailActions;
@@ -1504,7 +1532,7 @@ function bodyInfo(p) {
     out.push({ label: '가슴', value: deep >= 60 || slept ? `${fg.under}${fg.cup}(${fg.cGrade[1]})` : null });
     out.push({ label: '골반', value: deep >= 60 || slept ? cm(fg.hip, fg.hipGrade) : null });
   } else out.push({ label: '어깨', value: deep >= 60 || slept ? cm(fg.shoulder, fg.sGrade) : null });
-  if (slept && p.size) out.push({ label: '크기', value: BL.size[p.size] });
+  if (slept && p.penis) out.push({ label: '성기', value: penisLabel(p.penis) });
   if (p.pref) out.push({ label: '좋아하는 타입', value: deep >= 50 || slept ? prefText(p.pref) : null });
   return out;
 }
@@ -1513,7 +1541,7 @@ function prefText(pr) {
   const lab = (tbl, n) => tbl[Math.min(n, tbl.length) - 1][1];
   return [BL.height[pr.height], BL.build[pr.build],
     pr.cup && `가슴 ${Object.keys(G.cup).find(k => G.cup[k][0] === pr.cup) || ''}컵 이상`,
-    pr.hip && `골반 ${lab(G.hip, pr.hip)} 이상`, pr.shoulder && `어깨 ${lab(G.shoulder, pr.shoulder)} 이상`].filter(Boolean).join(', ');
+    pr.hip && `골반 ${lab(G.hip, pr.hip)} 이상`, pr.shoulder && `어깨 ${lab(G.shoulder, pr.shoulder)} 이상`, pr.penis && `크기 ${D.penisGrades[pr.penis - 1][2]} 이상`].filter(Boolean).join(', ');
 }
 function profile(p) {
   const L = (list, id) => (list.find(x => x.id === id) || {}).label;
@@ -1542,7 +1570,7 @@ function myProfile() {
     ['체형', [S.age >= 19 ? `키 ${cm(fg.height, fg.hGrade)}` : BL.height[b.height], BL.build[b.build]].filter(Boolean).join(', ') + ` (몸 ${gradeOf(S.stats.fit)})`],
     ...shape,
     ...(S.flags.unnatural ? [['특징', '어딘가 부자연스럽다']] : []),
-    ...(S.age >= C.sexMinAge && S.size ? [['크기', D.bodyLabel.size[S.size]]] : []),
+    ...(S.age >= C.sexMinAge && S.penis ? [['성기', penisLabel(S.penis)]] : []),
     ...(S.flags.hadSex ? [['밤의 기술', gradeOf(S.sexSkill)]] : []),
     ...((S.rumor || 0) >= 30 && S.rumorType ? [['소문', RUMOR_LINE[S.rumorType]]] : []),
     ['가치관', L(D.values, S.value)], ['집안', L(D.wealth, S.wealth)], ['꿈', L(D.dreams, S.dream) + (S.flags.dreamDone ? ' (이룸)' : '')],
@@ -1555,7 +1583,7 @@ const api = {
   rand, pick, josa, money: fmtMoney,
   givenName: g => pick(g === 'm' ? D.namesM : g === 'f' ? D.namesF : D.namesM.concat(D.namesF)),
   meet: spec => addPerson(spec),
-  person, npcAge, canRomance, heartOk, jailed, gradeMin, gradeOf,
+  person, npcAge, canRomance, heartOk, jailed, gradeMin, gradeOf, pGrade,
   faceStep: dir => { S.stats.face = gradeStep(S.stats.face, dir, LETTERS.indexOf('S')); },
   place: () => S.place, isHere: p => !!p && !!S.place && S.here.some(h => h.key === p.id),
   here: () => S.here.filter(h => !h.x).map(h => person(h.key)).filter(Boolean),
@@ -1583,7 +1611,7 @@ function newLife(opt = {}) {
   const name = (opt.name || '').trim().slice(0, 6) || pick(D.surnames) + pick(gender === 'm' ? D.namesM : D.namesF);
   const sib = D.siblings.find(x => x.id === opt.sibling) || (Math.random() < .35 ? D.siblings[0] : pick(D.siblings.slice(1)));
   S = {
-    v: 4, id: Date.now(), seq: 0, pseq: 0, xseq: 0,
+    v: 5, id: Date.now(), seq: 0, pseq: 0, xseq: 0,
     name, gender, age: 0, money: 0, ap: C.apPerYear, used: 0, seasonIdx: -1, trait: tr.id,
     personality: opt.personality || pick(D.personalities).id,
     hobby: opt.hobby || pick(D.hobbies).id,
@@ -1595,7 +1623,7 @@ function newLife(opt = {}) {
     stats: { happy: rand(60, 80), health: rand(65, 90), libido: 0, smart: rand(5, 20), fit: rand(5, 20), face: gradeValue(pickKey(tr.face || D.faceStart)), style: rand(0, 10), charm: rand(5, 20), art: rand(5, 20), craft: rand(5, 20) },
     school: { subj: { kor: 0, math: 0, eng: 0, sci: 0 }, naesin: [], mock: null, sat: null, tier: null, major: null, start: null, years: null, gpa: 0, gpaN: 0, studyYear: 0, degree: null },
     karma: 0, heat: 0, record: 0, crimes: 0, jail: 0, rank: 0, perf: 0, preg: null,
-    sexSkill: 0, size: gender === 'm' ? pickKey(D.sizeWeights) : null, drunk: 0, scene: null,
+    sexSkill: 0, penis: gender === 'm' ? rollPenis() : null, drunk: 0, scene: null,
     flags: {}, vars: {}, done: {}, last: {},
     people: [], job: null, salary: 0, log: [], memories: [], pending: [], ended: null,
     weather: 'sunny', time: 0,
@@ -1631,13 +1659,22 @@ function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } cat
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && s.v === 5) return s;
+    // v5 칸에 v4로 찍혀 저장된 것(새 인생이 v4로 만들어지던 버그)도 v5 그대로라 살려서 읽음
+    if (s && (s.v === 5 || s.v === 4)) { s.v = 5; return patch(s); }
     for (const k of OLD_KEYS) {
       const old = JSON.parse(localStorage.getItem(k));
       if (old && (old.v === 3 || old.v === 4)) return upgrade(old.v === 3 ? migrate(old) : old);
     }
     return null;
   } catch (e) { return null; }
+}
+// 같은 v5 안에서 새로 생긴 값 채우기: 크기 등급(small·avg·large·xlarge) → cm
+function patch(s) {
+  for (const x of [s, ...s.people]) {
+    if (x.gender === 'm' && x.penis == null) x.penis = cmFromSize(x.size);
+    delete x.size;
+  }
+  return s;
 }
 // v4 → v5 (외모 3층, 체형). 비어 있는 값만 채움
 function upgrade(s) {
@@ -1646,7 +1683,7 @@ function upgrade(s) {
   if (s.stats.face == null) { s.stats.face = s.stats.looks ?? gradeValue(pickKey(D.faceStart)); delete s.stats.looks; }
   if (s.stats.style == null) s.stats.style = 20;
   if (s.stats.libido == null) s.stats.libido = s.age >= C.sexMinAge ? 30 : 0;
-  if (s.sexSkill == null) { s.sexSkill = s.flags.intimate ? 40 : 0; s.size = s.gender === 'm' ? pickKey(D.sizeWeights) : null; s.drunk = 0; }
+  if (s.sexSkill == null) { s.sexSkill = s.flags.intimate ? 40 : 0; s.drunk = 0; }
   if (s.flags.intimate) s.flags.hadSex = true;
   if (!s.look && window.Avatar) s.look = Avatar.make(`${s.id}:me`, s.gender);
   if (s.look && !s.look.body && window.Avatar) s.look.body = Avatar.make(`${s.id}:me`, s.gender).body;
@@ -1655,11 +1692,11 @@ function upgrade(s) {
     if (p.face == null) p.face = LETTERS.indexOf(pickKey(D.npcFace));
     if (p.style == null) p.style = npcStyle(p.hobby, npcAge(p));
     if (p.pref === undefined) p.pref = npcAge(p) >= 19 && Math.random() < .6 ? randomPref() : null;
-    if (p.libido == null) { p.libido = npcAge(p) >= C.sexMinAge ? rand(10, 50) : 0; p.size = p.gender === 'm' ? pickKey(D.sizeWeights) : null; }
+    if (p.libido == null) p.libido = npcAge(p) >= C.sexMinAge ? rand(10, 50) : 0;
     if (p.appearance && !p.appearance.body && window.Avatar) p.appearance.body = Avatar.make(`${s.id}:${p.id}`, p.gender, { feature: p.feature }).body;
   }
   syncMyBody();
-  return s;
+  return patch(s);
 }
 // v3 저장 → v4 (장소, 단골 장소)
 function migrate(s) {

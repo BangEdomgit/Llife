@@ -621,13 +621,15 @@ GAME_DATA.events = [
       { label: '옷이라도 신경 쓰자', text: '옷장을 뒤집어엎었다. 어울리는 색을 찾았다.', effect: { style: [5, 10], happy: 1 } },
       { label: '신경 안 쓰기로 했다', text: '거울을 뒤집어 놓았다. 그래도 가끔 생각났다.', effect: { happy: -2 } },
     ] },
+  // 견적은 상담 때마다 1000~3000만원 (100만원 단위)
   { id: 'surgery', type: 'fixed', age: [20, 45], once: false, cooldown: 5,
-    when: (s, a) => s.stats.face < a.gradeMin('B') && s.money >= GAME_DATA.surgeryCost && !s.flags.unnatural,
-    text: '성형외과 앞을 지나갔다. 상담만 받아볼까.',
+    when: (s, a) => s.stats.face < a.gradeMin('B') && s.money >= GAME_DATA.surgeryCost[0] && !s.flags.unnatural,
+    onStart: (s, a) => { const [lo, hi] = GAME_DATA.surgeryCost; s.vars.quote = Math.min(Math.floor(s.money / 100) * 100, a.rand(lo / 100, hi / 100) * 100); },
+    text: s => `성형외과 앞을 지나갔다. 상담만 받아볼까. 견적은 ${s.vars.quote}만원.`,
     choices: [
-      { label: `한다 (${GAME_DATA.surgeryCost}만원)`, chance: .8,
-        success: { text: '붓기가 빠지자 거울 속 얼굴이 달라져 있었다.', memory: true, effect: { money: -GAME_DATA.surgeryCost, happy: 8 }, do: (s, a) => a.faceStep(1) },
-        fail: { text: '수술이 잘 안 됐다. 어딘가 부자연스럽다.', memory: true, set: 'unnatural', effect: { money: -GAME_DATA.surgeryCost, health: -10, happy: -8 }, do: (s, a) => a.faceStep(-1) } },
+      { label: s => `한다 (${s.vars.quote}만원)`, chance: .8,
+        success: { text: '붓기가 빠지자 거울 속 얼굴이 달라져 있었다.', memory: true, effect: s => ({ money: -s.vars.quote, happy: 8 }), do: (s, a) => a.faceStep(1) },
+        fail: { text: '수술이 잘 안 됐다. 어딘가 부자연스럽다.', memory: true, set: 'unnatural', effect: s => ({ money: -s.vars.quote, health: -10, happy: -8 }), do: (s, a) => a.faceStep(-1) } },
       { label: '이대로가 나다', text: '상담 실장의 명함을 가방 깊숙이 넣었다.' },
     ] },
 
@@ -809,7 +811,7 @@ GAME_DATA.events = [
     ] },
   // 싸운 뒤 (6턴 안), 설렘이 아직 30 넘게 남아 있을 때
   { id: 'makeupSex', type: 'random', on: ['home'], age: [20, 49], once: false, cooldown: 1, weight: 3,
-    when: mainIs((m, s, a) => (m.partner || m.spouse) && a.canSex(m) && m.fought != null && a.turn() - m.fought <= 6 && m.heart >= 30), onStart: focusMain,
+    when: mainIs((m, s, a) => (m.partner || m.spouse) && a.canSex(m) && m.fought != null && a.turn() - m.fought <= 3 && m.heart >= 30), onStart: focusMain,
     text: '싸운 뒤 냉전이 이어졌다. {fp|이} 먼저 내 방문을 열었다.',
     choices: [
       { label: '끌어안는다', intimate: true, satBonus: 15, memory: true, pregnant: (s, a) => a.focused().spouse ? .12 : .06,
@@ -821,10 +823,10 @@ GAME_DATA.events = [
 
   // 크기 — 기술이 결국 이김 / 크기만 믿으면 안 됨 (내가 남자일 때)
   { id: 'skillOverSize', type: 'fixed', age: [20, 49], req: { flags: ['hadSex'] },
-    when: (s, a) => s.gender === 'm' && s.size === 'small' && (s.sexSkill || 0) >= a.gradeMin('B'),
+    when: (s, a) => s.gender === 'm' && a.pGrade(s.penis) <= 2 && (s.sexSkill || 0) >= a.gradeMin('B'),
     text: '크기가 다가 아니라는 걸 알았다. 기술이 좋으면 상대의 표정이 달라진다.', effect: { happy: 5 }, memory: true },
   { id: 'sizeNotEnough', type: 'fixed', age: [20, 49], req: { flags: ['hadSex'] },
-    when: (s, a) => s.gender === 'm' && s.size === 'xlarge' && (s.sexSkill || 0) < a.gradeMin('D') && !!a.main() && a.canSex(a.main()), onStart: focusMain,
+    when: (s, a) => s.gender === 'm' && a.pGrade(s.penis) >= 5 && (s.sexSkill || 0) < a.gradeMin('D') && !!a.main() && a.canSex(a.main()), onStart: focusMain,
     text: '크기만 믿으면 안 된다는 걸 알았다. {fp|이} "좀 더… 천천히"라고 했다.', effect: { happy: -2 } },
   { id: 'hiddenChildSeen', type: 'fixed', age: [28, 50], req: { flags: ['hiddenChild'] },
     text: '길에서 나를 꼭 닮은 아이를 봤다. 아이 손을 잡고 걷던 {hiddenName|이} 나를 보고 걸음을 멈췄다.',
@@ -896,10 +898,16 @@ GAME_DATA.events = [
       { label: '"간지러워" 하고 웃는다', p: { heart: [2, 4] }, text: '{fp|이} 장난스럽게 한 번 더 그랬다.' },
     ] },
   { id: 'npcApproach', type: 'random', on: NOT_ROUTINE, age: [20, 49], once: false, weight: 3,
+    // 생김새 S는 한 해 1~2번, A는 2년에 1번, B는 3~4년에 1번 (몸 A 이상이면 S·A는 한 번 더, B는 2년마다). C 이하는 몸·매력이 좋으면 가끔
     when: (s, a) => {
-      const g = a.myFace(), gap = g >= 6 ? 1 : g >= 5 ? 2 : g >= 4 ? 3 : s.stats.fit >= a.gradeMin('A') && s.stats.charm >= a.gradeMin('C') ? 4 : 99;
-      return s.age - (s.last.npcApproach ?? -99) >= gap;
+      const g = a.myFace(), bodyA = s.stats.fit >= a.gradeMin('A');
+      const gap = g >= 6 ? 1 : g >= 5 ? 2 : g >= 4 ? (bodyA ? 2 : 3) : bodyA && s.stats.charm >= a.gradeMin('C') ? 4 : 99;
+      const quota = (g >= 6 ? (Math.random() < .5 ? 2 : 1) : 1) + (g >= 5 && bodyA ? 1 : 0), w = s.vars.npcApp || { from: -99, n: 0 };
+      s.vars.npcAppGap = gap;
+      return s.age - w.from >= gap || w.n < quota;
     },
+    // 기간(gap년) 안에서 몇 번 왔는지 셈
+    do: s => { const w = s.vars.npcApp; s.vars.npcApp = w && s.age - w.from < s.vars.npcAppGap ? { from: w.from, n: w.n + 1 } : { from: s.age, n: 1 }; },
     meet: s => ({ kind: 'friend', gender: s.gender === 'm' ? 'f' : 'm', ageRange: [Math.max(20, s.age - 5), Math.min(49, s.age + 5)], hangout: s.place, close: 30, heart: 20 }),
     text: s => s.place === 'bar' ? ['옆 테이블 {new|이} 먼저 말을 걸어왔다. "혼자세요?"', '{new|이} "같이 한 잔 해도 돼요?"라며 옆에 앉았다.']
       : ['{new|이} 웃으며 자기 번호를 적은 냅킨을 밀어왔다.', '{new|이} 머뭇거리다 먼저 말을 걸어왔다. "아까부터 보고 있었어요."'] },
