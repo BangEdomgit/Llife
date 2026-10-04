@@ -22,7 +22,7 @@ const genderKo = g => g === 'm' ? '남' : '여';
 const isMoney = k => k === 'money';
 const pbar = p => { const n = Math.round(p * 5); return '▰'.repeat(n) + '▱'.repeat(5 - n); };
 // 아바타 크기: 관계 목록 32×42 / 장소 48×64 / 상세·이벤트 60×80
-const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, G.npcAge(p)) : '';
+const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, { age: G.npcAge(p), libido: G.canSex(p) ? p.libido || 0 : 0 }) : '';   // 성욕이 높으면 볼이 붉어짐 (어른만)
 // 누르면 전신으로 펼쳐지는 초상화 (20살부터 키·허리·골반 수치가 실루엣에 반영)
 const avBtn = (key, html) => `<button type="button" class="av-btn" data-full="${key}" aria-label="${fullView === key ? '접기' : '전신 보기'}" title="${fullView === key ? '접기' : '전신 보기'}">${html}</button>`;
 // 전신: 성격에 따라 기본 자세가 다름 (직진형·낙천형 한 손 허리, 냉철형·무심형 팔짱)
@@ -200,7 +200,7 @@ function sceneCard(html) {
 const CONTRA_LABEL = { none: '피임 안 함', condom: '콘돔', pill: '피임약', both: '콘돔 + 피임약' };
 // 다음 날 아침 카드: 만족감에 따라 표정·머리가 달라진 초상화(80×107) + 아침 한 줄 + 바닥의 옷
 function morningCard(sc, p) {
-  const S = G.state(), look = { age: G.npcAge(p), after: { sat: sc.sat, personality: p.personality, lipstick: S.gender === 'f' && p.gender === 'm', fig: sc.fig } };
+  const S = G.state(), look = { age: G.npcAge(p), after: { sat: sc.sat, personality: p.personality, lipstick: S.gender === 'f' && p.gender === 'm', hickey: S.gender === 'm' && p.gender === 'f', fig: sc.fig } };
   return `<p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
     <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
@@ -217,9 +217,14 @@ function playScene(sc) {
     return;
   }
   const morningQ = [`<div class="sc-card sc-morning">${morningCard(sc, p)}</div>`];
-  const pregQ = sc.preg ? [`<div class="sc-card">${CONCEIVE}<p class="sc-later">몇 주 뒤…</p><button type="button" data-sc-next>계속</button></div>`] : [];
+  const pregQ = sc.preg ? [`<div class="sc-card">${CONCEIVE}<p class="sc-later">몇 주 뒤, ${esc(G.josa(G.pname(p), '이'))} 할 말이 있다고 했다.</p><button type="button" data-sc-next>계속</button></div>`] : [];
   nightJob = { sc, p };
-  sceneQueue = (calm || !window.Night ? [] : [`<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html()}</div>`]).concat(morningQ, pregQ);
+  // 서서 다가감 → 그날 밤 → (콘돔 없이면) 자궁 그림 → 다음 날 아침 → (임신이면) 몇 주 뒤
+  const S = G.state(), inside = sc.contra === 'none' || sc.contra === 'pill';
+  const tops = [Avatar.topColor(S.gender === 'm' ? G.myLook() : G.look(p)), Avatar.topColor(S.gender === 'm' ? G.look(p) : G.myLook())];
+  const nightQ = calm || !window.Night ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`, `<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}</div>`]
+    .concat(inside ? [`<div class="sc-card sc-ut">${Night.uterus(!!sc.preg)}</div>`] : []);
+  sceneQueue = nightQ.concat(morningQ, pregQ);
   nextScene();
 }
 function nextScene() {
@@ -229,6 +234,8 @@ function nextScene() {
     sceneCard(html);
     const night = sceneBox.querySelector('.nt-stage');
     if (night) Night.run(night, nightJob, () => { sceneTimer = setTimeout(nextScene, 500); });
+    else if (sceneBox.querySelector('.sc-fp')) sceneTimer = setTimeout(nextScene, 3100);
+    else if (sceneBox.querySelector('.sc-ut')) sceneTimer = setTimeout(nextScene, 4300);
     return;
   }
   sceneEl.hidden = true; sceneBox.innerHTML = '';
@@ -242,7 +249,7 @@ function maybeScene(S) {
 }
 sceneEl.addEventListener('click', e => {
   if (e.target.closest('[data-sc-next]')) { nextScene(); return; }
-  if (sceneBox.querySelector('.sc-night')) nextScene();
+  if (sceneBox.querySelector('.sc-night, .sc-fp, .sc-ut')) nextScene();
 });
 
 /* ---------- 모달 ---------- */

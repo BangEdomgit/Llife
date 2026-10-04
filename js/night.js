@@ -13,23 +13,33 @@ const HEART = 'M0,5 C-7,0 -6,-6 -2.5,-6 C-1,-6 0,-5 0,-4 C0,-5 1,-6 2.5,-6 C6,-6
 const CX = Array.from({ length: 44 }, (_, i) => 68 + 216 * i / 43);   // 이불 윗선 점들의 x
 const FOLDS = [[112, -4, .8], [146, 3, 1], [176, -3, .7], [212, 4, 1], [250, -2, .8]];
 const MY = 129;                                                       // 매트리스 윗면
-const ROOM = `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
-  <linearGradient id="ntWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#161c33"/><stop offset="1" stop-color="#0d1120"/></linearGradient>
-  <linearGradient id="ntSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1533"/><stop offset="1" stop-color="#27356c"/></linearGradient>
-  <radialGradient id="ntMoon"><stop offset="0" stop-color="#fff4c8" stop-opacity=".5"/><stop offset="1" stop-color="#fff4c8" stop-opacity="0"/></radialGradient>
-  <mask id="ntCres"><circle cx="236" cy="76" r="8" fill="#fff"/><circle cx="240" cy="73" r="7" fill="#000"/></mask>
-  <linearGradient id="ntBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6ff" stop-opacity=".14"/><stop offset="1" stop-color="#c9d6ff" stop-opacity="0"/></linearGradient>
-  <radialGradient id="ntLamp"><stop offset="0" stop-color="#ffc77a" stop-opacity=".4"/><stop offset="1" stop-color="#ffc77a" stop-opacity="0"/></radialGradient>
-  <linearGradient id="ntWood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6d4a33"/><stop offset="1" stop-color="#4a3122"/></linearGradient>
-  <linearGradient id="ntSheet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ece6dc"/><stop offset="1" stop-color="#b9b1a4"/></linearGradient>
-  <linearGradient id="ntQuilt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dcbde6"/><stop offset=".4" stop-color="#b48bc6"/><stop offset="1" stop-color="#76548c"/></linearGradient>
-  <radialGradient id="ntWarm"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".5"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient>
-  <radialGradient id="ntHeart" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ffc6d4"/><stop offset=".55" stop-color="#ff6f94"/><stop offset="1" stop-color="#df3467"/></radialGradient>
-  <filter id="ntBlur" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="1.7"/></filter>
-  <clipPath id="ntQC"><path class="nt-qc"/></clipPath>
-  <g id="ntH"><path d="${HEART}" fill="url(#ntHeart)"/><ellipse cx="-2.8" cy="-3.2" rx="1.7" ry="1" fill="#fff" opacity=".7" transform="rotate(-35 -2.8 -3.2)"/></g>
-</defs><g class="nt-cam">
-  <rect width="320" height="171" fill="url(#ntWall)"/><rect y="170" width="320" height="20" fill="#090b13"/><path d="M0,170.5 H320" stroke="#242b46"/>
+// 장소별 방: home 집 침실 / hotel 호텔(도시 야경) / sea 여행지 숙소(바다) / park 공원(이불 대신 덤불, 침대 대신 풀밭)
+const KIND = spot => spot === 'hotel' ? 'hotel' : spot === 'travel' ? 'sea' : spot === 'park' ? 'park' : 'home';
+const QSTYLE = {
+  home: { g: ['#dcbde6', '#b48bc6', '#76548c'], st: '#efdcf5', stO: .45, fd: '#5c3f70', fl: '#f1e0f7', hem: '#5a3e6e', rim: '#f3e6f8', sil: .4 },
+  hotel: { g: ['#fdfbf6', '#e7e1d6', '#b3a998'], st: '#fff', stO: 0, fd: '#8f8576', fl: '#fff', hem: '#a99f90', rim: '#fff', sil: .34 },
+  park: { g: ['#5d8f4f', '#3a6936', '#1d3a1f'], st: '#8fbf72', stO: 0, fd: '#132a17', fl: '#9fd07e', hem: '#132a17', rim: '#8fc77a', sil: .3, leafy: true },
+};
+QSTYLE.sea = QSTYLE.hotel;
+const SKY = { home: ['#0d1533', '#27356c'], hotel: ['#0f1430', '#3d2f58'], sea: ['#0b1532', '#25386a'], park: ['#060b20', '#1d2a52'] };
+const WALL = { home: ['#161c33', '#0d1120'], hotel: ['#2b211c', '#15100d'], sea: ['#2b211c', '#15100d'], park: ['#060b20', '#1d2a52'] };
+const stars = (list, cls = 'nt-star', fill = '#fff') => list.map(([x, y, d]) => `<circle class="${cls}" cx="${x}" cy="${y}" r=".9" fill="${fill}" style="animation-delay:${d}s"/>`).join('');
+const crescent = (x, y) => `<circle cx="${x}" cy="${y}" r="19" fill="url(#ntMoon)"/><circle cx="${x}" cy="${y}" r="8" fill="#f6ebc4" mask="url(#ntCres)"/>`;
+// 호텔·바다 숙소 공통: 큰 창(안쪽 풍경은 따로), 얇은 커튼, 벽등, 룸서비스 쟁반이 놓인 협탁
+const suite = view => `<rect width="320" height="171" fill="url(#ntWall)"/><rect y="170" width="320" height="20" fill="#120d0b"/><path d="M0,170.5 H320" stroke="#3a2c24"/>
+  <rect x="196" y="12" width="110" height="116" fill="url(#ntSky)"/>${view}
+  <path d="M251,12 V128 M196,70 H306" stroke="#2a2128" stroke-width="2"/><rect x="196" y="12" width="110" height="116" fill="none" stroke="#3b2e2a" stroke-width="3"/>
+  <path d="M188,8 H204 C201,50 208,92 202,130 H188 Z" fill="#efe4d4" opacity=".16"/><path d="M193,10 C192,50 196,90 194,128" fill="none" stroke="#efe4d4" stroke-width="1" opacity=".18"/>
+  <circle cx="68" cy="72" r="42" fill="url(#ntLamp)"/><path d="M64,64 h8 l-1.6,11 h-4.8 z" fill="#f3d9a6"/><rect x="67" y="75" width="2" height="5" fill="#8a6a48"/>
+  <rect x="4" y="138" width="28" height="32" rx="2" fill="#3a2a22"/><rect x="2" y="135" width="32" height="4" rx="1.5" fill="#4a362c"/><path d="M8,153 H28" stroke="#24180f"/>
+  <rect x="5" y="131.5" width="24" height="3" rx="1" fill="#b9b2a6"/><path d="M8,131.5 Q17,119 26,131.5 Z" fill="#d5d0c7"/><circle cx="17" cy="122.6" r="1.4" fill="#eeeae3"/>
+  <path d="M31,134.5 V128 M29.4,127 H32.6 L32,121.5 H30 Z" fill="#cfe9f5" stroke="#cfe9f5" stroke-width=".8" opacity=".75"/>`;
+const city = () => `<path d="M196,128 ${[[0, 30], [9, 48], [17, 22], [24, 60], [34, 38], [42, 52], [52, 28], [59, 66], [70, 40], [78, 54], [88, 26], [95, 44], [104, 34], [110, 30]].map(([x, h]) => `V${128 - h} H${196 + x + 7}`).join(' ')} V128 Z" fill="#0a0d20"/>` +
+  Array.from({ length: 46 }, (_, i) => { const x = 198 + (i * 37) % 104, y = 74 + (i * 23) % 50; return `<rect x="${x}" y="${y}" width="1.6" height="2" fill="#ffd98a" opacity="${.35 + (i % 4) * .15}"/>`; }).join('');
+const sea = () => `<rect x="196" y="86" width="110" height="42" fill="#0a1734"/><path d="M196,86 H306" stroke="#3a4d80" stroke-width=".8"/>${crescent(222, 70)}
+  ${[0, 1, 2, 3, 4, 5].map(i => `<path d="M${214 - i * 1.5},${92 + i * 6} h${16 + i * 3}" stroke="#f6ebc4" stroke-width="1.2" stroke-linecap="round" opacity="${.55 - i * .07}"/>`).join('')}`;
+const BACK = {
+  home: `  <rect width="320" height="171" fill="url(#ntWall)"/><rect y="170" width="320" height="20" fill="#090b13"/><path d="M0,170.5 H320" stroke="#242b46"/>
   <rect x="214" y="24" width="76" height="68" rx="2" fill="url(#ntSky)"/>
   ${[[224, 34, 0], [240, 48, .8], [233, 78, 1.6], [282, 70, .4], [258, 84, 1.2], [246, 31, 2]].map(([x, y, d]) => `<circle class="nt-star" cx="${x}" cy="${y}" r=".9" fill="#fff" style="animation-delay:${d}s"/>`).join('')}
   <circle cx="236" cy="76" r="19" fill="url(#ntMoon)"/><circle cx="236" cy="76" r="8" fill="#f6ebc4" mask="url(#ntCres)"/>
@@ -42,24 +52,69 @@ const ROOM = `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
   <circle cx="18" cy="112" r="50" fill="url(#ntLamp)"/>
   <rect x="3" y="134" width="30" height="36" rx="2" fill="url(#ntWood)"/><rect x="1" y="131" width="34" height="4" rx="1.5" fill="#5b3d2a"/><path d="M7,151 H29" stroke="#3a281c"/><circle cx="18" cy="143" r="1.3" fill="#c9a36a"/>
   <ellipse cx="18" cy="130" rx="5" ry="1.6" fill="#8a6a48"/><rect x="17" y="116" width="2" height="14" fill="#8a6a48"/><path d="M9,117 H27 L23,103 H13 Z" fill="#f3d9a6"/><path d="M9,117 H27" stroke="#d9b97f" stroke-width="1.2"/>
-  <g class="nt-bed">
-    <ellipse cx="168" cy="171" rx="134" ry="4" fill="#000" opacity=".5"/>
+`,
+  hotel: suite(city()),
+  sea: suite(sea()),
+  park: `<rect width="320" height="190" fill="url(#ntSky)"/>${stars([[20, 20, 0], [44, 44, 1], [92, 16, .5], [120, 40, 1.4], [150, 12, .2], [180, 52, 1.8], [205, 74, .7], [248, 88, 1.1], [300, 78, 1.6], [70, 64, .9]])}${crescent(176, 26)}
+  <path d="M0,124 L0,112 H14 V104 H22 V112 H40 V98 H48 V112 H210 V106 H222 V100 H230 V110 H258 V102 H268 V112 H320 V124 Z" fill="#0b1230" opacity=".9"/>
+  <path d="M20,128 V74 h7 V128 Z" fill="#0d1a12"/><circle cx="12" cy="66" r="18" fill="#0f2416"/><circle cx="34" cy="58" r="20" fill="#11281a"/><circle cx="24" cy="44" r="16" fill="#0f2416"/><circle cx="48" cy="72" r="13" fill="#0f2416"/>
+  <path d="M302,128 V80 h6 V128 Z" fill="#0d1a12"/><circle cx="296" cy="70" r="16" fill="#0f2416"/><circle cx="314" cy="62" r="18" fill="#11281a"/>
+  <rect y="124" width="320" height="66" fill="url(#ntGrass)"/>
+  <path d="${Array.from({ length: 64 }, (_, i) => { const x = i * 5 + (i % 3); return `M${x},126 l${(i % 2 ? 1.5 : -1.2)},-${4 + (i % 4)}`; }).join(' ')}" stroke="#2f5a30" stroke-width="1.1" stroke-linecap="round"/>
+  ${stars([[60, 150, 0], [130, 160, .8], [210, 148, 1.6], [270, 166, .4], [96, 176, 1.2]], 'nt-star nt-fly', '#d8ff9a')}
+  <text x="292" y="182" font-size="9" opacity=".7">🦗</text>`,
+};
+const BED = {
+  home: `    <ellipse cx="168" cy="171" rx="134" ry="4" fill="#000" opacity=".5"/>
     <path d="M40,170 V88 Q40,80 45,80 Q50,80 50,88 V170 Z" fill="url(#ntWood)"/><path d="M42.5,90 V166" stroke="#8a6448" opacity=".55"/>
     <path d="M286,170 V120 Q286,114 290,114 Q294,114 294,120 V170 Z" fill="url(#ntWood)"/><path d="M288.5,122 V166" stroke="#8a6448" opacity=".55"/>
     <rect x="48" y="145" width="240" height="11" rx="2" fill="url(#ntWood)"/><path d="M50,147.5 H286" stroke="#8a6448" opacity=".4"/>
     <rect x="50" y="129" width="236" height="17" rx="5" fill="url(#ntSheet)"/><path d="M54,137.5 H282" stroke="#a49b8d" stroke-dasharray="3 3" opacity=".5"/>
     <path d="M66,129 C63,121 72,115 86,116 C100,115 107,120 105,128 C104,131 68,132 66,129 Z" fill="#ddd5c8"/>
     <path d="M54,130 C51,123 60,117 73,118 C87,117 93,122 91,129 C90,132 56,133 54,130 Z" fill="#f4efe6"/><path d="M62,124 Q71,120 82,122" fill="none" stroke="#d3cbbd" stroke-width="1.2" stroke-linecap="round"/>
+`,
+  hotel: `<ellipse cx="168" cy="171" rx="134" ry="4" fill="#000" opacity=".5"/>
+    <rect x="28" y="86" width="24" height="84" rx="8" fill="#5b4a43"/>${[96, 108, 120].map(y => `<circle cx="36" cy="${y}" r="1.2" fill="#3a2e2a"/><circle cx="44" cy="${y + 6}" r="1.2" fill="#3a2e2a"/>`).join('')}<path d="M31,92 V166" stroke="#7a675e" opacity=".5"/>
+    <rect x="48" y="146" width="242" height="12" rx="2" fill="#2a2220"/>
+    <rect x="50" y="127" width="238" height="20" rx="5" fill="url(#ntSheet)"/>
+    <path d="M66,128 C63,120 72,114 86,115 C100,114 107,119 105,127 C104,130 68,131 66,128 Z" fill="#eeeae3"/>
+    <path d="M54,129 C51,122 60,116 73,117 C87,116 93,121 91,128 C90,131 56,132 54,129 Z" fill="#fbf9f5"/>`,
+  park: `<ellipse cx="168" cy="146" rx="120" ry="4" fill="#000" opacity=".35"/>`,
+};
+BED.sea = BED.hotel;
+function room(kind) {
+  const q = QSTYLE[kind], [s0, s1] = SKY[kind], [w0, w1] = WALL[kind];
+  return `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
+  <linearGradient id="ntWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${w0}"/><stop offset="1" stop-color="${w1}"/></linearGradient>
+  <linearGradient id="ntSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s0}"/><stop offset="1" stop-color="${s1}"/></linearGradient>
+  <linearGradient id="ntGrass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f3b22"/><stop offset="1" stop-color="#0b170d"/></linearGradient>
+  <radialGradient id="ntMoon"><stop offset="0" stop-color="#fff4c8" stop-opacity=".5"/><stop offset="1" stop-color="#fff4c8" stop-opacity="0"/></radialGradient>
+  <mask id="ntCres" maskUnits="userSpaceOnUse"><rect width="320" height="190" fill="#000"/>${[[236, 76], [222, 70], [176, 26]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="8" fill="#fff"/><circle cx="${x + 4}" cy="${y - 3}" r="7" fill="#000"/>`).join('')}</mask>
+  <linearGradient id="ntBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6ff" stop-opacity=".14"/><stop offset="1" stop-color="#c9d6ff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="ntLamp"><stop offset="0" stop-color="#ffc77a" stop-opacity=".4"/><stop offset="1" stop-color="#ffc77a" stop-opacity="0"/></radialGradient>
+  <linearGradient id="ntWood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6d4a33"/><stop offset="1" stop-color="#4a3122"/></linearGradient>
+  <linearGradient id="ntSheet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ece6dc"/><stop offset="1" stop-color="#b9b1a4"/></linearGradient>
+  <linearGradient id="ntQuilt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${q.g[0]}"/><stop offset=".4" stop-color="${q.g[1]}"/><stop offset="1" stop-color="${q.g[2]}"/></linearGradient>
+  <radialGradient id="ntWarm"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".5"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient>
+  <radialGradient id="ntHeart" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ffc6d4"/><stop offset=".55" stop-color="#ff6f94"/><stop offset="1" stop-color="#df3467"/></radialGradient>
+  <filter id="ntBlur" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="1.7"/></filter>
+  <clipPath id="ntQC"><path class="nt-qc"/></clipPath>
+  <g id="ntH"><path d="${HEART}" fill="url(#ntHeart)"/><ellipse cx="-2.8" cy="-3.2" rx="1.7" ry="1" fill="#fff" opacity=".7" transform="rotate(-35 -2.8 -3.2)"/></g>
+</defs><g class="nt-cam">
+  ${BACK[kind]}
+  <g class="nt-bed">
+    ${BED[kind]}
     <path class="nt-q" fill="url(#ntQuilt)"/>
-    <g class="nt-sil" clip-path="url(#ntQC)"><g filter="url(#ntBlur)" opacity=".4"><path class="nt-sf" fill="#2b1838"/><path class="nt-sm" fill="#2b1838"/></g></g><path class="nt-st" fill="none" stroke="#efdcf5" stroke-width=".9" stroke-dasharray="2.2 2.6" opacity=".45"/>
-    <g fill="none" stroke-linecap="round">${FOLDS.map(([, , o]) => `<path class="nt-f" stroke="#5c3f70" stroke-width="2.2" opacity="${.26 * o}"/><path class="nt-f" stroke="#f1e0f7" stroke-width="1.1" opacity="${.18 * o}"/>`).join('')}</g>
-    <path class="nt-hem" fill="none" stroke="#5a3e6e" stroke-width="2.2" opacity=".55"/><path class="nt-rim" fill="none" stroke="#f3e6f8" stroke-width="1.3" stroke-linecap="round" opacity=".6"/>
+    <g class="nt-sil" clip-path="url(#ntQC)"><g filter="url(#ntBlur)" opacity="${q.sil}"><path class="nt-sf" fill="#2b1838"/><path class="nt-sm" fill="#2b1838"/></g></g><path class="nt-st" fill="none" stroke="${q.st}" stroke-width=".9" stroke-dasharray="2.2 2.6" opacity="${q.stO}"/>
+    <g fill="none" stroke-linecap="round">${FOLDS.map(([, , o]) => `<path class="nt-f" stroke="${q.fd}" stroke-width="2.2" opacity="${.26 * o}"/><path class="nt-f" stroke="${q.fl}" stroke-width="1.1" opacity="${.18 * o}"/>`).join('')}</g>
+    <path class="nt-hem" fill="none" stroke="${q.hem}" stroke-width="2.2" opacity=".55"/><path class="nt-rim" fill="none" stroke="${q.rim}" ${q.leafy ? 'stroke-width="1.6" opacity=".7"' : 'stroke-width="1.3" opacity=".6"'} stroke-linecap="round"/>
     <g class="nt-dummy" hidden><path class="nt-df" fill="#ff9ec4" opacity=".8"/><path class="nt-dm" fill="#6bb5ff" opacity=".8"/><path class="nt-dj" fill="none" stroke="#222" stroke-width=".8"/></g>
   </g>
   <ellipse class="nt-warm" cx="182" cy="116" rx="122" ry="54" fill="url(#ntWarm)" opacity="0"/>
-  <path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>
+  ${kind === 'home' ? '<path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>' : kind === 'park' ? '' : '<path d="M198,128 L304,128 L230,170 L120,170 Z" fill="url(#ntBeam)"/>'}
   <g class="nt-hearts"></g><g class="nt-fx"></g>
 </g></svg>`;
+}
 
 // 오른쪽 위 ♂♀ 패널. ♀ 고리는 두 반원: 오른쪽 반원 → ♂ 화살 → 왼쪽 반원 순서로 그려 화살이 고리를 꿰뚫고 나가 보임
 const SYM = `<div class="nt-sym"><svg viewBox="0 0 140 64" aria-hidden="true"><defs><radialGradient id="ntSG"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".6"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient></defs>
@@ -68,9 +123,55 @@ const SYM = `<div class="nt-sym"><svg viewBox="0 0 140 64" aria-hidden="true"><d
   <g class="sy-m" transform="translate(40,28)"><circle r="13" fill="none" stroke="#5aa8ff" stroke-width="4.2"/><path class="sy-shaft" fill="none" stroke="#5aa8ff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></g>
   <g class="sy-f"><path class="sy-rl" fill="none" stroke="#ff6f9a" stroke-width="4.2" stroke-linecap="round"/><path class="sy-cross" fill="none" stroke="#ff6f9a" stroke-width="4.2" stroke-linecap="round"/></g>
   <g class="sy-ouch" opacity="0"><path d="M126,6 Q123,11 126,13 Q129,11 126,6 Z" fill="#cfeeff" stroke="#86bfdc" stroke-width=".7"/><path d="M134,4 V12 M134,15.5 V16" stroke="#ffd36b" stroke-width="2.4" stroke-linecap="round"/></g>
-  <g class="sy-hs"></g><g transform="translate(88,10)"><path class="sy-h" d="${HEART}" fill="#ff4f86"/></g></svg></div>`;
+  <g class="sy-hs"></g><g transform="translate(88,10)"><path class="sy-h" d="${HEART}" fill="#ff4f86"/></g>
+  <text class="sy-beat" x="0" y="0" font-size="13" text-anchor="middle" dominant-baseline="central" transform="translate(20,55)"></text></svg></div>`;
 // 크기(cm) → 등급 1~6 (단소·소형·보통·큰 편·대물·흉기)
 const sizeGrade = cm => cm < 10 ? 1 : cm < 13 ? 2 : cm < 16 ? 3 : cm < 18 ? 4 : cm < 20 ? 5 : 6;
+
+/* ---------- 앞뒤 카드: 서서 다가가는 실루엣 / 교과서식 자궁 그림 ---------- */
+// 옆에서 본 서 있는 실루엣 (오른쪽을 봄, 발끝 0,0). 팔은 따로 움직이는 묶음
+function standing(male) {
+  const sh = male ? 15 : 12, hip = male ? 11 : 14, hair = male ? '<path d="M-9,-150 Q2,-160 11,-148 Q6,-152 -9,-146 Z"/>' : '<path d="M-10,-152 Q2,-162 11,-150 Q14,-138 6,-140 Q2,-150 -6,-148 Q-14,-128 -10,-112 Q-18,-124 -16,-140 Z"/>';
+  return `<g class="fp-body"><circle cx="0" cy="-142" r="10"/><path d="M8,-144 l4,4 l-4,1 Z"/>${hair}
+    <path d="M-4,-133 h8 v8 h-8 Z"/><path d="M${-sh},-124 Q0,-130 ${sh},-124 L${sh - 3},-92 Q${male ? 4 : 8},-82 ${hip},-74 L${hip - 2},-66 H${-hip + 2} L${-hip},-74 Q${male ? -6 : -10},-84 ${-sh + 3},-92 Z"/>
+    ${male ? '' : '<ellipse cx="7" cy="-108" rx="6" ry="5.5"/>'}
+    <path d="M${-hip + 2},-68 L-9,-36 L-7,0 H-1 L0,-36 L3,-68 Z"/><path d="M2,-68 L4,-36 L7,0 H13 L11,-36 L${hip - 1},-68 Z"/></g>`;
+}
+const arm = () => `<path d="M-3,-3 Q3,12 2,30 L6,30 Q9,12 4,-3 Z"/><circle cx="4" cy="31" r="3"/>`;
+function foreplay(colors) {
+  const cloth = (c, cls) => `<g class="fp-cloth ${cls}"><path d="M-9,-6 L-4,-9 Q0,-6 4,-9 L9,-6 L12,0 L7,2 L6,10 H-6 L-7,2 L-12,0 Z" fill="${c}"/></g>`;
+  return `<div class="sc-fore"><svg viewBox="0 0 320 190" aria-hidden="true">
+  <defs><radialGradient id="fpLight" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="#3a3f66"/><stop offset="1" stop-color="#0b0d18"/></radialGradient></defs>
+  <rect width="320" height="190" fill="url(#fpLight)"/><rect x="118" y="20" width="84" height="110" rx="2" fill="#5a6390" opacity=".35"/><path d="M160,20 V130 M118,75 H202" stroke="#0b0d18" stroke-width="2" opacity=".5"/>
+  <rect y="172" width="320" height="18" fill="#07080f"/>
+  <g fill="#07080c">
+    <g class="fp-a"><g transform="translate(149,172)">${standing(true)}<g transform="translate(4,-122)"><g class="fp-arm-a">${arm()}</g></g></g></g>
+    <g class="fp-b"><g transform="translate(171,172) scale(-1,1)">${standing(false)}<g transform="translate(4,-120)"><g class="fp-arm-b">${arm()}</g></g></g></g>
+  </g>
+  <g transform="translate(146,96)">${cloth(colors[0], 'c1')}</g><g transform="translate(174,94)">${cloth(colors[1], 'c2')}</g>
+  <rect class="fp-dark" width="320" height="190" fill="#000"/></svg></div>`;
+}
+// 교과서식 자궁·난관·난소 단면. 정자는 자궁경부에서 올라오다 대부분 멈추고, 임신이면 하나가 왼쪽 난관 끝 난자에 닿아 빛남
+function uterus(preg) {
+  const way = (k, side, j) => { const tx = 160 + side * 34, ox = 160 + side * 92; return `M${160 + j},176 C${160 + j * 2},150 ${150 + side * 8 + j},122 ${tx},96 C${tx + side * 22},${76 + k % 3 * 2} ${ox - side * 30},58 ${ox},66`; };
+  const sperm = Array.from({ length: 14 }, (_, k) => {
+    const side = k % 2 ? 1 : -1, win = preg && k === 2, stop = win ? 1 : [.25, .38, .5, .62, .72, .82][k % 6], dur = 2.6 + (k % 5) * .2, d = (k * .09).toFixed(2), path = way(k, side, (k % 5 - 2) * 3);
+    return `<g opacity="1"><g class="sp-u"><ellipse rx="3.6" ry="2.4" fill="#f4f4f4"/><path class="tail" d="M-3.6,0 q-4,-3 -8,0 t-8,0" fill="none" stroke="#f4f4f4" stroke-width="1.1"/></g>
+      <animateMotion dur="${dur}s" begin="${d}s" fill="freeze" rotate="auto" keyPoints="0;${stop}" keyTimes="0;1" calcMode="spline" keySplines=".3 .1 .5 1" path="${path}"/>
+      ${win ? '' : `<animate attributeName="opacity" from="1" to="0" begin="${(+d + dur * .85).toFixed(2)}s" dur=".6s" fill="freeze"/>`}</g>`;
+  }).join('');
+  const tube = side => { const tx = 160 + side * 34, ox = 160 + side * 92; return `M${tx},96 C${tx + side * 22},76 ${ox - side * 30},58 ${ox},66`; };
+  return `<div class="sc-uterus"><svg viewBox="0 0 320 200" aria-hidden="true">
+  <defs><radialGradient id="utG" cx=".5" cy=".4" r=".6"><stop offset="0" stop-color="#f6c6be" stop-opacity=".45"/><stop offset="1" stop-color="#d98a7e" stop-opacity=".2"/></radialGradient>
+    <radialGradient id="eggG"><stop offset="0" stop-color="#fff6e8"/><stop offset="1" stop-color="#f0b48f"/></radialGradient></defs>
+  <path d="${tube(-1)}" fill="none" stroke="#d98a7e" stroke-width="7" stroke-linecap="round"/><path d="${tube(1)}" fill="none" stroke="#d98a7e" stroke-width="7" stroke-linecap="round"/>
+  <path d="${tube(-1)}" fill="none" stroke="#1b1220" stroke-width="2.4" stroke-linecap="round"/><path d="${tube(1)}" fill="none" stroke="#1b1220" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M124,92 Q160,80 196,92 Q194,140 172,160 L168,182 H152 L148,160 Q126,140 124,92 Z" fill="url(#utG)" stroke="#d98a7e" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M134,98 Q160,90 186,98 Q182,136 166,152 H154 Q138,136 134,98 Z" fill="#1b1220" opacity=".55"/>
+  <ellipse cx="62" cy="70" rx="13" ry="9" fill="#f1c0b4" stroke="#d98a7e" stroke-width="2"/><ellipse cx="258" cy="70" rx="13" ry="9" fill="#f1c0b4" stroke="#d98a7e" stroke-width="2"/>
+  <circle class="egg${preg ? ' win' : ''}" cx="68" cy="66" r="5.5" fill="url(#eggG)"/>
+  ${sperm}</svg><p class="sc-later" style="animation-delay:3s">${preg ? '…하나가 닿았다.' : ''}</p></div>`;
+}
 
 /* ---------- 더미 ---------- */
 // 길이와 반지름(옆에서 본 두께의 절반). [a, b]는 뿌리 → 끝으로 가늘어짐
@@ -216,8 +317,8 @@ function capsPath(list) {
 // { t0, T, A(세기), kind: n 보통 | strong 세게 | final 누른 채 떨림 }. 엉덩이는 0(맞닿음) ~ top = 2A(뺀 거리) 사이를 오감
 // 한 박자 = (세게·마지막이면) 크게 뺐다가 wu → 밀어 넣기 sl(점점 빨라져 끝에 부딪힘 hit) → (마지막이면) 누른 채 떨림 → 다음 박자 시작점(to)으로
 function nightPlan(tier) {
-  const S = [], good = tier >= 2, rampEnd = good ? 3.1 : tier === 1 ? 2.5 : 1.8;
-  let t = .3;
+  const S = [], good = tier >= 2, rampEnd = good ? 3.6 : tier === 1 ? 3 : 2.3;
+  let t = .9;   // 처음 0.9초: ♂♀가 양쪽에서 들어와 맞물림
   const add = (T, A, kind = 'n') => { S.push({ t0: t, T, A, kind }); t += T; };
   for (let T = .62; t < rampEnd; T = Math.max(good ? .22 : .32, T * .87)) add(T, good ? 3.5 + 3.5 * t / rampEnd : 3 + 1.5 * t / rampEnd);
   if (good) { add(.7, 10, 'strong'); add(.7, 11, 'strong'); add(.95, 12, 'final'); add(.9, 12.5, 'final'); }
@@ -245,6 +346,7 @@ function run(stage, job, done) {
   const G = window.Game, { sc, p } = job, tier = [30, 50, 70, 90].filter(v => (sc.sat ?? 50) >= v).length, good = tier >= 2;
   const debug = /[?&#]dummy/.test(location.href), poseName = pickPose(p.personality), POSE = POSES[poseName], M = BODY.m, F = BODY.f;
   stage.dataset.pose = poseName;
+  const park = stage.dataset.kind === 'park';
   const { S, end } = nightPlan(tier), SLUMP = .7, END = end + SLUMP + (good ? 1.9 : 2.3);
   const HB = [null, null, { n: .6, strong: 4, fount: 7 }, { n: 1.5, strong: 7, fount: 14 }, { n: 2.6, strong: 10, fount: 22, ring: 12 }][tier];
   const n = CX.length, y = new Float64Array(n), v = new Float64Array(n), surf = new Float64Array(n), sv = new Float64Array(n), rest = new Float64Array(n), hemL = new Float64Array(n), DT = 1 / 240;
@@ -258,7 +360,8 @@ function run(stage, job, done) {
   sq('.sy-shaft').setAttribute('d', `M13,0 H${f(13 + shaft)} M${f(5.5 + shaft)},-7.5 L${f(13 + shaft)},0 L${f(5.5 + shaft)},7.5`);
   // 받아들일 수 있는 세기: 체형이 가늘수록 낮음. 크기 × 세기가 넘으면 움찔, 아니면 하트
   const limit = { slim: 1.85, avg: 2.15, fit: 2.25, chubby: 2.35 }[sc.build] || 2.15, symHearts = [], symHS = sq('.sy-hs');
-  let symE = 0, symEV = 0, symX = 0, symXV = 0, ouchAt = -9;
+  let symE = 0, symEV = 0, symX = 0, symXV = 0, ouchAt = -9, beatK = 0, beatKV = 0, faceY = 0, faceYV = 0, beatTxt = '';
+  const beatEl = sq('.sy-beat'), firstBig = S.find(s => s.kind !== 'n');
   let t = 0, si = 0, hi = 0, sinkV = 0, bsV = 0, jy = 0, jyV = 0, jx = 0, jxV = 0, heat = 0, shakeAt = -9, shakeK = 0, buzz = 0, fount = 0;
   let P = null, capsM = [], capsF = [], lastD = 0, dEnd = null, faceKey = '', finale = false, acc = 0, last = 0;
   const hearts = [];
@@ -289,7 +392,7 @@ function run(stage, job, done) {
   }
   function surface(i) {
     const x = CX[i];
-    let top = Math.min(MY, capTop([62, 122, 98, 122, 6, 6], x));   // 베개
+    let top = Math.min(MY, park ? Infinity : capTop([62, 122, 98, 122, 6, 6], x));   // 베개 (공원엔 없음)
     for (const c of capsF) top = Math.min(top, capTop(c, x));
     for (const c of capsM) top = Math.min(top, capTop(c, x));
     return top - 3.2;
@@ -314,7 +417,7 @@ function run(stage, job, done) {
   }
   function impact(s) {
     const str = s.kind === 'final' ? 2.2 : s.kind === 'strong' ? 1.8 : Math.min(1.2, .45 + .75 * s.A / 7);
-    sinkV += 40 * str; bsV -= 24 * str; symEV += 13 * str; symXV += 45 * str;
+    sinkV += 40 * str; bsV -= 24 * str; symEV += 13 * str; symXV += 45 * str; beatKV += 9 * str; faceYV += 40 * str;
     const force = str * (.55 + .1 * grade);
     if (force > limit) { ouchAt = t; symXV += 60 * str; symEV -= 8; }   // 움찔
     else if (good) for (let j = Math.round(force / 1.2 * [0, 0, 1, 1.6, 2.3][tier]); j > 0; j--) symHeart();
@@ -374,6 +477,8 @@ function run(stage, job, done) {
     heat = Math.max(heat * Math.exp(-DT * 1.4), t < end ? (good ? .1 + .4 * Math.min(1, t / end) : .05) : 0);
     symEV += (-900 * symE - 14 * symEV) * DT; symE += symEV * DT;
     symXV += (-600 * symX - 16 * symXV) * DT; symX += symXV * DT;
+    beatKV += (-700 * beatK - 18 * beatKV) * DT; beatK += beatKV * DT;
+    faceYV += (-500 * faceY - 18 * faceYV) * DT; faceY += faceYV * DT;
     if (!finale && t > end + .45) {
       if (good) symH.classList.add('on'); else sym.classList.add('sad');
       finale = true;
@@ -397,9 +502,12 @@ function run(stage, job, done) {
   function draw() {
     const top = CX.map((x, i) => [x, y[i]]), hem = Array.from({ length: 9 }, (_, i) => { const x = 284 - 216 * i / 8; return [x, hemY(x)]; });
     const l = top[0], r = top[n - 1], hr = hem[0], hl = hem[8];
-    const qd = `M${f(l[0])},${f(l[1])}${curve(top)} C285.5,${f(r[1] + 8)} 285.5,${f(hr[1] - 8)} ${f(hr[0])},${f(hr[1])}${curve(hem)} C${f(hl[0] - 5)},${f(hl[1] - 4)} ${f(l[0] - 5)},${f(l[1] + 6)} ${f(l[0])},${f(l[1])} Z`;
+    // 공원 덤불은 윗선을 잎 뭉치처럼 오돌토돌하게 (두 점마다 위로 볼록한 호)
+    const scal = Q => Q.filter((_, i) => i % 2 === 0 || i === Q.length - 1).slice(1).map((b, i, arr) => { const a = i ? arr[i - 1] : Q[0], r = Math.hypot(b[0] - a[0], b[1] - a[1]) * .62; return ` A${f(r)},${f(r)} 0 0 1 ${f(b[0])},${f(b[1])}`; }).join('');
+    const topD = park ? scal(top) : curve(top);
+    const qd = `M${f(l[0])},${f(l[1])}${topD} C285.5,${f(r[1] + 8)} 285.5,${f(hr[1] - 8)} ${f(hr[0])},${f(hr[1])}${curve(hem)} C${f(hl[0] - 5)},${f(hl[1] - 4)} ${f(l[0] - 5)},${f(l[1] + 6)} ${f(l[0])},${f(l[1])} Z`;
     quilt.setAttribute('d', qd); qclip.setAttribute('d', qd);
-    rim.setAttribute('d', `M${f(l[0])},${f(l[1] + .8)}${curve(top.map(([x, yy]) => [x, yy + .8]))}`);
+    rim.setAttribute('d', park ? `M${f(l[0])},${f(l[1] + 1.5)}${scal(top.map(([x, yy]) => [x, yy + 1.5]))}` : `M${f(l[0])},${f(l[1] + .8)}${curve(top.map(([x, yy]) => [x, yy + .8]))}`);
     hemEl.setAttribute('d', `M${f(hr[0])},${f(hr[1] - 1)}${curve(hem.map(([x, yy]) => [x, yy - 1]))}`);
     const sp = top.slice(3, -3).map(([x, yy]) => [x, Math.min(143, yy + 8)]);
     stitch.setAttribute('d', `M${f(sp[0][0])},${f(sp[0][1])}${curve(sp)}`);
@@ -438,19 +546,23 @@ function run(stage, job, done) {
         const du = key[0] === 'p' && key.length === 2 ? { lv: +key[1] } : { mood: key };
         face.innerHTML = Avatar.render(G.look(p), 64, { age: G.npcAge(p), during: Object.assign(du, { personality: p.personality, fig: sc.fig }) });
       }
-      face.style.transform = sk > .02 ? `translate(${f(cx * 1.2)}px,${f(cy * 1.2)}px)` : '';
+      face.style.transform = `translate(${f(cx * 1.2)}px,${f(cy * 1.2 + faceY)}px)`;   // 부딪힐 때마다 초상화도 출렁
     }
     // ♂ 화살은 d를 따라 드나듦(맞닿으면 ♂ 원이 고리 바로 앞). 깊이 들어갈수록 고리가 조금 늘어남. 만족감이 낮으면 끝나고 빠지며 고개를 숙임
-    const u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0, gx = 76 - 1.6 * Math.max(-2, ms.d + (good ? 0 : 14 * ease(u))), depth = Math.max(0, gx + 13 + shaft - 91);
+    const intro = ease(Math.min(1, t / .8)), u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0, gx = 76 - 1.6 * Math.max(-2, ms.d + (good ? 0 : 14 * ease(u))) - (1 - intro) * 80, depth = Math.max(0, gx + 13 + shaft - 91);
     symM.setAttribute('transform', `translate(${f(gx)},${f(28 + ms.tr * 1.6)}) rotate(${f(good ? 0 : 35 * ease(u))})`);
     const ouch = t - ouchAt < .6 ? 1 - (t - ouchAt) / .6 : 0, jit = ouch * 1.6 * Math.sin((t - ouchAt) * 190);
-    const cx0 = 106 + symX + jit, cy0 = 28 + ms.tr * .8, rx = (15 + .1 * Math.min(depth, 30) - 4.5 * symE) * (1 - .1 * ouch), ry = (15 - .05 * Math.min(depth, 30) + 4 * symE) * (1 - .1 * ouch);
+    const cx0 = 106 + symX + jit + (1 - intro) * 50, cy0 = 28 + ms.tr * .8, rx = (15 + .1 * Math.min(depth, 30) - 4.5 * symE) * (1 - .1 * ouch), ry = (15 - .05 * Math.min(depth, 30) + 4 * symE) * (1 - .1 * ouch);
     const arc = sw => `M${f(cx0)},${f(cy0 - ry)} A${f(rx)},${f(ry)} 0 0 ${sw} ${f(cx0)},${f(cy0 + ry)}`;
     sq('.sy-rr').setAttribute('d', arc(1)); sq('.sy-rl').setAttribute('d', arc(0));
     sq('.sy-cross').setAttribute('d', `M${f(cx0)},${f(cy0 + ry)} V${f(cy0 + ry + 16)} M${f(cx0 - 7.5)},${f(cy0 + ry + 8.5)} H${f(cx0 + 7.5)}`);
     symC.setAttribute('cx', f(cx0)); symC.setAttribute('cy', f(cy0)); symC.setAttribute('rx', f(rx)); symC.setAttribute('ry', f(ry));
     symC.setAttribute('fill-opacity', (good ? heat * .35 : 0).toFixed(2)); symG.setAttribute('opacity', (good ? heat : heat * .3).toFixed(2));
     sq('.sy-ouch').setAttribute('opacity', ouch.toFixed(2));
+    // 박자 아이콘: 💓 → 💓💓 → 🔥 → (끝나면) ✨. 부딪힐 때마다 통통
+    const bt = t >= end + .3 ? (good ? '✨' : '') : t < firstBig.t0 ? (t / firstBig.t0 < .45 ? '💓' : t / firstBig.t0 < .8 ? '💓💓' : '🔥') : '🔥';
+    if (bt !== beatTxt) { beatTxt = bt; beatEl.textContent = bt; }
+    beatEl.setAttribute('transform', `translate(20,55) scale(${(1 + .35 * Math.max(-.5, beatK)).toFixed(3)})`);
     for (let i = symHearts.length - 1; i >= 0; i--) {
       const h = symHearts[i], k = (t - h.t0) / .9;
       if (k >= 1) { h.el.remove(); symHearts.splice(i, 1); continue; }
@@ -458,7 +570,7 @@ function run(stage, job, done) {
       h.el.setAttribute('transform', `translate(${f(h.x + h.dx * m)},${f(cy0 - ry + h.dy * m)}) scale(${(h.s * (k < .15 ? k / .15 : 1)).toFixed(3)})`);
       h.el.setAttribute('opacity', (k > .6 ? (1 - k) / .4 : 1).toFixed(2));
     }
-    sym.style.transform = face && face.style.transform || '';
+    sym.style.transform = sk > .02 ? `translate(${f(cx * 1.2)}px,${f(cy * 1.2)}px)` : '';
   }
   function frame(now) {
     acc += last ? Math.min(.05, (now - last) / 1000) : 0; last = now;
@@ -478,7 +590,8 @@ function run(stage, job, done) {
 }
 
 window.Night = {
-  html: () => `<div class="nt-stage">${ROOM}<div class="nt-face"></div>${SYM}</div>`,
+  html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div>${SYM}</div>`,
+  foreplay, uterus,
   run, stop: () => cancelAnimationFrame(raf),
   // 실험용: 체위 이름과 움직임 상태 → 관절 좌표
   pose: (name, st = {}) => POSES[name](Object.assign({ d: 0, tr: 0, slump: 0, sink: 0, bs: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } }, st), BODY.m, BODY.f),

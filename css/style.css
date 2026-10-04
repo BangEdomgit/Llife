@@ -242,6 +242,31 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 @keyframes twinkle{0%,100%{opacity:.9}50%{opacity:.25}}
 @keyframes ntPop{0%{opacity:0;transform:scale(.4)}70%{opacity:1;transform:scale(1.12)}100%{opacity:1;transform:scale(1)}}
 @keyframes ntBreakL{to{transform:translate(-3px,10px) rotate(-30deg);opacity:0}}
+/* 서서 다가가는 실루엣 (3초): 다가감 → 목에 손 → 입맞춤 → 옷깃 잡음 → 옷이 하나씩 떨어짐 → 암전 */
+.sc-fp{padding:10px;cursor:pointer}
+.sc-fore svg{display:block;width:100%;max-width:380px;height:auto;border-radius:3px}
+.sc-fore .fp-a{animation:fpA 1.6s ease-in-out both}
+.sc-fore .fp-b{animation:fpB 1.6s ease-in-out both}
+.sc-fore .fp-arm-a,.sc-fore .fp-arm-b{transform-box:fill-box;transform-origin:50% 0}
+.sc-fore .fp-arm-a{animation:fpArmA .5s ease-out .7s both}
+.sc-fore .fp-arm-b{animation:fpArmB .5s ease-out 1.3s both}
+.sc-fore .fp-cloth{opacity:0;transform-box:fill-box;transform-origin:50% 50%}
+.sc-fore .c1{animation:fpCloth .7s ease-in 1.8s both}
+.sc-fore .c2{animation:fpCloth2 .7s ease-in 2.15s both}
+.sc-fore .fp-dark{opacity:0;animation:scFade .45s ease-in 2.6s forwards}
+@keyframes fpA{0%{transform:translateX(-30px)}50%,75%{transform:translateX(-5px)}100%{transform:translateX(0)}}
+@keyframes fpB{0%{transform:translateX(30px)}50%,75%{transform:translateX(5px)}100%{transform:translateX(0)}}
+@keyframes fpArmA{from{transform:rotate(0)}to{transform:rotate(-112deg)}}
+@keyframes fpArmB{from{transform:rotate(0)}to{transform:rotate(-70deg)}}
+@keyframes fpCloth{0%{opacity:0;transform:translate(0,0) rotate(0)}10%{opacity:1}100%{opacity:1;transform:translate(-24px,76px) rotate(-70deg)}}
+@keyframes fpCloth2{0%{opacity:0;transform:translate(0,0) rotate(0)}10%{opacity:1}100%{opacity:1;transform:translate(26px,78px) rotate(80deg)}}
+/* 교과서식 자궁 그림 */
+.sc-ut{padding:12px 10px;cursor:pointer}
+.sc-uterus{display:grid;justify-items:center;gap:6px;background:#0b0d14;border-radius:4px;padding:8px 6px}
+.sc-uterus svg{display:block;width:100%;max-width:360px;height:auto}
+.sc-uterus .tail{animation:wig .18s ease-in-out infinite alternate;transform-origin:-3.6px 0}
+.sc-uterus .egg.win{animation:eggWin .8s ease-out 3s both}
+@keyframes eggWin{0%{filter:none}100%{filter:drop-shadow(0 0 6px #ffd9a8) drop-shadow(0 0 12px #ffb46b)}}
 @keyframes syHeart{0%{transform:scale(0)}25%{transform:scale(1.9)}40%{transform:scale(1.45)}55%{transform:scale(1.75)}75%,100%{transform:scale(1.55)}}
 @keyframes ntBreakR{to{transform:translate(3px,11px) rotate(26deg);opacity:0}}
 @keyframes glow{to{opacity:.55}}
@@ -249,4 +274,4 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 @keyframes sp2{0%{transform:translate(6px,36px);opacity:1}80%{opacity:.8}100%{transform:translate(150px,46px);opacity:0}}
 @keyframes sp3{0%{transform:translate(0,86px);opacity:1}80%{opacity:.8}100%{transform:translate(140px,76px);opacity:0}}
 @keyframes wig{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
-@media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *{animation:none!important}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}}
+@media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *,.sc-fore *,.sc-uterus *{animation:none!important}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}}
