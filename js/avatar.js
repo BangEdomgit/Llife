@@ -44,9 +44,13 @@ let UID = 0;   // clipPath id (그릴 때마다 새로)
 /* ---------- 팔레트 ---------- */
 // 피부 4톤: 밝은, 보통, 어두운, 진한
 const SKIN = ['#f7dcc5', '#e9bf98', '#c68b60', '#8b5a3c'];
-// 머리색: 검정, 갈색, 밝은 갈색, 회색(나이 들면), 염색 6가지(와인, 애쉬 금발, 애쉬 브라운, 구릿빛, 밀크티 베이지, 핑크 브라운)
-const HAIR = ['#23201f', '#4b3022', '#7d5536', '#a19d98', '#7e3343', '#c9a66c', '#6c625a', '#9a5a35', '#cdb594', '#9b6266'];
+// 머리색 (2-5): 0 흑발, 1 짙은 갈색, 2 밝은 갈색, 3 회색(예전 저장), 4 와인, 5 애쉬 금발, 6 애쉬브라운, 7 구릿빛, 8 밀크티 베이지, 9 핑크 브라운,
+//   10 흑갈색, 11 밀크브라운, 12 다크초코, 13 탈색 금발, 14 애쉬그레이, 15 핑크, 16 블루블랙, 17 레드
+const HAIR = ['#23201f', '#4b3022', '#7d5536', '#a19d98', '#7e3343', '#c9a66c', '#6c625a', '#9a5a35', '#cdb594', '#9b6266',
+  '#2e2420', '#a07c5c', '#4a2c22', '#dcc38f', '#9c9ca2', '#d08aa2', '#1e2333', '#8c2f33'];
 const GRAY = 3;
+const DYED = new Set([4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17]);   // 염색 — 정수리·가르마에 원래 머리색 뿌리가 보임
+const HC_NAT = [0, 0, 0, 10, 10, 1, 1], HC_MILD = [6, 11, 12, 8], HC_BOLD = [13, 14, 15, 16, 17, 4, 5, 9];
 const TOP_COLORS = ['#4f6d8f', '#9a4f5f', '#5f8f6a', '#d0a443', '#ece7dd', '#3b3e48', '#8a6fb0', '#d9784a', '#6aa3c8', '#7a8a5a'];
 const UNIFORM = { blazer: '#2f3a5a', shirt: '#f3f1ec', tie: ['#9b2f3a', '#2c4a7a', '#3d6b4a'], skirt: '#3b4766' };
 const LINE = '#33241f';
@@ -68,18 +72,22 @@ const FACE_N = 6, EYE_N = 11, BROW_N = 5, MOUTH_N = 6;
 // 두 색 섞기 (t: b 쪽 비율)
 const mixC = (a, b, t) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
 const TOPS = [0, 1, 2, 3, 5, 6, 7, 8];   // 4는 교복이라 뽑지 않음
-const M_HAIR = [0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 6, 6, 7, 8, 8, 9];   // 남자는 장발·묶은 머리가 드묾
+// opt: { feature, skin, personality, hobby, job } — 머리색 비율에 씀
 function make(seed, gender, opt = {}) {
   const r = rng(seed), n = k => Math.floor(r() * k);
-  const f = opt.feature || '';
-  const dyed = r() < .14;
+  const f = opt.feature || '', g = gender === 'f' ? 'f' : 'm';
+  // 머리 스타일 (여 18 / 남 14, 비중대로) + 머리색: 자연 65% / 무난한 염색 25% / 튀는 염색 10% (직진·장난·패션 취미 ×2, 회사원·공무원·선생님·은행원 ×0.2)
+  const hw = HW[g]; let ht = r() * hw.reduce((x, y) => x + y, 0), hi = 0;
+  for (; hi < hw.length - 1; hi++) { ht -= hw[hi]; if (ht <= 0) break; }
+  const boldK = (['bold', 'playful'].includes(opt.personality) || opt.hobby === 'fashion' ? 2 : 1) * (/회사원|공무원|선생님|은행원/.test(opt.job || '') ? .2 : 1);
+  const hcN = HC_NAT[n(HC_NAT.length)], cr = r() * (.9 + .1 * boldK), hcK = n(8);
   const a = {
-    g: gender === 'f' ? 'f' : 'm',
+    g,
     fs: String(seed),   // 얼굴 유전자 시드 (js/face.js) — ':me'로 끝나면 나, 아니면 NPC
     face: n(FACE_N),
     skin: opt.skin != null ? opt.skin : [0, 0, 1, 1, 1, 1, 2, 3][n(8)],
-    hair: gender === 'f' ? n(STYLES.f.length) : M_HAIR[n(M_HAIR.length)],
-    hc: dyed ? 4 + n(6) : [0, 0, 0, 1, 1, 2][n(6)],
+    hair: hi, hv: 2,   // hv 2: 새 머리 목록 (예전 저장은 번호를 옮겨서 읽음)
+    hc: cr < .65 ? hcN : cr < .9 ? HC_MILD[hcK % HC_MILD.length] : HC_BOLD[hcK % HC_BOLD.length], hcN,
     eyes: n(EYE_N), brows: n(BROW_N), mouth: n(MOUTH_N),
     glasses: f.includes('안경') ? 1 + n(4) : 0,
     top: TOPS[n(TOPS.length)], tc: n(TOP_COLORS.length), tie: n(UNIFORM.tie.length),
@@ -398,6 +406,7 @@ function genesAt(a, age) {
 function layoutOf(a, age) {
   const g = genesAt(a, age);
   if (!g) return null;
+  if (age >= 20 && a.body && a.body.build === 'chubby') { g.jawW += .07; g.cheekW += .025; }   // 통통하면 볼살 (1-9)
   const H = 66, ey = 72 + g.eyeY * H, gap = 12 * g.eyeGap, ex = [60 - gap, 60 + gap];
   // 입은 턱 끝에서 9.5 위까지만, 코끝은 입에서 4.2 위까지만 (짧은 얼굴에 긴 코·낮은 입이 겹쳐도 턱이 남게)
   const chinB = 66 + ([101, 100, 103, 102, 104, 102][g.shape] - 66) * g.faceLen;
@@ -449,65 +458,137 @@ const PARTED = (k, lip, female) => {
     (female ? `<ellipse cx="58.6" cy="${f1(90.9 + g * .55)}" rx="1.5" ry=".5" fill="#fff" opacity=".45"/>` : '');
 };
 
-/* ---------- 머리 ---------- */
-// 윗머리(돔) + 앞머리(이마를 덮는 모양, 따로) + 옆머리(얼굴 옆으로 내려옴) + 뒷머리(얼굴 뒤) + 묶음
-// w: 돔 반폭(얼굴보다 5~8 넓게), ys: 옆머리가 내려오는 높이, bangs: 이 스타일에서 나올 수 있는 앞머리
-const STYLES = {
-  m: [
-    { w: 31.5, ys: 66, bangs: ['up', 'side', 'side', 'up'] },                                   // 짧은
-    { w: 29.5, ys: 62, bangs: ['up'], buzz: true },                                              // 반삭
-    { w: 31, ys: 57, bangs: ['side', 'up'], block: true, crown: 2 },                            // 투블럭
-    { w: 33, ys: 70, bangs: ['low'] },                                                           // 덮은
-    { w: 33.5, ys: 74, bangs: ['center', 'side'], back: 'manLong', locks: 'manLong' },         // 장발
-    { w: 31.5, ys: 64, bangs: ['up'], bun: 'top', wisps: true },                                // 묶은
-    { w: 32, ys: 64, bangs: ['comma'] },                                                         // 댄디 (쉼표머리)
-    { w: 31, ys: 60, bangs: ['slick'], crown: 4 },                                               // 올백
-    { w: 34.5, ys: 66, bangs: ['curly'], curly: true, crown: 2 },                                // 곱슬 펌
-    { w: 33.5, ys: 70, bangs: ['see', 'center'], back: 'wolf', locks: 'wolf' },                 // 울프컷
-  ],
-  f: [
-    { w: 35, ys: 78, bangs: ['straight', 'side', 'center', 'straight'], back: 'bob', locks: 'bob', crown: 1 },  // 단발
-    { w: 34, ys: 78, bangs: ['side', 'straight', 'center', 'up'], back: 'shoulder', locks: 'shoulder' },       // 어깨
-    { w: 34, ys: 78, bangs: ['center', 'side', 'straight', 'up'], back: 'long', locks: 'long' },               // 긴 머리
-    { w: 32.5, ys: 70, bangs: ['up', 'side'], tail: 'low', wisps: true, crown: 3 },                            // 묶은
-    { w: 32.5, ys: 70, bangs: ['straight', 'side', 'up', 'side'], tail: 'pony', crown: 2 },                    // 포니테일
-    { w: 34, ys: 76, bangs: ['side', 'straight', 'center', 'side'], back: 'shoulder', locks: 'shoulder', bun: 'half' },  // 반묶음
-    { w: 33, ys: 68, bangs: ['side', 'see', 'comma'], locks: 'pixie' },                                        // 숏컷
-    { w: 35.5, ys: 78, bangs: ['center', 'see', 'side', 'see'], back: 'wavy', locks: 'wavy' },                // 긴 웨이브
-    { w: 32.5, ys: 70, bangs: ['see', 'up', 'straight', 'see'], bun: 'high', wisps: true, crown: 1 },          // 똥머리
-    { w: 33, ys: 72, bangs: ['side', 'straight', 'see', 'side'], braid: true, crown: 1 },                     // 옆으로 땋은 머리
-    { w: 34.5, ys: 78, bangs: ['straight'], back: 'long', locks: 'hime' },                                    // 히메컷
-    { w: 35, ys: 78, bangs: ['see', 'side', 'center', 'see'], back: 'layer', locks: 'layer' },                // 레이어드 (끝이 바깥으로 뻗침)
-  ],
-};
-// 어린이는 머리 스타일이 단순해짐 (남: 짧은·덮은 / 여: 단발·포니테일·묶은). 교복 입는 10대 남자는 장발·묶은 머리 없음
-//   새 스타일: 어린이 남 댄디·곱슬은 그대로 / 여 똥머리·땋은 머리는 그대로. 10대 남 올백 → 짧은, 울프컷 → 덮은 / 여 웨이브 → 긴 생머리
-const KID_HAIR = { m: [0, 3, 0, 3, 3, 0, 6, 0, 8, 3], f: [0, 4, 0, 3, 4, 0, 0, 4, 8, 9, 0, 0] };
-const TEEN_HAIR = { m: [0, 1, 2, 3, 3, 0, 6, 0, 8, 3], f: [0, 1, 2, 3, 4, 5, 6, 2, 8, 9, 10, 11] };
-// 앞머리 끝: 아래로 둥글게 들쭉날쭉 (오른쪽 x1에서 왼쪽 x2로)
-function scallop(x1, x2, y, h, n) {
+/* ---------- 머리 (HAIR_CLOTHES_BODY 2부) ---------- */
+// 레이어 4개: back 뒷머리(얼굴·몸 뒤) / side 옆머리(귀 앞뒤) / top 정수리·볼륨(두상보다 4~8% 크게) / front 앞머리(인상을 가장 크게 바꿈) + acc 액세서리
+//   스타일 = back·side·top·front 조합. 앞머리는 독립 파츠 → 같은 긴 머리도 앞머리만 바꿔 여러 가지. 사람마다 hair 시드로 한 번 정해짐
+//   그리는 법: 하이라이트는 좌상단에 두상을 따라 휘는 짧은 호 2~3개(머리색 +18%), 결 선은 최대 3개·옅게, 외곽선은 머리색의 가장 어두운 톤,
+//   가르마가 있는 스타일만 가르마 자리에 피부색 가는 틈, 이마·귀 옆 잔머리(묶은 머리일수록 많이)
+// 앞머리 9종 (오른쪽 관자놀이 87,ys → 왼쪽 33,ys 의 아래 선). 가르마·흐름은 한쪽 기준으로 그리고 사람마다 좌우를 뒤집음
+const FRONT_LABEL = { none_center: '앞머리 없음 (5:5)', none_side: '앞머리 없음 (옆가르마)', seethrough: '시스루뱅', curtain: '커튼뱅', side_swept: '옆으로 넘긴 앞머리', full: '일자 풀뱅', short_crop: '짧은 앞머리', comma: '쉼표', up: '올린 앞머리' };
+const FRONT_IDS = Object.keys(FRONT_LABEL);
+function jag(x1, x2, y, h, n) {   // 짧게 친 앞머리 끝 (들쭉날쭉)
   let d = '';
-  for (let i = 1; i <= n; i++) { const xa = x1 + (x2 - x1) * (i - .5) / n, xb = x1 + (x2 - x1) * i / n; d += `Q${P(xa, y + h * (i % 2 ? 1 : .55))} ${P(xb, y)} `; }
+  for (let i = 1; i <= n; i++) { const xa = x1 + (x2 - x1) * (i - .5) / n, xb = x1 + (x2 - x1) * i / n; d += `L${P(xa, y + h * (i % 2 ? 1 : .2))} L${P(xb, y + h * .45)} `; }
   return d;
 }
-// 앞머리 아래 선 — 오른쪽 관자놀이(87,ys)에서 왼쪽(33,ys)까지
-const BANGS = {
-  up:       ys => `C87,${Math.min(ys, 58)} 81,46 70,44.6 Q60,43 50,44.6 C39,46 33,${Math.min(ys, 58)} 33,${ys}`,                     // 이마 드러냄
-  straight: ys => `C87,63 86.5,59 85,57 ${scallop(85, 35, 57, 2.4, 9)}C33.5,59 33,63 33,${ys}`,                                  // 일자
-  low:      ys => `C87,65 87,62.5 86,61 ${scallop(86, 34, 61, 2.6, 10)}C33,62.5 33,65 33,${ys}`,                                 // 눈썹까지 덮음
-  side:     ys => `C87,62 86,56 81.5,53.5 C73,49.6 63,48.4 53,45.6 C46,43.8 40,46.4 36.5,51.6 C34.5,55.4 33,60 33,${ys}`,        // 옆가르마
-  center:   ys => `C87,60 85,51 77,47 C71,44.4 64,43.2 60,41.6 C56,43.2 49,44.4 43,47 C35,51 33,60 33,${ys}`,                     // 가운데 가르마
-  comma:    ys => `C87,61.5 86.8,59.5 86,58 C85.4,61 83,63.4 80.5,62.6 C78.6,62 78.4,59.6 80,58.4 C76,55.6 70,52 62,50 C55,48.2 49.5,47 46.5,47.6 C40,49 35.5,53 34,57.4 C33.3,59.6 33,62 33,${ys}`,   // 쉼표: 끝이 안으로 말림
-  slick:    ys => `C87,54 84,45 75,41.6 C69,39.6 64,40.4 60,40.4 C55,40.4 49,39.6 44,41.8 C36,45 33,54 33,${ys}`,                   // 올백: 이마를 다 드러냄
-  curly:    ys => `C87,62 86.5,58 85,56.5 ${curls(85, 35, 56, 7)}C33.5,58 33,62 33,${ys}`,                                         // 곱슬: 동글동글한 끝
-  see:      ys => `C87,58 84,49.5 74,46.6 Q60,43.8 46,46.6 C36,49.5 33,58 33,${ys}`,                                              // 시스루: 이마가 비치게 가는 가닥만 (가닥은 따로)
+const FRONTS = {
+  none_center: ys => `C87,58 84.5,50 77.5,46.6 C71,44 64.5,43.4 60,41.4 C55.5,43.4 49,44 42.5,46.6 C35.5,50 33,58 33,${ys}`,
+  none_side:   ys => `C87,58 85,49.6 78,45.8 C72,43 64,42.6 52,41.2 C46.4,43.2 40.4,46.4 36.8,51 C34.4,54.4 33,59 33,${ys}`,
+  seethrough:  ys => `C87,58 84,49.5 74,46.6 Q60,43.8 46,46.6 C36,49.5 33,58 33,${ys}`,
+  curtain:     ys => `C87,63 86,58 82.6,56 C77.4,53.6 70.4,50.6 65,46.8 Q61.6,44.2 60,42.4 Q58.4,44.2 55,46.8 C49.6,50.6 42.6,53.6 37.4,56 C34,58 33,63 33,${ys}`,
+  side_swept:  ys => `C87,63 86,57 81.5,54.4 C73,50.4 63,49.6 53,46.4 C46,44.4 40,46.6 36.5,51.6 C34.5,55.4 33,60 33,${ys}`,
+  full:        ys => `C87,63 86.5,59 85,57 ${scallop(85, 35, 57, 2.2, 11)}C33.5,59 33,63 33,${ys}`,
+  full_low:    ys => `C87,65 87,62.5 86,61 ${scallop(86, 34, 61, 2.6, 10)}C33,62.5 33,65 33,${ys}`,
+  short_crop:  ys => `C87,57 86,51.5 84,50.4 ${jag(84, 36, 49.6, 2.2, 10)}C34,51.5 33,57 33,${ys}`,
+  comma:       ys => `C87,61.5 86.8,59.5 86,58 C85.4,61 83,63.4 80.5,62.6 C78.6,62 78.4,59.6 80,58.4 C76,55.6 70,52 62,50 C55,48.2 49.5,47 46.5,47.6 C40,49 35.5,53 34,57.4 C33.3,59.6 33,62 33,${ys}`,
+  up:          ys => `C87,${Math.min(ys, 58)} 81,46 70,44.6 Q60,43 50,44.6 C39,46 33,${Math.min(ys, 58)} 33,${ys}`,
+  slick:       ys => `C87,54 84,45 75,41.6 C69,39.6 64,40.4 60,40.4 C55,40.4 49,39.6 44,41.8 C36,45 33,54 33,${ys}`,
+  curly:       ys => `C87,62 86.5,58 85,56.5 ${curls(85, 35, 56, 7)}C33.5,58 33,62 33,${ys}`,
 };
-const PART = { side: 'M51,27.5 Q49.5,36 52.5,45', center: 'M60,26.5 Q60.4,34 60,41.6', comma: 'M47,28 Q45.4,37 47.4,46.6' };
+// 가르마 자리 (x, 이마선 y) — 피부색 가는 틈
+const PARTING = { none_center: [60, 41.4], none_side: [52, 41.2], curtain: [60, 42.4], side_swept: [52, 45.6] };
+// 결 선 (최대 3개, 어둡게·옅게)
+const FLOW = {
+  none_center: ['M60,31 Q71,33 80,44', 'M60,31 Q49,33 40,44', 'M64,36 Q73,40 79,49'],
+  none_side:   ['M52,31 Q68,31 81,42', 'M54,36 Q69,39 82,50', 'M50,32 Q42,34 37,42'],
+  seethrough:  ['M60,31 Q72,32 81,43', 'M60,31 Q48,32 39,43', 'M48,40 Q60,36 72,40'],
+  curtain:     ['M60,31 Q72,33 81,45', 'M60,31 Q48,33 39,45', 'M66,43 Q75,48 82,56'],
+  side_swept:  ['M52,31 Q67,31 81,41', 'M54,38 Q68,41 80,51', 'M50,32 Q42,34 37,42'],
+  full:        ['M47,39 Q46,48 45,55', 'M60,38 Q60,48 60,56', 'M73,39 Q74,48 75,55'],
+  full_low:    ['M46,41 Q45,51 44,59', 'M60,40 Q60,51 60,60', 'M74,41 Q75,51 76,59'],
+  short_crop:  ['M46,36 Q46,43 45,49', 'M58,35 Q58,42 58,49', 'M71,36 Q72,43 73,49'],
+  comma:       ['M49,33 Q66,32 82,44', 'M50,39 Q66,40 80,54', 'M48,31 Q40,32 35.5,40'],
+  up:          ['M44,33 Q60,26 76,33', 'M40,39 Q60,31 80,39', 'M49,41 Q60,37.6 71,41'],
+  slick:       ['M45,42 Q49,32 58,27', 'M58,40.6 Q64,32 73,29', 'M70,41.4 Q78,36 84,42'],
+  curly: [],
+};
+// 시스루뱅 가닥
+const SEE2 = [[41.5, 47.6, 40.4, 53, 39.4, 57], [47, 45.8, 46, 52, 45.6, 58.4], [52.6, 45, 52.4, 52, 51.4, 59.4], [58.4, 44.6, 58.6, 52, 57.6, 59.8], [64.2, 44.8, 64.6, 52, 65.2, 59.6], [70, 45.4, 70.6, 52, 71.6, 58.8], [76, 46.6, 77, 52, 78.8, 57.6]];
+// 스타일 — 여 18 / 남 14 (+ 나이별: 40대 이상 여자 짧은 펌, 아이 머리)
+//   w 돔 반폭, ys 옆머리가 내려오는 높이, v 볼륨(두상보다 크게), crown 정수리 높이, back 뒷머리, side 옆머리, tie 묶음, wisps 잔머리 수, fronts [앞머리, 비중]
+const HSTYLES = {
+  f: [
+    { id: 'long', label: '긴 생머리', w: 34, ys: 78, back: 'long', side: 'long', fronts: [['none_center', 3], ['none_side', 3], ['seethrough', 2.4], ['curtain', 2], ['side_swept', 1], ['full', .6]] },
+    { id: 'wave', label: '긴 웨이브', w: 35.5, ys: 78, back: 'wavy', side: 'wavy', fronts: [['none_side', 3], ['none_center', 2], ['curtain', 2.5], ['seethrough', 2], ['full', .4]] },
+    { id: 'hippie', label: '히피펌', w: 36.5, ys: 76, v: 1.08, back: 'hippie', side: 'hippie', fronts: [['none_center', 3], ['none_side', 2], ['curtain', 2], ['seethrough', 1]] },
+    { id: 'hush', label: '허쉬컷', w: 35, ys: 78, back: 'layer', side: 'layer', fronts: [['seethrough', 3], ['curtain', 3], ['none_side', 2], ['side_swept', 1]] },
+    { id: 'cbob', label: 'C컬 단발', w: 35, ys: 78, crown: 1, back: 'bob', side: 'bob', fronts: [['seethrough', 3], ['none_side', 2], ['none_center', 2], ['curtain', 1.5], ['full', .8]] },
+    { id: 'bob', label: '일자 단발', w: 34.5, ys: 78, back: 'bobS', side: 'bobS', fronts: [['none_center', 2], ['none_side', 2], ['seethrough', 2], ['full', 1]] },
+    { id: 'pixie', label: '숏컷', w: 33, ys: 68, side: 'pixie', fronts: [['side_swept', 3], ['seethrough', 1.5], ['none_side', 1.5], ['comma', 1]] },
+    { id: 'wolf', label: '울프컷', w: 34.5, ys: 74, back: 'wolf', side: 'wolf', fronts: [['seethrough', 3], ['curtain', 2], ['none_center', 1]] },
+    { id: 'hipony', label: '하이 포니테일', w: 32.5, ys: 70, crown: 2, tie: 'pony', wisps: 3, fronts: [['up', 2], ['seethrough', 2], ['none_center', 2], ['curtain', 1.5], ['none_side', 1]] },
+    { id: 'lowpony', label: '로우 포니테일', w: 32.5, ys: 72, crown: 2, tie: 'lowFront', wisps: 3, fronts: [['none_center', 3], ['curtain', 2], ['none_side', 2], ['seethrough', 1]] },
+    { id: 'half', label: '반묶음', w: 34, ys: 76, back: 'shoulder', side: 'shoulder', tie: 'half', fronts: [['none_side', 2], ['none_center', 2], ['seethrough', 2], ['curtain', 1.5]] },
+    { id: 'hibun', label: '똥머리', w: 32.5, ys: 70, crown: 1, tie: 'high', wisps: 4, fronts: [['seethrough', 2], ['up', 2], ['curtain', 2], ['none_center', 1.5]] },
+    { id: 'lowbun', label: '로우번', w: 32.5, ys: 72, crown: 2, tie: 'lowbun', wisps: 3, fronts: [['none_center', 3], ['none_side', 3], ['curtain', 1]] },
+    { id: 'twin', label: '양갈래 땋기', w: 33, ys: 72, crown: 1, tie: 'twin', wisps: 2, fronts: [['none_center', 3], ['seethrough', 2], ['full', .8]] },
+    { id: 'braid', label: '한 갈래 땋기', w: 33, ys: 72, crown: 1, tie: 'braid', wisps: 2, fronts: [['none_side', 2], ['seethrough', 2], ['curtain', 1.5], ['side_swept', 1]] },
+    { id: 'curlS', label: '곱슬 숏', w: 36, ys: 72, v: 1.06, curly: true, side: 'curly', fronts: [['curly', 1]] },
+    { id: 'curlL', label: '곱슬 롱', w: 37.5, ys: 78, v: 1.08, curly: true, back: 'curlLong', side: 'curly', fronts: [['curly', 2], ['none_center', 1]] },
+    { id: 'tiedbob', label: '묶은 단발', w: 33, ys: 74, tie: 'stub', wisps: 3, side: 'short', fronts: [['seethrough', 2], ['none_side', 2], ['none_center', 1.5]] },
+  ],
+  m: [
+    { id: 'dandy', label: '댄디컷', w: 32, ys: 66, fronts: [['side_swept', 2], ['full', 1], ['seethrough', .6]] },
+    { id: 'comma', label: '쉼표머리', w: 32, ys: 64, fronts: [['comma', 1]] },
+    { id: 'p64', label: '가르마펌 6:4', w: 33.5, ys: 64, v: 1.07, fronts: [['none_side', 1]] },
+    { id: 'p55', label: '가르마펌 5:5', w: 33.5, ys: 64, v: 1.07, fronts: [['none_center', 1]] },
+    { id: 'regent', label: '리젠트', w: 31.5, ys: 60, crown: 2, quiff: true, fronts: [['up', 1]] },
+    { id: 'pomade', label: '포마드 올백', w: 31, ys: 60, crown: 3, gloss: true, fronts: [['slick', 1]] },
+    { id: 'twoblock', label: '투블럭', w: 31, ys: 57, crown: 2, block: true, fronts: [['side_swept', 1], ['comma', 1], ['up', 1]] },
+    { id: 'crop', label: '크롭컷', w: 31, ys: 62, fronts: [['short_crop', 1]] },
+    { id: 'buzz', label: '버즈컷', w: 29.5, ys: 62, buzz: true, fronts: [['up', 1]] },
+    { id: 'ash', label: '애즈펌', w: 33.5, ys: 66, v: 1.05, fronts: [['curtain', 1], ['seethrough', 1]] },
+    { id: 'wolf', label: '울프컷', w: 33.5, ys: 70, back: 'wolf', side: 'wolf', fronts: [['seethrough', 2], ['curtain', 1], ['none_center', 1]] },
+    { id: 'curlS', label: '곱슬 숏', w: 34.5, ys: 66, v: 1.05, crown: 2, curly: true, fronts: [['curly', 1]] },
+    { id: 'longtie', label: '장발 묶음', w: 32.5, ys: 70, tie: 'nape', wisps: 2, fronts: [['none_center', 1], ['none_side', 1]] },
+    { id: 'cover', label: '덮은 머리', w: 33, ys: 70, fronts: [['full_low', 1]] },
+  ],
+};
+const HX = {   // 나이별 특수 스타일
+  perm: { id: 'perm', label: '짧은 펌', w: 35.5, ys: 70, v: 1.1, crown: 2, curly: true, fronts: [['curly', 1]] },
+  bowl: { id: 'bowl', label: '바가지', w: 34, ys: 70, v: 1.06, fronts: [['full', 1]] },
+  kidboy: { id: 'kidboy', label: '짧은 남아컷', w: 32.5, ys: 66, v: 1.06, fronts: [['short_crop', 2], ['side_swept', 1]] },
+  kidbob: { id: 'kidbob', label: '짧은 단발', w: 35, ys: 78, v: 1.06, back: 'bobS', side: 'bobS', fronts: [['full', 1.5], ['seethrough', 1], ['none_side', 1]] },
+  pigtail: { id: 'pigtail', label: '양갈래', w: 33.5, ys: 72, v: 1.06, crown: 1, tie: 'pigtail', wisps: 2, fronts: [['full', 1], ['seethrough', 1], ['none_center', 1]] },
+  kidpony: { id: 'kidpony', label: '포니테일', w: 33, ys: 70, v: 1.06, crown: 2, tie: 'pony', wisps: 2, fronts: [['full', 1], ['seethrough', 1], ['up', 1]] },
+  kidlong: { id: 'kidlong', label: '긴 머리', w: 34.5, ys: 78, v: 1.06, back: 'long', side: 'long', fronts: [['full', 1], ['none_center', 1], ['seethrough', 1]] },
+};
+// 처음 고를 때 비중 (예전 일자 바가지 앞머리가 너무 많던 것 → 풀뱅은 10% 아래)
+const HW = { f: [2, 1.5, .6, 1.2, 1.5, 1, .6, .5, .8, .8, 1, .7, .5, .2, .4, .3, .3, .6], m: [2, 2, 1.5, 1, .6, .6, 1.5, 1.5, .5, 1, .6, .5, .3, 1] };
+// 예전 저장의 머리 번호 → 새 스타일 (hv 없음)
+const OLD_HAIR = { f: [4, 3, 0, 9, 8, 10, 6, 1, 11, 14, 0, 3], m: [7, 8, 6, 13, 10, 12, 0, 5, 11, 10] };
+const OLD_BANG = { straight: 'full', side: 'side_swept', center: 'none_center', up: 'up', see: 'seethrough', comma: 'comma', low: 'full_low', slick: 'slick', curly: 'curly' };
+// 사람마다 머리 세부 (hair 시드): 앞머리, 좌우, 액세서리, 뿌리 염색 주기, M자 이마·정수리 숱, 40대 펌
+function hairPlan(a, age) {
+  const key = 'hair:' + (a.fs || [a.g, a.face, a.skin, a.hair, a.hc, a.eyes].join(',')), r = rng(key), g = a.g === 'f' ? 'f' : 'm';
+  const roll = { front: r(), flip: r() < .5, acc: r(), accK: r(), root: r(), mline: r() < .25, thin: r() < .15, perm: r() < .3, wisp: r() };
+  const idx = a.hv === 2 ? a.hair : (OLD_HAIR[g][a.hair] ?? 0);
+  let st = HSTYLES[g][idx] || HSTYLES[g][0];
+  const kid = age <= 12, teen = age >= 13 && age <= 18;
+  if (kid) st = g === 'm' ? (age <= 4 ? HX.bowl : HX.kidboy)
+    : HX[{ long: 'kidlong', wave: 'kidlong', hippie: 'kidlong', curlL: 'kidlong', hipony: 'kidpony', lowpony: 'kidpony', half: 'kidpony', hibun: 'kidpony', lowbun: 'kidpony', twin: 'pigtail', braid: 'pigtail' }[st.id] || 'kidbob'];
+  else if (teen && g === 'm' && ['regent', 'pomade', 'longtie', 'wolf'].includes(st.id)) st = HSTYLES.m[{ regent: 7, pomade: 0, longtie: 13, wolf: 1 }[st.id]];   // 교복 입는 10대 남자: 올백·장발 묶음 없음
+  else if (g === 'f' && age >= 42 && roll.perm && !['pixie', 'curlS', 'curlL'].includes(st.id)) st = HX.perm;   // 40대부터 여자 30%는 짧은 펌
+  // 앞머리: 직접 고른 값(a.front) > 예전 저장의 앞머리 > 스타일 안에서 비중대로
+  let front = a.front && st.fronts.some(f => f[0] === a.front) ? a.front : null;
+  if (!front && a.hv !== 2) { const old = OLD_BANG[['up', 'straight', 'side', 'center', 'see', 'comma'][Math.floor(roll.front * 4)]]; if (st.fronts.some(f => f[0] === old)) front = old; }
+  if (!front) { let t = roll.front * st.fronts.reduce((x, f) => x + f[1], 0); for (const f of st.fronts) { t -= f[1]; if (t <= 0) { front = f[0]; break; } } front = front || st.fronts[0][0]; }
+  const male = g === 'm', older = age >= 40;
+  return { st, front, flip: roll.flip, roll, mline: male && older && roll.mline && ['up', 'slick', 'short_crop', 'none_side', 'none_center'].includes(front), thin: male && older && roll.thin && !st.buzz };
+}
+// 흰머리 (2-4): 55살 무렵부터 머리색과 회색이 가닥으로 섞이고, 70대엔 대부분 백발 (회색 단색 금지). 0~1
+const grayLevel = (a, age) => clamp((age - 52 - ((a.gray ?? .5) - .5) * 16) / 22, 0, 1);
 // 동글동글한 곱슬 끝 (x1 → x2, 아래로 볼록한 반원 n개)
 function curls(x1, x2, y, n) {
   let d = '';
   const dx = (x2 - x1) / n, r = Math.abs(dx) * .58;
   for (let i = 1; i <= n; i++) d += `A${f1(r)},${f1(r * 1.05)} 0 0 1 ${P(x1 + dx * i, y + (i % 2 ? -.8 : .5))} `;
+  return d;
+}
+// 앞머리 끝: 아래로 둥글게 들쭉날쭉 (오른쪽 x1에서 왼쪽 x2로)
+function scallop(x1, x2, y, h, n) {
+  let d = '';
+  for (let i = 1; i <= n; i++) { const xa = x1 + (x2 - x1) * (i - .5) / n, xb = x1 + (x2 - x1) * i / n; d += `Q${P(xa, y + h * (i % 2 ? 1 : .55))} ${P(xb, y)} `; }
   return d;
 }
 // 3차 곡선 위 점
@@ -517,58 +598,44 @@ function strandD(bx, by, cx, cy, tx, ty, w) {
   const dx = tx - bx, dy = ty - by, l = Math.hypot(dx, dy) || 1, px = -dy / l * w / 2, py = dx / l * w / 2;
   return `M${P(bx + px, by + py)} Q${P(cx + px * .5, cy + py * .5)} ${P(tx, ty)} Q${P(cx - px * .5, cy - py * .5)} ${P(bx - px, by - py)} Z`;
 }
-// 시스루뱅 가닥: 이마 위로 가늘게 내려옴
-const SEE = [[41.5, 47.6, 40.4, 53, 39.6, 56.6], [47, 45.8, 46, 52, 45.8, 58], [52.6, 45, 52.4, 52, 51.6, 59.2], [58.4, 44.6, 58.6, 52, 57.8, 59.6], [64.2, 44.8, 64.6, 52, 65, 59.4], [70, 45.4, 70.6, 52, 71.4, 58.6], [76, 46.6, 77, 52, 78.6, 57.4]];
-// 머리 결: 가르마에서 바깥으로 흐르는 곡선 몇 개 (밝은 결 + 어두운 결)
-const STRANDS = {
-  side:     ['M52,30 Q67,29.5 81,40', 'M53,34 Q68,36 83,49', 'M50,30 Q41,31 35,40', 'M56,40 Q70,44 80,52'],
-  center:   ['M60,29 Q73,30 83,42', 'M60,29 Q47,30 37,42', 'M62,34 Q72,38 79,47', 'M58,34 Q48,38 41,47'],
-  up:       ['M44,33 Q60,25.5 76,33', 'M39,39 Q60,30.5 81,39', 'M48,40 Q60,36.5 72,40'],
-  straight: ['M46,38 Q45,47 44,55', 'M56,37 Q56,47 55,56', 'M66,37 Q66,47 67,56', 'M76,39 Q77,47 78,55', 'M44,31 Q60,25.5 76,31'],
-  low:      ['M44,40 Q43,50 42,59', 'M54,39 Q54,50 53,60', 'M66,39 Q66,50 67,60', 'M77,41 Q78,50 79,59'],
-  comma:    ['M49,33 Q66,32 82,44', 'M50,39 Q66,40 80,54', 'M48,31 Q40,32 35.5,40', 'M54,45 Q68,47 78,57'],
-  slick:    ['M45,42.4 Q49,32 58,27', 'M53,41 Q57,32 66,28', 'M62,40.6 Q68,33 77,31', 'M70,41.4 Q78,36 84,42', 'M40,46 Q40,38 47,31'],
-  see:      ['M60,29 Q73,30 83,42', 'M60,29 Q47,30 37,42', 'M46,37 Q60,32 74,37'],
-};
-function strands(list, hc) {
-  if (!list || !list.length) return '';
-  const darkList = list.slice(0, 2).map(d => d.replace(/^M([\d.]+),([\d.]+)/, (m, x, y) => `M${+x + 2},${+y + 2}`));
-  return `<path d="${list.join(' ')}" fill="none" stroke="${shade(hc, 1.45)}" stroke-width="1.3" stroke-linecap="round" opacity=".2"/>` +
-    `<path d="${darkList.join(' ')}" fill="none" stroke="${shade(hc, .6)}" stroke-width="1.1" stroke-linecap="round" opacity=".18"/>`;
-}
 // 끝이 갈라지는 머리 끝 (오른쪽 xr에서 왼쪽 xl로)
 function splitEnds(xr, xl, y, n) {
   let d = '';
   for (let i = 1; i <= n; i++) { const x = xr + (xl - xr) * i / n; d += `L${P(x - (xl - xr) / n / 2, y + (i % 2 ? 4.5 : 2))} L${P(x, y)} `; }
   return d;
 }
-// 뒷머리 (얼굴 뒤). L.sy 어깨선, L.chest 가슴 높이 — 긴 머리 끝 위치
+// 물결치는 옆선 점들 (s 방향, y0~y1, 진폭 amp, 주기 per)
+const waveSide = (s, x0, y0, y1, amp, per, grow) => { const pts = []; for (let y = y0; y <= y1 - 2; y += per / 2) pts.push([60 + s * (x0 + (y - y0) * grow + amp * Math.sin((y - y0) / per * Math.PI * 2)), y]); pts.push([60 + s * (x0 + (y1 - y0) * grow), y1]); return pts; };
+// 뒷머리 (얼굴 뒤). L.sy 어깨선, L.chest 가슴 높이
 function backHair(kind, w, L) {
   const dome = `M${f1(60 - w - 2)},64 C${f1(60 - w - 4)},38 42,23.5 60,23.5 C78,23.5 ${f1(60 + w + 4)},38 ${f1(60 + w + 2)},64`;
-  if (kind === 'bob') return `${dome} L${f1(60 + w + 2.5)},95 C${f1(60 + w + 3)},104 ${f1(60 + w - 3)},108.5 ${f1(60 + w - 9)},104.5 L${f1(60 - w + 9)},104.5 C${f1(60 - w + 3)},108.5 ${f1(60 - w - 3)},104 ${f1(60 - w - 2.5)},95 Z`;   // 끝이 안쪽으로 말림
+  if (kind === 'bob') return `${dome} L${f1(60 + w + 2.5)},95 C${f1(60 + w + 3)},104 ${f1(60 + w - 3)},108.5 ${f1(60 + w - 9)},104.5 L${f1(60 - w + 9)},104.5 C${f1(60 - w + 3)},108.5 ${f1(60 - w - 3)},104 ${f1(60 - w - 2.5)},95 Z`;   // C컬: 끝이 안쪽으로 말림
+  if (kind === 'bobS') return `${dome} L${f1(60 + w + 2.4)},101 L${f1(60 + w + 1.6)},104.4 L${f1(60 - w - 1.6)},104.4 L${f1(60 - w - 2.4)},101 Z`;   // 일자: 턱선에서 직선
   if (kind === 'shoulder') { const yb = L.sy + 9; return `${dome} L${f1(60 + w + 5)},${f1(yb - 7)} Q${f1(60 + w + 7)},${f1(yb + 1)} ${f1(60 + w + 1)},${f1(yb)} ${splitEnds(60 + w + 1, 60 - w - 1, yb, 6)}Q${f1(60 - w - 7)},${f1(yb + 1)} ${f1(60 - w - 5)},${f1(yb - 7)} Z`; }
   if (kind === 'long') { const yb = L.chest + 24; return `${dome} C${f1(60 + w + 5)},90 ${f1(60 + w + 8)},${f1(yb - 30)} ${f1(60 + w + 7)},${f1(yb - 4)} ${splitEnds(60 + w + 7, 60 - w - 7, yb - 4, 9)}C${f1(60 - w - 8)},${f1(yb - 30)} ${f1(60 - w - 5)},90 ${f1(60 - w - 2)},64 Z`; }
-  if (kind === 'manLong') { const yb = L.sy + 4; return `${dome} L${f1(60 + w + 3)},${f1(yb - 6)} ${splitEnds(60 + w + 3, 60 - w - 3, yb - 6, 7)}L${f1(60 - w - 3)},${f1(yb - 6)} Z`; }
-  if (kind === 'wolf') { const yb = L.sy - 3; return `${dome} C${f1(60 + w + 3)},80 ${f1(60 + w + 5)},${f1(yb - 10)} ${f1(60 + w + 4)},${f1(yb - 2)} ${splitEnds(60 + w + 4, 60 - w - 4, yb - 2, 8)}C${f1(60 - w - 5)},${f1(yb - 10)} ${f1(60 - w - 3)},80 ${f1(60 - w - 2)},64 Z`; }   // 목덜미까지 층진 끝
-  if (kind === 'layer') {   // 어깨 길이, 끝이 바깥으로 뻗침
+  if (kind === 'wolf') { const yb = L.sy - 3; return `${dome} C${f1(60 + w + 3)},80 ${f1(60 + w + 5)},${f1(yb - 10)} ${f1(60 + w + 4)},${f1(yb - 2)} ${splitEnds(60 + w + 4, 60 - w - 4, yb - 2, 8)}C${f1(60 - w - 5)},${f1(yb - 10)} ${f1(60 - w - 3)},80 ${f1(60 - w - 2)},64 Z`; }   // 위 짧고 목뒤 길게
+  if (kind === 'layer') {   // 허쉬컷: 어깨 길이, 층진 끝이 바깥으로 뻗침
     const yb = L.sy + 8, R = v => f1(60 + w + v), Lx = v => f1(60 - w - v);
     return `${dome} C${R(4)},80 ${R(5)},${f1(yb - 16)} ${R(5)},${f1(yb - 8)} Q${R(7)},${f1(yb - 1)} ${R(12)},${f1(yb - 4)} Q${R(8)},${f1(yb + 3)} ${R(1)},${f1(yb + 1)} ${splitEnds(60 + w + 1, 60 - w - 1, yb + 1, 6)}Q${Lx(8)},${f1(yb + 3)} ${Lx(12)},${f1(yb - 4)} Q${Lx(7)},${f1(yb - 1)} ${Lx(5)},${f1(yb - 8)} C${Lx(5)},${f1(yb - 16)} ${Lx(4)},80 ${Lx(2)},64 Z`;
   }
-  if (kind === 'wavy') {   // 가슴 아래까지, 옆선이 물결
-    const yb = L.chest + 26, side = s => { const pts = []; for (let y = 64; y <= yb - 4; y += 9) pts.push([60 + s * (w + 3 + (y - 64) * .05 + 2.6 * Math.sin((y - 64) / 18 * Math.PI)), y]); pts.push([60 + s * (w + 5 + (yb - 64) * .05), yb - 4]); return pts; };
-    const Rp = side(1), Lp = side(-1).reverse();
-    return `${dome} L${P(...Rp[0])}${crThrough(Rp)} ${curls(Rp[Rp.length - 1][0], Lp[0][0], yb - 3, 9)}L${P(...Lp[0])}${crThrough(Lp)} Z`;
+  if (kind === 'wavy' || kind === 'hippie' || kind === 'curlLong') {   // 긴 웨이브: 가슴 아래 S자 / 히피펌: 어깨~가슴 잔물결·볼륨 / 곱슬 롱: 크게 퍼짐
+    const P0 = { wavy: [L.chest + 26, 3, 18, 2.6, .05], hippie: [L.chest + 8, 5, 8, 1.8, .14], curlLong: [L.chest + 14, 7, 9, 2.4, .2] }[kind];
+    const [yb, x0, per, amp, grow] = P0, Rp = waveSide(1, w + x0, 64, yb - 4, amp, per, grow), Lp = waveSide(-1, w + x0, 64, yb - 4, amp, per, grow).reverse();
+    return `${dome} L${P(...Rp[0])}${crThrough(Rp)} ${curls(Rp[Rp.length - 1][0], Lp[0][0], yb - 3, kind === 'wavy' ? 9 : 12)}L${P(...Lp[0])}${crThrough(Lp)} Z`;
   }
   return '';
 }
-// 옆머리 — 관자놀이에서 얼굴 옆(귀 앞)으로 내려와 어깨나 가슴 위로 떨어짐 (s: 왼쪽 -1 / 오른쪽 1)
+// 옆머리 — 관자놀이에서 얼굴 옆(귀 앞)으로 내려와 어깨나 가슴 위로 떨어짐 (s: 왼쪽 -1 / 오른쪽 1). 귀 근처에서 바깥으로 1~2 부풂
 function lock(kind, s, L) {
   const X = dx => f1(60 + s * dx), top = 58;
   if (kind === 'pixie') return `M${X(30)},${top} C${X(33.6)},66 ${X(33.6)},74 ${X(32.6)},82 L${X(30.4)},86.4 L${X(29.4)},80.4 C${X(28)},74 ${X(27.2)},66 ${X(26.8)},${top + 2} Z`;   // 숏컷: 귀 앞 짧은 구레나룻
-  if (kind === 'hime') return `M${X(30)},${top} C${X(34.8)},66 ${X(35.2)},78 ${X(35.2)},97.4 L${X(27.2)},97.8 C${X(27)},84 ${X(26)},70 ${X(26.5)},${top + 4} Z`;   // 히메컷: 턱선에서 일자로 자른 옆머리
-  if (kind === 'wavy') {
-    const yb = L.chest + 8;
-    return `M${X(30)},${top} C${X(36)},70 ${X(31)},82 ${X(35)},94 C${X(39)},106 ${X(32)},${f1(yb - 10)} ${X(35)},${f1(yb)} L${X(31)},${f1(yb + 4)} L${X(28.6)},${f1(yb - .5)} C${X(25)},${f1(yb - 12)} ${X(31.5)},104 ${X(27)},94 C${X(23)},84 ${X(28)},70 ${X(26.5)},${top + 4} Z`;
+  if (kind === 'short') return `M${X(30)},${top} C${X(35)},66 ${X(35.4)},76 ${X(33.6)},86 L${X(31.2)},90 L${X(29.8)},84 C${X(28)},76 ${X(27)},66 ${X(26.8)},${top + 3} Z`;   // 묶은 단발: 귀 옆으로 남은 짧은 가닥
+  if (kind === 'hime') return `M${X(30)},${top} C${X(34.8)},66 ${X(35.2)},78 ${X(35.2)},97.4 L${X(27.2)},97.8 C${X(27)},84 ${X(26)},70 ${X(26.5)},${top + 4} Z`;
+  if (kind === 'bobS') return `M${X(30)},${top} C${X(36)},70 ${X(36.4)},86 ${X(36)},103.6 L${X(27.6)},103.6 C${X(26.6)},88 ${X(26)},72 ${X(26.5)},${top + 4} Z`;   // 일자 단발: 턱선에서 직선
+  if (kind === 'wavy' || kind === 'hippie' || kind === 'curly') {
+    const yb = kind === 'wavy' ? L.chest + 8 : kind === 'hippie' ? L.sy + 10 : L.sy - 2, per = kind === 'wavy' ? 24 : 10, amp = kind === 'wavy' ? 2.6 : 1.8;
+    const O = waveSide(s, 35.2, top + 4, yb, amp, per, .02).map(([x, y]) => [x, y]), I = waveSide(s, 27.4, top + 6, yb - 3, amp * .8, per, 0).reverse();
+    return `M${X(30)},${top} L${P(...O[0])}${crThrough(O)} L${P(...I[0])}${crThrough(I)} Z`;
   }
   if (kind === 'layer') {   // 끝이 바깥으로 뻗침
     const yb = L.sy + 4;
@@ -576,81 +643,186 @@ function lock(kind, s, L) {
   }
   const yb = f1(kind === 'bob' ? 103 : kind === 'shoulder' ? L.sy + 6 : kind === 'long' ? L.chest + 12 : kind === 'wolf' ? 97 : L.sy);
   const end = kind === 'bob'
-    ? `C${X(33.5)},${f1(yb + 5)} ${X(28)},${f1(yb + 4.5)} ${X(25.5)},${f1(yb - 1)}`                       // 단발: 끝이 안쪽으로 말림 (C커브)
+    ? `C${X(33.5)},${f1(yb + 5)} ${X(28)},${f1(yb + 4.5)} ${X(25.5)},${f1(yb - 1)}`                       // C컬: 끝이 안쪽으로 말림
     : `L${X(31)},${f1(yb + 4)} L${X(29)},${yb} L${X(26.8)},${f1(yb + 3.4)} L${X(25.2)},${f1(yb - 2)}`;   // 끝이 갈라짐
-  return `M${X(30)},${top} C${X(35.5)},${top + 18} ${X(35)},${f1(yb - 24)} ${X(34)},${yb} ${end} C${X(25.5)},${f1(yb - 22)} ${X(25)},${top + 22} ${X(26.5)},${top + 4} Z`;
+  return `M${X(30)},${top} C${X(36.2)},${top + 14} ${X(35.6)},${f1(yb - 24)} ${X(34)},${yb} ${end} C${X(25.5)},${f1(yb - 22)} ${X(25)},${top + 22} ${X(26.5)},${top + 4} Z`;
 }
-// 땋은 머리: 왼쪽(보는 쪽) 귀 뒤에서 어깨 앞으로 내려옴. 굵기가 줄어드는 몸통 + 엇갈려 맞물리는 마디 선 + 마디마다 윤기 + 고무줄·끝 술
-function braidSVG(hc, L) {
-  const y0 = 79, y1 = L.chest + 12, x0 = 34.6, x1 = 40.6, n = Math.max(4, Math.round((y1 - y0) / 6.6)), seg = (y1 - y0) / n;
-  const at = t => [lerp(x0, x1, t * t), lerp(y0, y1, t)], wid = t => lerp(8.8, 6.2, t);
+// 땋은 머리: (x0,y0)에서 (x1,y1)로 내려옴. 굵기가 줄어드는 몸통 + 엇갈려 맞물리는 마디 선 + 마디마다 윤기 + 끈 + 끝 술
+function braidSVG(hc, x0, y0, x1, y1, w0, tieC) {
+  const n = Math.max(4, Math.round((y1 - y0) / 6.6)), seg = (y1 - y0) / n;
+  const at = t => [lerp(x0, x1, t * t), lerp(y0, y1, t)], wid = t => lerp(w0, w0 * .7, t);
   const body = taperD([[...at(0), wid(0)], [...at(.5), wid(.5)], [...at(1), wid(1)]], true);
   let d = '', hl = '';
   for (let i = 0; i < n; i++) {
     const ta = (i + .1) / n, [ax, ay] = at(ta), ha = wid(ta) / 2, tb = (i + .6) / n, [bx, by] = at(tb), hb = wid(tb) / 2;
     d += `M${P(ax - ha, ay)} Q${P(ax - ha * .1, ay + seg * .12)} ${P(ax + ha * .3, ay + seg * .62)} M${P(bx + hb, by)} Q${P(bx + hb * .1, by + seg * .12)} ${P(bx - hb * .3, by + seg * .62)} `;
-    hl += `M${P(ax - ha * .62, ay + seg * .14)} q${f1(ha * .32)},${f1(seg * .1)} ${f1(ha * .62)},${f1(seg * .36)} M${P(bx + hb * .62, by + seg * .14)} q${f1(-hb * .32)},${f1(seg * .1)} ${f1(-hb * .62)},${f1(seg * .36)} `;
+    hl += `M${P(ax - ha * .62, ay + seg * .14)} q${f1(ha * .32)},${f1(seg * .1)} ${f1(ha * .62)},${f1(seg * .36)} `;
   }
   const [ex, ey] = at(1);
-  return `<path d="${body}" fill="${hc}"/><path d="${d}" fill="none" stroke="${shade(hc, .55)}" stroke-width=".9" stroke-linecap="round" opacity=".7"/>` +
-    `<path d="${hl}" fill="none" stroke="${shade(hc, 1.6)}" stroke-width=".8" stroke-linecap="round" opacity=".28"/>` +
-    `<path d="M${f1(ex - 2.6)},${f1(ey)} C${f1(ex - 4)},${f1(ey + 5)} ${f1(ex - 2)},${f1(ey + 9)} ${f1(ex)},${f1(ey + 10)} C${f1(ex + 2)},${f1(ey + 9)} ${f1(ex + 4)},${f1(ey + 5)} ${f1(ex + 2.6)},${f1(ey)} Z" fill="${hc}"/>` +
-    `<path d="M${f1(ex - 1)},${f1(ey + 2)} L${f1(ex - 1.4)},${f1(ey + 8)} M${f1(ex + 1)},${f1(ey + 2)} L${f1(ex + 1.2)},${f1(ey + 8)}" stroke="${shade(hc, .6)}" stroke-width=".6" opacity=".5"/>` +
-    `<rect x="${f1(ex - 3)}" y="${f1(ey - 1.6)}" width="6" height="2.6" rx="1.2" fill="${shade(hc, .5)}"/>`;
+  return `<path d="${body}" fill="${hc}" stroke="${shade(hc, .55)}" stroke-width=".6"/><path d="${d}" fill="none" stroke="${shade(hc, .55)}" stroke-width=".9" stroke-linecap="round" opacity=".7"/>` +
+    `<path d="${hl}" fill="none" stroke="${shade(hc, 1.18)}" stroke-width=".9" stroke-linecap="round" opacity=".8"/>` +
+    `<path d="M${f1(ex - 2.4)},${f1(ey)} C${f1(ex - 3.6)},${f1(ey + 5)} ${f1(ex - 1.8)},${f1(ey + 8.4)} ${f1(ex)},${f1(ey + 9.4)} C${f1(ex + 1.8)},${f1(ey + 8.4)} ${f1(ex + 3.6)},${f1(ey + 5)} ${f1(ex + 2.4)},${f1(ey)} Z" fill="${hc}" stroke="${shade(hc, .55)}" stroke-width=".5"/>` +
+    `<rect x="${f1(ex - 2.8)}" y="${f1(ey - 1.6)}" width="5.6" height="2.6" rx="1.2" fill="${tieC}"/>`;
 }
-function hairPieces(a, X, age, hc, L) {
-  const kid = age <= 12, teen = age >= 13 && age <= 18;
-  const idx = (kid ? KID_HAIR : teen ? TEEN_HAIR : null)?.[a.g][a.hair] ?? a.hair;
-  const st = STYLES[a.g][idx] || STYLES[a.g][0];
-  const bang = st.bangs[X.bang % st.bangs.length];
-  const w = st.w, ys = st.ys, top = 27 - (st.crown || 0), dark = shade(hc, .82), band = shade(TOP_COLORS[a.tc], .8);
-  let back = '', front = '', shadow = '';
-  // 뒤: 묶음(정수리·반묶음·똥머리), 꼬리, 뒷머리
-  if (st.bun === 'top') back += `<circle cx="60" cy="20.5" r="7.5" fill="${shade(hc, .9)}"/><path d="M54.5,25 Q60,27.4 65.5,25" fill="none" stroke="${shade(hc, .55)}" stroke-width="1.6"/>`;
-  if (st.bun === 'half') back += `<circle cx="60" cy="23" r="6.2" fill="${shade(hc, .9)}"/>`;
-  if (st.bun === 'high') back += `<circle cx="60" cy="15.5" r="10.5" fill="${shade(hc, .92)}"/><path d="M52,13 Q57,6.4 64.6,9.4 M51.4,18 Q56,22.6 64,20.4 Q68.6,18.6 68.4,13.6 M56.4,13.6 Q60.4,11.2 63.6,14.4" fill="none" stroke="${shade(hc, .62)}" stroke-width="1.1" stroke-linecap="round" opacity=".55"/><path d="M54.4,9.6 Q59,6.6 64,8.4" fill="none" stroke="${shade(hc, 1.5)}" stroke-width="1.6" stroke-linecap="round" opacity=".22"/><path d="M53,24.6 Q60,27.4 67,24.6" fill="none" stroke="${band}" stroke-width="2.4" stroke-linecap="round"/>`;
-  if (st.tail === 'low') back += `<path d="M85,72 C95,85 96,106 90,126 C88,133 82,134 81,128 C85,112 85,95 79,80 Z" fill="${dark}"/><path d="M86,84 Q90,104 86,124" fill="none" stroke="${shade(hc, 1.4)}" stroke-width="1.1" opacity=".18"/><rect x="84.4" y="87" width="8.6" height="3.4" rx="1.6" transform="rotate(-12 88.7 88.7)" fill="${band}"/>`;
-  if (st.tail === 'pony') back += `<path d="M77,36 C97,35 106,58 101,88 C99,98 96,104 92,100 L94,95 L90,96 C95,74 93,54 80,46 Z" fill="${dark}"/><path d="M86,42 Q99,58 96,90" fill="none" stroke="${shade(hc, 1.4)}" stroke-width="1.1" opacity=".18"/>`;
-  if (st.back) back += `<path d="${backHair(st.back, w, L)}" fill="${dark}"/>`;
-  if (st.back === 'long' || st.back === 'shoulder' || st.back === 'wavy' || st.back === 'layer') back += `<path d="M${f1(60 - w + 1)},70 Q${f1(60 - w - 3)},${f1(L.sy)} ${f1(60 - w + 1)},${f1(L.sy + 30)} M${f1(60 + w - 1)},70 Q${f1(60 + w + 3)},${f1(L.sy)} ${f1(60 + w - 1)},${f1(L.sy + 30)}" fill="none" stroke="${shade(hc, 1.35)}" stroke-width="1.2" opacity=".14"/>`;
-  // 앞: 반삭은 두피가 비침, 투블럭은 옆을 짧게 깎은 경계
-  if (st.buzz) front += `<path d="M31,68 C30,42 43,30.5 60,30.5 C77,30.5 90,42 89,68 Z" fill="${shade(hc, .9)}" opacity=".45"/>`;
-  if (st.block) front += `<path d="M29.5,52 L35.5,49.5 L35,72 L30.5,70 Z M90.5,52 L84.5,49.5 L85,72 L89.5,70 Z" fill="${hc}" opacity=".38"/>`;
-  const dl = [60 - w, ys], dc1 = [60 - w - 1.5, top + 20], dc2 = [60 - w * .6, top], dt = [60, top];
-  let domeD = `M${f1(60 - w)},${ys} C${f1(60 - w - 1.5)},${top + 20} ${f1(60 - w * .6)},${top} 60,${top} C${f1(60 + w * .6)},${top} ${f1(60 + w + 1.5)},${top + 20} ${f1(60 + w)},${ys}`;
+// 머리 액세서리 (2-7): 집게핀·똑딱핀·머리끈·곱창밴드·리본·헤어밴드·볼캡·비니(겨울)·헤어 스카프. NPC 20%가 하나 (계절·요일에 따라 바뀜)
+const HACC = ['claw', 'snap', 'tie', 'scrunchie', 'ribbon', 'band', 'cap', 'beanie', 'scarf'];
+const HACC_LABEL = { claw: '집게핀', snap: '똑딱핀', tie: '머리끈', scrunchie: '곱창밴드', ribbon: '리본', band: '헤어밴드', cap: '볼캡', beanie: '비니', scarf: '헤어 스카프' };
+function hairAcc(a, X, st, plan, age, ctx) {
+  if (age < 4) return null;
+  let id = a.hacc !== undefined ? a.hacc : null;
+  if (id === null && a.hacc === undefined) {   // 예전 저장: 실핀(1)·머리띠(2)는 그대로, 새로 만든 사람은 20%
+    if (X.pin === 1) id = 'snap'; else if (X.pin === 2) id = 'band';
+    else if (plan.roll.acc < (a.g === 'f' ? .2 : .1)) {   // 여자 20%, 남자 10% (남자는 볼캡·비니만)
+      const ok = HACC.filter(k => (k !== 'tie' && k !== 'scrunchie' || st.tie) && (k !== 'claw' || ['half', 'lowbun', 'high', 'stub'].includes(st.tie)) && (a.g === 'f' || ['cap', 'beanie'].includes(k)));
+      const wt = k => k === 'cap' || k === 'beanie' ? (a.g === 'f' ? .5 : 1) : k === 'tie' || k === 'scrunchie' ? 1.6 : 1;
+      let t = plan.roll.accK * ok.reduce((x, k) => x + wt(k), 0); for (const k of ok) { t -= wt(k); if (t <= 0) { id = k; break; } }
+    }
+  }
+  if (!id) return null;
+  if (id === 'beanie' && ctx && ctx.season && ctx.season !== 'winter') return null;   // 비니는 겨울
+  if (id === 'cap' && ctx && ctx.weekend === false) return null;                      // 볼캡은 주말
+  if (st.buzz && (id === 'snap' || id === 'claw' || id === 'band' || id === 'ribbon')) return null;
+  return id;
+}
+function hairPieces(a, X, age, hc0, L, ctx) {
+  const plan = hairPlan(a, age), st = plan.st, front = plan.front, g = a.g === 'f' ? 'f' : 'm';
+  const gl = grayLevel(a, age), hc = gl > 0 ? mixC(hc0, '#d2cdc6', Math.pow(gl, 1.4) * .82) : hc0;
+  const dark = shade(hc, .82), edge = shade(hc, .55), skin = SKIN[a.skin] || SKIN[1];
+  const v = (st.v || 1.03) * (age <= 12 ? 1.03 : 1), w = st.w * v, ys = st.ys, top = 27 - (st.crown || 0) - (v - 1) * 34;
+  const acc = hairAcc(a, X, st, plan, age, ctx), hat = acc === 'cap' || acc === 'beanie';
+  const tieC = TOP_COLORS[(X.pinC + a.tc) % TOP_COLORS.length];
+  let back = '', front2 = '', shadow = '', over = '';
+  const OUT = `stroke="${edge}" stroke-width=".8" stroke-linejoin="round"`;
+  // ── back: 묶음(정수리·반묶음·똥머리·꼬리), 뒷머리
+  if (st.tie === 'high') back += `<circle cx="60" cy="${f1(top - 11)}" r="10.5" fill="${shade(hc, .92)}" ${OUT}/><path d="M52,${f1(top - 13.5)} Q57,${f1(top - 20)} 64.6,${f1(top - 17)} M51.4,${f1(top - 8.5)} Q56,${f1(top - 4)} 64,${f1(top - 6)} Q68.6,${f1(top - 8)} 68.4,${f1(top - 13)}" fill="none" stroke="${edge}" stroke-width="1" stroke-linecap="round" opacity=".45"/><path d="M53.6,${f1(top - 16)} Q58,${f1(top - 19.6)} 62.6,${f1(top - 18.6)}" fill="none" stroke="${shade(hc, 1.18)}" stroke-width="1.8" stroke-linecap="round"/>`;
+  if (st.tie === 'half') back += `<circle cx="60" cy="${f1(top - 4)}" r="6.2" fill="${shade(hc, .9)}" ${OUT}/>`;
+  if (st.tie === 'pony') back += `<path d="M77,36 C97,35 106,58 101,88 C99,98 96,104 92,100 L94,95 L90,96 C95,74 93,54 80,46 Z" fill="${dark}" ${OUT}/><path d="M86,42 Q99,58 96,90" fill="none" stroke="${shade(hc, 1.18)}" stroke-width="1.4" opacity=".7"/>`;
+  if (st.tie === 'pigtail') for (const s of [-1, 1]) { const X0 = dx => f1(60 + s * dx); back += `<path d="M${X0(30)},70 C${X0(42)},74 ${X0(44)},92 ${X0(40)},106 C${X0(39)},110 ${X0(35)},110 ${X0(35)},106 C${X0(37)},94 ${X0(35)},82 ${X0(28)},76 Z" fill="${dark}" ${OUT}/>`; }
+  if (st.tie === 'nape') back += `<path d="M80,84 C88,92 89,104 86,114 C85,117 82,117 82,114 C84,104 82,95 77,89 Z" fill="${dark}" ${OUT}/>`;   // 장발 묶음: 목덜미 꼬리가 옆으로 살짝
+  if (st.tie === 'stub') back += `<path d="M82,86 C88,90 89,96 87,100 L84,99 C85,95 83,91 79,89 Z" fill="${dark}" ${OUT}/>`;   // 묶은 단발: 짧은 꽁지
+  if (st.tie === 'lowbun') back += `<ellipse cx="${f1(60 + w * .78)}" cy="88" rx="5.6" ry="5" fill="${dark}" ${OUT}/>`;   // 로우번: 목덜미 번이 옆으로 살짝 보임
+  if (st.back) back += `<path d="${backHair(st.back, w, L)}" fill="${dark}" ${OUT}/>`;
+  else {   // 짧은 머리·묶은 머리: 귀 뒤로 내려가는 뒤통수 (옆이 수평으로 잘린 헬멧처럼 보이지 않게)
+    const bw = w - .6, nb = st.buzz ? 88 : 94;
+    back += `<path d="M${f1(60 - bw)},${f1(ys - 6)} C${f1(60 - bw - .4)},${f1(ys + 10)} ${f1(60 - bw * .8)},${f1(nb - 6)} ${f1(60 - bw * .56)},${nb} L${f1(60 + bw * .56)},${nb} C${f1(60 + bw * .8)},${f1(nb - 6)} ${f1(60 + bw + .4)},${f1(ys + 10)} ${f1(60 + bw)},${f1(ys - 6)} Z" fill="${st.buzz ? shade(hc, .9) : dark}"${st.buzz ? ' opacity=".55"' : ` ${OUT}`}/>`;
+  }
+  if (st.back && !['bob', 'bobS', 'wolf'].includes(st.back)) back += `<path d="M${f1(60 - w + 1)},70 Q${f1(60 - w - 3)},${f1(L.sy)} ${f1(60 - w + 1)},${f1(L.sy + 30)} M${f1(60 + w - 1)},70 Q${f1(60 + w + 3)},${f1(L.sy)} ${f1(60 + w - 1)},${f1(L.sy + 30)}" fill="none" stroke="${edge}" stroke-width="1" opacity=".25"/>`;
+  // ── top + front: 돔(두상 + 볼륨, 귀 근처에서 바깥으로 부풂) + 앞머리 아래 선
+  let F = '';
+  if (st.block) F += `<path d="M29.5,52 L35.5,49.5 L35,72 L30.5,70 Z M90.5,52 L84.5,49.5 L85,72 L89.5,70 Z" fill="${hc}" opacity=".38"/>`;
+  const pf = 1.4 * (v - .98) / .1;   // 귀 근처 옆 볼륨
+  let domeD = `M${f1(60 - w)},${ys} C${f1(60 - w - 1.5 - pf)},${f1(top + 22)} ${f1(60 - w * .62)},${f1(top)} 60,${f1(top)} C${f1(60 + w * .62)},${f1(top)} ${f1(60 + w + 1.5 + pf)},${f1(top + 22)} ${f1(60 + w)},${ys}`;
   if (st.curly) {   // 곱슬: 윤곽이 동글동글
-    const pts = [];
-    for (let i = 0; i <= 5; i++) pts.push(cAt(dl, dc1, dc2, dt, i / 5));
-    for (let i = 4; i >= 0; i--) { const q = cAt(dl, dc1, dc2, dt, i / 5); pts.push([120 - q[0], q[1]]); }
+    const dl = [60 - w, ys], dc1 = [60 - w - 1.5 - pf, top + 22], dc2 = [60 - w * .62, top], dt = [60, top], pts = [];
+    for (let i = 0; i <= 6; i++) pts.push(cAt(dl, dc1, dc2, dt, i / 6));
+    for (let i = 5; i >= 0; i--) { const q = cAt(dl, dc1, dc2, dt, i / 6); pts.push([120 - q[0], q[1]]); }
     domeD = `M${P(...pts[0])}` + pts.slice(1).map((q, i) => { const p0 = pts[i], r = Math.hypot(q[0] - p0[0], q[1] - p0[1]) * .6; return ` A${f1(r)},${f1(r)} 0 0 1 ${P(...q)}`; }).join('');
   }
-  const mainD = `${domeD} L87,${ys} ${BANGS[bang](ys)} L${f1(60 - w)},${ys} Z`;
-  front += `<path d="${mainD}" fill="${hc}"${st.buzz ? ' opacity=".55"' : ''}/>`;
+  const frontEdge = (FRONTS[front === 'up' && st.gloss ? 'slick' : front] || FRONTS.up)(ys);
+  const mainD = `${domeD} L87,${ys} ${frontEdge} L${f1(60 - w)},${ys} Z`, hid = `av${UID}h`;
+  F += `<path d="${mainD}" fill="${hc}"${st.buzz ? ' opacity=".62"' : ` ${OUT}`}/>`;
+  if (st.buzz) F += `<path d="${mainD}" fill="none" stroke="${hc}" stroke-width="1.6" stroke-dasharray=".6 1.2" opacity=".5"/>`;   // 버즈컷: 두피가 비치는 짧은 머리 + 가장자리 까슬함
   if (!st.buzz) {
     shadow += mainD;
-    front += strands(STRANDS[bang], hc);
-    // 윤기: 정수리 아래로 둥근 띠 (끊어진 하이라이트)
-    const hid = `av${UID}h`;
-    front += `<clipPath id="${hid}"><path d="${mainD}"/></clipPath><g clip-path="url(#${hid})"><path d="M${f1(60 - w * .8)},${top + 18} Q60,${top + 4} ${f1(60 + w * .8)},${top + 18}" fill="none" stroke="${shade(hc, 1.75)}" stroke-width="3.6" stroke-dasharray="16 2.6 7 2.6 20 2.6" opacity=".14"/>` +
-      `<path d="M${f1(60 - w * .95)},${ys} C${f1(60 - w - 1)},${top + 22} ${f1(60 - w * .6)},${top + 1} 60,${top + 1}" fill="none" stroke="${shade(hc, .6)}" stroke-width="2.4" opacity=".18"/></g>`;
+    F += `<clipPath id="${hid}"><path d="${mainD}"/></clipPath><g clip-path="url(#${hid})">`;
+    // 결 선 (최대 3개, 어둡고 옅게)
+    if (FLOW[front] && FLOW[front].length) F += `<path d="${FLOW[front].slice(0, 3).join(' ')}" fill="none" stroke="${shade(hc, .62)}" stroke-width=".8" stroke-linecap="round" opacity=".35"/>`;
+    // 하이라이트: 좌상단, 두상 곡선을 따라 휘는 짧은 호 2~3개 (서로 끊어짐)
+    const hl = shade(hc, 1.18), T0 = top;
+    F += `<path d="M${f1(60 - w * .7)},${f1(T0 + 15)} Q${f1(60 - w * .58)},${f1(T0 + 7.4)} ${f1(60 - w * .36)},${f1(T0 + 3.6)} M${f1(60 - w * .24)},${f1(T0 + 2.2)} Q${f1(60 - w * .1)},${f1(T0 + 1.2)} ${f1(60 + w * .06)},${f1(T0 + 1.4)}` +
+      (st.gloss || v >= 1.05 ? ` M${f1(60 - w * .82)},${f1(T0 + 24)} Q${f1(60 - w * .8)},${f1(T0 + 20)} ${f1(60 - w * .74)},${f1(T0 + 17.6)}` : '') + `" fill="none" stroke="${hl}" stroke-width="${st.gloss ? 2.4 : 1.9}" stroke-linecap="round" opacity="${st.gloss ? 1 : .9}"/>`;
+    // 곱슬 질감
+    if (st.curly) F += `<path d="${[[44, 36], [54, 31.5], [66, 32], [76, 37], [40, 46], [50, 41.6], [62, 40.6], [72, 43.6], [81, 49]].map(([x, y]) => `M${x},${f1(y + top - 27)} a2.4,2.4 0 1 1 3.4,1.4`).join(' ')}" fill="none" stroke="${shade(hc, .6)}" stroke-width="1" stroke-linecap="round" opacity=".35"/>`;
+    // 뿌리 염색 (2-5): 염색한 사람은 가르마·정수리 둘레가 원래 머리색. 시간이 지나면 넓어짐
+    const nat = a.hcN != null ? HAIR[a.hcN] : null;
+    if (nat && DYED.has(a.hc) && age >= 15 && gl < .3) {
+      const rw = 1 + ((age * 7 + Math.floor(plan.roll.root * 40)) % 10) / 10 * 1.6, pt = PARTING[front];   // 양쪽으로 1~2.6 (2~3단위에서 점점 넓어짐)
+      const d = pt ? `M${pt[0]},${f1(top + 1)} Q${f1(pt[0] + .4)},${f1((top + pt[1]) / 2)} ${pt[0]},${f1(pt[1] - 1)}` : `M${f1(60 - w * .6)},${f1(top + 6)} Q60,${f1(top - 5.4)} ${f1(60 + w * .6)},${f1(top + 6)}`;   // 가르마 없으면 정수리 윗선
+      F += `<path d="${d}" fill="none" stroke="${nat}" stroke-width="${f1(rw * 2)}" stroke-linecap="round" opacity=".35"/><path d="${d}" fill="none" stroke="${nat}" stroke-width="${f1(rw * 1.1)}" stroke-linecap="round" opacity=".8"/>`;
+    }
+    // 흰머리 가닥 (머리색과 섞임), 70대 이상은 원래 색 가닥이 조금 남음
+    if (gl > .02) F += grayStrands(w, top, ys, gl, hc0, plan.roll.wisp);
+    // 정수리 숱 감소 (40대 이상 남자 15%)
+    if (plan.thin) F += `<ellipse cx="60" cy="${f1(top + 4.5)}" rx="${f1(w * .42)}" ry="4.6" fill="${skin}" opacity=".42"/><path d="M53,${f1(top + 3)} q2,3 1.4,6 M60,${f1(top + 2)} q.6,3.4 0,6.6 M67,${f1(top + 3)} q-2,3 -1.4,6" fill="none" stroke="${shade(hc, .7)}" stroke-width=".6" opacity=".6"/>`;
+    F += '</g>';
+    // 가르마: 피부색 가는 틈 (가르마가 있는 앞머리만)
+    const pt = PARTING[front];
+    if (pt) F += `<path d="M${pt[0]},${f1(top + 3)} Q${f1(pt[0] + .5)},${f1((top + pt[1]) / 2 + 1)} ${pt[0]},${f1(pt[1] - .2)}" fill="none" stroke="${skin}" stroke-width="1" stroke-linecap="round" opacity=".85"/>`;
   }
-  if (st.curly) front += `<path d="${[[44, 36], [54, 31.5], [66, 32], [76, 37], [40, 46], [50, 41.6], [62, 40.6], [72, 43.6], [81, 49]].map(([x, y]) => `M${x},${y} a2.4,2.4 0 1 1 3.4,1.4`).join(' ')}" fill="none" stroke="${shade(hc, .58)}" stroke-width="1" stroke-linecap="round" opacity=".28"/>` +
-    `<path d="${[[47, 34], [59, 30], [70, 35], [45, 44], [57, 39.6], [67, 42]].map(([x, y]) => `M${x},${y} a2,2 0 0 1 3,-.6`).join(' ')}" fill="none" stroke="${shade(hc, 1.5)}" stroke-width="1" stroke-linecap="round" opacity=".22"/>`;
-  if (bang === 'see') { const sd = SEE.map(q => strandD(...q, 3.4)).join(' '); front += `<path d="${sd}" fill="${hc}"/>`; shadow += ' ' + sd; }
-  if (PART[bang]) front += `<path d="${PART[bang]}" fill="none" stroke="${shade(hc, .55)}" stroke-width="1.3" stroke-linecap="round" opacity=".7"/>`;
-  if (st.locks) {
-    const ld = `${lock(st.locks, -1, L)} ${lock(st.locks, 1, L)}`;
-    front += `<path d="${ld}" fill="${hc}"/>` + (st.locks === 'pixie' ? '' : `<path d="M29,66 Q27,84 29.5,100 M91,66 Q93,84 90.5,100" fill="none" stroke="${shade(hc, 1.45)}" stroke-width="1.1" opacity=".18"/>`);
+  // M자 이마 (40대 이상 남자 25%): 관자놀이 쪽 이마선이 올라감
+  if (plan.mline) F += `<path d="M36.4,55 C37.6,48.4 42,45.4 47.6,44.4 C46.4,48.6 44,52.6 40,55.6 Z M83.6,55 C82.4,48.4 78,45.4 72.4,44.4 C73.6,48.6 76,52.6 80,55.6 Z" fill="${skin}"/>`;
+  if (st.quiff && !hat) F += `<path d="M45.6,45.4 C45.4,38.6 51.6,33.4 60,32.8 C68.4,32.4 75.4,35.4 77.4,41 C72.4,38.8 66.4,38.2 60.4,38.8 C53.6,39.6 48.8,41.8 45.6,45.4 Z" fill="${shade(hc, 1.04)}" stroke="${edge}" stroke-width=".6"/><path d="M50,38.4 Q55,34.6 62,34.4" fill="none" stroke="${shade(hc, 1.18)}" stroke-width="1.6" stroke-linecap="round"/>`;   // 리젠트: 앞머리를 올려 넘긴 볼륨
+  if (front === 'seethrough') { const sd = SEE2.map(q => strandD(...q, 3.2)).join(' '); F += `<path d="${sd}" fill="${hc}" stroke="${shade(hc, .78)}" stroke-width=".35"/>`; shadow += ' ' + sd; }
+  if (!st.side && !st.buzz && (g === 'm' || st.id === 'perm' || st.id === 'curlS')) {
+    const bd = [-1, 1].map(s => { const X0 = dx => f1(60 + s * dx); return `M${X0(30.6)},${f1(ys - 3)} C${X0(30.2)},${f1(ys + 3)} ${X0(29.6)},${f1(ys + 8)} ${X0(28.6)},${f1(ys + 12)} C${X0(27.2)},${f1(ys + 9)} ${X0(26.4)},${f1(ys + 4)} ${X0(26.6)},${f1(ys - 2)} Z`; }).join(' ');
+    F += `<path d="${bd}" fill="${hc}"/>`;   // 구레나룻: 귀 앞으로 가늘게
+  }
+  if (st.side) {
+    const ld = `${lock(st.side, -1, L)} ${lock(st.side, 1, L)}`;
+    F += `<path d="${ld}" fill="${hc}" ${OUT}/>` + (['pixie', 'short'].includes(st.side) ? '' : `<path d="M29.4,68 Q27.4,84 29.8,98 M90.6,68 Q92.6,84 90.2,98" fill="none" stroke="${shade(hc, 1.18)}" stroke-width="1.2" opacity=".6"/>`);
     shadow += ' ' + ld;
   }
-  if (st.wisps) front += `<path d="M33.5,57 q-3.4,6 -1.2,13.5 M86.5,57 q3.4,6 1.2,13.5" fill="none" stroke="${hc}" stroke-width="1.2" stroke-linecap="round"/>`;   // 잔머리
-  if (st.braid) front += braidSVG(hc, L);
-  if (st.tail === 'pony') front += `<path d="M82,40 l5,-4 l.6,6 Z M82,40 l4.6,4.4 l-5.4,1.6 Z" fill="${TOP_COLORS[a.tc]}"/><circle cx="82" cy="40" r="2.8" fill="${band}"/>`;   // 리본
-  if (st.bun === 'half') front += `<path d="M54.5,27.5 Q60,29.6 65.5,27.5" fill="none" stroke="${band}" stroke-width="2"/>`;
-  // 머리 장식 (여자, 4살부터): 실핀 두 개 / 머리띠
-  if (X.pin === 1 && age >= 4 && !st.buzz) front += `<path d="M75.6,41.4 L82.6,45.4 M76.6,44.6 L83.4,48.2" stroke="${METAL[X.metal]}" stroke-width="1.2" stroke-linecap="round"/>`;
-  if (X.pin === 2 && age >= 4) { const hb = TOP_COLORS[X.pinC], yb = Math.min(ys - 10, 60); front += `<path d="M${f1(60 - w + 1)},${yb} C${f1(60 - w * .74)},${top + 3} ${f1(60 + w * .74)},${top + 3} ${f1(60 + w - 1)},${yb}" fill="none" stroke="${hb}" stroke-width="3.4" stroke-linecap="round"/><path d="M${f1(60 - w * .6)},${top + 9} Q60,${top + 3.2} ${f1(60 + w * .6)},${top + 9}" fill="none" stroke="#fff" stroke-width=".9" opacity=".3"/>`; }
-  return { back, front, shadow: st.buzz ? '' : shadow };
+  // 잔머리 (이마선·귀 옆, 묶은 머리일수록 많이)
+  const nw = st.wisps || (st.buzz ? 0 : 1);
+  if (nw) {
+    const W2 = [[33.4, 57, -3.2, 6, -1.4, 13], [86.6, 57, 3.2, 6, 1.4, 13], [46, 45.4, -1.6, 3.4, -2.6, 7], [74, 45.6, 1.8, 3.2, 2.4, 7.4]].slice(0, Math.min(4, nw + (plan.roll.wisp < .5 ? 0 : 1)));
+    F += `<path d="${W2.map(([x, y, cx, cy, dx, dy]) => `M${x},${y} q${cx},${cy} ${dx},${dy}`).join(' ')}" fill="none" stroke="${hc}" stroke-width=".9" stroke-linecap="round" opacity=".6"/>`;
+  }
+  // 묶음 앞 (땋은 머리·양갈래·앞으로 넘긴 꼬리) — 몸 앞으로 내려옴
+  if (st.tie === 'braid') F += braidSVG(hc, 34.6, 79, 40.6, L.chest + 12, 8.8, tieC);
+  if (st.tie === 'twin') F += braidSVG(hc, 32.4, 78, 36, L.chest + 4, 7.4, tieC) + braidSVG(hc, 87.6, 78, 84, L.chest + 4, 7.4, tieC);
+  if (st.tie === 'lowFront') F += `<path d="M84,74 C92,86 94,104 90,${f1(L.chest + 4)} C89,${f1(L.chest + 9)} 84,${f1(L.chest + 9)} 83.6,${f1(L.chest + 4)} C86,104 85,90 79,80 Z" fill="${hc}" ${OUT}/><path d="M86,86 Q90,100 88,${f1(L.chest)}" fill="none" stroke="${shade(hc, 1.18)}" stroke-width="1.3" opacity=".7"/><rect x="83" y="80.4" width="7.6" height="3.2" rx="1.5" transform="rotate(-24 86.8 82)" fill="${tieC}"/>`;   // 로우 포니테일: 목덜미에서 묶어 어깨 앞으로
+  if (st.tie === 'pigtail') F += `<circle cx="31" cy="72" r="2.4" fill="${tieC}"/><circle cx="89" cy="72" r="2.4" fill="${tieC}"/>`;
+  if (st.tie === 'pony' && acc !== 'scrunchie' && acc !== 'ribbon') F += `<circle cx="82" cy="40" r="2.4" fill="${acc === 'tie' ? tieC : shade(hc, .55)}"/>`;
+  if (st.tie === 'half') F += `<path d="M54.5,${f1(top + .5)} Q60,${f1(top + 2.6)} 65.5,${f1(top + .5)}" fill="none" stroke="${shade(hc, .55)}" stroke-width="1.8"/>`;
+  // 액세서리
+  if (acc) F += accSVG(acc, st, w, top, ys, tieC, hc, X);
+  // 앞쪽 레이어는 사람마다 좌우 뒤집음 (가르마·흐름·땋은 쪽)
+  const flip = plan.flip && !st.quiff;
+  if (flip) F = `<g transform="translate(120,0) scale(-1,1)">${F}</g>`;
+  if (hat) over = hatSVG(acc, w, top, ys, tieC, X);
+  return { back, front: F + over, shadow: st.buzz || hat ? '' : shadow, shadowT: flip ? 'translate(120,0) scale(-1,1)' : '', style: st.id, frontId: front, acc };
+}
+// 흰머리 가닥: 돔 안에서 정수리에서 바깥으로 흐르는 가는 선. gl 0~1
+function grayStrands(w, top, ys, gl, hc0, seed) {
+  const n = Math.round(5 + gl * 18), r = rng('gray' + seed);
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const u = r() * 2 - 1, x0 = 60 + u * w * .35, y0 = top + 2 + r() * 4, x1 = 60 + u * (w + 2), y1 = ys - r() * 10, cx = 60 + u * w * .9, cy = top + 6;
+    d += `M${P(x0, y0)} Q${P(cx, cy)} ${P(x1, y1)} `;
+  }
+  let o = `<path d="${d}" fill="none" stroke="#ece9e4" stroke-width=".7" stroke-linecap="round" opacity="${f1(.35 + gl * .4)}"/>`;
+  if (gl > .6) { let d2 = ''; for (let i = 0; i < 5; i++) { const u = r() * 2 - 1; d2 += `M${P(60 + u * w * .3, top + 3)} Q${P(60 + u * w * .9, top + 7)} ${P(60 + u * (w + 1), ys - 6)} `; } o += `<path d="${d2}" fill="none" stroke="${shade(hc0, .9)}" stroke-width=".6" opacity=".5"/>`; }
+  return o;
+}
+// 머리 액세서리 그림 (모자 제외)
+function accSVG(id, st, w, top, ys, c, hc, X) {
+  const m = METAL[X.metal] || METAL[0];
+  if (id === 'snap') return `<path d="M73.6,44.4 L81.8,48.4" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/><circle cx="80.6" cy="47.8" r=".7" fill="#fff" opacity=".7"/>`;   // 똑딱핀
+  if (id === 'band') return `<path d="M${f1(60 - w + 1)},${f1(Math.min(ys - 10, 60))} C${f1(60 - w * .74)},${f1(top + 3)} ${f1(60 + w * .74)},${f1(top + 3)} ${f1(60 + w - 1)},${f1(Math.min(ys - 10, 60))}" fill="none" stroke="${c}" stroke-width="3.4" stroke-linecap="round"/><path d="M${f1(60 - w * .6)},${f1(top + 9)} Q60,${f1(top + 3.2)} ${f1(60 + w * .6)},${f1(top + 9)}" fill="none" stroke="#fff" stroke-width=".9" opacity=".3"/>`;
+  if (id === 'scarf') return `<path d="M${f1(60 - w + .5)},${f1(Math.min(ys - 8, 58))} C${f1(60 - w * .7)},${f1(top + 5)} ${f1(60 + w * .7)},${f1(top + 5)} ${f1(60 + w - .5)},${f1(Math.min(ys - 8, 58))} L${f1(60 + w - 1)},${f1(Math.min(ys - 3, 63))} C${f1(60 + w * .7)},${f1(top + 10)} ${f1(60 - w * .7)},${f1(top + 10)} ${f1(60 - w + 1)},${f1(Math.min(ys - 3, 63))} Z" fill="${c}" stroke="${shade(c, .65)}" stroke-width=".6"/>` +
+    `<path d="M${f1(60 - w * .5)},${f1(top + 8)} l1.2,1.2 M${f1(60 - w * .1)},${f1(top + 6.4)} l1.2,1.2 M${f1(60 + w * .3)},${f1(top + 7)} l1.2,1.2" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity=".7"/>` +
+    `<path d="M${f1(60 + w - 1)},${f1(Math.min(ys - 6, 60))} l6,3 l-3,4 Z M${f1(60 + w - 1)},${f1(Math.min(ys - 6, 60))} l4,-2 l1,5 Z" fill="${shade(c, .9)}"/>`;
+  if (id === 'claw') return `<g transform="translate(60,${f1(top - 1)})"><rect x="-6" y="-2.6" width="12" height="4.4" rx="2" fill="${c}" opacity=".95"/><path d="M-4.4,1.6 v2.4 M-1.5,1.6 v2.8 M1.5,1.6 v2.8 M4.4,1.6 v2.4" stroke="${shade(c, .7)}" stroke-width="1.2" stroke-linecap="round"/><path d="M-4,-1.4 h7" stroke="#fff" stroke-width=".8" opacity=".45"/></g>`;   // 집게핀 (정수리 뒤)
+  const tieAt = st.tie === 'pony' ? [82, 40] : st.tie === 'high' ? [60, top - 1.2] : st.tie === 'half' ? [60, top + 1] : st.tie === 'lowFront' ? [86.8, 82] : st.tie === 'stub' ? [84, 88] : st.tie === 'pigtail' ? [89, 72] : [82, 40];
+  if (id === 'scrunchie') return `<ellipse cx="${tieAt[0]}" cy="${tieAt[1]}" rx="4.4" ry="3.4" fill="${c}" stroke="${shade(c, .7)}" stroke-width=".6"/><path d="M${tieAt[0] - 3},${tieAt[1] - 1} q1.5,1.6 3,0 q1.5,1.6 3,0" fill="none" stroke="${shade(c, .7)}" stroke-width=".7" opacity=".7"/>`;
+  if (id === 'ribbon') return `<g transform="translate(${tieAt[0]},${tieAt[1]})"><path d="M0,0 l-6,-4 l0,8 Z M0,0 l6,-4 l0,8 Z M0,0 l-3,7 M0,0 l3.4,7" fill="${c}" stroke="${shade(c, .7)}" stroke-width=".8"/><circle r="1.8" fill="${shade(c, .85)}"/></g>`;
+  if (id === 'tie') return `<circle cx="${tieAt[0]}" cy="${tieAt[1]}" r="2.4" fill="${c}"/>`;
+  return '';
+}
+// 모자: 볼캡(챙이 이마 위) / 비니(골지 단) — 앞머리 위를 덮음
+function hatSVG(id, w, top, ys, c, X) {
+  if (id === 'cap') {
+    const by = 47.5;
+    return `<path d="M${f1(60 - w - 1)},${f1(by + 2)} C${f1(60 - w - 2)},${f1(top + 8)} ${f1(60 - w * .5)},${f1(top - 2)} 60,${f1(top - 2)} C${f1(60 + w * .5)},${f1(top - 2)} ${f1(60 + w + 2)},${f1(top + 8)} ${f1(60 + w + 1)},${f1(by + 2)} Z" fill="${c}" stroke="${shade(c, .6)}" stroke-width=".8"/>` +
+      `<path d="M60,${f1(top - 1.6)} L60,${f1(by)} M${f1(60 - w * .45)},${f1(top + 4)} Q${f1(60 - w * .3)},${f1(by - 8)} ${f1(60 - w * .32)},${f1(by + 1)} M${f1(60 + w * .45)},${f1(top + 4)} Q${f1(60 + w * .3)},${f1(by - 8)} ${f1(60 + w * .32)},${f1(by + 1)}" fill="none" stroke="${shade(c, .7)}" stroke-width=".7" opacity=".7"/>` +
+      `<path d="M${f1(60 - w * .82)},${f1(by + 1)} Q60,${f1(by - 2)} ${f1(60 + w * .82)},${f1(by + 1)} Q60,${f1(by + 7.6)} ${f1(60 - w * .82)},${f1(by + 1)} Z" fill="${shade(c, .85)}" stroke="${shade(c, .55)}" stroke-width=".8"/><circle cx="60" cy="${f1(top - 1.4)}" r="1.4" fill="${shade(c, .7)}"/>`;
+  }
+  const by = 50, cuff = 7;   // 비니
+  let ribs = '';
+  for (let x = 60 - w + 2; x < 60 + w - 1; x += 3) ribs += `M${f1(x)},${f1(by - cuff + 1)} L${f1(x)},${f1(by - .5)} `;
+  return `<path d="M${f1(60 - w - 1.4)},${f1(by)} C${f1(60 - w - 2)},${f1(top + 4)} ${f1(60 - w * .5)},${f1(top - 5)} 60,${f1(top - 5)} C${f1(60 + w * .5)},${f1(top - 5)} ${f1(60 + w + 2)},${f1(top + 4)} ${f1(60 + w + 1.4)},${f1(by)} Z" fill="${c}" stroke="${shade(c, .6)}" stroke-width=".8"/>` +
+    `<path d="M${f1(60 - w - 1.6)},${f1(by - cuff)} Q60,${f1(by - cuff - 3)} ${f1(60 + w + 1.6)},${f1(by - cuff)} L${f1(60 + w + 1.6)},${f1(by)} Q60,${f1(by - 3)} ${f1(60 - w - 1.6)},${f1(by)} Z" fill="${shade(c, .88)}" stroke="${shade(c, .6)}" stroke-width=".7"/><path d="${ribs}" stroke="${shade(c, .7)}" stroke-width=".8" opacity=".6"/>`;
 }
 
 /* ---------- 몸·옷 공용 ---------- */
@@ -773,13 +945,13 @@ const mittIn = skin => `<path d="M-4.4,-1.5 C-5.2,4.5 -4.8,10.6 -1.4,12.6 C1.8,1
   <path d="M-1.2,9.6 Q1,11 3.2,9.2" fill="none" stroke="${shade(skin, .7)}" stroke-width=".8" opacity=".5"/>`;
 // (x,y) 손목, rot 회전(아래가 0), s 바깥쪽 방향
 const mitt = (x, y, s, skin, rot) => `<g transform="translate(${f1(x)},${f1(y)}) rotate(${rot || 0}) scale(${s},1)">${mittIn(skin)}</g>`;
-// 전신용 손: 손목에서 좁게 시작해 손바닥으로 넓어짐 (손목이 원점, 길이 약 15.3). len = 손 길이(px), 폭은 길이의 절반쯤
-const handIn = skin => `<path d="M-2.6,-1.5 C-3.4,1.6 -4.9,3.8 -4.8,7.8 C-4.7,11.2 -2.8,13.7 0,13.8 C2.8,13.9 4.9,11.6 4.9,7.8 C4.9,4 3.4,1.4 2.8,-1.5 Z" fill="${skin}" stroke="${shade(skin, .72)}" stroke-width=".55"/>
-  <path d="M-3.3,3 C-6.8,4.4 -7,8.6 -4.6,9.9 C-3.8,8.5 -3.5,6.1 -2.9,4 Z" fill="${shade(skin, .9)}" stroke="${shade(skin, .72)}" stroke-width=".5"/>
-  <path d="M-1.3,9.6 L-1.1,12.4 M1.5,9.6 L1.7,12.2" stroke="${shade(skin, .7)}" stroke-width=".55" stroke-linecap="round" opacity=".55"/>`;
+// 전신용 손 (1-2): 손바닥이 허벅지 쪽 → 옆에서 본 좁은 미트(폭 = 손목 1.3) + 앞(몸 안쪽)으로 나온 엄지. 손목이 원점, 길이 약 15.3, +x가 바깥
+const handIn = skin => `<path d="M-1.6,-1.5 C-1.8,2.6 -2,6.8 -1.8,10 C-1.6,13 -.4,14.9 .7,14.8 C1.9,14.6 2.6,12.4 2.5,9.2 C2.4,5.6 2.2,2 1.9,-1.5 Z" fill="${skin}" stroke="${shade(skin, .72)}" stroke-width=".6"/>
+  <path d="M-1.3,2.8 C-3,4.6 -3.3,7.6 -2.2,9.2 C-1.6,10 -.8,9.6 -.7,8.6 C-.6,6.8 -.6,4.8 -.3,3.4 Z" fill="${shade(skin, .93)}" stroke="${shade(skin, .72)}" stroke-width=".55"/>
+  <path d="M.5,10 Q1,12.2 .8,14 M1.7,9.6 Q2.2,11.6 2,13.2" fill="none" stroke="${shade(skin, .7)}" stroke-width=".45" stroke-linecap="round" opacity=".5"/>`;
 // ring: 결혼 반지 — 약지 아래쪽 마디에 작은 금색 고리
-const RING = '<circle cx="1.6" cy="10.3" r="1.2" fill="none" stroke="#d8b45a" stroke-width="1"/><circle cx="1.1" cy="9.8" r=".35" fill="#fff6d8"/>';
-const handAt = (x, y, s, skin, rot, len, ring) => { const q = len / 15.3; return `<g transform="translate(${f1(x)},${f1(y)}) rotate(${f1(rot)}) scale(${(s * q * .8).toFixed(3)},${q.toFixed(3)})">${handIn(skin)}${ring ? RING : ''}</g>`; };
+const RING = '<path d="M-.4,10.6 Q1.4,11.5 3.2,10.4" fill="none" stroke="#d8b45a" stroke-width="1.1" stroke-linecap="round"/><circle cx="1.2" cy="10.9" r=".35" fill="#fff6d8"/>';
+const handAt = (x, y, s, skin, rot, len, ring) => { const q = len / 15.3; return `<g transform="translate(${f1(x)},${f1(y)}) rotate(${f1(rot)}) scale(${(s * q).toFixed(3)},${q.toFixed(3)})">${handIn(skin)}${ring ? RING : ''}</g>`; };
 // 팔 한 마디 (윤곽선 + 색)
 const limb = (x1, y1, cx, cy, x2, y2, w, c) => `<path d="M${P(x1, y1)} Q${P(cx, cy)} ${P(x2, y2)}" fill="none" stroke="${shade(c, .74)}" stroke-width="${f1(w + 1.6)}" stroke-linecap="round"/><path d="M${P(x1, y1)} Q${P(cx, cy)} ${P(x2, y2)}" fill="none" stroke="${c}" stroke-width="${f1(w)}" stroke-linecap="round"/>`;
 
@@ -844,20 +1016,25 @@ function anchorsOf(a, age, fig) {
   const fitM = adult && !f && build === 'fit', chubbyM = adult && !f && (build === 'chubby' || C.waist >= 88);
   const half = (v, k) => pxW(v, k) / 2;
   // 높이
-  const chin = 1 / hr, shR = chin * 1.236, remap = v => shR + (v - .225) / .725 * (.95 - shR);
-  const y = { chin: top + H * chin, neck: top + H * chin * 1.1, sh: top + H * shR };
+  const grown = clamp((age - 12) / 7, 0, 1), chin = 1 / hr, shR = chin * lerp(1.236, f ? 1.27 : 1.2, grown), remap = v => shR + (v - .225) / .725 * (.95 - shR);
+  const y = { chin: top + H * chin, neck: top + H * chin * lerp(1.1, f ? 1.12 : 1.09, grown), sh: top + H * shR };
   for (const k in ANCHOR_Y) y[k] = top + H * remap(ANCHOR_Y[k]);
   const ci = cup ? CUPS.indexOf(cup) : -1;
   if (cup) y.bust += H * .004 * (ci - 3);   // 컵이 커질수록 가슴 앵커가 아래로
   y.armpit = lerp(y.sh, y.bust, .55); y.hipUp = lerp(y.waist, y.hip, .5);
   // 팔·손·발
-  const bm = adult ? { slim: .9, fit: 1.15, chubby: 1.2 }[build] || 1 : 1;
-  const arm = { uw: H * .0425 * bm, hand: H * .1 };
-  arm.fw = arm.uw * .85; arm.ww = arm.uw * .6;
+  // 팔 (HAIR_CLOTHES_BODY 1-2): 상완 굵기 기준 앵커 5개 — 어깨 1 / 상완 중간 .95(근육형 1.05, 이두 볼록) / 팔꿈치 .75 / 전완 .85 / 손목 .55
+  //   남자가 굵고 여자는 가늘게. 손 길이 = 머리 .55 (= 키 .1), 폭 = 손목 1.3 (손바닥이 허벅지를 향해 옆에서 보이는 손)
+  const bm = adult ? { slim: .9, fit: 1.13, chubby: 1.24 }[build] || 1 : 1;
+  const arm = { uw: H * lerp(.0425, f ? .0385 : .047, grown) * bm, hand: H * .1 };
+  arm.mw = arm.uw * (adult && build === 'fit' ? 1.05 : .95); arm.ew = arm.uw * .75; arm.fw = arm.uw * .85; arm.ww = arm.uw * .55;
   // 반폭
-  const w = { nh: (age <= 12 ? 8.5 : f ? 10.5 : 12) * hs, sh: (adult && !f ? E.shoulder : C.shoulder) * PXCM / 2 };
+  const w = { nh: (age <= 12 ? 8.5 : lerp(10.5, f ? 9.6 : 12.8, grown)) * hs, sh: (adult && !f ? E.shoulder : C.shoulder) * PXCM / 2 };
   w.waist = half(E.waist, KW.waist) - (fitM ? 2 : 0);
   w.hip = half(E.hip, KW.hip);
+  // 여자 어깨는 골반 폭쯤 (어깨 ≤ 골반, 1-8) — 10대 중반부터 점점
+  if (f && age >= 13) w.sh = lerp(w.sh, 12 + w.hip * .45 + ({ slim: -.4, fit: .6 }[build] || 0), grown);
+  if (f && adult) w.sh = Math.max(w.sh, half(E.underbust || E.waist + 8, KW.underbust) + 3.2);   // 가슴 둘레보다 어깨가 좁으면 팔이 벌어짐
   if (adult && f) {
     w.ub = half(E.underbust, KW.underbust); w.rib = w.ub + 1;   // rib: 가슴 높이의 몸통 (가슴 볼륨 뺀 폭)
     w.armpit = lerp(w.rib, w.sh, .45);
@@ -868,16 +1045,19 @@ function anchorsOf(a, age, fig) {
     w.ub = lerp(w.bust, w.waist, .35); w.armpit = lerp(w.bust, w.sh, .4);
   }
   w.tip = w.sh - arm.uw * .4;   // 어깨 솔기: 팔 중심 바로 바깥. 팔(둥근 어깨 끝)은 여기서 바깥으로 나옴
+  const delt = adult && !f ? (fitM ? 2 : 1) : 0;   // 남자 삼각근 볼륨 (팔 바깥선이 이만큼 나옴)
   w.armpit = Math.min(w.armpit, w.tip - .3);
-  w.hipUp = chubbyM ? Math.max(w.waist, w.hip) + 2.5 : lerp(w.waist, w.hip, f && !kid ? .68 : .5);   // 골반은 허리에서 바로 벌어짐 / 통통한 남자는 배
+  const chubbyF = adult && f && build === 'chubby';
+  w.hipUp = chubbyM ? Math.max(w.waist, w.hip) + 2.5 : lerp(w.waist, w.hip, f && !kid ? .68 : .5) + (chubbyF ? 1.6 : 0);   // 골반은 허리에서 바로 벌어짐 / 통통하면 배가 옆 윤곽으로 볼록
   // 다리 (한쪽): 허벅지 → 무릎(허벅지의 .68) → 종아리 → 발목(종아리의 .55)
-  const gap = adult ? ({ slim: 3, avg: 1 }[build] ?? 0) : kid ? 2 : 1.5;
-  const thighW = Math.min(pxW(E.thigh, 1), w.hip - .8 - gap / 2), kneeW = thighW * .68;
-  const calfW = clamp(pxW(E.calf, 1), kneeW * 1.04, thighW * .92), ankleW = calfW * .55, foot = H * .136;
-  const leg = { gap, thighW, kneeW, calfW, ankleW, ct: gap / 2 + thighW / 2, ck: kneeW / 2 + (f ? .5 : 1.5) + gap * .3, cc: calfW / 2 + (f ? 1.2 : 2.2) + gap * .3 };
+  // 다리 (1-5): 허벅지(굵음) → 무릎(좁음, 살짝 안쪽) → 종아리(바깥 볼록) → 발목(가장 좁음). 허벅지 사이: 마름 넓게 / 보통 조금 / 근육·통통 붙음
+  const gap = adult ? ({ slim: 4, avg: 1.2 }[build] ?? 0) : kid ? 2 : 1.5;
+  const thighW = Math.min(pxW(E.thigh, 1) * (adult && build === 'chubby' ? 1.06 : 1), w.hip - .8 - gap / 2), kneeW = thighW * (adult && build === 'slim' ? .64 : .68);
+  const calfW = clamp(pxW(E.calf, 1) * (adult && build === 'fit' ? 1.08 : 1), kneeW * 1.04, thighW * .92), ankleW = calfW * .55, foot = H * .136;
+  const leg = { gap, thighW, kneeW, calfW, ankleW, ct: gap / 2 + thighW / 2, ck: kneeW / 2 + (f ? .2 : 1.2) + gap * .3, cc: calfW / 2 + (f ? 1.2 : 2.2) + gap * .3 };
   leg.ca = Math.max(ankleW / 2 + (f ? 2 : 3) + gap * .3, foot * .28);
   const edge = [[w.tip, y.sh + 1.2], [w.armpit, y.armpit], [w.bust, y.bust], [w.ub, y.underbust], [w.waist, y.waist], [w.hipUp, y.hipUp], [w.hip, y.hip], [w.hip - 1, y.crotch]];
-  return { f, adult, kid, age, build, cup, ci, sig: cup ? BUST_SIG[cup] : null, fitM, chubbyM, hcm, H, top, headH, hs,
+  return { f, adult, kid, age, build, cup, ci, sig: cup ? BUST_SIG[cup] : null, fitM, chubbyM, chubbyF, delt, hcm, H, top, headH, hs,
     htx: 60 - 60 * hs, hty: top - 26 * hs, y, w, leg, arm, foot, edge, C, E, at: yy => edgeAt(edge, yy),
     px: { height: H, shoulder: w.sh * 2, bust: w.bust * 2, underbust: w.ub * 2, waist: w.waist * 2, hip: w.hip * 2, thigh: thighW } };
 }
@@ -917,12 +1097,27 @@ function legSide(A, s, e = 0) {
   };
 }
 const pantsTop = (A, bt) => bt.tucked ? A.y.waist + 1 : lerp(A.y.waist, A.y.hip, .28);
+// 어깨 윤곽 (1-1): 목 옆 → 승모근 경사(완만한 내리막) → 어깨 끝(견봉) → 삼각근(작은 둥근 곡선) → 팔 바깥선으로 이어짐
+//   여자: 경사 길고 완만, 어깨 끝 작게 / 남자: 경사 짧고 어깨 끝 넓게, 삼각근 볼륨(+1, 근육형 +2). 둥근 혹이 머리 쪽으로 솟지 않음
+//   e: 옷 여유분(니트·후디도 어깨 위로는 반만), drop: 오버핏 — 어깨선이 팔 위로 내려옴
+function shoulderR(A, e = 0, drop = 0) {
+  const { y, w } = A, k = A.hs, uw = A.arm.uw, m = A.adult && !A.f, acro = w.sh - uw * .5;
+  return [[w.nh + 1.6 * k + e * .25, y.neck + (m ? .8 * k : 0)],
+    [lerp(w.nh, acro, m ? .42 : .5) + e * .3, lerp(y.neck, y.sh, m ? .5 : .6) + (m ? .4 * k : 0)],
+    [acro + e * .45 + drop * .5, y.sh + e * .1 + drop * .3],
+    [w.sh + e * .6 + A.delt + drop * .3, y.sh + uw * .55 + drop]];
+}
 
 // 하의 + 다리 + 신발. 바지·치마는 다리·골반 윤곽 + 여유분
-function lowerFull(a, X, age, A, skin, bt) {
+function lowerFull(a, X, age, A, skin, bt, ST) {   // ST: 짝다리 (renderFull의 stanceOf) — 신발 위치·뒤꿈치
   const { y, w, leg: L } = A, k = A.hs, dk = shade(bt.c, .72), sw = v => f1(v * k);
-  const shoeT = shoeOf(X, age, A, bt), kf = A.foot / 31 * (shoeT === 'heel' ? 1.23 : 1), sy0 = FLOOR - 10.4 * kf;   // 신발 길이 = 머리 .75 (정면이라 보이는 폭은 그 절반쯤)
-  const shoes = [-1, 1].map(s => { const x = 60 + s * L.ca; return `<g transform="translate(${f1(x)},${f1(sy0)}) scale(${kf.toFixed(3)}) translate(${f1(-x)},${f1(-sy0)})">${shoe(shoeT, x, sy0, s, 4.4, skin, a)}</g>`; }).join('');
+  // 신발 (1-6): 머리 .75 크기, 발끝이 살짝 바깥(6°), 바닥에 작은 타원 그림자 → 떠 보이지 않게
+  const shoeT = shoeOf(X, age, A, bt), kf = A.foot / 31 * (shoeT === 'heel' ? 1.2 : 1.06), sy0 = FLOOR - 10.4 * kf;
+  const shoes = `<ellipse cx="60" cy="${f1(FLOOR - .4)}" rx="${f1(L.ca + 11 * kf)}" ry="${f1(2.4 * kf)}" fill="#3a2a22" opacity=".13"/>` +
+    [-1, 1].map(s => {
+      const x0 = 60 + s * L.ca, fr = ST && s === ST.fs, x = ST ? ST.W(x0, FLOOR)[0] : x0, up = fr ? ST.heel : 0, rot = s * 6 + (fr ? s * 5 : 0);   // 짝다리: 쉬는 발은 뒤꿈치가 살짝 들리고 더 바깥으로
+      return `<g transform="translate(0,${f1(-up)}) rotate(${rot},${f1(x)},${FLOOR}) translate(${f1(x)},${f1(sy0)}) scale(${kf.toFixed(3)}) translate(${f1(-x)},${f1(-sy0)})">${shoe(shoeT, x, sy0, s, 4.4, skin, a)}</g>`;
+    }).join('');
   const legD = s => { const { outer, inner } = legSide(A, s); return `M${P(60 + s * .2, y.hip)} L${P(...outer[0])}${crThrough(outer)} L${P(...inner[0])}${crThrough(inner)} Z`; };
   const bare = `<path d="${legD(-1)} ${legD(1)}" fill="${skin}"/>` +
     `<path d="${[-1, 1].map(s => `M${P(60 + s * (L.ck - L.kneeW * .3), y.knee + 1)} q${f1(s * L.kneeW * .3)},${sw(1.4)} ${f1(s * L.kneeW * .6)},0`).join(' ')}" fill="none" stroke="${shade(skin, .78)}" stroke-width="${sw(1)}" opacity=".55"/>`;
@@ -941,7 +1136,8 @@ function lowerFull(a, X, age, A, skin, bt) {
     } else if (pencil) det = `<path d="M60,${f1(hemY)} L60,${f1(hemY - 9 * k)} M${f1(60 - w.hip * .5)},${f1(y.hip + 2)} Q${f1(60 - w.hip * .45)},${f1(hemY - 6 * k)} ${f1(60 - w.hip * .38)},${f1(hemY - 2 * k)}" fill="none" stroke="${dk}" stroke-width="${sw(1.1)}" opacity=".4"/>`;   // 뒤트임 + 주름
     else det = `<path d="M${f1(60 - w.hip * .45)},${f1(y.hip + 3)} Q${f1(60 - w.hip * .55)},${f1(hemY - 8 * k)} ${f1(60 - hw * .7)},${f1(hemY)} M${f1(60 + w.hip * .4)},${f1(y.hip + 4)} Q${f1(60 + w.hip * .5)},${f1(hemY - 8 * k)} ${f1(60 + hw * .62)},${f1(hemY)}" fill="none" stroke="${dk}" stroke-width="${sw(1.2)}" opacity=".35"/>`;   // A라인 주름
     const band = `<path d="M${f1(60 - w.waist - 1)},${f1(topY)} L${f1(60 + w.waist + 1)},${f1(topY)} L${f1(60 + w.waist + 1.3)},${f1(topY + 4 * k)} L${f1(60 - w.waist - 1.3)},${f1(topY + 4 * k)} Z" fill="${dk}" opacity=".7"/>`;
-    return { svg: bare + shoes + `<path d="${symShape(R, hemY + 1.4, topY)}" fill="${bt.c}"/>` + det + band, belt: '', hipEdge: w.hip + ex };
+    const cloth = `<path d="${symShape(R, hemY + 1.4, topY)}" fill="${bt.c}"/>` + det + band;
+    return { svg: bare + shoes + cloth, legs: bare, shoes, cloth, belt: '', hipEdge: w.hip + ex };
   }
   // 바지·반바지: 허리 → 골반 → 다리 윤곽 + 여유분 (반바지는 허벅지에서 끝남)
   const cut = bt.k === 'shorts' ? 'short' : bt.cut || 'straight', e = cut === 'skinny' ? .5 : 2;
@@ -959,7 +1155,7 @@ function lowerFull(a, X, age, A, skin, bt) {
     if (s > 0) hems.push(ol.length ? [ol[0][0] - 60, ol[1][0] - 60] : [oc[oc.length - 1][0] - 60, ic[0][0] - 60]);
     return `M${P(60 - s * .6, topY)} L${P(...oc[0])}${crThrough(oc)}${ol.map(p => ` L${P(...p)}`).join('')} L${P(...ic[0])}${crThrough(ic)} L${P(60 - s * .6, y.crotch + 1.5)} Z`;
   };
-  let out = (cut === 'short' ? bare : '') + shoes + `<path d="${side(-1)}" fill="${bt.c}"/><path d="${side(1)}" fill="${bt.c}"/>`;   // 좌우를 한 path에 넣으면 겹친 가운데가 뚫림
+  let out = `<path d="${side(-1)}" fill="${bt.c}"/><path d="${side(1)}" fill="${bt.c}"/>`;   // 좌우를 한 path에 넣으면 겹친 가운데가 뚫림
   const [ho, hi] = hems[0], hc = (ho + hi) / 2;
   const thighIn = L.ct - L.thighW / 2 - e, kneeIn = (cut === 'straight' ? sh.cK - sh.hw : L.ck - L.kneeW / 2 - e);
   const seamTo = cut === 'short' ? hemY : thighIn > .3 ? y.crotch + 1 : kneeIn > .3 ? lerp(y.thigh, y.knee, .5) : cut === 'wide' ? hemY : y.knee;   // 다리가 붙은 곳까지 안쪽 솔기
@@ -973,7 +1169,8 @@ function lowerFull(a, X, age, A, skin, bt) {
     `<path d="M${f1(60 - tw + 2 * k)},${f1(topY + k)} Q${f1(60 - tw + 5 * k)},${f1(y.hip - 4 * k)} ${f1(60 - w.hip - e)},${f1(y.hip - 2 * k)} M${f1(60 + tw - 2 * k)},${f1(topY + k)} Q${f1(60 + tw - 5 * k)},${f1(y.hip - 4 * k)} ${f1(60 + w.hip + e)},${f1(y.hip - 2 * k)}" fill="none" stroke="#d2a659" stroke-width="${sw(.8)}" opacity=".55"/>`;   // 옆선 스티치, 주머니
   if (bt.k === 'slacks' && cut !== 'short') out += `<path d="M${f1(60 - L.ct)},${f1(y.hip + 6 * k)} L${f1(60 - hc)},${f1(hemY - 6 * k)} M${f1(60 + L.ct)},${f1(y.hip + 6 * k)} L${f1(60 + hc)},${f1(hemY - 6 * k)}" stroke="${shade(bt.c, 1.3)}" stroke-width="${sw(.9)}" opacity=".45"/>`;   // 다림질 선
   const belt = bt.tucked ? `<path d="M${f1(60 - tw - .3)},${f1(topY - 2.5 * k)} L${f1(60 + tw + .3)},${f1(topY - 2.5 * k)} L${f1(60 + tw + .5)},${f1(topY + 2.5 * k)} L${f1(60 - tw - .5)},${f1(topY + 2.5 * k)} Z" fill="#2a211d"/><rect x="${f1(60 - 3 * k)}" y="${f1(topY - 3 * k)}" width="${sw(6)}" height="${sw(6)}" rx="${sw(1)}" fill="none" stroke="#c8a24a" stroke-width="${sw(1.2)}"/>` : '';
-  return { svg: out, belt, hipEdge: w.hip + e };
+  const legs = cut === 'short' ? bare : '';
+  return { svg: legs + shoes + out, legs, shoes, cloth: out, belt, hipEdge: w.hip + e };
 }
 
 // 윗옷 종류별 [여유분(한쪽 px), 헐렁함 0~1, 밑단 높이(허리→가랑이 비율), 가슴 볼록 반영]
@@ -994,6 +1191,36 @@ function bustVolume(id, bx, cy, r, dk, op, valley, k) {
   if (valley) o += `<ellipse cx="60" cy="${f1(cy - r * .12)}" rx="${f1(1.8 * k + Math.max(0, bx - r) * .8)}" ry="${f1(r * .62)}" fill="url(#${id}v)"/>`;
   return o;
 }
+// 옷 위 가슴 볼륨 (1-3): 동그란 하이라이트·컵 윤곽선 없이 — 밑가슴 그림자 곡선(초승달) + 윗면 아주 옅은 빛 (+ 몸에 붙는 옷은 가운데 짧은 골)
+//   옆 윤곽 볼록과 밑단 들림은 윤곽에서 처리. bx: 가운데에서 가슴 중심까지, cy: 꼭짓점 높이, r: 반지름, dk 그림자 색, op 세기
+function bustCloth(id, bx, cy, r, dk, op, valley, k) {
+  const q = v => f1(v * 100) / 100;
+  let o = `<defs><linearGradient id="${id}t" gradientUnits="userSpaceOnUse" x1="0" y1="${f1(cy - r * 1.05)}" x2="0" y2="${f1(cy + r * .1)}"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".7" stop-color="#fff" stop-opacity="${q(op * .32)}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>`;
+  const xo = bx + r * .95;
+  o += `<path d="M${f1(60 - xo)},${f1(cy + r * .1)} Q${f1(60 - bx)},${f1(cy - r * 1.15)} 60,${f1(cy - r * .55)} Q${f1(60 + bx)},${f1(cy - r * 1.15)} ${f1(60 + xo)},${f1(cy + r * .1)} Z" fill="url(#${id}t)"/>`;
+  o += [-1, 1].map(s => {   // 밑가슴: 바깥에서 안쪽으로 가늘어지는 초승달
+    const X = v => f1(60 + s * v);
+    return `<path d="M${X(bx + r * .92)},${f1(cy + r * .05)} Q${X(bx + r * .7)},${f1(cy + r * 1.02)} ${X(bx - r * .15)},${f1(cy + r * .98)} Q${X(bx - r * .55)},${f1(cy + r * .92)} ${X(Math.max(1.2 * k, bx - r * .82))},${f1(cy + r * .58)} Q${X(bx - r * .3)},${f1(cy + r * .74)} ${X(bx + r * .1)},${f1(cy + r * .72)} Q${X(bx + r * .62)},${f1(cy + r * .66)} ${X(bx + r * .92)},${f1(cy + r * .05)} Z" fill="${dk}" opacity="${q(op)}"/>`;
+  }).join('');
+  if (valley) o += `<path d="M60,${f1(cy - r * .35)} L60,${f1(cy + r * .35)}" stroke="${dk}" stroke-width="${f1(1.3 * k)}" stroke-linecap="round" opacity="${q(op * .7)}"/>`;
+  return o;
+}
+// 줄무늬가 가슴 높이에서 몸 볼륨을 따라 휨 (1-3) — 따로 선을 긋지 않음. rows: 줄 가운데 y 목록, half(y): 그 높이 반폭, bust: { bx, cy, r, amp }
+function stripeRows(rows, half, bust, c, th) {
+  return rows.map(yy => {
+    const hw = half(yy) + 2;
+    let d = `M${f1(60 - hw)},${f1(yy)}`;
+    for (let x = -hw + 2; x <= hw + .01; x += 2) {
+      let dy = 0;
+      if (bust) {
+        const t = (yy - (bust.cy - bust.r)) / (bust.r * 2.1);
+        if (t > 0 && t < 1) { const ax = Math.abs(x), bump = Math.max(0, 1 - ((ax - bust.bx) / (bust.r * 1.05)) ** 2); dy = bust.amp * Math.sin(Math.PI * t) * bump; }
+      }
+      d += ` L${f1(60 + x)},${f1(yy + dy)}`;
+    }
+    return d;
+  }).join(' ').replace(/^/, `<path d="`) + `" fill="none" stroke="${c}" stroke-width="${f1(th)}"/>`;
+}
 // 밑단 골지 (세로줄)
 const hemRib = (hemW, hemY, k, c) => `<path d="${Array.from({ length: 9 }, (_, i) => { const x = 60 - hemW + 1.5 + i * (hemW * 2 - 3) / 8; return `M${f1(x)},${f1(hemY - 6 * k)} L${f1(x)},${f1(hemY)}`; }).join(' ')}" stroke="${c}" stroke-width="${f1(1.2 * k)}"/>`;
 // 윗옷 (전신): 몸 앵커 + 여유분. 헐렁할수록 허리 곡선이 덜 드러남. 어른 여자는 옆 볼록·밑단 들림 + 가슴 자리 입체 그림자
@@ -1003,21 +1230,26 @@ function topFull(a, top, A, skin, bt, X) {
   const c = top === 4 ? UNIFORM.blazer : stripe ? (base === '#ece7dd' ? '#3b4a6b' : base) : base, dark = shade(c, .78), fold = shade(c, .58);
   const [e, loose, hemR, bustF] = TOP_FIT[top] || TOP_FIT[0];
   const { y, w } = A, k = A.hs, sw = v => f1(v * k), nh = w.nh, ny = y.neck, sig = A.adult && A.f ? A.sig : null, tid = `av${UID}t`;
+  let pocketT = null;
   const tucked = !!bt.tucked, rib = top === 2 || top === 3 || top === 5 || top === 6, fitted = top === 0 || top === 1 || top === 3 || top === 5 || top === 8;
   const hemY = tucked ? pantsTop(A, bt) + 2.5 : y.waist + (y.crotch - y.waist) * hemR;
   const lift = tucked ? 0 : (sig ? sig[4] : 0) + (A.chubbyM ? 2 : 0);
   const bustW = w.rib + (w.bust - w.rib) * bustF;   // 헐렁한 옷은 옆 볼록이 절반
   const straight = lerp(w.waist, Math.max(w.ub, Math.min(bustW, w.hip) * .97), loose);
   const below = yy => Math.max(A.at(yy), lerp(A.at(yy), straight, loose)) + e;
-  const R = [[nh + 2 * k, ny], [lerp(nh, w.sh, .58) + e * .4, lerp(ny, y.sh, .72)], [w.tip + e * .6, y.sh + 1.2], [w.armpit + e, y.armpit],
-    [bustW + e, y.bust], [lerp(w.ub, bustW, loose * .7) + e, y.underbust]];
+  const R = [...shoulderR(A, e), [w.armpit + e, y.armpit], [bustW + e, y.bust], [lerp(w.ub, bustW, loose * .7) + e, y.underbust]];
   if (hemY > y.waist + 2) R.push([straight + e, y.waist]);
   for (const yy of [y.hipUp, y.hip]) if (yy < hemY - 2) R.push([below(yy), yy]);
   const hemW = (hemY > y.waist ? below(hemY) : A.at(hemY) + e) - (rib ? 1.4 : 0);   // 후디·니트는 밑단 골지가 조임
   R.push([hemW, hemY]);
-  const shapeD = symShape(R, hemY + 1.4 - 2 * lift, ny + 2), fillC = stripe ? `url(#${tid}p)` : c;
+  const shapeD = symShape(R, hemY + 1.4 - 2 * lift, ny + 2), fillC = stripe ? STRIPE_BASE : c;
   let o = `<defs><clipPath id="${tid}c"><path d="${shapeD}"/></clipPath>${stripe ? `<pattern id="${tid}p" patternUnits="userSpaceOnUse" x="0" y="${f1(ny)}" width="40" height="${sw(7)}"><rect width="40" height="${sw(7)}" fill="${STRIPE_BASE}"/><rect y="${sw(4.2)}" width="40" height="${sw(2.8)}" fill="${c}"/></pattern>` : ''}</defs>`;
   o += `<path d="${shapeD}" fill="${fillC}" stroke="${shade(c, .6)}" stroke-width=".55" stroke-opacity=".55"/>`;
+  if (stripe) {   // 줄무늬: 몸통은 가슴에서 휘는 줄, 소매는 패턴
+    const rows = []; for (let yy = ny + 5.6 * k; yy < hemY; yy += 7 * k) rows.push(yy);
+    const bz = sig && A.ci >= 1 ? { bx: bustW * .5, cy: y.bust, r: bustW * (.42 + A.ci * .022), amp: Math.min(2.6, .5 + A.ci * .4) * k } : null;
+    o += `<g clip-path="url(#${tid}c)">${stripeRows(rows, yy => edgeAt(R, yy), bz, c, 2.8 * k)}</g>`;
+  }
   if (top === 4) {   // 교복: 셔츠 V + 라펠 + 넥타이/리본 + 단추 + 왼가슴 마크
     const tie = UNIFORM.tie[a.tie], vy = lerp(y.armpit, y.bust, .85);
     o += `<path d="M${f1(60 - nh - k)},${f1(ny)} L60,${f1(vy)} L${f1(60 + nh + k)},${f1(ny)} Z" fill="${UNIFORM.shirt}"/>
@@ -1039,6 +1271,8 @@ function topFull(a, top, A, skin, bt, X) {
     if (sig && A.ci >= 5) o += `<path d="M60,${f1(y.bust - 2.4)} Q61.4,${f1(y.bust)} 60,${f1(y.bust + 2.4)} Q58.6,${f1(y.bust)} 60,${f1(y.bust - 2.4)} Z" fill="${shade(skin, .92)}" stroke="${dark}" stroke-width=".5"/>`;   // 단추 사이 벌어짐
   } else if (top === 2) {   // 후디: 후드 + 끈 + 캥거루 주머니 + 밑단 골지
     const pw = straight * .62 + e * .3, py = y.waist - 6 * k;
+    const pkD = `M${f1(60 - pw)},${f1(py + 16 * k)} L${f1(60 - pw + 5 * k)},${f1(py)} Q60,${f1(py - 4 * k)} ${f1(60 + pw - 5 * k)},${f1(py)} L${f1(60 + pw)},${f1(py + 16 * k)} Z`;
+    pocketT = { x: pw - 2.4 * k, y: py + 7 * k, svg: `<path d="${pkD}" fill="${c}" stroke="${fold}" stroke-width="${sw(1.3)}" stroke-opacity=".45"/>` };   // 캥거루 주머니 (주머니 자세에서 손 위로 다시 그림)
     o += `<path d="M${f1(60 - nh - 10 * k)},${f1(ny + 5 * k)} C${f1(60 - nh - 9 * k)},${f1(ny - 9 * k)} ${f1(60 + nh + 9 * k)},${f1(ny - 9 * k)} ${f1(60 + nh + 10 * k)},${f1(ny + 5 * k)} C${f1(60 + nh)},${f1(ny + 14 * k)} ${f1(60 - nh)},${f1(ny + 14 * k)} ${f1(60 - nh - 10 * k)},${f1(ny + 5 * k)} Z" fill="${dark}"/>
       <path d="M${f1(60 - nh - k)},${f1(ny)} Q60,${f1(ny + 10 * k)} ${f1(60 + nh + k)},${f1(ny)}" fill="${skin}"/>
       <path d="M${f1(60 - 5 * k)},${f1(ny + 9 * k)} L${f1(60 - 6 * k)},${f1(ny + 28 * k)} M${f1(60 + 5 * k)},${f1(ny + 9 * k)} L${f1(60 + 6 * k)},${f1(ny + 28 * k)}" stroke="${shade(c, 1.5)}" stroke-width="${sw(1.6)}" stroke-linecap="round"/>
@@ -1096,48 +1330,63 @@ function topFull(a, top, A, skin, bt, X) {
     const wx = straight + e;
     o += `<path d="${[-1, 1].map(s => `M${f1(60 + s * (wx - 2.5 * k))},${f1(y.waist - 7 * k)} L${f1(60 + s * (wx - 2 * k))},${f1(y.waist + k)} M${f1(60 + s * (wx - 5.5 * k))},${f1(y.waist - 5 * k)} L${f1(60 + s * (wx - 5 * k))},${f1(y.waist + 1.5 * k)}`).join(' ')}" ${sf} stroke-width="${sw(1.2)}" opacity=".2"/>`;
   }
-  if (sig && A.ci >= 1) {   // 가슴 자리에만 입체 그림자 (컵이 클수록 짙게, 헐렁한 옷은 약하게, 몸에 붙는 옷은 가운데 골)
-    const bx = bustW * .5, r = bustW * (.42 + A.ci * .022), op = Math.min(.42, .1 + A.ci * .05) * (fitted ? 1 : .6);
-    o += `<g clip-path="url(#${tid}c)">${bustVolume(tid + 'b', bx, y.bust, r, shade(stripe ? '#8d8679' : c, .42), op, fitted && A.ci >= 3, k)}</g>`;
+  if (sig && A.ci >= 1) {   // 가슴: 밑가슴 그림자 곡선 + 윗면 옅은 빛 (컵이 클수록 짙게, 헐렁한 옷은 약하게, 몸에 붙는 옷은 가운데 골)
+    const bx = bustW * .5, r = bustW * (.42 + A.ci * .022), op = Math.min(.34, .08 + A.ci * .04) * (fitted ? 1 : .6);
+    o += `<g clip-path="url(#${tid}c)">${bustCloth(tid + 'b', bx, y.bust, r, shade(stripe ? '#8d8679' : c, .5), op, fitted && A.ci >= 4, k)}</g>`;
     if (fitted && A.ci >= 4) {   // 옷 장력 주름: 가슴에서 겨드랑이 쪽으로 (D 1개, E 이상 2개)
       let dd = '';
       for (let i = 0; i < (A.ci >= 5 ? 2 : 1); i++) for (const s of [-1, 1]) dd += `M${f1(60 + s * bustW * .62)},${f1(y.bust - 1 - i * 2.4 * k)} Q${f1(60 + s * bustW * .82)},${f1(y.bust - 3 - i * 2.4 * k)} ${f1(60 + s * (ax - 1.2))},${f1(y.armpit + 2.5 - i * 1.2 * k)} `;
       o += `<path d="${dd}" ${sf} stroke-width=".7" opacity=".3"/>`;
     }
-  } else if (!A.f && A.adult && (A.fitM || A.C.shoulder >= 46)) o += `<path d="M${f1(60 - w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 - w.rib * .35)},${f1(y.bust + 3)} 59,${f1(y.bust + 1.5)} M${f1(60 + w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 + w.rib * .35)},${f1(y.bust + 3)} 61,${f1(y.bust + 1.5)}" ${sf} stroke-width=".9" opacity=".22"/>`;   // 가슴 근육선
-  return { svg: o, color: c, fill: stripe ? fillC : null, gw: yy => edgeAt(R, yy), bustEdge: bustW + e };
+  } else if (!A.f && A.adult && A.fitM) o += `<path d="M${f1(60 - w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 - w.rib * .35)},${f1(y.bust + 3)} 59,${f1(y.bust + 1.5)} M${f1(60 + w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 + w.rib * .35)},${f1(y.bust + 3)} 61,${f1(y.bust + 1.5)}" ${sf} stroke-width=".9" opacity=".22"/>`;   // 가슴 근육선
+  return { svg: o, color: c, fill: stripe ? `url(#${tid}p)` : null, gw: yy => edgeAt(R, yy), bustEdge: bustW + e, hemY, pocket: pocketT, lowC: bt.c };
 }
 
-// 팔: 어깨 끝에서 시작해 골반보다 바깥으로 떨어짐. 기본 자세는 몸통 뒤에 그려서 가슴·허리 윤곽이 가려지지 않게
-//   default 차렷 / hip 한 손 허리(팔꿈치는 허리 높이에서 바깥, 팔과 허리 사이 빈 삼각형) / cross 팔짱(밑가슴 +2px, 가슴에 밀려 바깥으로)
+// 팔 (1-2): 어깨 관절에서 앵커 5개(어깨 1 / 상완 중간 .95·근육형 1.05 / 팔꿈치 .75 / 전완 .85 / 손목 .55)를 지나는 굵기가 변하는 팔
+//   팔꿈치는 허리 높이, 손목은 골반 높이, 손끝은 허벅지 중간. 팔꿈치에서 바깥으로 살짝 꺾임(남 2.5°, 여 4°) — 완전 직선 없음
+//   기본 자세는 몸통 뒤에 그려서 가슴·허리 윤곽이 가려지지 않게. 위쪽 끝은 몸통(삼각근 윤곽) 아래로 숨음
+//   default 차렷 / hip 한 손 허리 / cross 팔짱 / clasp 두 손을 앞에 모음 / pocket 주머니(한 손 또는 두 손)
 function armsFull(A, top, pose, skin, T, lowHip, ring) {   // ring: 왼손(화면 오른쪽, s=1) 약지에 결혼 반지
-  const { y, w } = A, { uw, fw, ww, hand } = A.arm, k = A.hs, c = T.color, shortSl = top === 0, ln = shade(c, .6);
-  const jx = w.sh - uw / 2, jy = y.sh + uw * .45, capR = uw / 2 + (A.adult && !A.f ? (A.fitM ? 2.5 : 1.2) : 0);   // 남자는 삼각근 볼륨
+  const { y, w } = A, { uw, mw, ew, fw, ww, hand } = A.arm, k = A.hs, c = T.color, shortSl = T.sleeve ? T.sleeve === 'short' : top === 0, bareArm = T.sleeve === 'none', ln = shade(c, .6);
+  const jx = w.sh - uw / 2, jy = y.sh + uw * .5, dv = A.delt || 0;
   const rotOf = (E, W) => Math.atan2(-(W[0] - E[0]), W[1] - E[1]) * 180 / Math.PI;
+  const along = (P0, P1, d) => { const l = Math.hypot(P1[0] - P0[0], P1[1] - P0[1]) || 1; return [P0[0] + (P1[0] - P0[0]) * d / l, P0[1] + (P1[1] - P0[1]) * d / l]; };
+  const cuffAt = T.cuff ?? .86;   // 소매 끝 (전완의 비율, 오버핏은 손등까지)
   const cuff = (E, W, wd) => {
-    const x = lerp(E[0], W[0], .84), yy = lerp(E[1], W[1], .84), l = Math.hypot(W[0] - E[0], W[1] - E[1]) || 1, nx = -(W[1] - E[1]) / l * wd * .55, ny = (W[0] - E[0]) / l * wd * .55;
+    const x = lerp(E[0], W[0], Math.min(cuffAt, 1)), yy = lerp(E[1], W[1], Math.min(cuffAt, 1)), l = Math.hypot(W[0] - E[0], W[1] - E[1]) || 1, nx = -(W[1] - E[1]) / l * wd * .55, ny = (W[0] - E[0]) / l * wd * .55;
     return `<path d="M${P(x - nx, yy - ny)} L${P(x + nx, yy + ny)}" stroke="${ln}" stroke-width="${f1(1.4 * k)}" opacity=".55"/>`;
   };
-  // 팔 한 마디: 반팔이면 소매 아래는 살
+  // 팔 한 줄기: 반팔이면 소매 아래는 살, 민소매면 전부 살. sleeveTo: 반팔 소매 끝(상완 비율)
   const seg = (pts, dim, sleeveTo) => {
-    const sc = T.fill || (dim ? shade(c, .9) : c), sk = dim ? shade(skin, .94) : skin;
-    if (!shortSl) return `<path d="${taperD(pts, true)}" fill="${sc}" stroke="${ln}" stroke-width=".5"/>`;
-    let o = `<path d="${taperD(pts, true)}" fill="${sk}" stroke="${shade(skin, .72)}" stroke-width=".5"/>`;
-    if (sleeveTo) { const p = pts[0], q = pts[pts.length - 1], m = [lerp(p[0], q[0], sleeveTo), lerp(p[1], q[1], sleeveTo)]; o += `<path d="${taperD([[p[0], p[1], p[2] + 1.2 * k], [m[0], m[1], uw + 1.3 * k]], true)}" fill="${sc}" stroke="${ln}" stroke-width=".5"/>`; }
+    const sc = T.sleeveFill || T.fill || (dim ? shade(c, .9) : c), sk = dim ? shade(skin, .94) : skin;
+    if (!shortSl && !bareArm) return `<path d="${taperD(pts, false)}" fill="${sc}" stroke="${ln}" stroke-width=".5"/>`;
+    let o = `<path d="${taperD(pts, false)}" fill="${sk}" stroke="${shade(skin, .72)}" stroke-width=".5"/>`;
+    if (shortSl && sleeveTo) { const p = pts[0], q = pts[1], m = [lerp(p[0], q[0], sleeveTo), lerp(p[1], q[1], sleeveTo)]; o += `<path d="${taperD([[p[0], p[1], p[2] + 1.4 * k], [m[0], m[1], q[2] + 1.6 * k]], false)}" fill="${sc}" stroke="${ln}" stroke-width=".5"/>`; }
     return o;
   };
+  // 마른 체형은 손목뼈가 살짝 보임, 주름 (팔꿈치 안쪽, 옷 색 -15%)
+  const knob = (W, s) => A.build === 'slim' && A.adult && (shortSl || bareArm || cuffAt < .8) ? `<path d="M${P(W[0] + s * ww * .45, W[1] - 1.6 * k)} q${f1(s * .9 * k)},${f1(1 * k)} 0,${f1(2.2 * k)}" fill="none" stroke="${shade(skin, .7)}" stroke-width="${f1(.6 * k)}" opacity=".6"/>` : '';
+  const elbowFold = (E, s) => shortSl || bareArm ? '' : `<path d="M${P(E[0] - s * ew * .35, E[1] - 2.4 * k)} q${f1(s * ew * .3)},${f1(1.6 * k)} ${f1(s * ew * .55)},${f1(1 * k)} M${P(E[0] - s * ew * .3, E[1] + .6 * k)} q${f1(s * ew * .25)},${f1(.9 * k)} ${f1(s * ew * .45)},${f1(.4 * k)}" fill="none" stroke="${shade(c, .85)}" stroke-width="${f1(.9 * k)}" stroke-linecap="round" opacity=".7"/>`;
   const one = (s, E, W, rot, dim) => {
-    const J = [60 + s * jx, jy];
-    const pts = [[J[0], J[1], capR * 2], [lerp(J[0], E[0], .4) + s * .5, lerp(J[1], E[1], .4), uw], [E[0], E[1], (uw + fw) / 2], [(E[0] + W[0]) / 2 + s * .3, (E[1] + W[1]) / 2, fw * .9], [W[0], W[1], ww]];
-    let o = seg(pts, dim, .2);
-    if (!shortSl) o += cuff(E, W, ww * 1.5);
-    o += `<path d="M${P(E[0] - s * fw * .25, E[1] + 2 * k)} Q${P((E[0] + W[0]) / 2 - s * fw * .35, (E[1] + W[1]) / 2)} ${P(W[0] - s * ww * .3, W[1] - 2 * k)}" fill="none" stroke="${shade(shortSl ? skin : c, .72)}" stroke-width="${f1(k)}" opacity=".35"/>`;   // 팔 안쪽 그림자
-    return o + handAt(W[0], W[1], s, skin, rot, hand, ring && s === 1);
+    const J = [60 + s * jx, jy], U = along(J, E, A.H * .08), F = along(E, W, A.H * .05);
+    const pts = [[J[0] + s * dv * .5, J[1], uw + dv], [U[0] + s * dv * .3, U[1], mw + dv * .6], [E[0], E[1], ew], [F[0], F[1], fw], [W[0], W[1], ww]];
+    let o = seg(pts, dim, .62);
+    if (!shortSl && !bareArm) o += cuff(E, W, ww * 1.6) + elbowFold(E, s);
+    o += `<path d="M${P(E[0] - s * ew * .25, E[1] + 2 * k)} Q${P(F[0] - s * fw * .35, F[1])} ${P(W[0] - s * ww * .3, W[1] - 2 * k)}" fill="none" stroke="${shade(shortSl || bareArm ? skin : c, .72)}" stroke-width="${f1(k)}" opacity=".3"/>`;   // 팔 안쪽 그림자
+    const hd = handAt(W[0], W[1], s, skin, rot, hand, ring && s === 1) + knob(W, s);
+    return cuffAt > 1 ? hd + o : o + hd;   // 오버핏 소매는 손등을 덮음
   };
+  // 차렷: 팔꿈치는 허리 높이에서 몸 바깥, 손목은 골반 높이에서 골반 바깥 — 팔꿈치에서 바깥으로 꺾임
   const tB = clamp((y.bust - jy) / (y.waist - jy), .2, 1);
-  const xe = Math.max(jx + 1, T.gw(y.waist) + uw / 2 + 2.5, jx + (T.bustEdge + 1.5 - uw / 2 - jx) / tB);
-  const yw = lerp(y.hip, y.crotch, .55), xw = Math.max(Math.max(lowHip, T.gw(yw)) + ww / 2 + 1.5, xe + 1);
-  const def = (s, dim) => { const E = [60 + s * xe, y.waist], W = [60 + s * xw, yw]; return one(s, E, W, rotOf(E, W) * .7, dim); };
+  const xe = Math.max(jx + .6, T.gw(y.waist) + ew * .3, jx + (T.bustEdge - uw * .55 - jx) / tB);   // 팔 안쪽은 몸통(가슴·허리) 옆에 살짝 가려짐
+  const bend = (A.f ? 4 : 2.5) * Math.PI / 180, fl = (y.hip - y.waist) * 1.02;
+  const armDown = s => {
+    const E = [60 + s * xe, y.waist], th = Math.atan2(xe - jx, y.waist - jy) + bend;
+    const wy = y.waist + Math.cos(th) * fl, need = Math.max(wy < T.hemY ? T.gw(wy) + ww * .2 : 0, w.hip - ww * .1);   // 윗옷 밑단 위면 윗옷 옆, 아래면 손이 골반·허벅지 옆에 살짝 걸침
+    const W = [60 + s * Math.max(need, Math.min(xe + Math.sin(th) * fl, Math.max(xe, need) + 1.4)), wy];   // 팔꿈치가 이미 바깥이면 전완은 거의 수직으로
+    return [E, W];
+  };
+  const def = (s, dim) => { const [E, W] = armDown(s); return one(s, E, W, rotOf(E, W) * .85, dim); };
   if (pose === 'hip') {
     const yh = lerp(y.waist, y.hip, .42), E = [60 + T.gw(y.waist) + uw * 1.3 + 3.5, y.waist - (y.waist - y.sh) * .06];
     const W = [60 + Math.max(T.gw(yh), lowHip * .92) + ww * .2, yh - hand * .3];
@@ -1146,11 +1395,36 @@ function armsFull(A, top, pose, skin, T, lowHip, ring) {   // ring: 왼손(화�
   if (pose === 'cross') {
     const yc = (A.adult && A.f ? y.underbust : lerp(y.bust, y.waist, .35)) + 2 + fw / 2;
     const ex = Math.max(T.bustEdge, xe + uw / 2) + 2 - uw / 2;
-    const up = s => { const J = [60 + s * jx, jy], E = [60 + s * ex, yc]; return seg([[J[0], J[1], capR * 2], [lerp(J[0], E[0], .5) + s * .8, lerp(J[1], E[1], .5), uw], [E[0], E[1], uw * .98]], true, .45); };
-    const fore = (s, E, W) => seg([[E[0], E[1], (uw + fw) / 2], [lerp(E[0], W[0], .5), lerp(E[1], W[1], .5) + fw * .15, fw * .95], [W[0], W[1], ww * 1.25]], false, 0) + (shortSl ? '' : cuff(E, W, ww * 1.7));
+    const up = s => { const J = [60 + s * jx, jy], E = [60 + s * ex, yc]; return seg([[J[0] + s * dv * .5, J[1], uw + dv], [lerp(J[0], E[0], .5) + s * .8, lerp(J[1], E[1], .5), mw + dv * .6], [E[0], E[1], uw * .9]], true, .62); };
+    const fore = (s, E, W) => seg([[E[0], E[1], uw * .85], [lerp(E[0], W[0], .5), lerp(E[1], W[1], .5) + fw * .15, fw], [W[0], W[1], ww * 1.25]], false, 0) + (shortSl || bareArm ? '' : cuff(E, W, ww * 1.7));
     const ER = [60 + ex, yc], EL = [60 - ex, yc + fw * .55];
     return { back: up(-1) + up(1),
       front: fore(1, ER, [60 - ex + uw * .9, yc - fw * .2]) + fore(-1, EL, [60 + ex - uw * 1.1, yc + fw * .15]) + handAt(60 + ex - uw * .75, yc + fw * .1, 1, skin, -160, hand * .72, ring) };
+  }
+  if (pose === 'clasp') {   // 두 손을 앞에 모음: 팔꿈치는 허리 옆, 전완이 비스듬히 모여 골반 높이에서 한 손이 다른 손 위에 겹침
+    const yc = lerp(y.waist, y.hip, 1.05), xe2 = Math.max(jx + .4, xe - 1.4);
+    const arm2 = s => {
+      const J = [60 + s * jx, jy], E = [60 + s * xe2, y.waist + 1], W = [60 + s * 3.2, yc + (s > 0 ? 1.2 : 0)], U = along(J, E, A.H * .08), F = along(E, W, A.H * .04);
+      let o = seg([[J[0] + s * dv * .5, J[1], uw + dv], [U[0], U[1], mw + dv * .6], [E[0], E[1], ew], [F[0], F[1], fw], [W[0], W[1], ww]], false, .62);
+      if (!shortSl && !bareArm) o += cuff(E, W, ww * 1.6);
+      return { o, h: handAt(W[0] - s * .6, W[1] - .4, -s, skin, rotOf(E, W) * .55, hand * .9, ring && s > 0) };
+    };
+    const L2 = arm2(-1), R2 = arm2(1);
+    return { back: '', front: L2.o + R2.o + L2.h + R2.h };
+  }
+  if (pose === 'pocket' || pose === 'pocket1') {   // 주머니: 손은 주머니 속(안 보임), 주머니 입구 천이 손목을 덮음. pocket1은 한 손만
+    const kang = !!T.pocket, both = pose === 'pocket';
+    const yp = kang ? T.pocket.y : lerp(y.hip, y.crotch, .15), pk = s => {
+      const E = [60 + s * (xe + 1.6), y.waist + (kang ? -1 : 1)], W = kang ? [60 + s * T.pocket.x, yp] : [60 + s * (w.hip * .74), yp];
+      const J = [60 + s * jx, jy], U = along(J, E, A.H * .08), F = along(E, W, A.H * .04);
+      const upper = seg([[J[0] + s * dv * .5, J[1], uw + dv], [U[0], U[1], mw + dv * .6], [E[0], E[1], ew * 1.05]], true, .62);
+      const fore = seg([[E[0], E[1], ew], [F[0], F[1], fw], [W[0], W[1], ww * 1.15]], false, 0) + (shortSl || bareArm ? '' : elbowFold(E, s));
+      return { upper, fore, W };
+    };
+    const arms = both ? [pk(-1), pk(1)] : [pk(1)];
+    const mouth = arms.map(({ W }) => { const s = W[0] > 60 ? 1 : -1; return kang ? '' : `<path d="M${P(W[0] - s * ww * .9, W[1] - 1.2)} Q${P(W[0], W[1] + 1.4)} ${P(W[0] + s * ww * 1.1, W[1] + 2.6)} L${P(W[0] + s * ww * 1.1, W[1] + 5)} L${P(W[0] - s * ww * .9, W[1] + 4)} Z" fill="${T.lowC || '#4a5f86'}"/><path d="M${P(W[0] - s * ww * .9, W[1] - 1.2)} Q${P(W[0], W[1] + 1.4)} ${P(W[0] + s * ww * 1.1, W[1] + 2.6)}" fill="none" stroke="${shade(T.lowC || '#4a5f86', .6)}" stroke-width=".7"/>`; }).join('');
+    return { back: (both ? '' : def(-1, true)) + arms.map(q => q.upper).join('') + (kang ? '' : arms.map(q => q.fore).join('') + mouth),
+      front: kang ? arms.map(q => q.fore).join('') + T.pocket.svg : '', pocket: true };
   }
   return { back: def(-1, true) + def(1, true), front: '' };
 }
@@ -1334,8 +1608,7 @@ function coverArms(F, skin, personality) {
 function renderPreIntimate(a, size, st) {
   UID++;
   const X = extras(a), age = st.age || 25, skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86);
-  const old = age >= 40 && a.gray < (age - 38) / 22;
-  const hc = HAIR[old ? GRAY : a.hc] || HAIR[0];
+  const hc = hairColor(a, age);
   const female = a.g === 'f', fig = typeof st.preIntimate === 'object' ? st.preIntimate : null;
   const F = frameOf(a, age, fig), personality = st.personality || 'warm';
   const w = Math.round(size), h = Math.round(size * 7 / 3);
@@ -1417,7 +1690,6 @@ function arousalFX(level) {
 }
 
 /* ---------- 그리기 ---------- */
-const POSE = { bold: 'hip', sunny: 'hip', sharp: 'cross', cool: 'cross' };
 // 머리 (머리 좌표: 정수리~턱 77). 목 그림자·귀·얼굴·눈·눈썹·코·입·앞머리·안경
 //   g: { skin, hc, hp, nh(머리 좌표 목 반폭), neckBot, af(다음 날 아침), tier, chin2(이중턱) }
 function headSVG(a, X, age, st, g) {
@@ -1442,7 +1714,7 @@ function headSVG(a, X, age, st, g) {
   o += `<defs><radialGradient id="${fid}g" cx=".5" cy=".44" r=".62"><stop offset=".58" stop-color="${skin}"/><stop offset="1" stop-color="${shade(skin, .91)}"/></radialGradient><clipPath id="${fid}c"><path d="${faceD}"/></clipPath></defs>`;
   o += `<path d="${faceD}" fill="url(#${fid}g)"/>`;
   // 앞머리·옆머리가 이마와 볼에 드리우는 그림자
-  if (hp.shadow) o += `<g clip-path="url(#${fid}c)"><path d="${hp.shadow}" transform="translate(.7,2.6)" fill="${shade(skin, .5)}" opacity=".2"/></g>`;
+  if (hp.shadow) o += `<g clip-path="url(#${fid}c)"><g transform="translate(.7,2.6)"><path d="${hp.shadow}"${hp.shadowT ? ` transform="${hp.shadowT}"` : ''} fill="${shade(skin, .5)}" opacity=".2"/></g></g>`;
   // 귀걸이 (어른만, 남자는 작은 큐빅). 옆머리가 있으면 그 뒤로
   if (adult && X.ear) o += G(L && L.earT(-1), earringSVG(female ? X.ear : 1, X.metal, -1)) + G(L && L.earT(1), earringSVG(female ? X.ear : 1, X.metal, 1));
   if (g.chin2) o += G(L && `translate(0,${f1(L.chinDy)})`, `<path d="M48,100.5 Q60,108.5 72,100.5" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.6" stroke-linecap="round" opacity=".4"/>`);   // 이중턱
@@ -1556,27 +1828,75 @@ function headSVG(a, X, age, st, g) {
   o += G(L && a.glasses && L.glassT, glassesSVG(a.glasses, X.glc));
   return o;
 }
-const hairColor = (a, age) => {
-  const old = age >= 40 && a.gray < (age - 38) / 22;   // 40대부터 흰머리 확률 증가
-  return HAIR[old ? GRAY : age <= 18 && a.hc >= 4 ? (a.hc % 2 ? 2 : 1) : a.hc] || HAIR[0];   // 어린이·10대는 염색 안 함 (갈색 / 밝은 갈색)
-};
+// 머리색 (흰머리 섞기 전). 어린이·10대는 염색 안 함 → 원래 머리색
+const hairColor = (a, age) => HAIR[age <= 18 && (DYED.has(a.hc) || a.hc === GRAY) ? (a.hcN ?? (a.hc % 2 ? 2 : 1)) : a.hc] || HAIR[0];
+// 눈썹·수염용: 흰머리가 섞인 색
+const browColor = (a, age) => { const hc = hairColor(a, age), gl = grayLevel(a, age); return gl > 0 ? mixC(hc, '#d2cdc6', Math.pow(gl, 1.4) * .6) : hc; };
 const topOf = (a, age) => age >= 13 && age <= 18 ? 4 : age <= 12 ? ({ 1: 0, 3: 2, 7: 2 }[a.top] ?? a.top) : a.top;   // 10대는 교복, 어린이는 셔츠·니트·재킷 대신 티·후디
+// SVG 문자열 안의 절대 좌표를 W(x, y)로 옮김 (path d의 대문자 명령, cx·cy, x·y). 상대 명령(소문자)은 변위라 그대로 둠
+function warpSVG(svg, W) {
+  const wp = d => {
+    const tk = d.match(/[A-Za-z]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g) || [];
+    const AR = { M: 2, L: 2, T: 2, C: 6, S: 4, Q: 4, A: 7, H: 1, V: 1, Z: 0 };
+    let out = '', cmd = '', i = 0, cx = 0, cy = 0;
+    while (i < tk.length) {
+      if (/[A-Za-z]/.test(tk[i])) { cmd = tk[i++]; out += cmd; if (cmd === 'Z' || cmd === 'z') continue; }
+      const U = cmd.toUpperCase(), n = AR[U], abs = cmd === U, nums = tk.slice(i, i + n).map(Number); i += n;
+      if (nums.length < n) break;
+      if (!abs) { if (U === 'H') cx += nums[0]; else if (U === 'V') cy += nums[0]; else { cx += nums[n - 2]; cy += nums[n - 1]; } out += nums.join(',') + ' '; continue; }
+      if (U === 'H' || U === 'V') { if (U === 'H') cx = nums[0]; else cy = nums[0]; const q = W(cx, cy); out = out.slice(0, -1) + 'L' + P(q[0], q[1]) + ' '; continue; }
+      const o = nums.slice();
+      for (let j = U === 'A' ? 5 : 0; j < n; j += 2) { const q = W(nums[j], nums[j + 1]); o[j] = f1(q[0]); o[j + 1] = f1(q[1]); }
+      cx = nums[n - 2]; cy = nums[n - 1]; out += o.join(',') + ' ';
+    }
+    return out;
+  };
+  return svg.replace(/ d="([^"]*)"/g, (m, d) => ` d="${wp(d)}"`)
+    .replace(/cx="(-?[\d.]+)" cy="(-?[\d.]+)"/g, (m, x, y) => { const q = W(+x, +y); return `cx="${f1(q[0])}" cy="${f1(q[1])}"`; });
+}
+// 기본 서기 자세 (1-7): 차렷(소심·냉철) / 짝다리(직진·장난·낙천) / 손 모음(다정·예민) / 주머니(무심, 바지·후디일 때만)
+//   arms: default·hip·cross·clasp·pocket·pocket1, stance: stand·contra. 냉철형은 차렷 + 팔짱, 직진형은 짝다리 + 한 손 허리
+const POSE = { shy: ['stand', 'default'], sharp: ['stand', 'cross'], bold: ['contra', 'hip'], playful: ['contra', 'default'], sunny: ['contra', 'default'],
+  warm: ['stand', 'clasp'], sensitive: ['stand', 'clasp'], cool: ['stand', 'pocket'] };
+// 짝다리: 체중 실은 쪽 골반이 3.5° 올라가고 바깥으로 밀림, 반대쪽 무릎은 살짝 굽어 안쪽으로, 발은 바깥·뒤꿈치 들림, 어깨는 반대로 1.5°
+function stanceOf(A, ws) {
+  const { y, w, leg: L } = A, k = A.hs, fs = -ws, sway = 3.4, tilt = Math.tan(4 * Math.PI / 180), kb = 3.4, fo = 2.4;
+  const ramp = (v, a, b) => clamp((v - a) / (b - a), 0, 1);
+  const W = (x, yy) => {
+    const side = clamp((x - 60) / 2.5, -1, 1), free = Math.max(0, side * fs);
+    const fsw = 1 - ramp(yy, y.hip, y.ankle), ft = 1 - ramp(yy, y.hip, y.knee);
+    let dx = ws * sway * fsw, dy = -(x - 60) * ws * tilt * ft;
+    if (free) {
+      const kn = Math.max(0, 1 - Math.abs(yy - y.knee) / (y.knee - y.thigh) * .9);
+      dx += free * (-fs * kb * kn + fs * fo * ramp(yy, y.knee, y.ankle));
+      dy -= free * 1.8 * ramp(yy, y.calf, y.ankle);
+    }
+    return [x + dx, yy + dy];
+  };
+  return { ws, fs, W, heel: 1.8, up: `translate(${f1(ws * sway)},0) rotate(${ws * 1.8},60,${f1(y.waist)})` };
+}
 // 옷 입은 전신: 0 0 120 280, 바닥선 272. 머리는 머리 좌표 그대로 그려서 나이별 머리 높이에 맞게 줄임
 function renderFull(a, size, st) {
   UID++;
   const X = extras(a), age = st.age ?? 25, skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86), hc = hairColor(a, age), top = topOf(a, age);
   const A = anchorsOf(a, age, typeof st.full === 'object' ? st.full : null), { y, w } = A, hs = A.hs;
   const toHead = v => (v - A.hty) / hs, HG = s => `<g transform="translate(${f1(A.htx)},${f1(A.hty)}) scale(${hs.toFixed(4)})">${s}</g>`;
-  const hp = hairPieces(a, X, age, hc, { sy: toHead(y.sh), chest: toHead(y.bust) });
-  const bt = bottomOf(a, X, age, A), pose = age <= 12 ? 'default' : st.pose || POSE[st.personality] || 'default';
-  const low = lowerFull(a, X, age, A, skinD, bt), T = topFull(a, top, A, skinD, bt, X), AR = armsFull(A, top, pose, skinD, T, low.hipEdge, !!st.ring && age >= 19);
-  const neckBot = y.neck + 4 * hs;
+  const hp = hairPieces(a, X, age, hc, { sy: toHead(y.sh), chest: toHead(y.bust) }, st.ctx);
+  const bt = bottomOf(a, X, age, A);
+  // 자세: st.pose('default'|'hip'|'cross'|'clasp'|'pocket'|'contra'…) 또는 성격. 어린이는 차렷. 주머니는 바지·후디일 때만
+  const pz = typeof st.pose === 'string' && st.pose !== 'default' ? (st.pose === 'contra' ? ['contra', 'default'] : st.pose.startsWith('contra-') ? ['contra', st.pose.slice(7)] : ['stand', st.pose]) : st.pose === 'default' ? ['stand', 'default'] : POSE[st.personality] || ['stand', 'default'];
+  let [stance, pose] = age <= 12 ? ['stand', 'default'] : pz;
+  if (pose === 'pocket' && bt.k === 'skirt' && top !== 2) pose = 'cross';
+  if (pose === 'pocket' && hash(String(a.fs || a.hair)) % 3 === 0) pose = 'pocket1';
+  const ST = stance === 'contra' ? stanceOf(A, pose === 'hip' ? 1 : hash(String(a.fs || a.face)) % 2 ? 1 : -1) : null;
+  const low = lowerFull(a, X, age, A, skinD, bt, ST), T = topFull(a, top, A, skinD, bt, X), AR = armsFull(A, top, pose, skinD, T, low.hipEdge, !!st.ring && age >= 19);
+  const neckBot = y.neck + 4 * hs, LW = s => ST ? warpSVG(s, ST.W) : s, UP = s => ST ? `<g transform="${ST.up}">${s}</g>` : s;
   let o = `<svg class="av av-full" width="${Math.round(size)}" height="${Math.round(size * 7 / 3)}" viewBox="0 0 120 280" aria-hidden="true">`;
   o += `<rect class="av-bg" x=".5" y=".5" width="119" height="279" rx="10" style="stroke-width:1.5"/>`;
-  o += HG(hp.back) + AR.back + low.svg;
-  o += `<path d="M${f1(60 - w.nh)},${f1(A.hty + 90 * hs)} L${f1(60 + w.nh)},${f1(A.hty + 90 * hs)} L${f1(60 + w.nh)},${f1(neckBot)} L${f1(60 - w.nh)},${f1(neckBot)} Z" fill="${skinD}"/>`;
-  o += T.svg + low.belt + AR.front;
-  o += HG(headSVG(a, X, age, st, { skin, hc, hp, nh: w.nh / hs, neckBot: toHead(neckBot), af: null, tier: -1, chin2: A.chubbyM }));
+  o += UP(HG(hp.back)) + LW(low.legs) + low.shoes + LW(low.cloth) + UP(AR.back);
+  o += UP(`<path d="M${f1(60 - w.nh)},${f1(A.hty + 90 * hs)} L${f1(60 + w.nh)},${f1(A.hty + 90 * hs)} L${f1(60 + w.nh)},${f1(neckBot)} L${f1(60 - w.nh)},${f1(neckBot)} Z" fill="${skinD}"/>`);
+  o += UP(T.svg) + LW(low.belt) + UP(AR.front);
+  o += UP(HG(headSVG(a, X, age, st, { skin, hc: browColor(a, age), hp, nh: w.nh / hs, neckBot: toHead(neckBot), af: null, tier: -1, chin2: A.chubbyM })));
   if (st.guides) o += guidesSVG(A);
   return o + '</svg>';
 }
@@ -1596,7 +1916,7 @@ function render(a, size = 48, state = 25) {
   const fig = adult ? (af || du || st).fig : null;
   const A = anchorsOf(a, age, fig && typeof fig === 'object' ? fig : null), hs = A.hs, toHead = v => (v - A.hty) / hs;
   const BG = s => `<g transform="scale(${(1 / hs).toFixed(4)}) translate(${f1(-A.htx)},${f1(-A.hty)})">${s}</g>`;
-  const hp = st.mask ? { back: '', front: '', shadow: '' } : hairPieces(a, X, age, hc, { sy: toHead(A.y.sh), chest: toHead(A.y.bust) });
+  const hp = st.mask ? { back: '', front: '', shadow: '' } : hairPieces(a, X, age, hc, { sy: toHead(A.y.sh), chest: toHead(A.y.bust) }, st.ctx);
   const nh = A.w.nh / hs, neckBot = toHead(A.y.neck + 4 * hs);
   const neck = c => `<path d="M${f1(60 - nh)},94 L${f1(60 + nh)},94 L${f1(60 + nh)},${f1(neckBot)} L${f1(60 - nh)},${f1(neckBot)} Z" fill="${c}"/>`;
   let o = `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/>`;
@@ -1612,7 +1932,7 @@ function render(a, size = 48, state = 25) {
     const bt = bottomOf(a, X, age, A), T = topFull(a, top, A, skinD, bt, X), AR = armsFull(A, top, 'default', skinD, T, A.w.hip + 2);
     o += BG(AR.back) + neck(skinD) + BG(T.svg + AR.front);
   }
-  o += headSVG(a, X, age, st, { skin, hc, hp, nh, neckBot, af, tier, du, cut, chin2: A.chubbyM });
+  o += headSVG(a, X, age, st, { skin, hc: browColor(a, age), hp, nh, neckBot, af, tier, du, cut, chin2: A.chubbyM });
   return o + '</svg>';
 }
 
@@ -1641,9 +1961,10 @@ function univLogo(u, size = 40) {
 
 // 고를 수 있는 파츠 이름 (20세 시작 외모 단계)
 const PARTS = {
-  hair: { m: ['짧은', '반삭', '투블럭', '덮은', '장발', '묶은', '댄디', '올백', '곱슬 펌', '울프컷'],
-    f: ['단발', '어깨', '긴 머리', '묶은', '포니테일', '반묶음', '숏컷', '긴 웨이브', '똥머리', '땋은 머리', '히메컷', '레이어드'] },
-  hc: ['검정', '갈색', '밝은 갈색', '회색', '와인', '애쉬 금발', '애쉬 브라운', '구릿빛', '밀크티 베이지', '핑크 브라운'].map((label, id) => ({ id, label, color: HAIR[id] })).filter(x => x.id !== GRAY),
+  hair: { m: HSTYLES.m.map(x => x.label), f: HSTYLES.f.map(x => x.label) },
+  front: FRONT_IDS.map(id => ({ id, label: FRONT_LABEL[id] })),
+  hc: ['흑발', '짙은 갈색', '밝은 갈색', '회색', '와인', '애쉬 금발', '애쉬브라운', '구릿빛', '밀크티 베이지', '핑크 브라운', '흑갈색', '밀크브라운', '다크초코', '탈색 금발', '애쉬그레이', '핑크', '블루블랙', '레드']
+    .map((label, id) => ({ id, label, color: HAIR[id] })).filter(x => x.id !== GRAY),
   skin: ['밝은', '보통', '어두운', '진한'].map((label, id) => ({ id, label, color: SKIN[id] })),
   eyes: ['동그란', '날카로운', '처진', '가는', '무쌍', '큰 눈', '아몬드', '고양이', '여우', '졸린', '덮인'].map((label, id) => ({ id, label })),
 };

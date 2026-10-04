@@ -227,9 +227,9 @@ function syncMyBody() {
 // 생김새 (js/avatar.js). 같은 인생의 같은 id면 늘 같은 얼굴. 가족·아이는 피부색이 나와 같음
 function lookOf(p) {
   if (!p.appearance && window.Avatar) {
-    p.appearance = Avatar.make(`${S.id}:${p.id}`, p.gender, { feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null });
-    // 30대 이상 기혼자: 남자는 셔츠·재킷, 여자는 단정한 머리가 조금 더 많음 (미혼이어도 단정한 사람은 있음)
-    if (p.married && npcAge(p) >= 30 && Math.random() < .5) { if (p.gender === 'm') p.appearance.top = pick([1, 1, 7]); else p.appearance.hair = pick([0, 1, 3, 4, 5]); }
+    p.appearance = Avatar.make(`${S.id}:${p.id}`, p.gender, { feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null, personality: p.personality, hobby: p.hobby, job: p.npcJob });
+    // 30대 이상 기혼자: 남자는 셔츠·재킷, 여자는 단정한 머리(C컬 단발·허쉬컷·로우 포니테일·로우번·반묶음)가 조금 더 많음
+    if (p.married && npcAge(p) >= 30 && Math.random() < .5) { if (p.gender === 'm') p.appearance.top = pick([1, 1, 7]); else p.appearance.hair = pick([4, 3, 9, 12, 10]); }
     // 비슷한 얼굴 방지 (FACE_VARIETY.md §10): 같은 생활권(같은 소속, 아니면 같은 관계·같은 단골 장소)에 얼굴 거리 3 미만이 있으면 얼굴 시드만 바꿔 다시 (최대 5번)
     if (Avatar.faceDistance) {
       const peers = alive().filter(q => q !== p && q.appearance && (p.org ? q.org === p.org : q.kind === p.kind && q.hangout === p.hangout)).slice(-40);
