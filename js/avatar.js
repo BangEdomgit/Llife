@@ -40,6 +40,8 @@ function lerpTable(tbl, v) {
   return tbl[tbl.length - 1][1];
 }
 let UID = 0;   // clipPath id (그릴 때마다 새로)
+// 그리는 정밀도 (FACE_UPGRADE 1절 LOD): 2 큰 화면(전부) / 1 작은 화면(64~96px — 얼굴만 크롭, 선 ×1.3, 작은 하이라이트·눈썹 결·속눈썹 꼬리·머리 결 끔) / 0 아주 작은 썸네일
+let LOD = 2, LW = 1;
 
 /* ---------- 팔레트 ---------- */
 // 피부 4톤: 밝은, 보통, 어두운, 진한
@@ -68,7 +70,7 @@ const shade = (hex, k) => {   // k<1 어둡게, k>1 밝게
 
 /* ---------- 생김새 만들기 ---------- */
 // 파츠 수 (예전 저장의 번호는 그대로 쓰고, 새로 만드는 사람부터 늘어난 범위에서 뽑음)
-const FACE_N = 6, EYE_N = 11, BROW_N = 5, MOUTH_N = 6;
+const FACE_N = 6, EYE_N = 12, BROW_N = 5, MOUTH_N = 6;
 // 두 색 섞기 (t: b 쪽 비율)
 const mixC = (a, b, t) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
 const TOPS = [0, 1, 2, 3, 5, 6, 7, 8];   // 4는 교복이라 뽑지 않음
@@ -154,19 +156,13 @@ function earSVG(skin, s) {
     `<ellipse cx="${X(27.9)}" cy="72.8" rx="1.3" ry="2.7" fill="${shade(skin, .7)}" opacity=".35"/>` +
     `<path d="M${X(26.4)},67.6 C${X(29.4)},67 ${X(30.1)},70.6 ${X(29.5)},73.9 C${X(29.1)},76.1 ${X(28.1)},77.2 ${X(27.1)},76.8" fill="none" stroke="${ln}" stroke-width=".9" stroke-linecap="round" opacity=".55"/>`;
 }
-// 눈 모양: 안쪽 꼬리(i), 바깥 꼬리(o), 윗꺼풀(u)·아랫꺼풀(l) 조절점, 홍채 반지름 (side: 왼눈 -1 / 오른눈 1)
+// 눈 모양 (FACE_UPGRADE 2절): 카탈로그(js/face.js EYES) 수치로 — 안쪽 꼬리(i), 바깥 꼬리(o), 윗꺼풀(u)·아랫꺼풀(l) 조절점, 홍채 반지름 (side: 왼눈 -1 / 오른눈 1)
+//   w 가로, h 세로, peak 윗선 꼭짓점(0 안쪽~1 바깥), tilt 눈꼬리 각도, lower 아랫선 볼록함, iris 눈동자 크기, lid 윗꺼풀이 눈동자를 덮는 비율
+const EYE_FALLBACK = { w: 1, h: 1, peak: .5, tilt: 2, lower: .5, iris: 1, lid: .15 };
 function eyeShape(t, x, y, s) {
-  if (t === 1) return { i: [x - 5.4 * s, y + .9], o: [x + 5.8 * s, y - 2.1], u: [x - .4 * s, y - 6.4], l: [x + .8 * s, y + 3.8], ir: [2.8, 3.3] };   // 날카로운: 눈꼬리 올라감, 가는 홍채
-  if (t === 2) return { i: [x - 5.4 * s, y - .9], o: [x + 5.9 * s, y + 1.9], u: [x + .6 * s, y - 6.8], l: [x, y + 4.6], ir: [3.7, 3.8] };   // 처진: 눈꼬리 내려감, 큰 홍채
-  if (t === 3) return { i: [x - 5.9 * s, y + .4], o: [x + 5.9 * s, y - .3], u: [x, y - 3.8], l: [x, y + 2.8], ir: [2.4, 2.4] };              // 가는: 가로로 긴 슬릿
-  if (t === 4) return { i: [x - 5.8 * s, y + .8], o: [x + 6 * s, y - .9], u: [x + .5 * s, y - 5.2], l: [x, y + 3.9], ir: [3.1, 3.3], mono: 1 };   // 무쌍: 납작한 윗꺼풀, 굵은 눈두덩 선
-  if (t === 5) return { i: [x - 6.1 * s, y + .9], o: [x + 6.2 * s, y + .1], u: [x + .2 * s, y - 8], l: [x, y + 6], ir: [3.8, 3.9], crease: 2 };     // 큰 눈: 또렷한 겉쌍
-  if (t === 6) return { i: [x - 6 * s, y + 1], o: [x + 6.1 * s, y - 1], u: [x + 1 * s, y - 6.4], l: [x - .8 * s, y + 4.3], ir: [3.2, 3.4] };     // 아몬드: 앞트임처럼 안쪽이 뾰족
-  if (t === 7) return { i: [x - 5.6 * s, y + 1.3], o: [x + 6.1 * s, y - 2.8], u: [x + .7 * s, y - 6.2], l: [x + 1.2 * s, y + 2.9], ir: [3, 3.3] };   // 고양이: 바깥 끝이 확 올라가고 아랫선은 곧음
-  if (t === 8) return { i: [x - 6.4 * s, y + 1.1], o: [x + 6.7 * s, y - 2.2], u: [x + .9 * s, y - 4.8], l: [x + .7 * s, y + 2.5], ir: [2.7, 2.9] };  // 여우: 가늘고 길며 끝이 올라감
-  if (t === 9) return { i: [x - 5.8 * s, y + .7], o: [x + 5.9 * s, y + .9], u: [x, y - 4.6], l: [x, y + 4.8], ir: [3.4, 3.6], heavy: 1 };          // 졸린: 윗꺼풀이 홍채 위를 덮음
-  if (t === 10) return { i: [x - 5.9 * s, y + .9], o: [x + 6 * s, y + .3], u: [x + .3 * s, y - 5.6], l: [x, y + 4.3], ir: [3.3, 3.5], hood: 1 };     // 덮인: 꺼풀이 두껍게 덮어 깊어 보임
-  return { i: [x - 5.8 * s, y + .7], o: [x + 5.8 * s, y + .4], u: [x, y - 7.2], l: [x, y + 5.4], ir: [3.5, 3.6] };                           // 동그란
+  const E = (window.Face && Face.EYES[t]) || EYE_FALLBACK, W = 5.9 * E.w, rise = Math.tan(E.tilt * Math.PI / 180) * W * 1.15;
+  return { i: [x - W * s, y + .6 + rise * .25], o: [x + W * s, y + .3 - rise], u: [x + (E.peak - .5) * 2 * W * .7 * s, y - 6.7 * E.h - rise * .4], l: [x + (.5 - E.peak) * W * .3 * s, y + (2.6 + 2.6 * E.lower) * E.h * .92],
+    ir: [3.3 * E.iris, 3.45 * E.iris], lidC: E.lid, crease: E.id === 'doe' ? 2 : 0, mono: E.id === 'narrow', heavy: E.id === 'sleepy', hood: E.id === 'deep' };
 }
 const qAt = (p0, c, p2, t) => [(1 - t) * (1 - t) * p0[0] + 2 * (1 - t) * t * c[0] + t * t * p2[0], (1 - t) * (1 - t) * p0[1] + 2 * (1 - t) * t * c[1] + t * t * p2[1]];
 // 속눈썹: 윗꺼풀 바깥쪽 끝에 짧은 곡선 (여자 2~3개, 남자아이 1개)
@@ -203,7 +199,8 @@ function irisSVG(X, id, gx, gy, rx, ry) {
   return `<radialGradient id="${id}" cx=".5" cy=".72" r=".78"><stop offset="0" stop-color="${shade(c, 1.5)}"/><stop offset=".55" stop-color="${c}"/><stop offset="1" stop-color="${shade(c, .5)}"/></radialGradient>` +
     `<ellipse cx="${f1(gx)}" cy="${f1(gy)}" rx="${f1(rx)}" ry="${f1(ry)}" fill="url(#${id})"/>` +
     `<ellipse cx="${f1(gx)}" cy="${f1(gy)}" rx="${f1(rx - .3)}" ry="${f1(ry - .3)}" fill="none" stroke="${shade(c, .42)}" stroke-width=".6" opacity=".75"/>` +
-    `<ellipse cx="${f1(gx)}" cy="${f1(gy + .3)}" rx="${f1(rx * .48)}" ry="${f1(ry * .5)}" fill="${PUPIL}"/>`;
+    `<ellipse cx="${f1(gx)}" cy="${f1(gy + .3)}" rx="${f1(rx * .48)}" ry="${f1(ry * .5)}" fill="${PUPIL}"/>` +
+    `<path d="M${f1(gx - rx * .78)},${f1(gy + ry * .28)} Q${f1(gx)},${f1(gy + ry * 1.12)} ${f1(gx + rx * .78)},${f1(gy + ry * .28)} Q${f1(gx)},${f1(gy + ry * .74)} ${f1(gx - rx * .78)},${f1(gy + ry * .28)} Z" fill="${shade(c, 2.1)}" opacity=".55"/>`;   // 아래쪽 밝은 초승달
 }
 // 아래 눈꺼풀: 눈꼬리 쪽 속눈썹 선 + 전체 옅은 선
 const lowerLid = (e, s) => `<path d="${polyD(qOffset(e.i, e.l, e.o, s, .38, 1, () => 0, 5))}" fill="none" stroke="${LINE}" stroke-width=".9" stroke-linecap="round" opacity=".5"/>` +
@@ -213,16 +210,16 @@ function openEye(a, X, x, y, s, nLash, o = {}) {
   const shape = `M${P(...e.i)} Q${P(...e.u)} ${P(...e.o)} Q${P(...e.l)} ${P(...e.i)} Z`;
   const gx = x + X.gaze * 1.2, gy = y + .5;
   // 쌍꺼풀: 가는 눈·무쌍은 없음, 큰 눈은 늘 겉쌍 / 속쌍은 눈머리 쪽에서 붙고, 겉쌍은 나란히
-  const lid = e.mono || a.eyes === 3 ? 0 : Math.max(e.crease || 0, X.lid);
+  const lid = e.mono && !(a.fx && a.fx.lid) ? 0 : Math.max(e.crease || 0, X.lid, (a.fx && a.fx.lid) || 0);
   const crease = lid ? `<path d="${polyD(qOffset(e.i, e.u, e.o, s, lid === 1 ? .14 : .06, 1.04, t => lid === 1 ? 2.5 * clamp((t - .1) / .45, 0, 1) : 2.3))}" fill="none" stroke="${LINE}" stroke-width=".8" stroke-linecap="round" opacity=".42"/>` : '';
   const aegyo = o.aegyo ? `<path d="${polyD(qOffset(e.i, e.l, e.o, s, .12, .9, () => -2.4, 5))}" fill="none" stroke="${o.skinLn}" stroke-width=".9" stroke-linecap="round" opacity=".55"/>` +
     `<ellipse cx="${f1(x + .3 * s)}" cy="${f1(e.l[1] - .2)}" rx="3.6" ry=".9" fill="#fff" opacity=".16"/>` : '';
   return `<clipPath id="${id}"><path d="${shape}"/></clipPath><path d="${shape}" fill="${WHITE}"/>
     <g clip-path="url(#${id})">${irisSVG(X, id + 'i', gx, gy, e.ir[0], e.ir[1])}
-      <circle cx="${f1(gx + 1.3)}" cy="${f1(gy - 1.4)}" r="1.4" fill="#fff"/><circle cx="${f1(gx - 1.1)}" cy="${f1(gy + 1.5)}" r=".6" fill="#fff" opacity=".8"/>
-      <path d="M${P(...e.i)} Q${P(...e.u)} ${P(...e.o)}" fill="none" stroke="${PUPIL}" stroke-width="3.4" opacity=".16"/></g>
+      <circle cx="${f1(gx + 1.3)}" cy="${f1(gy - 1.4)}" r="1.4" fill="#fff"/>${LOD >= 2 ? `<circle cx="${f1(gx - 1.1)}" cy="${f1(gy + 1.5)}" r=".6" fill="#fff" opacity=".85"/>` : ''}
+      <path d="M${P(...e.i)} Q${P(...e.u)} ${P(...e.o)}" fill="none" stroke="${PUPIL}" stroke-width="${f1(2.4 + (e.lidC ?? .15) * 9)}" opacity="${f1((.12 + (e.lidC ?? .15) * .3) * 100) / 100}"/></g>
     ${e.hood ? `<path d="${polyD(qOffset(e.i, e.u, e.o, s, .1, 1.02, t => 1.6 + 1.2 * Math.sin(Math.PI * t)))}" fill="none" stroke="${o.skinLn || LINE}" stroke-width="2.4" stroke-linecap="round" opacity=".45"/>` : ''}
-    ${crease}${aegyo}${lidSVG(e.i, e.u, e.o, s, (e.mono ? 1.5 : 1) * (o.male ? 1.15 : 1), (e.mono || e.hood || e.heavy ? 3.4 : 2.8) * (o.male ? 1.15 : 1), o.wing)}${lowerLid(e, s)}${nLash ? lashes(e, s, nLash) : ''}`;
+    ${crease}${aegyo}${lidSVG(e.i, e.u, e.o, s, (e.mono ? 1.5 : 1) * (o.male ? 1.15 : 1) * LW, (e.mono || e.hood || e.heavy ? 3.4 : 2.8) * (o.male ? 1.15 : 1) * LW, o.wing)}${lowerLid(e, s)}${nLash && LOD >= 2 ? lashes(e, s, Math.min(2, nLash)) : ''}`;
 }
 // 반쯤 감은 눈: gap(눈꺼풀이 내려온 정도), (dx, dy) 시선
 function halfEye(a, X, x, y, s, nLash, dx, dy, gap) {
@@ -250,7 +247,6 @@ function loveEye(a, X, x, y, s, nLash, gap, big) {
 const JOY = (k, lip, female) => {
   const w = 5.4 + k * .7, y0 = 87.2 - k * .3, y1 = 91.6 + k * 1.8;
   return `<path d="M${f1(60 - w)},${f1(y0)} Q60,${f1(y0 + 2)} ${f1(60 + w)},${f1(y0)} Q${f1(60 + w * .55)},${f1(y1)} 60,${f1(y1)} Q${f1(60 - w * .55)},${f1(y1)} ${f1(60 - w)},${f1(y0)} Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3" stroke-linejoin="round"/>` +
-    `<path d="M${f1(60 - w * .62)},${f1(y0 + 1.1)} Q60,${f1(y0 + 2.6)} ${f1(60 + w * .62)},${f1(y0 + 1.1)} L${f1(60 + w * .5)},${f1(y0 + 2.2)} Q60,${f1(y0 + 3.4)} ${f1(60 - w * .5)},${f1(y0 + 2.2)} Z" fill="#fbf7f2"/>` +
     `<ellipse cx="60" cy="${f1(y1 - 1.5 - k * .3)}" rx="${f1(w * .48)}" ry="${f1(1.5 + k * .5)}" fill="#e27886"/>`;
 };
 // 절정 표정 (성격별). 없으면 하트 눈
@@ -316,12 +312,19 @@ function browFill(type, x, y, s, expr, wid) {
   }
   return `M${P(...dn[0])}${crThrough(dn)} L${P(...up[N])}${crThrough(up.reverse())} Z`;
 }
+// 눈썹 결: 눈썹머리 쪽에 위로 비스듬히 선 짧은 가닥 3~4개
+function browHairs(type, x, y, s, expr, wid, c) {
+  const B = browPts(type, x, y, s, expr);
+  let d = '';
+  for (let k = 0; k < 4; k++) { const t = .03 + k * .07, p = qAt(B.a, B.m, B.b, t); d += `M${P(p[0], p[1] + wid * .3)} l${f1(s * (.5 + k * .2))},${f1(-wid * .85)} `; }
+  return `<path d="${d}" fill="none" stroke="${c}" stroke-width=".55" stroke-linecap="round" opacity=".75"/>`;
+}
 // 입 6종 (보통·웃는·무표정·약간 벌린·다문 미소·고양이 입). 윗입술 선 + 아랫입술, 여자는 입술 색
 //   lip: { c 색, teeth, f 두께(0 얇은 / 1 보통 / 2 도톰), gloss 아랫입술 윤기 }
 function mouthSVG(type, lip, female) {
   const lo = female ? .95 : .5, fz = lip.f ?? 1, d = [-.9, 0, 1.3][fz], gl = lip.gloss ? `<ellipse cx="58.4" cy="${f1(91 + d * .5)}" rx="1.7" ry=".55" fill="#fff" opacity=".4"/>` : '';
   if (type === 1) return lip.teeth
-    ? `<path d="M52.5,86.4 Q60,95.6 67.5,86.4 Q60,89.2 52.5,86.4 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3" stroke-linejoin="round"/><path d="M54.6,87.5 Q60,89.6 65.4,87.5 L64.8,89.1 Q60,90.8 55.2,89.1 Z" fill="#fbf7f2"/>`
+    ? `<path d="M52.5,86.4 Q60,95.6 67.5,86.4 Q60,89.2 52.5,86.4 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="60" cy="91.2" rx="3.4" ry="1.2" fill="#e27886" opacity=".8"/>`
     : `<path d="M53,86.8 Q60,93.8 67,86.8" fill="none" stroke="${LINE}" stroke-width="1.9" stroke-linecap="round"/><path d="M56,90.8 Q60,${f1(92.8 + d * .6)} 64,90.8" fill="none" stroke="${lip.c}" stroke-width="${f1(1.7 + fz * .3)}" stroke-linecap="round" opacity="${lo}"/>`;
   if (type === 2) return `<path d="M55,88.8 L65,88.8" stroke="${LINE}" stroke-width="1.8" stroke-linecap="round"/><path d="M56.6,90 Q60,${f1(92.2 + d * .7)} 63.4,90" fill="none" stroke="${lip.c}" stroke-width="${f1(1.6 + fz * .3)}" stroke-linecap="round" opacity="${lo}"/>`;
   if (type === 3) return `<path d="M55.4,87 Q60,85.8 64.6,87 Q64.2,93.6 60,93.6 Q55.8,93.6 55.4,87 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.4" stroke-linejoin="round"/><ellipse cx="60" cy="92" rx="2.6" ry="1.2" fill="#c96a6e" opacity=".8"/>`;
@@ -337,33 +340,36 @@ function mouthSVG(type, lip, female) {
 function closedMouth(id, lip, female, full) {
   const lo = female ? .9 : .6, lc = lip.c, dl = (full - 1) * 1.7;
   const lower = (w, y, k = 1) => `<path d="M${f1(60 - w)},${f1(y)} Q60,${f1(y + (2.5 + dl) * k)} ${f1(60 + w)},${f1(y)} Q60,${f1(y + .9)} ${f1(60 - w)},${f1(y)} Z" fill="${lc}" opacity="${lo}"/>`;
-  const upper = (w, y, bow) => female ? `<path d="M${f1(60 - w)},${f1(y)} Q${f1(60 - w * .45)},${f1(y - 1.6 - bow)} 60,${f1(y - .4 + bow * .4)} Q${f1(60 + w * .45)},${f1(y - 1.6 - bow)} ${f1(60 + w)},${f1(y)} Q60,${f1(y + 1.2)} ${f1(60 - w)},${f1(y)} Z" fill="${lc}" opacity=".88"/>` : '';
-  const ln = (d, w) => `<path d="${d}" fill="none" stroke="${LINE}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const gl = lip.gloss ? `<ellipse cx="58.6" cy="${f1(90.6 + dl * .5)}" rx="1.5" ry=".5" fill="#fff" opacity=".38"/>` : '';
-  if (id === 'line') return lower(4.2, 89.4, .7) + ln('M54.8,88.6 Q60,89.5 65.2,88.6', 1.25);
+  const upper = (w, y, bow) => `<path d="M${f1(60 - w)},${f1(y)} Q${f1(60 - w * .45)},${f1(y - 1.6 - bow)} 60,${f1(y - .4 + bow * .4)} Q${f1(60 + w * .45)},${f1(y - 1.6 - bow)} ${f1(60 + w)},${f1(y)} Q60,${f1(y + 1.2)} ${f1(60 - w)},${f1(y)} Z" fill="${lc}" opacity="${female ? .88 : .35}"/>`;   // 윗·아랫입술 구분
+  const ln = (d, w) => `<path d="${d}" fill="none" stroke="${LINE}" stroke-width="${f1(w * LW)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const gl = `<ellipse cx="58.6" cy="${f1(90.6 + dl * .5)}" rx="1.5" ry=".5" fill="#fff" opacity="${lip.gloss ? .42 : .2}"/>`;   // 아랫입술 하이라이트
+  if (id === 'line') return lower(4.2, 89.4, .7) + ln('M54.8,88.6 Q60,89.5 65.2,88.6', 1.25) + gl;
   if (id === 'smile') return upper(5.4, 88, .2) + lower(4.4, 89.8) + ln('M53.8,87.3 Q60,91.2 66.2,87.3', 1.6) + gl;
-  if (id === 'flat') return lower(4, 89.8, .8) + ln('M54.8,88.8 L65.2,88.8', 1.6) + ln('M54.1,88.2 l-.5,1 M65.9,88.2 l.5,1', .8);
-  if (id === 'down') return lower(4, 90, .8) + ln('M54.6,89.9 Q60,87.9 65.4,89.9', 1.5);
+  if (id === 'flat') return lower(4, 89.8, .8) + ln('M54.8,88.8 L65.2,88.8', 1.6) + ln('M54.1,88.2 l-.5,1 M65.9,88.2 l.5,1', .8) + gl;
+  if (id === 'down') return lower(4, 90, .8) + ln('M54.6,89.9 Q60,87.9 65.4,89.9', 1.5) + gl;
   if (id === 'small') return upper(3.4, 88.2, .3) + lower(2.8, 89.4) + ln('M56.6,88.4 Q60,89.5 63.4,88.4', 1.35) + gl;
   if (id === 'wide') return upper(7, 88, 0) + lower(5.8, 89.6) + ln('M52.2,88 Q60,90.4 67.8,88', 1.6) + gl;
   if (id === 'pout') return upper(3.8, 88, .7) + lower(3.8, 89.5, 1.35) + ln('M56,88.1 Q60,89.1 64,88.1', 1.35) + gl;
   if (id === 'cat') return mouthSVG(5, lip, female);
   return upper(5.2, 88.2, .8) + lower(4.4, 89.4) + ln('M54.4,88.3 Q57,89 60,88.6 Q63,89 65.6,88.3', 1.5) + gl;   // bow: 윗입술 큐피드 활
 }
-// 코 5종: 꺾인 선 / 동글한 코끝 / 높은 콧대 / 넓은 콧방울 / 작고 뾰족한. 코끝 하이라이트 + 코 아래 그림자
+// 코 10종 (FACE_UPGRADE 3절, 최소 선): 0 반듯한 / 1 둥근 / 2 콧대 높은 / 3 콧볼 넓은 / 4 단추 / 5 작고 오똑 / 6 긴 / 7 코끝이 들린 / 8 낮은 / 9 큼직한
+//   코끝 하이라이트 + 코 아래 그림자. 콧구멍은 들린 코만 점 둘. 길이·폭은 유전자(noseLen·noseW)가 한 번 더 곱해짐
 function noseSVG(type, skin, kid) {
-  const ln = shade(skin, .66), st = w => `fill="none" stroke="${ln}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"`;
-  const hl = (x, y, r) => `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${f1(r * .8)}" fill="#fff" opacity=".28"/>`;
+  const ln = shade(skin, .66), st = w => `fill="none" stroke="${ln}" stroke-width="${f1(w * LW)}" stroke-linecap="round" stroke-linejoin="round"`;
+  const hl = (x, y, r) => `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${f1(r * .8)}" fill="#fff" opacity=".3"/>`;
+  const bridgeSh = (y0, y1, w, op) => `<path d="M58.4,${y0} Q58.9,${f1((y0 + y1) / 2)} 58.2,${y1}" fill="none" stroke="${shade(skin, .74)}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`;
   let o = `<ellipse cx="60.4" cy="84.7" rx="3" ry="1" fill="${shade(skin, .62)}" opacity=".16"/>`;
-  if (type === 1) o += `<path d="M57.5,82.3 Q60,84.6 62.5,82.3" ${st(1.3)}/><path d="M58,83.3 q.8,.5 1.5,.2 M62,83.3 q-.8,.5 -1.5,.2" ${st(.9)} opacity=".6"/>${hl(60.2, 80.6, 1.3)}`;
-  else if (type === 2) o += `<path d="M58.3,69.5 Q58.8,75.5 58.1,80.4" fill="none" stroke="${shade(skin, .74)}" stroke-width="1.2" stroke-linecap="round" opacity=".35"/>` +
-    `<path d="M58.2,81.4 Q57.4,83.7 59.7,84 Q61.7,84.1 62.7,82.8 Q63.4,81.8 62.4,80.9" ${st(1.4)}/><path d="M60.8,71.5 L61,79" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity=".22"/>`;
-  else if (type === 3) o += `<path d="M56.5,80.4 Q55.4,83.4 58.2,83.7 M63.5,80.4 Q64.6,83.4 61.8,83.7" ${st(1.3)}/><path d="M58.6,84.2 Q60,84.9 61.4,84.2" ${st(.9)} opacity=".6"/>${hl(60, 81, 1.5)}`;
-  else if (type === 4) o += `<path d="M60.6,78.2 L59.1,82.5 Q60.4,83.5 62,82.8" ${st(1.3)}/>${hl(60.6, 81.2, .9)}`;
-  else if (type === 5) o += `<ellipse cx="60.2" cy="82.6" rx="1.5" ry="1" fill="${ln}" opacity=".55"/>${hl(60, 81.4, .8)}`;                          // 점: 코끝 음영 하나
-  else if (type === 6) o += `<path d="M59.4,71 Q59.6,76 59.2,80.6" fill="none" stroke="${shade(skin, .74)}" stroke-width="1.1" stroke-linecap="round" opacity=".32"/><path d="M58.6,82.9 Q60,83.9 61.6,82.9" ${st(1.25)}/>${hl(60.2, 80.4, 1)}`;   // 곧은: 옅은 콧대 + 코끝
+  if (type === 1) o += `<path d="M57.5,82.3 Q60,84.6 62.5,82.3" ${st(1.2)}/>${hl(60.2, 80.6, 1.3)}`;                                         // 둥근: 둥근 코끝
+  else if (type === 2) o += bridgeSh(69.5, 80.4, 1.2, .35) + `<path d="M58.2,81.4 Q57.4,83.7 59.7,84 Q61.7,84.1 62.7,82.8 Q63.4,81.8 62.4,80.9" ${st(1.3)}/><path d="M60.8,71.5 L61,79" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity=".22"/>`;   // 콧대 높은
+  else if (type === 3) o += `<path d="M56.5,80.4 Q55.4,83.4 58.2,83.7 M63.5,80.4 Q64.6,83.4 61.8,83.7" ${st(1.2)}/>${hl(60, 81, 1.5)}`;      // 콧볼 넓은: 콧망울 곡선 둘
+  else if (type === 4) o += `<path d="M60.4,79.4 L59.6,81.6" ${st(1.1)}/><path d="M58.3,82.4 Q60,84.4 61.9,82.4" ${st(1.15)}/>${hl(60.4, 81.6, .9)}`;   // 단추: 짧은 선 + 둥근 코끝 반원
+  else if (type === 5) o += `<path d="M61.2,78.6 L60.2,82.2" ${st(1.15)}/><path d="M59.4,83.1 Q60.4,83.6 61.5,83" ${st(1)} opacity=".7"/>${hl(60.1, 81.5, .85)}`;   // 작고 오똑: 그림자 쪽 짧은 선 + 코끝 점 하이라이트
+  else if (type === 6) o += bridgeSh(68.5, 81.5, 1.1, .32) + `<path d="M58.4,83.6 Q60,85.2 61.8,83.6" ${st(1.25)}/>${hl(60.2, 81.8, 1)}`;   // 긴: 긴 콧대 + 처진 코끝
   else if (type === 7) o += `<path d="M58.4,81.2 Q60.2,79.6 62,81.2" ${st(1.1)} opacity=".7"/><circle cx="58.9" cy="82.7" r=".6" fill="${ln}" opacity=".7"/><circle cx="61.5" cy="82.7" r=".6" fill="${ln}" opacity=".7"/>${hl(60.2, 80.2, 1.1)}`;   // 들린: 코끝이 위로, 콧구멍 점 둘
-  else o += `<path d="M61.2,76.4 L58.4,82.8 Q60.2,84.2 62.6,83.2" ${st(1.5)}/>`;
+  else if (type === 8) o += `<ellipse cx="60.2" cy="82.8" rx="2.2" ry="1.1" fill="${ln}" opacity=".32"/>${hl(60.1, 81.6, .9)}`;   // 낮은: 콧대 없이 코끝 그림자만
+  else if (type === 9) o += bridgeSh(70, 80.6, 2, .3) + `<path d="M57.2,81 Q56.4,84 59.6,84.4 Q63.6,84.4 63,81" ${st(1.4)}/>${hl(60.2, 81.4, 1.6)}`;   // 큼직한: 굵은 콧대 그림자 + 넓은 코끝
+  else o += `<path d="M61.2,76.4 L58.4,82.8 Q60.2,84.2 62.6,83.2" ${st(1.4)}/>`;                                                          // 반듯한: 중간 길이 선 + 콧망울 짧은 획
   return kid ? `<g transform="translate(60,82) scale(.82) translate(-60,-82)">${o}</g>` : o;
 }
 // 수염 (어른 남자): 1 거뭇한 턱 / 2 콧수염 / 3 염소수염 / 4 짧은 턱수염. clip: 얼굴 clipPath id
@@ -391,8 +397,19 @@ const GENES = new Map();
 function genesOf(a) {
   if (!window.Face || !a) return null;
   const key = (a.fs || ['o', a.g, a.face, a.skin, a.hair, a.hc, a.brows, a.mouth, a.top, a.tc, a.gray].join(',')) + (a.gs ? '#' + a.gs : '');
-  let g = GENES.get(key);
-  if (!g) { g = Face.genes(key, a.g, !/:me$/.test(a.fs || '')); GENES.set(key, g); }
+  const ck = key + (a.gb ? '|b' + a.gb : '') + (a.fx ? '|' + JSON.stringify(a.fx) : '');
+  let g = GENES.get(ck);
+  if (!g) {
+    g = Face.genes(key, a.g, !/:me$/.test(a.fs || ''));
+    if (a.gb) g = Face.biasGenes(g, a.g, a.gb);   // 원하는 등급의 얼굴 (배치를 이상값 쪽으로)
+    if (a.fx) {   // 성형: 코 모양·눈 크기 / 실패하면 비대칭
+      g = Object.assign({}, g);
+      if (a.fx.nose != null) g.nose = a.fx.nose;
+      if (a.fx.eyeAdd) g.eyeSize += a.fx.eyeAdd;
+      if (a.fx.asymAdd) g.asym = Math.min(1, (g.asym || 0) + a.fx.asymAdd);
+    }
+    GENES.set(ck, g);
+  }
   return g;
 }
 // 지금 나이의 유전자 (눈 종류: 아키타입이 없으면 생김새에서 고른 눈)
@@ -416,8 +433,9 @@ function layoutOf(a, age) {
   // 윤곽 휘기: 위(이마)는 그대로, 광대(y 60~72)는 cheekW, 그 아래는 jaw 쪽으로, 턱 끝은 chinPoint만큼 모임, 66 아래는 faceLen만큼 길어짐
   const wk = y => y <= 50 ? 1 + (g.cheekW - 1) * Math.max(0, (y - 38) / 12) : y <= 72 ? g.cheekW : (() => { const t = Math.min(1, (y - 72) / 30); return lerp(g.cheekW, g.cheekW * jawK * (1 - .2 * g.chinPoint * t * t), t); })();
   const warp = d => d.replace(/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/g, (_, x, y) => { const X = +x, Y = +y; return `${f1(60 + (X - 60) * wk(Y))},${f1(Y <= 66 ? Y : 66 + (Y - 66) * g.faceLen)}`; });
-  const eyeT = i => { const s = i ? 1 : -1, x0 = i ? 72 : 48; return `translate(${f1(ex[i])},${f1(ey)}) rotate(${f1(-s * g.eyeTilt * .7)}) scale(${g.eyeSize.toFixed(3)}) translate(${-x0},-72)`; };
-  const browT = i => { const s = i ? 1 : -1, x0 = i ? 72 : 48; return `translate(${f1(ex[i] - x0)},${f1(ey - 72 - g.browY * H)}) rotate(${f1(-s * g.browAngle * .55)},${x0},62)`; };
+  const ay = i => i ? (g.asym || 0) * 1.6 : 0;   // 좌우 비대칭 (FACE_UPGRADE 4-1)
+  const eyeT = i => { const s = i ? 1 : -1, x0 = i ? 72 : 48; return `translate(${f1(ex[i])},${f1(ey + ay(i))}) rotate(${f1(-s * g.eyeTilt * .7)}) scale(${g.eyeSize.toFixed(3)}) translate(${-x0},-72)`; };
+  const browT = i => { const s = i ? 1 : -1, x0 = i ? 72 : 48; return `translate(${f1(ex[i] - x0)},${f1(ey - 72 - g.browY * H + ay(i) * .7)}) rotate(${f1(-s * g.browAngle * .55)},${x0},62)`; };
   return { g, ey, ex, tipY, my, chinDy, warp, eyeT, browT, cheek: 27 * (g.cheekW - 1),
     noseT: `translate(60,${f1(ey)}) scale(${g.noseW.toFixed(3)},${g.noseLen.toFixed(3)}) translate(-60,-72)`,
     mouthT: `translate(60,${f1(my)}) scale(${g.mouthW.toFixed(3)},1) translate(-60,-88.5)`,
@@ -727,7 +745,7 @@ function hairPieces(a, X, age, hc0, L, ctx) {
     shadow += mainD;
     F += `<clipPath id="${hid}"><path d="${mainD}"/></clipPath><g clip-path="url(#${hid})">`;
     // 결 선 (최대 3개, 어둡고 옅게)
-    if (FLOW[front] && FLOW[front].length) F += `<path d="${FLOW[front].slice(0, 3).join(' ')}" fill="none" stroke="${shade(hc, .62)}" stroke-width=".8" stroke-linecap="round" opacity=".35"/>`;
+    if (LOD >= 2 && FLOW[front] && FLOW[front].length) F += `<path d="${FLOW[front].slice(0, 3).join(' ')}" fill="none" stroke="${shade(hc, .62)}" stroke-width=".8" stroke-linecap="round" opacity=".35"/>`;
     // 하이라이트: 좌상단, 두상 곡선을 따라 휘는 짧은 호 2~3개 (서로 끊어짐)
     const hl = shade(hc, 1.18), T0 = top;
     F += `<path d="M${f1(60 - w * .7)},${f1(T0 + 15)} Q${f1(60 - w * .58)},${f1(T0 + 7.4)} ${f1(60 - w * .36)},${f1(T0 + 3.6)} M${f1(60 - w * .24)},${f1(T0 + 2.2)} Q${f1(60 - w * .1)},${f1(T0 + 1.2)} ${f1(60 + w * .06)},${f1(T0 + 1.4)}` +
@@ -1902,9 +1920,9 @@ function headSVG(a, X, age, st, g) {
   if (a.buds && !af && !du) o += `<circle cx="33" cy="76" r="2.6" fill="#f4f4f4"/>`;
   const faceD = L ? L.warp(FACES[FG.shape] || FACES[0]) : FACES[age <= 6 ? 0 : a.face] || FACES[0], fid = `av${UID}f`;
   o += `<defs><radialGradient id="${fid}g" cx=".5" cy=".44" r=".62"><stop offset=".58" stop-color="${skin}"/><stop offset="1" stop-color="${shade(skin, .91)}"/></radialGradient><clipPath id="${fid}c"><path d="${faceD}"/></clipPath></defs>`;
-  o += `<path d="${faceD}" fill="url(#${fid}g)"/>`;
+  o += `<path d="${faceD}" fill="url(#${fid}g)" stroke="${mixC(skin, '#4a2a20', .45)}" stroke-width="${f1(.75 * LW)}" stroke-opacity=".8"/>`;   // 웹툰풍 외곽선 (피부보다 짙은 갈색, 검정 아님)
   // 앞머리·옆머리가 이마와 볼에 드리우는 그림자
-  if (hp.shadow) o += `<g clip-path="url(#${fid}c)"><g transform="translate(.7,2.6)"><path d="${hp.shadow}"${hp.shadowT ? ` transform="${hp.shadowT}"` : ''} fill="${shade(skin, .5)}" opacity=".2"/></g></g>`;
+  if (hp.shadow) o += `<filter id="${fid}bl" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation=".7"/></filter><g clip-path="url(#${fid}c)"><g transform="translate(.7,2.6)"${LOD >= 2 ? ` filter="url(#${fid}bl)"` : ''}><path d="${hp.shadow}"${hp.shadowT ? ` transform="${hp.shadowT}"` : ''} fill="${shade(skin, .5)}" opacity=".22"/></g></g>`;   // 부드러운 셀 그림자 1단계
   // 귀걸이 (어른만, 남자는 작은 큐빅). 옆머리가 있으면 그 뒤로
   if (adult && X.ear) o += G(L && L.earT(-1), earringSVG(female ? X.ear : 1, X.metal, -1)) + G(L && L.earT(1), earringSVG(female ? X.ear : 1, X.metal, 1));
   if (g.chin2) o += G(L && `translate(0,${f1(L.chinDy)})`, `<path d="M48,100.5 Q60,108.5 72,100.5" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.6" stroke-linecap="round" opacity=".4"/>`);   // 이중턱
@@ -1969,7 +1987,7 @@ function headSVG(a, X, age, st, g) {
   const expr = (xp ? XB[xp] : st.expr) || (pk && 'brow' in pk ? pk.brow : du ? (mood === 'disappointed' ? 'sad' : (mood === 'pleasure' && lv >= 1) || mood === 'bliss' ? 'soft' : null) : af && tier <= 1 ? 'sad' : lt === 1 || lt === 2 ? 'soft' : null);
   const btype = (af && tier >= 3) || mood === 'bliss' || mood === 'content' ? 1 : mood === 'bored' ? 0 : FG ? FG.brow : a.brows;
   const bw = (a.thick ? 3.8 : (a.g === 'm' ? 3.1 : 2.5) * (FG ? Math.min(FG.browThick, 2.1) : 1)) * (kid ? .9 : 1);
-  o += ex.map((x, i) => G(L && L.browT(i), `<path d="${browFill(btype, x, ey - 10, i ? 1 : -1, expr, bw)}" fill="${shade(hc, .72)}"/>` +
+  o += ex.map((x, i) => G(L && L.browT(i), `<path d="${browFill(btype, x, ey - 10, i ? 1 : -1, expr, bw * (LOD < 2 ? 1.15 : 1))}" fill="${shade(hc, .72)}"/>` + (LOD >= 2 ? browHairs(btype, x, ey - 10, i ? 1 : -1, expr, bw, shade(hc, .62)) : '') +
     (i === 0 && FG && FG.marks.scar === 'brow' && age >= 10 ? `<path d="M${x - 1.4},${ey - 13.4} l1.6,4.2" stroke="${shade(skin, .92)}" stroke-width="1.1" stroke-linecap="round"/>` : ''))).join('');
   // 코 (8종) + 코 아래 그림자 — 길이·폭은 유전자
   o += G(L && L.noseT, noseSVG(FG ? FG.nose : X.nose, skin, kid));
@@ -2098,7 +2116,14 @@ function render(a, size = 48, state = 25) {
   const w = Math.round(size), h = Math.round(size * (full ? 7 / 3 : 4 / 3));
   if (!a) return `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 ${full ? 280 : 160}" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="${full ? 279 : 159}" rx="10"/></svg>`;
   if (adult && st.preIntimate) return renderPreIntimate(a, size, st);
-  if (full) return renderFull(a, size, st);
+  if (full) { LOD = size < 200 ? 1 : 2; LW = LOD < 2 ? 1.2 : 1; try { return renderFull(a, size, st); } finally { LOD = 2; LW = 1; } }
+  // 작은 화면 (FACE_UPGRADE 1절): 96px 이하는 얼굴만 크롭 + 선 ×1.3 + 작은 디테일 끔. 함께 밤·아침 장면은 그대로
+  const lod = st.after || st.during || st.mask ? 2 : st.lod ?? (size <= 48 ? 0 : size <= 96 ? 1 : 2);
+  LOD = lod; LW = lod < 2 ? 1.3 : 1;
+  try { return renderPortrait(a, size, st, lod < 2); } finally { LOD = 2; LW = 1; }
+}
+function renderPortrait(a, size, st, crop) {
+  const age = st.age ?? 25, adult = age >= 20, w = Math.round(size), h = Math.round(size * 4 / 3);
   // 상반신 (0 0 120 160): 머리·어깨·가슴 위. 몸은 전신과 같은 앵커(어깨 폭·가슴 높이·팔)를 머리 좌표로 옮겨 그림
   UID++;
   if (st.mask) a = Object.assign({}, a, { top: 0, tc: 5, glasses: 0 });   // 검사용 (test.html 가림 테스트): 같은 회색 옷, 안경 없음, 머리 없음
@@ -2111,7 +2136,8 @@ function render(a, size = 48, state = 25) {
   const hp = st.mask ? { back: '', front: '', shadow: '' } : hairPieces(a, X, age, hc, { sy: toHead(A.y.sh), chest: toHead(A.y.bust) }, af || du ? { noHat: true } : hatCtx(st, OF));
   const nh = A.w.nh / hs, neckBot = toHead(A.y.neck + 4 * hs);
   const neck = c => `<path d="M${f1(60 - nh)},94 L${f1(60 + nh)},94 L${f1(60 + nh)},${f1(neckBot)} L${f1(60 - nh)},${f1(neckBot)} Z" fill="${c}"/>`;
-  let o = `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/>`;
+  let o = crop ? `<svg class="av" width="${w}" height="${h}" viewBox="18 14 84 112" aria-hidden="true"><rect class="av-bg" x="18.4" y="14.4" width="83.2" height="111.2" rx="7"/>`
+    : `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/>`;
   o += hp.back;
   let cut = 0;
   if (af || du) {
@@ -2162,7 +2188,44 @@ const PARTS = {
 };
 // 얼굴 유전자 (js/face.js): 지금 나이의 유전자, 두 사람 얼굴 거리(3 미만이면 비슷함), 프로필 특징 문장
 const effGenes = a => { const g = genesOf(a); return g && Object.assign({}, g, { eye: g.eye != null ? g.eye : a.eyes }); };
-window.Avatar = { make, render, topColor, univLogo, parts: PARTS, anchors: (a, age, fig) => anchorsOf(a, age, fig),
+// 얼굴 재능 (FACE_UPGRADE 4절): 배치 55% + 파츠 45% → 백분위 등급. 20살 기준 얼굴(나이 들면 40대부터 천천히 내려감)
+function faceInfo(a, age = 25) {
+  if (!window.Face || !a) return null;
+  const g = genesAt(a, Math.max(20, age));
+  if (!g) return null;
+  const X = extras(a), sex = a.g === 'm' ? 'm' : 'f', eye = g.eye ?? a.eyes ?? 6, sc = Face.faceScore(g, sex, { eye, aegyo: X.aegyo });
+  const grade = Face.gradeOf(sc.raw, sex), E = Face.EYES[eye] || Face.EYES[6], N = Face.NOSES[g.nose] || Face.NOSES[0];
+  return { raw: sc.raw, layout: sc.layout, parts: sc.parts, grade, pos: Face.gradePos(sc.raw, sex), eye: E.id, eyeName: E.name, eyeIx: eye, nose: N.id, noseName: N.name, noseIx: g.nose,
+    words: Face.words(g, { sex, eye, mole: X.mole }).map(w => w[0]), sentence: Face.sentence(g, { sex, eye, mole: X.mole, grade, noun: age < 13 ? (sex === 'm' ? '남자아이' : '여자아이') : age < 20 ? (sex === 'm' ? '소년' : '소녀') : null }) };
+}
+// 원하는 등급의 얼굴로 (4-5): 얼굴 시드(gs)를 바꿔 가며 그 등급이 나올 때까지 (A·S는 배치를 이상값 쪽으로 당겨서 찾음)
+const GORDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
+function fitGrade(a, letter, tries = 300) {
+  const ti = GORDER.indexOf(letter), bias = ti >= 6 ? .62 : ti >= 5 ? .45 : ti >= 4 ? .22 : 0;
+  let best = null, bd = 99;
+  for (let i = 0; i < tries; i++) {
+    const b = Object.assign({}, a, { gs: i || undefined, gb: bias || undefined });
+    const inf = faceInfo(b), d = Math.abs(GORDER.indexOf(inf.grade) - ti);
+    if (d < bd) { bd = d; best = b; if (!d) break; }
+  }
+  if (GENES.size > 4000) GENES.clear();
+  a.gs = best.gs; a.gb = best.gb;
+  return faceInfo(a);
+}
+// 성형 (4-6): 코를 작고 오똑·콧대 높은 코로 / 눈 크기 +0.05 / 쌍꺼풀(점수 변화 없음, 인상만). 실패하면 비대칭 +0.2
+function surgery(a, ok, r = Math.random()) {
+  const fx = Object.assign({}, a.fx);
+  if (!ok) { a.fx = Object.assign(fx, { asymAdd: Math.min(.6, (fx.asymAdd || 0) + .2) }); return 'fail'; }
+  // 상담: 코(neat·bridge)·눈 키우기 중 점수가 가장 오르는 쪽 / 쌍꺼풀은 점수 변화 없이 인상만 (원하는 사람만)
+  const opts = [['nose', { nose: 5 }], ['nose', { nose: 2 }], ['eye', { eyeAdd: Math.min(.15, (fx.eyeAdd || 0) + .05) }]].filter(([, o]) => o.nose == null ? (fx.eyeAdd || 0) < .15 : fx.nose !== o.nose);
+  const base = faceInfo(a).raw;
+  let best = null;
+  for (const [kind, o] of opts) { const raw = faceInfo(Object.assign({}, a, { fx: Object.assign({}, fx, o) })).raw; if (!best || raw > best.raw) best = { kind, o, raw }; }
+  const pick = r >= .85 && !fx.lid || !best || best.raw <= base + .05 ? ['lid', { lid: 2 }] : [best.kind, best.o];
+  a.fx = Object.assign(fx, pick[1]);
+  return pick[0];
+}
+window.Avatar = { make, render, topColor, univLogo, parts: PARTS, anchors: (a, age, fig) => anchorsOf(a, age, fig), faceInfo, fitGrade, surgery,
   genes: (a, age) => age != null ? genesAt(a, age) : effGenes(a),
   faceDistance: (a, b) => { const x = effGenes(a), y = effGenes(b); return x && y ? Face.distance(x, y) : 99; },
   traits: a => { const g = effGenes(a); return g ? Face.traits(g, extras(a).mole) : []; } };

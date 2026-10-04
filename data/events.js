@@ -714,8 +714,8 @@ GAME_DATA.events = [
     text: s => `성형외과 앞을 지나갔다. 상담만 받아볼까. 견적은 ${s.vars.quote}만원.`,
     choices: [
       { label: s => `한다 (${s.vars.quote}만원)`, chance: .8,
-        success: { text: '붓기가 빠지자 거울 속 얼굴이 달라져 있었다.', memory: true, effect: s => ({ money: -s.vars.quote, happy: 8 }), do: (s, a) => a.faceStep(1) },
-        fail: { text: '수술이 잘 안 됐다. 어딘가 부자연스럽다.', memory: true, set: 'unnatural', effect: s => ({ money: -s.vars.quote, health: -10, happy: -8 }), do: (s, a) => a.faceStep(-1) } },
+        success: { text: '붓기가 빠지자 거울 속 얼굴이 달라져 있었다.', memory: true, effect: s => ({ money: -s.vars.quote, happy: 8 }), do: (s, a) => a.faceSurgery(true) },
+        fail: { text: '수술이 잘 안 됐다. 어딘가 부자연스럽다.', memory: true, set: 'unnatural', effect: s => ({ money: -s.vars.quote, health: -10, happy: -8 }), do: (s, a) => a.faceSurgery(false) } },
       { label: '이대로가 나다', text: '상담 실장의 명함을 가방 깊숙이 넣었다.' },
     ] },
 

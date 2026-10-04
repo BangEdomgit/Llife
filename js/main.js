@@ -146,7 +146,7 @@ function render(S) {
   else if (['event', 'report', 'apply', 'intro'].includes(modalMode)) closeModal();   // 상태가 사라진 창(확인한 성적표·낸 원서·20년 요약)은 닫음
   else if (modalMode === 'people') openPeople();
   else if (modalMode === 'person') openPerson(modalArg);
-  else if (modalMode === 'stranger') openStranger(modalArg);
+  else if (modalMode === 'browse') openBrowse(browseIx);
   else if (modalMode === 'jobs') openJobs();
   else if (modalMode === 'crime') openCrime();
   else if (modalMode === 'me') openMe();
@@ -170,7 +170,7 @@ function strangerLabel(p, grp) {
 // 여기 있는 사람 한 줄: 아는 사람은 이름(나이) + 결혼 마커 + 관계, 모르는 사람은 낯선 사람 + 하고 있는 일 (NPC_ENCOUNTER)
 function hereRow(h) {
   const p = h.p, mk = h.stranger ? '' : G.marker(p);
-  const who = h.stranger ? `<b>${esc(strangerLabel(p))}${G.ringVisible(p) ? ' <span class="dim">(반지)</span>' : ''}</b>${h.grp ? `<span class="hr">일행 ${h.grp}명과 같이</span>` : ''}`
+  const who = h.stranger ? `<b>${esc(strangerLabel(p))}${G.ringVisible(p) ? ' <span class="dim">(반지)</span>' : ''}${h.approach ? ' <span title="이쪽을 힐끔거린다">👋</span>' : ''}</b>${h.grp ? `<span class="hr">일행 ${h.grp}명과 같이</span>` : ''}`
     : `<b>${esc(G.pname(p))} <span class="dim">(${G.npcAge(p)})</span>${mk ? ` <span class="mk">${mk}</span>` : ''}</b><span class="hr">${esc(G.relLabel(p))}</span>`;
   return `<button type="button" class="hp${h.used ? ' used' : ''}${h.grp ? ' grp' : ''}" data-hp="${h.key}" title="${esc(h.doing)}">${av(p, 32)}
     <span class="hw">${who}<span class="hd">${h.used ? '이야기함' : esc(h.doing)}</span></span></button>`;
@@ -200,7 +200,7 @@ function renderWhere(S) {
   box.innerHTML = `
     <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}${S.drunk ? ` <small class="drunk d${S.drunk}">🍺 ${G.drunkLabel()}</small>` : ''}</span><button type="button" data-leave>← 돌아가기</button></div>
     ${compBar(pl)}
-    <p class="sec-t">여기 있는 사람들 <span class="dim">· 아는 사람 ${nKnown}명 / 모르는 사람 ${nNew}명 · 말 걸기는 행동을 안 씀</span></p>
+    <p class="sec-t">여기 있는 사람들 <span class="dim">· 아는 사람 ${nKnown}명 / 모르는 사람 ${nNew}명 · 말 걸기는 행동을 안 씀</span>${pl.crowd ? ' <button type="button" class="br-open" data-browse>👀 둘러보기</button>' : ''}</p>
     <div class="here">${here.map(hereRow).join('') || '<p class="empty">아무도 없다.</p>'}</div>
     <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· 행동 1</span></p>
     <div class="acts">${actButtons(acts) || '<p class="empty">여기선 딱히 할 게 없다.</p>'}</div>`;
@@ -483,16 +483,59 @@ function openPerson(id) {
     <button type="button" class="back" data-back>${personFrom === 'here' ? '← 닫기' : '← 목록'}</button>`, true, id);
 }
 
-/* 장소에서 처음 보는 사람 */
-function openStranger(key) {
-  const h = G.here().find(x => x.key === key && x.stranger);
-  if (!h) return;   // 말 걸기에 성공하면 엔진이 이 사람을 관계 목록으로 옮김 → 클릭 처리에서 openPerson으로 넘어감
-  const p = h.p;
-  showModal('stranger', '처음 보는 사람', `
-    <div class="p-top">${av(p, 60)}<div class="p-who"><b>${esc(strangerLabel(p, h.grp))}</b><span class="dim">${ageBand(G.npcAge(p))} ${genderKo(p.gender)}${G.ringVisible(p) ? ' · 왼손에 반지' : ''}</span><span class="dim">${esc(h.doing)}.</span></div></div>
-    <div class="igrid"><button type="button" data-talk="${h.key}"${h.used ? ' disabled' : ''}>💬 말 걸기 <small>행동 안 씀</small></button></div>
-    <p class="hint">${h.used ? '대화가 이어지지 않았다. 다음에 또 마주칠지도.' : `말을 걸면 이름과 특징을 알 수 있다. 잘 받아주면 관계 목록에 추가된다.${h.grp ? ` 일행 ${h.grp}명과도 인사하게 된다.` : ''}`}</p>
-    <button type="button" class="back" data-back>← 닫기</button>`, true, key);
+/* 장소에서 처음 보는 사람 — 둘러보기 (FACE_UPGRADE 6-3): 한 명씩 넘겨보며 말을 걸지 고름 (◀ ▶·화살표 키·좌우 스와이프, 모아 보기) */
+let browseIx = 0, browseGrid = false, browseHey = null;
+const brCache = new Map();   // 초상화는 넘길 때 그리고 캐시 (지금 ±1명은 미리)
+function brPortrait(h) {
+  const k = h.key + ':' + (h.p.sk || '');
+  if (!brCache.has(k)) { if (brCache.size > 30) brCache.clear(); brCache.set(k, av(h.p, 160)); }
+  return brCache.get(k);
+}
+const strangerWho = p => { const a = G.npcAge(p); return a < 13 ? (p.gender === 'f' ? '여자아이' : '남자아이') : a < 20 ? (p.gender === 'f' ? '여학생' : '남학생') : p.gender === 'f' ? '여자' : '남자'; };
+function startBrowse(key) {
+  const list = G.here().filter(h => h.stranger);
+  browseIx = Math.max(0, list.findIndex(h => h.key === key)); browseGrid = false; brCache.clear();
+  openBrowse(browseIx);
+}
+function openBrowse(ix) {
+  const pl = G.place(), S = G.state();
+  if (!pl) { closeModal(); return; }
+  const list = G.here().filter(h => h.stranger), n = list.length, left = G.browseLeft(), ti = G.timeInfo(), wx = WX[S.weather];
+  const head = `<p class="br-head">${pl.icon} ${esc(pl.label)} · ${esc(ti.phase === 'adult' ? ti.slot : G.timeLabel())}${wx ? ` · ${wx.icon} ${esc(wx.label)}` : ''}</p>`;
+  const more = pl.crowd ? `<button type="button" data-brmore${left > 0 ? '' : ' disabled'}>🔄 새로 둘러보기 <small>${left > 0 ? `오늘 ${left}번 더` : '오늘은 여기까지'}</small></button>` : '';
+  if (!n) {
+    showModal('browse', '👀 둘러보기', `${head}<p class="empty">눈에 띄는 낯선 사람이 없다.</p><div class="choices">${more}<button type="button" class="back" data-back>← 닫기</button></div>`, true, 'x');
+    return;
+  }
+  browseIx = ((ix % n) + n) % n;
+  // 다시 그려도 누르던 버튼에 초점이 남게 (키보드로 넘길 때)
+  const fa = document.activeElement, fat = fa && mBody.contains(fa) && [...fa.attributes].find(x => x.name.startsWith('data-'));
+  const refocus = () => { const b = fat && mBody.querySelector(fat.name === 'data-brgo' ? '.br-dot.on, .br-cell.on' : `[${fat.name}]:not(:disabled)`); if (b) b.focus({ preventScroll: true }); };
+  if (browseGrid) {
+    const cells = list.map((h, i) => `<button type="button" class="br-cell${i === browseIx ? ' on' : ''}${h.used ? ' used' : ''}" data-brgo="${i}">${window.Avatar ? Avatar.render(G.look(h.p), 64, { age: G.npcAge(h.p), lod: 0, ctx: G.outfitCtx(h.p) }) : ''}<small>${esc(strangerWho(h.p))} · ${esc(ageBand(G.npcAge(h.p)))}</small></button>`).join('');
+    showModal('browse', '👀 둘러보기', `${head}<div class="br-grid">${cells}</div><div class="choices"><button type="button" data-brgrid>한 명씩 보기 ◀▶</button>${more}<button type="button" class="back" data-back>← 닫기</button></div>`, true, 'grid');
+    refocus();
+    return;
+  }
+  const h = list[browseIx], p = h.p, age = G.npcAge(p);
+  const inf = window.Avatar && Avatar.faceInfo ? Avatar.faceInfo(G.look(p), age) : null;
+  const hey = h.approach && browseHey !== h.key;   // 먼저 말을 걸어오는 사람: 처음 볼 때 카드가 흔들리며 "저기요"
+  if (hey) browseHey = h.key;
+  const dots = list.map((x, i) => `<button type="button" class="br-dot${i === browseIx ? ' on' : ''}" data-brgo="${i}" aria-label="${i + 1}번째 사람">${i === browseIx ? '●' : '○'}</button>`).join('');
+  showModal('browse', '👀 둘러보기', `${head}
+    <div class="br-stage"><button type="button" class="br-nav" data-brprev aria-label="이전 사람">◀</button>
+      <div class="br-card${hey ? ' hey' : ''}">${brPortrait(h)}${h.approach ? '<span class="br-bubble">저기요</span>' : ''}</div>
+      <button type="button" class="br-nav" data-brnext aria-label="다음 사람">▶</button></div>
+    <p class="br-n">${browseIx + 1} / ${n}</p>
+    <div class="br-info"><b>낯선 ${esc(strangerWho(p))} · ${esc(ageBand(age))}</b>${h.grp ? ` <span class="dim">· 일행 ${h.grp}명과 같이</span>` : ''}
+      ${inf ? `<span>${esc(inf.sentence)}</span>` : ''}<span class="dim">${esc(h.doing)}.</span>${G.ringVisible(p) ? '<span class="dim">(왼손에 반지)</span>' : ''}
+      ${h.used ? '<span class="hint">대화가 이어지지 않았다. 다음에 또 마주칠지도.</span>' : h.approach ? '<span class="hint">상대가 먼저 다가왔다. 받아주면 거의 이어진다.</span>' : ''}</div>
+    <div class="choices br-acts"><button type="button" data-talk="${h.key}"${h.used ? ' disabled' : ''}>💬 ${h.approach ? '대답한다' : '말 걸기'} <small>행동 안 씀</small></button><button type="button" data-brnext>다음 사람 ▶</button><button type="button" data-brpass="${h.key}">그냥 지나간다</button></div>
+    <div class="br-foot"><span class="br-dots">${dots}</span><button type="button" data-brgrid>모아 보기 ▦</button></div>
+    <div class="choices">${more}<button type="button" class="back" data-back>← 닫기</button></div>`, true, 'one');
+  refocus();
+  // 다음·이전 사람 초상화는 화면을 그린 뒤 미리
+  setTimeout(() => { if (modalMode !== 'browse') return; const L = G.here().filter(x => x.stranger); for (const d of [1, -1]) { const q = L[(browseIx + d + L.length) % L.length]; if (q) brPortrait(q); } }, 30);
 }
 
 /* 직업 */
@@ -956,12 +999,13 @@ $('#where').addEventListener('click', e => {
   if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) (a.id === 'shop' ? openShop() : openStudy()); else G.doAction(d.a); }
   else if (d.pl) G.goPlace(d.pl);
   else if ('leave' in d) G.leavePlace();
+  else if ('browse' in d) startBrowse(null);
   else if ('endco' in d) G.endCompany();
   else if (d.enjoy) G.interact(d.enjoy, 'enjoy');
   else if (d.hp) {
     const h = G.here().find(x => x.key === d.hp);
     if (!h) return;
-    if (h.stranger) openStranger(h.key); else { personFrom = 'here'; openPerson(h.key); }
+    if (h.stranger) startBrowse(h.key); else { personFrom = 'here'; openPerson(h.key); }
   }
 });
 $('#meBtn').addEventListener('click', openMe);
@@ -1005,6 +1049,14 @@ mBody.addEventListener('click', e => {
     else if (d.sdel) { G.deleteSlot(+d.sdel); openSlots(); }
     return;
   }
+  if (modalMode === 'browse') {
+    if ('brnext' in d) { openBrowse(browseIx + 1); return; }
+    if ('brprev' in d) { openBrowse(browseIx - 1); return; }
+    if (d.brgo != null) { browseGrid = false; openBrowse(+d.brgo); return; }
+    if ('brgrid' in d) { browseGrid = !browseGrid; openBrowse(browseIx); return; }
+    if (d.brpass) { G.passBy(d.brpass); return; }   // 다시 그리기는 render → openBrowse (같은 자리에 다음 사람)
+    if ('brmore' in d) { brCache.clear(); browseIx = 0; browseGrid = false; G.browseMore(); return; }
+  }
   if (d.s) { G.doAction('study', d.s === 'all' ? null : d.s); return; }
   if (d.shop != null) { closeModal(); G.doAction('shop', +d.shop); return; }
   if ('shopskip' in d) { closeModal(); G.doAction('shop'); return; }
@@ -1017,17 +1069,27 @@ mBody.addEventListener('click', e => {
   else if (d.i === 'date' && G.dateOutfits().length) openDateDress(modalArg);
   else if (d.i) G.interact(modalArg, d.i);
   else if (d.talk) { const id = G.talkTo(d.talk); if (id && !G.state().pending.length) { personFrom = 'here'; openPerson(id); } }
-  else if ('back' in d) { if (modalMode === 'stranger' || personFrom === 'here') closeModal(); else openPeople(); }
+  else if ('back' in d) { if (modalMode === 'browse' || personFrom === 'here') closeModal(); else openPeople(); }
   else if (d.j) G.applyJob(d.j);
   else if (d.k) G.commitCrime(d.k);
   else if ('quit' in d) G.quitJob();
   else if ('new' in d) { draft = null; openCreate(true); }
   else if ('cancel' in d) closeModal();
 });
+// 둘러보기: 좌우 스와이프로 넘기기
+let swipe0 = null;
+mBody.addEventListener('touchstart', e => { swipe0 = modalMode === 'browse' && !browseGrid && e.touches.length === 1 ? [e.touches[0].clientX, e.touches[0].clientY] : null; }, { passive: true });
+mBody.addEventListener('touchend', e => {
+  if (!swipe0) return;
+  const t = e.changedTouches[0], dx = t.clientX - swipe0[0], dy = t.clientY - swipe0[1];
+  swipe0 = null;
+  if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) openBrowse(browseIx + (dx < 0 ? 1 : -1));
+});
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey || (e.target && e.target.tagName === 'INPUT')) return;
   if (!sceneEl.hidden) { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { e.preventDefault(); nextScene(); } return; }
   if (modalMode === 'event' && /^[1-9]$/.test(e.key)) { G.choose(+e.key - 1); e.preventDefault(); }
+  else if (modalMode === 'browse' && !browseGrid && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { openBrowse(browseIx + (e.key === 'ArrowRight' ? 1 : -1)); e.preventDefault(); }
   else if (e.key === 'Escape' && !modal.hidden && !$('#mClose').hidden) closeModal();
 });
 
