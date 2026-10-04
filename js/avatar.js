@@ -819,16 +819,30 @@ function bareBody(a, skin, nh, hw, o) {
     <linearGradient id="${id}q" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dcbde6"/><stop offset=".5" stop-color="#b48bc6"/><stop offset="1" stop-color="#8c66a3"/></linearGradient></defs>`;
   s += `<path d="M${L},160 C${L},147 ${L + 1},137 ${L + 7},131 C${L + 13},125 ${nl - 9},120 ${nl},112 L${nr},112 C${nr + 9},120 ${R - 13},125 ${R - 7},131 C${R - 1},137 ${R},147 ${R},160 Z" fill="url(#${id}sk)"/>`;
   s += ln(`M${L + 9},139 Q${L + 12},150 ${L + 11},160 M${R - 9},139 Q${R - 12},150 ${R - 11},160`, sk(.74), 1.2, .45);   // 팔과 가슴 경계
-  s += `<ellipse cx="${L + 9}" cy="134" rx="4.5" ry="2.4" fill="#fff" opacity=".13"/><ellipse cx="${R - 9}" cy="134" rx="4.5" ry="2.4" fill="#fff" opacity=".13"/>`;
+  s += `<ellipse cx="${L + 9}" cy="134" rx="4" ry="2" fill="#fff" opacity=".08"/><ellipse cx="${R - 9}" cy="134" rx="4" ry="2" fill="#fff" opacity=".08"/>`;
   s += ln(`M${nl + 1.5},101 Q${nl + 3},112 58.2,121.5 M${nr - 1.5},101 Q${nr - 3},112 61.8,121.5`, sk(.72), 1, .22);        // 목 근육
   const clav = `M57.8,123.4 C54,124.2 50,122 ${f1(60 - hw * .55)},120.8 M62.2,123.4 C66,124.2 70,122 ${f1(60 + hw * .55)},120.8`;
   s += ln(clav, sk(.68), 1.2, .42) + `<g transform="translate(0,-1.3)">${ln(clav, '#fff', .9, .14)}</g>`;                     // 쇄골
   s += ln('M58.6,121.6 Q60,124.2 61.4,121.6', sk(.62), 1.1, .5);
-  if (female && by >= 126) {
-    const c = o.cup || 5.5, bw = 13 + c * .6, bh = 5 + c * .4;
-    s += ln(`M${60 - bw},${by + 1} Q${60 - bw * .8},${by - bh} 59.3,${by + 1.5} M${60 + bw},${by + 1} Q${60 + bw * .8},${by - bh} 60.7,${by + 1.5}`, sk(.66), 1.2, .45);
-    s += `<path d="M60,${f1(by - bh * .6)} L60,${by + 2}" stroke="${sk(.6)}" stroke-width="1.6" opacity=".25" stroke-linecap="round"/>`;
-  } else if (!female && by >= 131) s += ln(`M${L + 16},131 Q50,136.5 58.6,132.6 M${R - 16},131 Q70,136.5 61.4,132.6`, sk(.72), 1.2, .35);
+  if (female) {
+    // 가슴 윗부분과 가슴골: 컵이 클수록 크고 가운데로 모임. 아랫부분은 이불 속
+    const c = o.cup ?? 5.5, bx = 13 + c * .35, r = 10 + c * .75, cy = 146 + c * .2;
+    const yc = r > bx ? cy - Math.sqrt(r * r - bx * bx) + 1 : cy - r * .15;   // 가슴골이 시작하는 높이 (작으면 낮게)
+    s += `<defs><linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset=".3" stop-color="${skin}"/><stop offset="1" stop-color="${sk(.86)}"/></linearGradient></defs>`;
+    s += [-1, 1].map(k => `<circle cx="${f1(60 + k * bx)}" cy="${f1(cy)}" r="${f1(r)}" fill="url(#${id}b)"/>`).join('');
+    s += [-1, 1].map(k => {
+      const ox = x => f1(60 + k * x);
+      return ln(`M${ox(bx + r * .15)},${f1(cy - r)} Q${ox(bx + r * .78)},${f1(cy - r * .92)} ${ox(bx + r * .97)},${f1(cy - r * .25)}`, sk(.72), 1, .26) +   // 바깥 위 둥근 선
+        ln(`M${ox(bx - r * .5)},${f1(cy - r * .86)} Q${ox(2.4)},${f1(cy - r * .7 + (yc - cy + r * .7) * .3)} ${ox(.5)},${f1(yc)}`, sk(.66), 1.2, .42);   // 안쪽 → 가슴골
+    }).join('');
+    s += `<path d="M60,${f1(yc)} L60,${by + 3}" stroke="${sk(.58)}" stroke-width="1.5" opacity=".42" stroke-linecap="round"/><ellipse cx="60" cy="${f1((yc + by) / 2 + 2)}" rx="2.2" ry="${f1(Math.max(2, (by - yc) / 2 + 2))}" fill="${sk(.7)}" opacity=".22"/>`;
+    s += [-1, 1].map(k => `<ellipse cx="${f1(60 + k * (bx - 1))}" cy="${f1(cy - r * .62)}" rx="${f1(r * .3)}" ry="${f1(r * .12)}" fill="#fff" opacity=".07"/>`).join('');
+  } else {
+    // 가슴 근육 아랫선, 가운데 오목한 선
+    s += ln(`M${L + 13},137 Q47,151 58.6,145.5 M${R - 13},137 Q73,151 61.4,145.5`, sk(.7), 1.3, .38);
+    s += `<path d="M60,127 L60,146" stroke="${sk(.66)}" stroke-width="1.4" opacity=".18" stroke-linecap="round"/>`;
+    s += [-1, 1].map(k => `<ellipse cx="${60 + k * 14}" cy="136" rx="7" ry="2.6" fill="#fff" opacity=".06"/>`).join('');
+  }
   // 자국: 목·쇄골의 립스틱, 어깨의 손톱 자국
   const kiss = (x, y, r) => `<path d="M${x - 4},${y} q2,-2.5 4,0 q2,-2.5 4,0 q-2,3.5 -4,3.5 q-2,0 -4,-3.5 Z" fill="#c43c4f" opacity=".55" transform="rotate(${r} ${x} ${y})"/>`;
   if (o.lipstick && o.marks >= 3) s += kiss(66, 109, -10) + kiss(47, 126, 14) + (o.marks >= 4 ? kiss(R - 14, 128, -18) : '');
@@ -1042,11 +1056,11 @@ function headSVG(a, X, age, st, g) {
   // 턱 아래·목 옆 그림자
   let o = `<ellipse cx="60" cy="101.5" rx="${f1(nh - .5)}" ry="6" fill="${shade(skin, .6)}" opacity=".26"/>`;
   o += `<path d="M${f1(60 - nh + 1.6)},104 L${f1(60 - nh + 1.6)},${f1(neckBot - 2)} M${f1(60 + nh - 1.6)},104 L${f1(60 + nh - 1.6)},${f1(neckBot - 2)}" stroke="${shade(skin, .66)}" stroke-width="2" opacity=".14"/>`;
-  if (a.buds) o += `<path d="M34,78 C30,96 40,112 47,130" fill="none" stroke="#f4f4f4" stroke-width="1.3"/>`;
+  if (a.buds && !af && !du) o += `<path d="M34,78 C30,96 40,112 47,130" fill="none" stroke="#f4f4f4" stroke-width="1.3"/>`;
   // 귀, 얼굴 (6살 이하는 둥근 얼굴)
   o += `<ellipse cx="33.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/><ellipse cx="86.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
   o += `<path d="M33,70 q-2.4,3 0,7 M87,70 q2.4,3 0,7" fill="none" stroke="${shade(skin, .68)}" stroke-width="1" opacity=".5"/>`;
-  if (a.buds) o += `<circle cx="33" cy="76" r="2.6" fill="#f4f4f4"/>`;
+  if (a.buds && !af && !du) o += `<circle cx="33" cy="76" r="2.6" fill="#f4f4f4"/>`;
   o += `<path d="${FACES[age <= 6 ? 0 : a.face] || FACES[0]}" fill="${skin}"/>`;
   if (g.chin2) o += `<path d="M48,100.5 Q60,108.5 72,100.5" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.6" stroke-linecap="round" opacity=".4"/>`;   // 이중턱
   // 볼 홍조 (모두 옅게, 어린이·볼 빨간 사람은 더), 주근깨, 주름
@@ -1153,9 +1167,9 @@ function render(a, size = 48, state = 25) {
   o += `<path d="M${f1(60 - nh)},94 L${f1(60 + nh)},94 L${f1(60 + nh)},${f1(neckBot)} L${f1(60 - nh)},${f1(neckBot)} Z" fill="${af || du ? skin : skinD}"/>`;
   let cut = 0;
   if (af || du) {
-    // 이불 높이: 아침엔 만족감이 낮을수록 끌어올림, 관계 중엔 쇄골 아래. 소심형은 더 올리고 움켜쥠
+    // 이불 높이: 가슴골이 보이게. 아침엔 만족감이 낮을수록 조금 끌어올림, 소심형은 더 올리고 움켜쥠
     const shy = (af || du).personality === 'shy', female = a.g === 'f', fig = (af || du).fig;
-    const by = (af ? (female ? [121, 124, 128, 132, 136] : [126, 130, 134, 138, 142])[tier] : female ? 127 : 133) - (shy ? 4 : 0);
+    const by = (af ? [148, 150, 152, 153, 154][tier] : 152) - (shy ? 2 : 0);
     cut = by + 2;
     o += bareBody(a, skin, nh, hw, { by, cup: female ? (fig && CUP_OUT[fig.cup] != null ? CUP_OUT[fig.cup] : ({ small: 2.5, large: 9.5 }[(a.body || {}).chest] ?? 5.5)) : 0, marks: af ? tier : 0, lipstick: af && af.lipstick, clutch: shy });
   } else o += clothes(a, top, kid, skinD, hw, adult);
