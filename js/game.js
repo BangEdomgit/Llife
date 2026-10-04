@@ -230,6 +230,11 @@ function lookOf(p) {
     p.appearance = Avatar.make(`${S.id}:${p.id}`, p.gender, { feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null });
     // 30대 이상 기혼자: 남자는 셔츠·재킷, 여자는 단정한 머리가 조금 더 많음 (미혼이어도 단정한 사람은 있음)
     if (p.married && npcAge(p) >= 30 && Math.random() < .5) { if (p.gender === 'm') p.appearance.top = pick([1, 1, 7]); else p.appearance.hair = pick([0, 1, 3, 4, 5]); }
+    // 비슷한 얼굴 방지 (FACE_VARIETY.md §10): 같은 생활권(같은 소속, 아니면 같은 관계·같은 단골 장소)에 얼굴 거리 3 미만이 있으면 얼굴 시드만 바꿔 다시 (최대 5번)
+    if (Avatar.faceDistance) {
+      const peers = alive().filter(q => q !== p && q.appearance && (p.org ? q.org === p.org : q.kind === p.kind && q.hangout === p.hangout)).slice(-40);
+      for (let k = 1; k <= 5 && peers.some(q => Avatar.faceDistance(p.appearance, q.appearance) < 3); k++) p.appearance.gs = k;
+    }
   }
   return p.appearance || null;
 }
@@ -2236,7 +2241,7 @@ function profile(p) {
   const kin = p.kind === 'family' || p.kind === 'child';
   const mt = marriageText(p);
   return [
-    f('feature', '특징', p.feature),
+    f('feature', '특징', [...(window.Avatar && Avatar.traits ? Avatar.traits(lookOf(p)).filter(t => !['보조개', '주근깨', '눈썹'].some(k => t.includes(k) && (p.feature || '').includes(k))).slice(0, 2) : []), p.feature].join(' · ')),   // 얼굴 특징(○○상·점·보조개 …) + 말버릇
     ...(age >= 13 && !kin ? [{ field: 'face', label: '생김새', value: `${LETTERS[p.face] || 'D'} · 꾸밈 ${LETTERS[p.style] || 'D'}` }] : []),
     ...bodyInfo(p).map(x => Object.assign({ field: 'body' }, x)),
     ...(mt !== undefined ? [{ field: 'married', label: '결혼', value: mt }] : []),

@@ -29,6 +29,8 @@
 <div class="bar"><label><input type="checkbox" id="guides" checked> 앵커·바닥 가이드</label></div>
 <div class="checks" id="checks"></div>
 <div id="rows"></div>
+<div id="faces"></div>
+<script src="js/face.js"></script>
 <script src="js/avatar.js"></script>
 <script>
 const A = window.Avatar;
@@ -78,6 +80,29 @@ function draw() {
 }
 document.getElementById('guides').addEventListener('change', draw);
 draw();
+
+// ── 얼굴 다양성 (FACE_VARIETY.md §12) ──
+// 1. 머리·옷 가림: 같은 대머리 + 같은 회색 상의 + 같은 피부로 24명 → 비슷한 얼굴 쌍이 없어야 함 (faceDistance 최솟값, 3 미만이면 경고)
+// 2. 같은 사람 일관성: 썸네일 / 상반신 / 전신 / 표정 7종
+// 3. 같은 시드 남·녀: 남매처럼 닮았지만 머리 없이도 성별이 구분돼야 함
+function drawFaces() {
+  const box = document.getElementById('faces'), cell = (svg, lab) => `<div class="fig">${svg}<span class="lab">${lab}</span></div>`;
+  const P = [];
+  for (let i = 0; i < 24; i++) { const a = A.make('face-' + i, i % 2 ? 'f' : 'm'); a.skin = 1; P.push(a); }
+  let min = 99, pair = '';
+  for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) { const d = A.faceDistance(P[i], P[j]); if (d < min) { min = d; pair = `${i}·${j}`; } }
+  const row1 = P.map((a, i) => cell(A.render(a, 96, { age: 26, mask: true }), `${i} ${(A.genes(a).arch && Face.ARCH[A.genes(a).arch].label) || Face.SHAPE_LABEL[A.genes(a).shape]}`)).join('');
+  const who = A.make('face-same', 'f');
+  const EX = [['neutral', '기본'], ['smile', '미소'], ['laugh', '웃음'], ['sad', '슬픔'], ['angry', '화남'], ['surprised', '놀람'], ['shy', '수줍음']];
+  const row2 = cell(A.render(who, 40, { age: 26 }), '썸네일') + cell(A.render(who, 120, { age: 26 }), '상반신') + cell(A.render(who, 100, { age: 26, full: true }), '전신')
+    + EX.map(([x, l]) => cell(A.render(who, 96, { age: 26, expr: x === 'neutral' ? null : x }), l)).join('');
+  const row3 = [0, 1, 2, 3, 4, 5].map(i => { const m = A.make('sib-' + i, 'm'), f = A.make('sib-' + i, 'f'); m.skin = f.skin = 1; return cell(A.render(m, 80, { age: 24, mask: true }), `시드 ${i} 남`) + cell(A.render(f, 80, { age: 24, mask: true }), `시드 ${i} 여`); }).join('');
+  if (min < 3) console.warn('비슷한 얼굴:', pair, min.toFixed(2)); else console.log('24명 faceDistance 최솟값', min.toFixed(2), pair);
+  box.innerHTML = `<section><h2>얼굴 1 · 머리·옷 가림 24명 — faceDistance 최솟값 <b class="${min < 3 ? 'bad' : 'ok'}">${min.toFixed(2)}</b> (${pair}, 3 미만이면 경고)</h2><div class="row" style="flex-wrap:wrap">${row1}</div></section>`
+    + `<section><h2>얼굴 2 · 같은 사람 — 썸네일 / 상반신 / 전신 / 표정 7종</h2><div class="row" style="flex-wrap:wrap">${row2}</div></section>`
+    + `<section><h2>얼굴 3 · 같은 시드 남·녀 (머리 없이)</h2><div class="row" style="flex-wrap:wrap">${row3}</div></section>`;
+}
+drawFaces();
 </script>
 </body>
 </html>
