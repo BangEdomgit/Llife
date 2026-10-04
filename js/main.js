@@ -274,7 +274,7 @@ function playScene(sc) {
   // 서서 다가감 → 그날 밤 → (콘돔 없이면) 자궁 그림 → 다음 날 아침 → (임신이면) 몇 주 뒤
   const S = G.state(), inside = sc.contra === 'none' || sc.contra === 'pill';
   const tops = [Avatar.topColor(S.gender === 'm' ? G.myLook() : G.look(p)), Avatar.topColor(S.gender === 'm' ? G.look(p) : G.myLook())];
-  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`]).concat([`<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}</div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
+  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`]).concat([`<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}<button type="button" class="nt-end" data-nt-end>종료</button></div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
     .concat(inside ? [`<div class="sc-card sc-ut">${Night.uterus(!!sc.preg)}</div>`] : []);
   sceneQueue = nightQ.concat(morningQ, pregQ);
   nextScene();
@@ -301,7 +301,10 @@ function maybeScene(S) {
 }
 sceneEl.addEventListener('click', e => {
   if (e.target.closest('[data-sc-next]')) { nextScene(); return; }
-  if (sceneBox.querySelector('.sc-night, .sc-fp, .sc-ut')) nextScene();
+  // 그날 밤은 종료 버튼을 누를 때까지 계속 (누르면 마무리, 마무리 중에 또 누르면 바로 넘김)
+  const end = e.target.closest('[data-nt-end]');
+  if (end) { if (window.Night && Night.finish()) end.textContent = '넘기기'; else nextScene(); return; }
+  if (sceneBox.querySelector('.sc-fp, .sc-ut')) nextScene();
 });
 
 /* ---------- 모달 ---------- */

@@ -214,7 +214,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .sil{width:220px;height:auto;fill:var(--text);opacity:.85}
 .sil .sil-heart{fill:var(--minus)}
 .floor{width:200px;height:auto;opacity:.9}
-.sc-night{display:grid;justify-items:center;gap:8px;padding:14px 10px 10px;background:#0b0d14;border-radius:4px;cursor:pointer;animation:scFade .5s ease-out}
+.sc-night{display:grid;justify-items:center;gap:8px;padding:14px 10px 10px;background:#0b0d14;border-radius:4px;animation:scFade .5s ease-out}
+.nt-end{padding:6px 26px;font-size:13.5px;letter-spacing:2px}
+.nt-face{transition:box-shadow .4s}
+.nt-face.peak{box-shadow:0 0 0 2px #ff7aa2,0 0 18px 4px rgba(255,110,160,.75);animation:ntPeak .7s ease-out}
+@keyframes ntPeak{0%{filter:brightness(1.9) saturate(1.4)}40%{filter:brightness(1.25)}100%{filter:none}}
 .sc-night .sc-t{margin:0}
 .nt-stage{position:relative;width:100%;max-width:380px}
 .bed{display:block;width:100%;height:auto;border-radius:3px}
