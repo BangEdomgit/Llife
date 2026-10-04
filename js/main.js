@@ -131,7 +131,8 @@ function render(S) {
 
   maybeScene(S);
   // 모달 (이벤트 → 성적표·합격 → 원서)
-  if (S.pending.length) openEvent();
+  if (S.intro) openIntro();
+  else if (S.pending.length) openEvent();
   else if (S.report) openReport();
   else if (S.apply) openApply();
   else if (S.ended && endingFor !== S.id) { endingFor = S.id; openEnding(); }
@@ -292,6 +293,7 @@ function showModal(mode, title, html, closable = true, arg = null) {
   mBody.innerHTML = html;
   mBody.scrollTop = scroll;
   $('#mClose').hidden = !closable;
+  modal.querySelector('.modal').classList.toggle('wide', mode === 'quick');   // 20세 시작: 오른쪽에 전신 미리보기
   modal.hidden = false;
   if (!same) {
     const first = mBody.querySelector('button:not(:disabled)') || (closable ? $('#mClose') : null);
@@ -536,25 +538,28 @@ function openMe() {
     ${school}`);
 }
 
-/* 새 인생: 특성 고르기 */
+/* 새 인생: 특성 고르기 — 처음부터(0살) / 20세 시작 (QUICKSTART.md) */
 const CREATE_FIELDS = [
   ['gender', '성별', [{ id: 'm', label: '남' }, { id: 'f', label: '여' }]],
   ['trait', '소질', null], ['personality', '성격', null], ['wealth', '집안', null],
   ['hobby', '취미', null], ['value', '가치관', null], ['dream', '꿈', null], ['sibling', '형제', null],
   ['month', '생일', Array.from({ length: 12 }, (_, i) => ({ id: i + 1, label: `${i + 1}월` }))],
 ];
+const Q20_FIELDS = ['gender', 'month'];   // 20세 시작: 첫 화면엔 이름·성별·생일만 (나머지는 단계마다)
 const SRC = { trait: 'traits', personality: 'personalities', wealth: 'wealth', hobby: 'hobbies', value: 'values', dream: 'dreams', sibling: 'siblings' };
 let draft = null;
 const optsOf = f => f[2] || G.creation[SRC[f[0]]];
 const rnd = arr => arr[Math.floor(Math.random() * arr.length)];
-function randomDraft() {
-  const d = { name: '' };
+function randomDraft(mode) {
+  const d = { name: '', mode: mode || 'full', step: 0 };
   CREATE_FIELDS.forEach(f => { d[f[0]] = rnd(optsOf(f)).id; });
   return d;
 }
 function openCreate(closable) {
   if (!draft) draft = randomDraft();
-  const fields = CREATE_FIELDS.map(f => {
+  if (draft.mode === 'q20' && draft.step > 0) { openQuick(closable); return; }
+  const q20 = draft.mode === 'q20';
+  const fields = CREATE_FIELDS.filter(f => !q20 || Q20_FIELDS.includes(f[0])).map(f => {
     const opts = optsOf(f);
     const sel = opts.find(o => o.id === draft[f[0]]);
     return `<div class="fld"><div class="fl"><span>${f[1]}</span><button type="button" class="dice" data-rf="${f[0]}" aria-label="${f[1]} 랜덤">🎲</button></div>
@@ -562,21 +567,234 @@ function openCreate(closable) {
       ${sel && sel.desc ? `<p class="desc">${esc(sel.desc)}</p>` : ''}</div>`;
   }).join('');
   showModal('create', '🌱 새 인생', `<div class="create">
+    <div class="fld"><div class="fl"><span>시작</span></div><div class="chips mode">
+      <button type="button" data-mode="full" aria-pressed="${!q20}">처음부터 (0세~)</button><button type="button" data-mode="q20" aria-pressed="${q20}">20세 시작</button></div>
+      <p class="desc">${q20 ? '0~19살을 건너뛴다. 학력·능력치·몸·관계를 직접 정하고 스무 살 봄부터.' : '태어나는 순간부터. 어린 시절의 선택이 성격과 취향이 된다.'}</p></div>
     <div class="fld"><div class="fl"><span>이름 (비우면 랜덤)</span></div><input id="cName" maxlength="6" value="${esc(draft.name)}" placeholder="예: 김하늘" autocomplete="off"></div>
     ${fields}
-    <div class="create-go"><button type="button" data-rall>🎲 전부 랜덤</button><button type="button" class="go" data-go>태어나기</button></div>
+    <div class="create-go"><button type="button" data-rall>🎲 전부 랜덤</button><button type="button" class="go" data-go>${q20 ? '다음 →' : '태어나기'}</button></div>
   </div>`, !!closable, 'create');
 }
 function createClick(b) {
   const d = b.dataset;
   const nameEl = $('#cName'); if (nameEl) draft.name = nameEl.value;
-  if (d.cf) { const f = CREATE_FIELDS.find(x => x[0] === d.cf); draft[d.cf] = typeof optsOf(f)[0].id === 'number' ? +d.cv : d.cv; }
+  if (d.mode) draft.mode = d.mode;
+  else if (d.cf) { const f = CREATE_FIELDS.find(x => x[0] === d.cf); draft[d.cf] = typeof optsOf(f)[0].id === 'number' ? +d.cv : d.cv; }
   else if (d.rf) { const f = CREATE_FIELDS.find(x => x[0] === d.rf); draft[d.rf] = rnd(optsOf(f)).id; }
-  else if ('rall' in d) { const n = draft.name; draft = randomDraft(); draft.name = n; }
-  else if ('go' in d) { const opt = draft; draft = null; G.newLife(opt); closeModal(); return; }
+  else if ('rall' in d) { const n = draft.name, m = draft.mode; draft = randomDraft(m); draft.name = n; }
+  else if ('go' in d) {
+    if (draft.mode === 'q20') { quickSync(); draft.step = 1; draft.maxStep = Math.max(draft.maxStep || 1, 1); openQuick(!$('#mClose').hidden); return; }
+    const opt = draft; draft = null; G.newLife(opt); closeModal(); return;
+  }
   const top = mBody.scrollTop;
   openCreate(!$('#mClose').hidden);
   mBody.scrollTop = top;
+}
+
+/* ── 20세 시작: 배경 → 능력치 → 외모·신체 → 성격·취향 → 관계 → 확인 (뒤로 가기 가능, 오른쪽에 전신 미리보기) ── */
+const QSTEPS = ['배경', '능력치', '외모·신체', '성격·취향', '관계', '확인'];
+const QNUM = ['hair', 'hc', 'skin', 'eyes', 'friends', 'ly'], QBOOL = ['exp', 'lsex'];
+const QD = () => G.quick.data();
+// 처음 들어올 때(또는 성별을 바꿨을 때) 기본값: 첫 화면에서 뽑힌 성격·집안·취미·꿈·형제를 이어받음
+function quickSync() {
+  const g = draft.gender, Q = QD();
+  let q = draft.q;
+  if (!q) {
+    q = draft.q = {
+      seed: Math.random().toString(36).slice(2, 9), gender: g,
+      edu: 'normal', univ: null, dept: null, job: Q.jobs[0], wealth: draft.wealth, home: 'parents', army: 'next',
+      st: Object.fromEntries(Q.stats.map(k => [k, 50])), style: 20, exp: false, trait: draft.trait,
+      build: 'avg', cup: 'B', waist: 63, hip: 90, shoulder: 44, penis: 14,
+      personality: draft.personality, hobbies: [draft.hobby], value: draft.value, dream: draft.dream,
+      parents: 'both', sibling: draft.sibling, friends: 2, love: 'none', lp: 'warm', ly: 1, lsex: false, exWhy: Q.exWhy[0].id,
+    };
+  }
+  if (q.gender !== g || q.height == null) {
+    const a = window.Avatar ? Avatar.make(`${q.seed}:me`, g) : {};
+    Object.assign(q, { gender: g, height: g === 'm' ? 173 : 162, hair: a.hair ?? 0, hc: a.hc ?? 0, skin: a.skin ?? 1, eyes: a.eyes ?? 0 });
+  }
+  quickFixEdu();
+}
+// 학력이 바뀌면 그 등급의 대학·학과로 맞춤
+function quickFixEdu() {
+  const q = draft.q, e = QD().edu.find(x => x.id === q.edu);
+  if (!e || !e.tiers) return;
+  const unis = G.quick.tierUnis(e.tiers);
+  if (!unis.some(u => u.id === q.univ)) q.univ = unis[0].id;
+  const u = unis.find(x => x.id === q.univ);
+  if (!u.departments.includes(q.dept)) q.dept = u.departments[0];
+}
+const qLeft = q => QD().points - QD().stats.reduce((t, k) => t + (q.st[k] || 0), 0);
+const qFig = q => G.quick.fig(q.gender, q.build, q);
+function qLabel(k) {
+  const q = draft.q, Qk = G.quick, gl = v => { const L = Qk.grade(v); return `<b class="g g-${L}">${L}</b>`; };
+  if (k === 'left') return String(qLeft(q));
+  if (q.st && k in q.st) return `${q.st[k]} ${gl(q.st[k])}`;
+  if (k === 'style') return `${q.style} ${gl(q.style)}`;
+  if (k === 'height') return `${q.height}cm (${Qk.heightLabel(q.gender, q.height)})`;
+  if (k === 'waist') return `${q.waist}cm`;
+  if (k === 'hip') return `${q.hip}cm (${Qk.hipLabel(q.hip)})`;
+  if (k === 'shoulder') return `${q.shoulder}cm (${Qk.shoulderLabel(q.shoulder)})`;
+  if (k === 'penis') return `${q.penis}cm (${Qk.penisLabel(q.penis)})`;
+  return '';
+}
+function qPreview() {
+  const q = draft.q, f = qFig(q), look = G.quick.look(q);
+  const svg = window.Avatar && look ? Avatar.render(look, 132, { age: 20, full: f, personality: q.personality }) : '';
+  const bl = (QD().builds.find(b => b.id === q.build) || {}).label || '';
+  const cap = q.gender === 'f' ? `${f.under}${f.cup} · ${f.bust}-${f.waist}-${f.hip}` : `어깨 ${f.shoulder}cm`;
+  return `${svg}<p class="qs-cap">${f.height}cm · ${esc(bl)} 체형<br>${esc(cap)}</p>`;
+}
+const qChip = (f, v, label, on, title) => `<button type="button" data-qf="${f}" data-qv="${v}" aria-pressed="${!!on}"${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
+const qChips = (f, list, cur) => `<div class="chips">${list.map(o => qChip(f, o.id, esc(o.label), o.id === cur)).join('')}</div>`;
+const qFld = (title, body, desc) => `<div class="fld"><div class="fl"><span>${title}</span></div>${body}${desc ? `<p class="desc">${desc}</p>` : ''}</div>`;
+const qRange = (key, min, max, val, label, attr = 'qr') => `<div class="qs-r"><span class="qs-rl">${label}</span><input type="range" data-${attr}="${key}" min="${min}" max="${max}" step="1" value="${val}" aria-label="${esc(label.replace(/<[^>]+>/g, ''))}"><span class="qs-rv" data-qlab="${key}">${qLabel(key)}</span></div>`;
+// 컵 아이콘: 옆모습 실루엣 — 컵이 클수록 앞으로 더 나옴
+const cupIcon = i => `<svg class="cup-i" viewBox="0 0 18 18" width="16" height="16" aria-hidden="true"><path d="M3 1 L3 4.5 Q${(3 + 2.2 + i * 2.1).toFixed(1)} ${(7.5 + i * .45).toFixed(1)} 3 ${(11.5 + i * .55).toFixed(1)} L3 17" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function quickStep(n) {
+  const q = draft.q, Q = QD(), C = G.creation, L = (list, id) => (list.find(x => x.id === id) || {}).label || '';
+  if (n === 1) {
+    const e = Q.edu.find(x => x.id === q.edu);
+    let more = '';
+    if (e.tiers) {
+      const unis = G.quick.tierUnis(e.tiers), u = unis.find(x => x.id === q.univ);
+      more = qFld('대학', `<div class="chips unis">${unis.map(x => qChip('univ', x.id, `${logo(x.id, 18)} ${esc(x.short || x.name)}`, x.id === q.univ, x.name)).join('')}</div>`, `${esc(u.name)} · ${esc(G.tierLabel(u.tier))} · "${esc(u.motto || '')}"`)
+        + qFld('학과', `<div class="chips">${u.departments.map(id => { const d = G.departments.find(x => x.id === id); return qChip('dept', id, esc(d.icon + ' ' + d.name), id === q.dept); }).join('')}</div>`, '1학년을 마친 2학년으로 시작한다. 1학년 학점은 능력치로 정해진다.');
+    } else if (q.edu === 'work') {
+      more = qFld('하는 일', `<div class="chips">${G.quick.jobs().map(j => qChip('job', j.id, `${esc(j.label)} <small>${esc(G.fmtMoney(j.salary))}</small>`, j.id === q.job)).join('')}</div>`, '연봉 (만원). 고졸로 바로 시작할 수 있는 일.');
+    }
+    const mr = Q.money[q.wealth] || [0, 0], w = C.wealth.find(x => x.id === q.wealth) || {};
+    const army = q.gender === 'm' ? qFld('병역', qChips('army', Q.army.filter(a => q.edu !== 'retake' || a.id !== 'now'), q.army === 'now' && q.edu === 'retake' ? 'next' : q.army), '입대하면 2년 동안 훈련이 하루 8칸을 쓴다.') : '';
+    return qFld('학력', qChips('edu', Q.edu, q.edu), esc(e.desc)) + more
+      + qFld('집안', qChips('wealth', C.wealth, q.wealth), `${esc(w.desc || '')} 시작 돈 ${mr[0] === mr[1] ? G.fmtMoney(mr[0]) + (q.wealth === 'poor' ? ' (대학생이면 학자금 대출)' : '') : `${G.fmtMoney(mr[0])}~${G.fmtMoney(mr[1])}`}`)
+      + qFld('사는 곳', qChips('home', Q.home, q.home)) + army;
+  }
+  if (n === 2) {
+    const tr = C.traits.find(t => t.id === q.trait) || {};
+    const rows = Q.stats.map(k => qRange(k, 0, 100, q.st[k], `${G.LABEL[k]} <small class="dim">${esc(Q.statDesc[k])}</small>`, 'qs')).join('');
+    return `<div class="qs-left">남은 포인트 <b data-qlab="left">${qLabel('left')}</b> / ${Q.points}</div>
+      <div class="chips">${Q.presets.map(p => `<button type="button" data-qpre="${p.id}">${esc(p.label)}</button>`).join('')}<button type="button" data-qpre="random">🎲 랜덤</button></div>
+      <div class="qs-rs">${rows}</div>
+      <p class="hint">0~20 F · 21~40 E~D · 41~60 C · 61~80 B~A · 81~100 S. 남은 포인트가 0이면 더 올릴 수 없다.</p>
+      <div class="qs-rs">${qRange('style', 0, 50, q.style, '꾸밈 <small class="dim">옷·머리 상태</small>')}</div>
+      ${qFld('소질 <small class="dim">앞으로 잘 오르는 것</small>', qChips('trait', C.traits, q.trait), esc(tr.desc || ''))}
+      ${qFld('경험', `<div class="chips">${qChip('exp', 0, '없음', !q.exp)}${qChip('exp', 1, '있음', q.exp)}</div>`, q.exp ? '밤의 기술이 조금 있는 채로 시작한다.' : '아직 경험 없이 시작한다.')}`;
+  }
+  if (n === 3) {
+    const P = window.Avatar ? Avatar.parts : { hair: { m: [], f: [] }, hc: [], skin: [], eyes: [] }, g = q.gender, R = Q.range;
+    const body = g === 'f'
+      ? qFld('가슴', `<div class="chips">${Q.cups.map((c, i) => qChip('cup', c, `${cupIcon(i)} ${c}`, c === q.cup)).join('')}</div>`, esc(G.quick.cupLabel(q.cup)))
+        + `<div class="qs-rs">${qRange('waist', R.waist[0], R.waist[1], q.waist, '허리')}${qRange('hip', R.hip[0], R.hip[1], q.hip, '골반')}</div>`
+      : `<div class="qs-rs">${qRange('shoulder', R.shoulder[0], R.shoulder[1], q.shoulder, '어깨')}${qRange('penis', R.penis[0], R.penis[1], q.penis, '크기')}</div>`;
+    const sw = (f, list) => `<div class="chips sw">${list.map(o => qChip(f, o.id, `<i style="background:${o.color}"></i>${esc(o.label)}`, o.id === q[f])).join('')}</div>`;
+    return `<div class="qs-rs">${qRange('height', R.height[g][0], R.height[g][1], q.height, '키')}</div>`
+      + qFld('체형', qChips('build', Q.builds, q.build)) + body
+      + qFld('머리 스타일', `<div class="chips">${P.hair[g].map((l, i) => qChip('hair', i, esc(l), i === q.hair)).join('')}</div>`)
+      + qFld('머리색', sw('hc', P.hc)) + qFld('피부', sw('skin', P.skin))
+      + qFld('눈', `<div class="chips">${P.eyes.map(o => qChip('eyes', o.id, esc(o.label), o.id === q.eyes)).join('')}</div>`)
+      + `<div class="chips"><button type="button" data-qreface>🎲 얼굴 다시 뽑기</button></div>`;
+  }
+  if (n === 4) {
+    const pe = C.personalities.find(x => x.id === q.personality) || {};
+    return qFld('성격', qChips('personality', C.personalities, q.personality), `${esc(pe.desc || '')} <b>${esc(Q.persEffect[q.personality] || '')}</b>`)
+      + qFld(`취미 <small class="dim">두 개까지 (${q.hobbies.length}/2)</small>`, `<div class="chips">${C.hobbies.map(h => `<button type="button" data-qh="${h.id}" aria-pressed="${q.hobbies.includes(h.id)}">${esc(h.label)}</button>`).join('')}</div>`)
+      + qFld('가치관', qChips('value', C.values, q.value)) + qFld('꿈', qChips('dream', C.dreams, q.dream));
+  }
+  if (n === 5) {
+    let love = '';
+    if (q.love === 'yes') {
+      love = qFld('연인 성격', qChips('lp', C.personalities, q.lp))
+        + qFld('만난 기간', `<div class="chips">${[1, 2, 3].map(y => qChip('ly', y, `${y}년`, y === q.ly)).join('')}</div>`, '오래 만날수록 친밀·신뢰는 깊고, 설렘은 조금 잔잔하다.')
+        + qFld('함께 보낸 밤', `<div class="chips">${qChip('lsex', 0, '아직', !q.lsex)}${qChip('lsex', 1, '있음', q.lsex)}</div>`, q.lsex ? '경험이 있는 채로 시작하고, 서로 조금 맞춰져 있다.' : '');
+    } else if (q.love === 'ex') love = qFld('헤어진 이유', qChips('exWhy', Q.exWhy, q.exWhy), '첫 여름에 그 사람과 다시 얽히는 일이 생긴다.');
+    return qFld('부모님', qChips('parents', Q.parents, q.parents))
+      + qFld('형제', qChips('sibling', C.siblings, q.sibling))
+      + qFld('친구', `<div class="chips">${[0, 1, 2, 3].map(k => qChip('friends', k, k ? `${k}명` : '없음', k === q.friends)).join('')}</div>`, q.edu === 'elite' || q.edu === 'normal' || q.edu === 'college' ? '두 명까지는 같은 과 — 캠퍼스에서 자주 마주친다.' : '')
+      + qFld('연인', qChips('love', Q.love, q.love)) + love;
+  }
+  // 6: 확인
+  const e = Q.edu.find(x => x.id === q.edu), u = q.univ && G.universities.find(x => x.id === q.univ), d = q.dept && G.departments.find(x => x.id === q.dept);
+  const f = qFig(q), P = window.Avatar ? Avatar.parts : null;
+  const rows = [
+    ['이름', `${draft.name.trim() || '(랜덤)'} · ${genderKo(q.gender)} · ${draft.month}월생`],
+    ['학력', e.tiers && u ? `${e.label} — ${u.name} ${d ? d.name : ''}` : q.edu === 'work' ? `${e.label} — ${(G.quick.jobs().find(j => j.id === q.job) || {}).label || ''}` : e.label],
+    ['집안', `${L(C.wealth, q.wealth)} · ${L(Q.home, q.home)}${q.gender === 'm' ? ` · ${L(Q.army, q.edu === 'retake' && q.army === 'now' ? 'next' : q.army)}` : ''}`],
+    ['능력치', Q.stats.map(k => `${G.LABEL[k]} ${G.quick.grade(q.st[k])}`).join(' · ') + ` · 꾸밈 ${G.quick.grade(q.style)}`],
+    ['소질', L(C.traits, q.trait) + (q.exp ? ' · 경험 있음' : '')],
+    ['몸', `${f.height}cm · ${L(Q.builds, q.build)} · ${q.gender === 'f' ? `${f.under}${f.cup} · ${f.bust}-${f.waist}-${f.hip}` : `어깨 ${f.shoulder}cm · ${q.penis}cm`}`],
+    ['생김새', P ? `${P.hair[q.gender][q.hair] || ''} · ${(P.hc.find(x => x.id === q.hc) || {}).label || ''} · 피부 ${(P.skin[q.skin] || {}).label || ''} · ${(P.eyes[q.eyes] || {}).label || ''} 눈` : ''],
+    ['성격·취향', `${L(C.personalities, q.personality)} · ${q.hobbies.map(h => L(C.hobbies, h)).join('·')} · ${L(C.values, q.value)} · 꿈 ${L(C.dreams, q.dream)}`],
+    ['관계', `부모님 ${L(Q.parents, q.parents)} · ${L(C.siblings, q.sibling)} · 친구 ${q.friends}명 · ${q.love === 'yes' ? `연인 (${L(C.personalities, q.lp)}, ${q.ly}년)` : q.love === 'ex' ? `전 연인 (${L(Q.exWhy, q.exWhy)})` : '솔로'}`],
+  ];
+  return `<dl class="prof qs-sum">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl><p class="hint">스무 살 3월 1일, 새 학년도의 첫날부터 시작한다.</p>`;
+}
+function openQuick(closable) {
+  const n = draft.step, q = draft.q;
+  const steps = QSTEPS.map((t, i) => { const k = i + 1; return `<button type="button" class="${k === n ? 'on' : k < n ? 'done' : ''}" data-qstep="${k}"${k > (draft.maxStep || 1) ? ' disabled' : ''}>${k} ${t}</button>`; }).join('');
+  const warn = n === 4 && !q.hobbies.length ? '취미를 하나 이상 골라줘.' : '';
+  showModal('quick', `🌱 20세 시작 · ${n}/6 ${QSTEPS[n - 1]}`, `<div class="create qs">
+    <div class="qs-steps">${steps}</div>
+    <div class="qs-grid"><div class="qs-main">${quickStep(n)}</div><div class="qs-side" id="qsPrev">${qPreview()}</div></div>
+    ${warn ? `<p class="hint warn">${warn}</p>` : ''}
+    <div class="create-go"><button type="button" data-qback>← 뒤로</button><button type="button" class="go" data-${n === 6 ? 'qgo' : 'qnext'}${warn ? ' disabled' : ''}>${n === 6 ? '이대로 시작' : '다음 →'}</button></div>
+  </div>`, closable == null ? !$('#mClose').hidden : !!closable, 'q' + n);
+}
+function quickRefresh() {
+  mBody.querySelectorAll('[data-qlab]').forEach(el => { el.innerHTML = qLabel(el.dataset.qlab); });
+  const pv = $('#qsPrev'); if (pv) pv.innerHTML = qPreview();
+}
+function quickRandom() {
+  const Q = QD(), v = Q.stats.map(() => 0);
+  let left = Q.points;
+  while (left > 0) { const i = Math.floor(Math.random() * v.length), add = Math.min(left, 1 + Math.floor(Math.random() * 10), 100 - v[i]); v[i] += add; left -= add; }
+  return v;
+}
+function quickClick(b) {
+  const d = b.dataset, q = draft.q, Q = QD();
+  if ('qback' in d) { draft.step--; if (draft.step <= 0) { draft.step = 0; openCreate(!$('#mClose').hidden); } else openQuick(); return; }
+  if ('qnext' in d) { draft.step = Math.min(6, draft.step + 1); draft.maxStep = Math.max(draft.maxStep || 1, draft.step); openQuick(); return; }
+  if (d.qstep) { draft.step = +d.qstep; openQuick(); return; }
+  if ('qgo' in d) { const opt = Object.assign({}, q, { name: draft.name, gender: draft.gender, month: draft.month }); draft = null; closeModal(); G.newLife20(opt); return; }   // 닫고 나서 만들어야 '나의 20년' 창이 뜸
+  if (d.qf) {
+    const f = d.qf, v = QNUM.includes(f) ? +d.qv : QBOOL.includes(f) ? d.qv === '1' : d.qv;
+    q[f] = v;
+    if (f === 'edu' || f === 'univ') quickFixEdu();
+  } else if (d.qh) {
+    const i = q.hobbies.indexOf(d.qh);
+    if (i >= 0) q.hobbies.splice(i, 1); else { q.hobbies.push(d.qh); if (q.hobbies.length > 2) q.hobbies.shift(); }
+  } else if (d.qpre) {
+    const v = d.qpre === 'random' ? quickRandom() : (Q.presets.find(p => p.id === d.qpre) || Q.presets[0]).v;
+    Q.stats.forEach((k, i) => { q.st[k] = v[i]; });
+  } else if ('qreface' in d) q.seed = Math.random().toString(36).slice(2, 9);
+  openQuick();
+}
+// 슬라이더: 다시 그리지 않고 값·라벨·미리보기만 (끄는 중에 슬라이더가 사라지지 않게). 능력치는 남은 포인트까지만
+mBody.addEventListener('input', e => {
+  if (modalMode !== 'quick' || !draft || !draft.q) return;
+  const el = e.target;
+  if (!el || el.type !== 'range') return;
+  const q = draft.q;
+  if (el.dataset.qs) {
+    const k = el.dataset.qs, max = Math.min(100, q.st[k] + qLeft(q));
+    let v = +el.value;
+    if (v > max) { v = max; el.value = v; }
+    q.st[k] = v;
+  } else if (el.dataset.qr) q[el.dataset.qr] = +el.value;
+  quickRefresh();
+});
+
+/* 20세 시작: 지나온 20년 요약 → [시작하기] */
+function openIntro() {
+  const S = G.state(), it = S.intro;
+  if (!it) return;
+  const me = G.myLook() && window.Avatar ? Avatar.render(G.myLook(), 58, { age: S.age, fig: G.figure(null) }) : '';
+  const lines = it.lines.map(([i, t, sub]) => `<p class="il"><span class="ii">${i}</span><span>${esc(t)}${sub ? `<br><small class="dim">${esc(sub)}</small>` : ''}</span></p>`).join('');
+  showModal('intro', '나의 20년', `<div class="intro">
+    <div class="intro-top">${me}<span><b>${esc(S.name)}</b><br><span class="dim">스무 살 · ${S.date.y}년 3월 1일</span></span></div>
+    ${lines}
+    <p class="il"><span class="ii">📷</span><span>추억${it.mems.map(m => `<br>• "${esc(m)}"`).join('')}</span></p>
+    <p class="intro-last">지금, 인생이 시작된다.</p>
+    <div class="choices"><button type="button" data-intro>시작하기</button></div></div>`, false, 'intro');
 }
 
 /* 엔딩 */
@@ -626,7 +844,7 @@ function dreamDone(S) {
 function openSlots() {
   const rows = G.slots().map(x => {
     const info = x.empty ? '<span class="dim">비어 있음</span>'
-      : `<b>${esc(x.name)}</b> <span class="dim">${x.age}살 ${genderKo(x.gender)}${x.date ? ` · ${x.date.y}년 ${x.date.m}월` : ''}${x.ended ? ' · 끝난 인생' : ''}</span>`;
+      : `<b>${esc(x.name)}</b> <span class="dim">${x.age}살 ${genderKo(x.gender)}${x.date ? ` · ${x.date.y}년 ${x.date.m}월` : ''}${x.quick ? ' · 20세 시작' : ''}${x.ended ? ' · 끝난 인생' : ''}</span>`;
     const btns = x.current ? '<span class="tag">지금 칸 · 자동 저장</span>'
       : (x.empty ? `<button type="button" data-sv="${x.n}">여기에 저장</button><button type="button" data-snew="${x.n}">새 인생</button>`
         : `<button type="button" data-sl="${x.n}">불러오기</button><button type="button" data-sv="${x.n}">덮어쓰기</button><button type="button" data-sdel="${x.n}">지우기</button>`);
@@ -678,6 +896,8 @@ mBody.addEventListener('click', e => {
   if (!b || b.disabled) return;
   const d = b.dataset;
   if (modalMode === 'create') { createClick(b); return; }
+  if (modalMode === 'quick') { quickClick(b); return; }
+  if ('intro' in d) { G.ackIntro(); return; }
   if ('rok' in d) { G.ackReport(); return; }
   if (modalMode === 'apply') {
     if ('apadd' in d) { applyDraft.rows.push({ u: '', d: '', type: '교과' }); openApply(); }

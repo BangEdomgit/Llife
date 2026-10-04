@@ -106,7 +106,7 @@ GAME_DATA.events = [
       { label: '전문대라도 간다', do: (s, a) => { const u = a.univ('COL1'); a.admit('COL1', a.pick(u.departments)); }, text: '갈 수 있는 곳에 갔다. 여기서 다시 시작이다.' },
     ] },
   { id: 'dreamSpeech', type: 'must', at: 10, text: '장래희망 발표 시간. "{dreamSpeech}"', memory: true },
-  { id: 'enlist', type: 'must', at: 20, req: { gender: 'm', noFlags: ['inJail'] },
+  { id: 'enlist', type: 'must', age: [20, 21], season: ['봄'], req: { gender: 'm', noFlags: ['inJail', 'exempt'] }, when: s => s.age === (s.vars.enlistAt || 20),   // 20세 시작에선 내년으로 미루거나 면제
     text: '입영 통지서가 날아왔다. 머리를 짧게 깎았다.', memory: true, set: ['army', 'inArmy'], effect: { happy: -6, health: 4 },
     do: s => {
       s.vars.enlistAge = s.age; s.job = null; s.salary = 0;
@@ -264,7 +264,7 @@ GAME_DATA.events = [
   { id: 'collegeFest', type: 'fixed', age: [19, 23], season: ['봄'], req: { flags: ['student'] }, text: '대학 축제. 처음 보는 사람들이랑 밤새 놀았다.', memory: true, effect: { happy: 6 },
     meet: s => ({ kind: 'friend', ageRange: [s.age - 1, s.age + 2], close: 25 }) },
   { id: 'mt', type: 'fixed', age: [19, 21], season: ['봄'], req: { flags: ['student'] }, text: '첫 MT. 밤새 게임하다가 아침에 라면을 먹었다.', memory: true, effect: { happy: 5 } },
-  { id: 'moveOut', type: 'fixed', age: [21, 30], req: { noFlags: ['married'] }, text: '처음으로 자취방을 구했다. 좁지만 온전히 내 공간이다.', memory: true, set: 'ownPlace', effect: { happy: 5, money: -300 } },
+  { id: 'moveOut', type: 'fixed', age: [21, 30], req: { noFlags: ['married', 'ownPlace'] }, text: '처음으로 자취방을 구했다. 좁지만 온전히 내 공간이다.', memory: true, set: 'ownPlace', effect: { happy: 5, money: -300 } },
   { id: 'jobSeason', type: 'fixed', age: [23, 30], once: false, cooldown: 2, req: { job: false, noFlags: ['student', 'inArmy', 'inJail'] }, text: '공채 시즌이다.',
     choices: [
       { label: '원서를 왕창 쓴다', do: (s, a) => a.tryJob(), text: s => s.job ? '드디어 합격 문자가 왔다.' : '불합격 메일만 잔뜩 쌓였다.', effect: s => s.job ? { happy: 6 } : { happy: -4 } },
@@ -336,7 +336,7 @@ GAME_DATA.events = [
     onStart: (s, a) => { s.vars.dadClose = a.person('dad').close; },
     text: s => s.vars.dadClose >= 70 ? '아버지가 돌아가셨다. 마지막까지 손을 꼭 잡고 있었다.' : '아버지가 돌아가셨다. 하지 못한 말들이 자꾸 떠올랐다.',
     memory: true, effect: { happy: -15 }, do: (s, a) => { a.person('dad').gone = true; } },
-  { id: 'reunion', type: 'fixed', age: [40, 48],
+  { id: 'reunion', type: 'fixed', age: [40, 48], past: true,   // past: 지나온 어린 시절을 떠올리는 이벤트 — 20세 시작이면 안 나옴
     text: s => s.flags.president ? '동창회에 나갔다. 다들 반장이었던 나를 기억하고 있었다.'
       : s.vars.bfName ? '동창회에 나갔다. {bfName|이} 제일 먼저 손을 흔들었다.'
       : '동창회에 나갔다. 이름이 잘 떠오르지 않는 얼굴이 많았다.',

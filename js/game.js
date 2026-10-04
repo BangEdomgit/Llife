@@ -110,6 +110,7 @@ function relLabel(p) {
   if (p.heart >= 40 && heartOk(p)) return '썸';
   if (p.close >= 75) return '절친';
   if (p.close >= 45) return '친구';
+  if (p.tag) return p.tag;   // 20세 시작: 과 친구·과 선배
   if (p.kind === 'classmate') return S.age >= 19 ? '동창' : '같은 반';
   return KIND_LABEL[p.kind] || '아는 사람';
 }
@@ -196,8 +197,16 @@ function bodyIdx(p) {
   return clamp(i, 0, 6);
 }
 // 내 체격: 체력이 B 이상이면 탄탄, 아니면 타고난 골격
-const myBuild = () => gIdx(S.stats.fit) >= 4 ? 'fit' : S.frame || 'avg';
-function syncMyBody() { if (S.look && S.look.body) S.look.body.build = myBuild(); }
+//   20세 시작에서 직접 고른 체형은 체력 등급이 바뀌기 전까지 그대로 (fitAtPick: 고를 때의 체력 등급)
+function myBuild() {
+  const g = gIdx(S.stats.fit);
+  if (S.fitAtPick != null && g === S.fitAtPick) return S.frame || 'avg';
+  return g >= 4 ? 'fit' : S.frame && S.frame !== 'fit' ? S.frame : 'avg';
+}
+function syncMyBody() {
+  if (S.fitAtPick != null && gIdx(S.stats.fit) !== S.fitAtPick) delete S.fitAtPick;
+  if (S.look && S.look.body) S.look.body.build = myBuild();
+}
 // 생김새 (js/avatar.js). 같은 인생의 같은 id면 늘 같은 얼굴. 가족·아이는 피부색이 나와 같음
 function lookOf(p) {
   if (!p.appearance && window.Avatar) p.appearance = Avatar.make(`${S.id}:${p.id}`, p.gender, { feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null });
@@ -396,7 +405,7 @@ function allure(p, sit) {
   const rel = sit === 'first' ? 0 : p.heart * .5 + p.close * .15;
   let m = personality(p).allure || 0;
   m += prefBonus(p);
-  if (p.hobby === S.hobby) m += rand(5, 8);
+  if (myHobby(p.hobby)) m += rand(5, 8);
   if (p.value === S.value) m += rand(5, 8); else if (valueClash(p)) m -= rand(5, 8);
   if (S.place === 'bar') m += rand(10, 15); else if (S.place === 'station') m += rand(8, 10);
   if (S.age >= C.sexMinAge && lustOf(p) >= 60) m += lustOf(p) / 8;   // 이 사람을 향한 내 성욕
@@ -427,7 +436,7 @@ function sizeTerm(p) {
   return 6 + (g === 6 && herBuild === 'slim' ? -3 : g ? PG()[g - 1][4] : 0);
 }
 function startCompat(p) {
-  return clamp(rand(20, 45) + (p.hobby === S.hobby ? 10 : 0) + (p.value === S.value ? 5 : valueClash(p) ? -5 : 0) + (prefMatch(p) ? 10 : 0), 0, 100);
+  return clamp(rand(20, 45) + (myHobby(p.hobby) ? 10 : 0) + (p.value === S.value ? 5 : valueClash(p) ? -5 : 0) + (prefMatch(p) ? 10 : 0), 0, 100);
 }
 function satisfaction(p, mood, adj) {
   const md = clamp(50 + (mood || 0) + [0, 10, 15, -10][S.drunk || 0], 0, 100);
@@ -800,6 +809,7 @@ function eligible(ev) {
   if (ev.once !== false && S.done[ev.id]) return false;
   if (ev.cooldown && S.last[ev.id] != null && S.age - S.last[ev.id] < ev.cooldown) return false;
   if (ev.at != null && S.age !== ev.at) return false;
+  if (ev.past && S.quickstart) return false;   // 20세 시작: 플레이하지 않은 어린 시절을 떠올리는 이벤트는 없음
   if (ev.age && (S.age < ev.age[0] || S.age > ev.age[1])) return false;
   if (!!ev.jail !== jailed() && ev.type !== 'must' && ev.type !== 'trigger') return false;
   if (!meets(ev.req)) return false;
@@ -925,7 +935,7 @@ const DAY_AP = 12, LATE_AP = 6;       // 하루 12칸 + 새벽 6칸
 function phase() {
   if (S.age <= 12) return 'story';
   if (S.age <= 15) return 'ms';
-  if (S.age <= 18 || (S.age === 19 && S.flags.retake && !S.flags.student)) return 'hs';
+  if (S.age <= 18 || (S.age <= 20 && S.flags.retake && !S.flags.student)) return 'hs';   // 재수: 19살(20세 시작이면 20살)에 고3 턴을 한 번 더
   return 'adult';
 }
 const schedule = () => { const ph = phase(); return ph === 'ms' ? SCHED.ms : ph === 'hs' ? (S.age >= 18 ? SCHED.hs3 : S.age === 17 ? SCHED.hs2 : SCHED.hs) : null; };
@@ -1566,7 +1576,7 @@ function after() {
   // 단계가 바뀌면(예: 재수하다 대학에 붙음) 그 단계로 시작
   if (!S.ended && S.date) { const ph = phase(); if (S.ph !== ph) { const was = S.ph; S.ph = ph; if (was) beginPhase(); } }
   // 학교: 자유·방학 턴의 행동을 다 쓰면 다음 턴으로 / 어른: 18칸을 다 쓰면 쓰러지듯 잠듦
-  if (!S.ended && !S.pending.length && !S.report && !S.apply) {
+  if (!S.ended && !S.pending.length && !S.report && !S.apply && !S.intro) {
     const ph = phase();
     if ((ph === 'ms' || ph === 'hs') && S.ap <= 0 && TURN_AP[S.tkind]) { nextTurn(); return; }
     if (ph === 'adult' && S.ap <= 0) { log('더는 버틸 수 없어 그대로 잠들었다.', { t: 'info' }); endDay(false); }
@@ -1597,7 +1607,7 @@ function settleChildhood() {
 }
 
 /* ═════════ 행동 ═════════ */
-const busy = () => !!S.ended || S.pending.length > 0 || !!S.report || !!S.apply;
+const busy = () => !!S.ended || S.pending.length > 0 || !!S.report || !!S.apply || !!S.intro;
 // 행동력 쓰기 (어른은 시계가 1.5시간씩 감)
 function spend(n = 1) { S.ap -= n; S.used = (S.used || 0) + n; updateTime(); if (phase() !== 'adult') libidoTick(); }
 const apOf = a => phase() === 'adult' ? (a.ap || 1) : 1;
@@ -1893,6 +1903,7 @@ function roleText() {
   if (S.flags.inArmy) return '군인';
   if (S.job) return jobTitle();
   if (S.flags.student) return univLabel() ? `${univLabel()} ${majorLabel() || ''}`.trim() : '대학생';
+  if (S.flags.retake) return '재수생';
   if (a <= 1) return '아기';
   if (a <= 6) return '어린이';
   if (a <= 12) return '초등학생';
@@ -1904,7 +1915,8 @@ function karmaLabel() { const k = S.karma; return k >= 30 ? '맑음' : k >= -10 
 
 /* ═════════ 사람 정보 ═════════ */
 const personality = x => D.personalities.find(t => t.id === x.personality) || D.personalities[0];
-const sharedHobby = p => p.hobby === S.hobby ? D.hobbies.find(h => h.id === p.hobby) : null;
+const myHobby = h => !!h && (h === S.hobby || h === S.hobby2);   // 취미는 하나, 20세 시작이면 두 개까지
+const sharedHobby = p => myHobby(p.hobby) ? D.hobbies.find(h => h.id === p.hobby) : null;
 const valueClash = p => D.valueClash.some(([a, b]) => (a === p.value && b === S.value) || (b === p.value && a === S.value));
 const valueLabel = id => (D.values.find(v => v.id === id) || {}).label || '';
 function known(p, field) {
@@ -1921,6 +1933,7 @@ const invNorm = u => {   // 표준정규 역함수 근사 (0<u<1)
   return u < .5 ? -z : z;
 };
 function figure(p) {
+  if (!p && S.fig) return customFig(S.gender, myBuild(), S.fig);   // 20세 시작: 직접 정한 몸
   const look = p ? lookOf(p) : S.look, g = p ? p.gender : S.gender;
   const b = (look || {}).body || {}, BG = D.bodyGrades;
   let h = 7; for (const ch of String(S.id) + (p ? p.id : 'me')) h = (h * 31 + ch.charCodeAt(0)) % 2147483647;
@@ -2000,7 +2013,7 @@ function myProfile() {
     ? [['가슴', `${fg.under}${fg.cup}(${fg.cGrade[1]})`], ['골반', cm(fg.hip, fg.hipGrade)], ['사이즈', [fg.bust, fg.waist, fg.hip].join('-')]]
     : [['어깨', cm(fg.shoulder, fg.sGrade)]];
   return [
-    ['소질', trait().label], ['성격', L(D.personalities, S.personality)], ['취미', L(D.hobbies, S.hobby)],
+    ['소질', trait().label], ['성격', L(D.personalities, S.personality)], ['취미', [S.hobby, S.hobby2].filter(Boolean).map(h => L(D.hobbies, h)).join(', ')],
     ['체형', [S.age >= 19 ? `키 ${cm(fg.height, fg.hGrade)}` : BL.height[b.height], BL.build[b.build]].filter(Boolean).join(', ') + ` (몸 ${gradeOf(S.stats.fit)})`],
     ...shape,
     ...(S.flags.unnatural ? [['특징', '어딘가 부자연스럽다']] : []),
@@ -2043,12 +2056,9 @@ const api = {
 const newSchool = () => ({ track: null, electives: [], prep: {}, bonus: {}, exams: [], naesin: [], mocks: [], mock: null, sat: null, susi: null, susiDone: false, jeongsi: null, offers: null,
   univ: null, dept: null, tier: null, start: null, years: null, gpa: 0, gpaN: 0, studyYear: 0, studyN: 0, extra: 0, degree: null, club: null });
 const labelOf = (list, id) => (list.find(x => x.id === id) || {}).label || '';
-function newLife(opt = {}) {
-  const gender = opt.gender === 'm' || opt.gender === 'f' ? opt.gender : (Math.random() < .5 ? 'm' : 'f');
-  const tr = D.traits.find(t => t.id === opt.trait) || pick(D.traits);
-  const name = (opt.name || '').trim().slice(0, 6) || pick(D.surnames) + pick(gender === 'm' ? D.namesM : D.namesF);
-  const sib = D.siblings.find(x => x.id === opt.sibling) || (Math.random() < .35 ? D.siblings[0] : pick(D.siblings.slice(1)));
-  S = {
+// 빈 인생 (0살 상태) — 새 인생·20세 시작이 같이 씀
+function blankState(opt, gender, tr, name, sib) {
+  return {
     v: 5, id: Date.now(), seq: 0, pseq: 0, xseq: 0,
     name, gender, age: 0, money: 0, ap: 0, used: 0, seasonIdx: -1, trait: tr.id,
     birthYear: rand(2000, 2006), date: null, dayN: 0, turn: 0, tkind: null, zone: 'home', fatigue: 0, meals: 0, wake: 0, worked: false, report: null,
@@ -2068,6 +2078,13 @@ function newLife(opt = {}) {
     weather: 'sunny', time: 0,
     place: null, here: [], visits: {}, regular: {},
   };
+}
+function newLife(opt = {}) {
+  const gender = opt.gender === 'm' || opt.gender === 'f' ? opt.gender : (Math.random() < .5 ? 'm' : 'f');
+  const tr = D.traits.find(t => t.id === opt.trait) || pick(D.traits);
+  const name = (opt.name || '').trim().slice(0, 6) || pick(D.surnames) + pick(gender === 'm' ? D.namesM : D.namesF);
+  const sib = D.siblings.find(x => x.id === opt.sibling) || (Math.random() < .35 ? D.siblings[0] : pick(D.siblings.slice(1)));
+  S = blankState(opt, gender, tr, name, sib);
   if (tr.start) for (const k in tr.start) S.stats[k] = COND.includes(k) ? clamp(S.stats[k] + tr.start[k], 0, 100) : S.stats[k] + tr.start[k];
   S.look = window.Avatar ? Avatar.make(`${S.id}:me`, gender) : null;
   S.skin = S.look ? S.look.skin : 1;
@@ -2093,6 +2110,236 @@ function newLife(opt = {}) {
   log(`소질 ${tr.label}, 성격 ${labelOf(D.personalities, S.personality)}, 집안 ${labelOf(D.wealth, S.wealth)}, 형제 ${sib.label}, 꿈 ${dr.label}.`, { t: 'info' });
   enterSeason(0);
   S.memories[0].wx = S.weather; S.memories[0].season = season().id;
+  after();
+}
+/* ═════════ 20세 시작 (QUICKSTART.md) ═════════
+   0~19살을 건너뛰고, 직접 정한 능력치(300포인트)·몸·배경·관계로 스무 살 3월 1일(학년도 시작)부터 어른 하루를 삶 (재수면 고3 턴 한 번 더)
+   지나온 시간(내신·수능·1학년 학점, 가족·친구·연인, 어린 시절 추억)은 고른 값에서 거꾸로 만들어 넣음 (data/quick.js) */
+const QD = () => D.quick;
+// 0~100 포인트 → 게임 능력치: 0~20 F / 21~40 E~D / 41~60 C / 61~80 B~A / 81~100 S (등급 시작값 data/life.js grades)
+const QS_CONV = [[0, 0], [20, 24], [21, 25], [40, 79], [41, 80], [60, 119], [61, 120], [80, 229], [81, 230], [100, 299]];
+function qsStat(v) {
+  v = clamp(Math.round(+v || 0), 0, 100);
+  for (let i = 1; i < QS_CONV.length; i++) {
+    const [x0, y0] = QS_CONV[i - 1], [x1, y1] = QS_CONV[i];
+    if (v <= x1) return x1 === x0 ? y1 : Math.round(y0 + (y1 - y0) * (v - x0) / (x1 - x0));
+  }
+  return 299;
+}
+// 직접 정한 몸 수치 → figure() 모양 (밑가슴은 허리에서, 남자 가슴둘레는 어깨에서)
+function customFig(g, build, c) {
+  const BG = D.bodyGrades, h = clamp(Math.round(+c.height || (g === 'm' ? 173 : 162)), 140, 200);
+  const f = { height: h, hGrade: gradeBy(BG.height[g], h) };
+  if (g === 'f') {
+    const cups = Object.keys(BG.cup), ci = Math.max(0, cups.indexOf(c.cup)), waist = clamp(Math.round(+c.waist || 63), 50, 90);
+    f.under = clamp(Math.round((waist + 10) / 5) * 5, 65, 85);
+    f.cup = cups[ci]; f.cGrade = BG.cup[f.cup];
+    f.bust = Math.round(f.under + 7 + ci * 2.5);
+    f.waist = waist; f.hip = clamp(Math.round(+c.hip || 90), 75, 110); f.hipGrade = gradeBy(BG.hip, f.hip);
+  } else {
+    f.shoulder = clamp(Math.round(+c.shoulder || 44), 36, 52); f.sGrade = gradeBy(BG.shoulder, f.shoulder);
+    f.bust = Math.round(f.shoulder * 2.15 + (build === 'fit' ? 3 : build === 'chubby' ? 6 : 0));
+    f.waist = { slim: 71, fit: 76, chubby: 90 }[build] || 78;
+    f.hip = { slim: 89, fit: 93, chubby: 99 }[build] || 93;
+  }
+  return f;
+}
+// 고른 생김새 (머리·머리색·피부·눈 + 체형). 세부(코·점·귀걸이…)는 seed로 고정 — 머리를 바꿔도 얼굴이 흔들리지 않음
+function quickLook(q) {
+  if (!window.Avatar) return null;
+  const g = q.gender === 'f' ? 'f' : 'm', a = Avatar.make(`${q.seed || 'qs'}:me`, g);
+  a.xseed = String(q.seed || 'qs');
+  for (const k of ['hair', 'hc', 'skin', 'eyes']) if (q[k] != null && q[k] !== '') a[k] = +q[k];
+  const h = +q.height || (g === 'm' ? 173 : 162), R = g === 'm' ? [168, 179] : [157, 167];
+  a.body = { height: h < R[0] ? 'short' : h > R[1] ? 'tall' : 'avg', build: QD().builds.some(b => b.id === q.build) ? q.build : 'avg' };
+  if (g === 'f') { const ci = QD().cups.indexOf(q.cup); a.body.chest = ci <= 1 ? 'small' : ci >= 4 ? 'large' : 'avg'; }
+  else a.body.shoulder = +q.shoulder < 41 ? 'narrow' : +q.shoulder > 46 ? 'wide' : 'avg';
+  return a;
+}
+const QS_TRACK = { cs: 'tech', medicine: 'life', nursing: 'life', biology: 'life', physics: 'science', chemistry: 'science', engineering: 'science', architecture: 'science', arts: 'arts', music: 'arts', design: 'arts', culinary: 'arts', beauty: 'arts' };
+const r1 = v => Math.round(v * 10) / 10;
+const ida = w => josa(w, '이').slice(-1) === '이' ? w + '이다' : w + '다';
+function newLife20(q = {}) {
+  const Q = QD(), gender = q.gender === 'f' ? 'f' : 'm', opp = gender === 'm' ? 'f' : 'm';
+  const tr = D.traits.find(t => t.id === q.trait) || pick(D.traits);
+  const name = (q.name || '').trim().slice(0, 6) || pick(D.surnames) + pick(gender === 'm' ? D.namesM : D.namesF);
+  const sib = D.siblings.find(x => x.id === q.sibling) || D.siblings[0];
+  const hob = [...new Set((q.hobbies || []).filter(h => D.hobbies.some(x => x.id === h)))].slice(0, 2);
+  const valid = (list, id) => list.some(x => x.id === id) ? id : null;
+  S = blankState({ personality: valid(D.personalities, q.personality), hobby: hob[0], value: valid(D.values, q.value), wealth: valid(D.wealth, q.wealth), dream: valid(D.dreams, q.dream), month: q.month }, gender, tr, name, sib);
+  S.hobby2 = hob[1] || null;
+  S.quickstart = true;
+
+  // 능력치: 300포인트 → 등급 수치. 소질의 시작 보너스는 그대로 얹음 (타고난 외모는 생김새 B~S 보장)
+  const pts = Q.stats.map(k => clamp(Math.round(+((q.st || {})[k]) || 0), 0, 100));
+  const sum = pts.reduce((a, b) => a + b, 0);
+  if (sum > Q.points) { const k = Q.points / sum; for (let i = 0; i < pts.length; i++) pts[i] = Math.floor(pts[i] * k); }
+  Q.stats.forEach((k, i) => { S.stats[k] = qsStat(pts[i]); });
+  S.stats.style = qsStat(clamp(+q.style || 0, 0, 50));
+  S.stats.happy = 60; S.stats.health = 80; S.stats.libido = 0;
+  if (tr.start) for (const k in tr.start) S.stats[k] = COND.includes(k) ? clamp(S.stats[k] + tr.start[k], 0, 100) : S.stats[k] + tr.start[k];
+  if (tr.face) S.stats.face = Math.max(S.stats.face, gradeValue(pickKey(tr.face)));
+  const edu = Q.edu.find(e => e.id === q.edu) || Q.edu[1];
+  if (edu.bonus) for (const k in edu.bonus) S.stats[k] += edu.bonus[k];
+
+  // 몸: 고른 체형·수치 (체형은 체력 등급이 바뀌기 전까지 그대로)
+  S.look = quickLook(q);
+  S.skin = S.look ? S.look.skin : 1;
+  S.frame = S.look ? S.look.body.build : 'avg';
+  S.fitAtPick = gIdx(S.stats.fit);
+  const R = Q.range, num = (v, r, d) => clamp(Math.round(+v || d), r[0], r[1]);
+  S.fig = gender === 'f'
+    ? { height: num(q.height, R.height.f, 162), cup: Q.cups.includes(q.cup) ? q.cup : 'B', waist: num(q.waist, R.waist, 63), hip: num(q.hip, R.hip, 90) }
+    : { height: num(q.height, R.height.m, 173), shoulder: num(q.shoulder, R.shoulder, 44) };
+  S.penis = gender === 'm' ? num(q.penis, R.penis, 14) : null;
+  syncMyBody();
+
+  // 날짜: 스무 살 3월 1일 (게임의 한 해는 학년도 — 3월에 시작하고 그때 나이가 오름)
+  S.age = 20; S.dayN = Math.round(20 * 365.25);
+  S.date = { y: S.birthYear + 20, m: 3, d: 1 };
+  const dr = D.dreams.find(x => x.id === S.dream);
+  S.vars.dreamLabel = dr.label;
+  S.vars.dreamSpeech = dr.id === 'family' ? '행복한 가정을 꾸리고 싶어요!' : `${josa(dr.label, '이')} 되고 싶어요!`;
+  const mr = Q.money[S.wealth] || [50, 100];
+  S.money = rand(mr[0], mr[1]);
+  if (q.home === 'own') S.flags.ownPlace = true;
+  if (gender === 'm') { const ar = edu.id === 'retake' && q.army === 'now' ? 'next' : q.army; if (ar === 'exempt') S.flags.exempt = true; else S.vars.enlistAt = ar === 'now' ? 20 : 21; }
+
+  // 학교: 고교 내신·수능은 능력치로 역산 (대학을 골랐으면 그 대학 합격선 쪽으로), 1학년 학점
+  const sc = S.school, lines = [];
+  const uniEdu = !!edu.tiers;
+  let u = null, d = null;
+  if (uniEdu) {
+    u = UNIV(q.univ);
+    if (!u || !edu.tiers.includes(u.tier)) u = pick(D.universities.filter(x => edu.tiers.includes(x.tier)));
+    d = DEPT(u.departments.includes(q.dept) ? q.dept : pick(u.departments));
+  }
+  const tk = D.tracks.find(t => t.id === (d && QS_TRACK[d.id] || (S.stats.art > S.stats.smart ? 'liberal' : 'science'))) || D.tracks[0];
+  sc.track = tk.id; sc.electives = tk.electives.slice();
+  const L = COMMON.concat(sc.electives), g0 = gradeOfScore(L.reduce((t, k) => t + subjBase(k) + 8, 0) / L.length);
+  const toward = (cut, w) => clamp(r1((g0 + cut * w) / (1 + w) + rand(-3, 3) / 10), 1, 9);
+  const hs = pick(Q.highSchools);
+  let nae, sat = null;
+  if (uniEdu) {
+    const cb = d.cut_bonus || 0;
+    nae = toward(Math.max(1, u.cut.수시 + cb), 2); sat = toward(Math.max(1, u.cut.정시가 + cb), 2);
+    Object.assign(sc, { univ: u.id, dept: d.id, tier: u.tier, start: 19, years: d.years || (u.tier === 5 && d.id !== 'nursing' ? 2 : 4) });
+    const y = clamp(1.8 + rand(2, 5) * .3 + gIdx(S.stats.smart) * .1 + (d.stat ? gIdx(S.stats[d.stat]) * .06 : 0) + rand(-3, 3) / 10, 1, 4.5);
+    sc.gpa = Math.round(y * 100) / 100; sc.gpaN = 1;
+    S.flags.student = true;
+    if (S.wealth === 'poor') S.money = -rand(100, 300);   // 학자금 대출
+    lines.push(['📚', `${josa(hs, '을')} 졸업하고 ${u.name} ${d.name}에 입학했다. ${sc.years - 1 <= 1 ? '지금은 2학년, 올겨울 졸업 예정.' : '지금은 2학년.'}`,
+      `내신 ${nae}등급 · 수능 ${sat}등급 · 1학년 학점 ${sc.gpa.toFixed(2)}`]);
+  } else if (edu.id === 'retake') {
+    nae = clamp(r1(g0 + rand(-3, 3) / 10), 1, 9); sat = clamp(r1(g0 + rand(3, 10) / 10), 1, 9);
+    S.flags.retake = true;
+    sc.studyN = Math.round(10 + pts[0] / 4);
+    S.money = Math.round(S.money * .2);
+    S.stats.happy = 45;
+    lines.push(['📚', `${josa(hs, '을')} 졸업했지만 원하는 대학에 가지 못했다. 올해 수능을 한 번 더 본다.`, `내신 ${nae}등급 · 작년 수능 ${sat}등급`]);
+  } else {
+    nae = clamp(r1(g0 + rand(-3, 3) / 10), 1, 9);
+    if (Math.random() < .5) sat = clamp(r1(g0 + rand(0, 6) / 10), 1, 9);
+    const j = job(Q.jobs.includes(q.job) ? q.job : Q.jobs[0]);
+    S.job = j.id; S.rank = 0; S.perf = rand(10, 25); S.salary = j.salary;
+    S.flags.firstJob = true; S.flags.noCollege = true;
+    S.money += rand(300, 700);   // 1년 동안 모은 돈
+    if (dr.job === j.id) S.flags.dreamDone = true;
+    addPerson({ kind: 'coworker', ageRange: [21, 30] });
+    lines.push(['📚', `${josa(hs, '을')} 졸업하고 바로 ${j.label} 일을 시작했다.${S.flags.dreamDone ? ' 어릴 적 꿈이 이미 이뤄진 셈이다.' : ''}`, `연봉 ${fmtMoney(S.salary)}${sat ? ` · 수능 ${sat}등급` : ' · 수능은 보지 않았다'}`]);
+  }
+  sc.naesin = Array.from({ length: 6 }, () => clamp(r1(nae + rand(-4, 4) / 10), 1, 9));
+  if (sat != null) { sc.sat = { avg: sat, rows: [] }; sc.mocks = [0, 1, 2].map(() => clamp(r1(sat + rand(-6, 6) / 10), 1, 9)); }
+  if (gender === 'm') lines[0][1] += S.flags.exempt ? ' 병역은 면제받았다.' : S.vars.enlistAt === 20 ? ' 올봄 입대를 앞두고 있다.' : ' 내년 봄에 입대한다.';
+
+  // 가족: 부모(함께·이혼·여읨), 형제는 이미 자란 채로
+  const mom = addPerson({ kind: 'family', role: '엄마', gender: 'f', ageDiff: rand(26, 34), close: rand(55, 85), trust: rand(55, 80), taken: true, wealth: S.wealth });
+  const dad = addPerson({ kind: 'family', role: '아빠', gender: 'm', ageDiff: rand(27, 36), close: rand(45, 80), trust: rand(50, 75), taken: true, wealth: S.wealth });
+  mom.id = 'mom'; mom.name = null; dad.id = 'dad'; dad.name = null;
+  let fam = `${Q.wealthAdj[S.wealth] || '평범한'} 집에서 자랐다.`;
+  if (q.parents === 'divorced') {
+    const at = rand(8, 17), away = Math.random() < .7 ? dad : mom;
+    away.close = clamp(away.close - rand(20, 30), 5, 100);
+    S.flags.parentsDivorced = true; S.vars.divorceAt = at;
+    fam += ` ${at}살 때 부모님이 이혼하셨다.`;
+  } else if (q.parents === 'lost') {
+    const at = rand(10, 18), gone = Math.random() < .6 ? dad : mom;
+    gone.gone = true; S.vars.lostParent = gone.role; S.vars.lostAt = at;
+    fam += ` ${at}살 때 ${josa(gone.role, '을')} 여의었다.`;
+  }
+  if (sib.id !== 'none') {
+    S.vars.sibGap = rand(sib.gap[0], sib.gap[1]);
+    const sg = sib.gender || (Math.random() < .5 ? 'm' : 'f');
+    const sp = addPerson({ kind: 'family', sibling: true, gender: sg, ageDiff: S.vars.sibGap, close: rand(50, 80), trust: rand(45, 75), taken: false });
+    sp.role = sibRole(sib, S.vars.sibGap > 0, sg);
+    S.done.siblingBorn = 1;
+    fam += ` ${josa(sp.role, '이')} 한 명 있다.`;
+  } else fam += ' 외동이다.';
+  if (S.flags.ownPlace) fam += ' 지금은 혼자 산다.';
+  lines.unshift(['🏠', fam]);
+
+  // 친구 (같은 대학이면 캠퍼스에서 자주 마주침) — 명문대는 인맥 보너스: 더 가깝고 과 선배 한 명
+  const campus = p => { if (uniEdu) { p.uni = sc.univ; p.hangout = 'campus'; p.tag = p.tag || '과 친구'; } };
+  const friends = [];
+  for (let i = 0; i < clamp(+q.friends || 0, 0, 3); i++) {
+    const f = addPerson({ kind: 'friend', ageDiff: rand(-1, 1), close: rand(40, 60) + (edu.id === 'elite' ? 8 : 0), trust: rand(35, 55) });
+    if (i < 2) campus(f);
+    friends.push(f);
+  }
+  if (edu.id === 'elite') { const sr = addPerson({ kind: 'friend', ageDiff: rand(1, 3), close: rand(28, 38), trust: rand(30, 42) }); sr.tag = '과 선배'; campus(sr); }
+
+  // 연인 / 전 연인
+  const exp = !!q.exp || (q.love === 'yes' && !!q.lsex);
+  let lover = null, ex = null, love = '지금은 솔로다.';
+  if (q.love === 'yes') {
+    const y = clamp(Math.round(+q.ly || 1), 1, 3), sx = !!q.lsex;   // 연인은 동갑~두 살 위 (스무 살 이상이라 성욕의 대상이 될 수 있음)
+    lover = addPerson({ kind: 'friend', gender: opp, ageDiff: rand(0, 2), personality: valid(D.personalities, q.lp) || undefined, taken: false, married: false,
+      close: 50 + y * 10 + rand(-3, 3), trust: 45 + y * 10 + rand(-3, 3), heart: 80 - y * 8 + rand(-3, 3) });
+    startRelation(lover, false); lover.since = S.age - y;
+    if (canSex(lover)) lover.libido = clamp(rand(25, 45) + y * 5, 0, 100);
+    if (sx && canSex(lover)) { lover.nights = rand(6, 14) * y; lover.compat = clamp(startCompat(lover) + rand(5, 10) * y, 0, 100); }
+    if (uniEdu && Math.random() < .5) { campus(lover); lover.tag = null; }
+    love = `${josa(lover.name, '와')} 사귄 지 ${y}년째.`;
+  } else if (q.love === 'ex') {
+    const why = Q.exWhy.find(w => w.id === q.exWhy) || Q.exWhy[0];
+    ex = addPerson({ kind: 'friend', gender: opp, ageDiff: rand(0, 2), taken: false, married: false,
+      close: val(why.p.close), trust: val(why.p.trust), heart: val(why.p.heart), grudge: val(why.p.grudge) });
+    ex.ex = true; ex.since = S.age - rand(1, 2);
+    if (canSex(ex)) ex.libido = rand(10, 30);
+    S.vars.exWhy = why.id; S.vars.exId = ex.id;
+    if (why.karma) addKarma(why.karma);
+    love = `${josa(ex.name, '와')}는 ${why.line}.`;
+  }
+  // 밤의 기술: 경험 있음이면 20~40 (0~100 기준) / 성욕(20~60)은 대상별 — 연인에게, 전 연인에게는 조금
+  if (exp) { S.sexSkill = qsStat(rand(20, 40)); S.flags.hadSex = true; S.flags.intimate = true; }
+  const lib = rand(20, 60);
+  if (lover && canSex(lover)) S.lust[lover.id] = lib;
+  if (ex && canSex(ex)) S.lust[ex.id] = Math.round(lib * .35);
+  syncLibido();
+
+  const L2 = (list, id) => (list.find(x => x.id === id) || {}).label || '';
+  const hl = [S.hobby, S.hobby2].filter(Boolean).map(h => L2(D.hobbies, h)).join('·');
+  lines.push(['👤', `성격은 ${L2(D.personalities, S.personality)}, ${josa(hl, '을')} 좋아한다.`]);
+  lines.push(['💭', `꿈은 ${ida(dr.label)}.`]);
+  lines.push(['💕', love]);
+  lines.push(['👥', friends.length ? `친구: ${friends.map(f => f.name).join(', ')}` : '아직 마음을 터놓을 친구는 없다.']);
+  lines.push(['💰', S.money < 0 ? `학자금 대출 ${fmtMoney(-S.money)}.` : `통장에 ${fmtMoney(S.money)}.`]);
+
+  // 어린 시절 추억 2~3개 (성격으로 초등·고등, 취미로 중학교) → 앨범
+  const am = Q.autoMemories[S.personality] || Q.autoMemories.warm, hm = Q.hobbyMemories[S.hobby];
+  const mem = (age, text) => { const si = rand(0, 3), se = SEASONS[si]; S.memories.push({ age, season: se.id, wx: weighted(Object.keys(se.weather), k => se.weather[k]), text }); return text; };
+  const mems = [mem(rand(8, 11), am[0])];
+  if (hm) mems.push(mem(14, hm));
+  mems.push(mem(17, am[1]));
+
+  S.intro = { lines, mems };
+  S.log.push({ n: ++S.seq, t: 'year', age: S.age });
+  log(`스무 살의 봄. ${josa(S.name, '은')} 여기서부터 시작한다.`, { memory: true });
+  const first = S.memories[S.memories.length - 1];
+  log(`소질 ${tr.label}, 성격 ${L2(D.personalities, S.personality)}, 집안 ${L2(D.wealth, S.wealth)}, 꿈 ${dr.label}.`, { t: 'info' });
+  enterSeason(0);
+  first.wx = S.weather; first.season = season().id;
+  beginPhase();
   after();
 }
 // 자동 저장: 행동·턴·하루가 끝날 때마다 지금 칸에
@@ -2191,7 +2438,7 @@ function init() { S = load(); if (S) { after(); return true; } return false; }
 function slotList() {
   return Array.from({ length: SLOTS_N }, (_, i) => {
     const n = i + 1, s = n === slot && S ? S : readSlot(n);
-    return { n, current: n === slot, empty: !s, name: s && s.name, age: s && s.age, gender: s && s.gender, date: s && s.date, ended: s && s.ended };
+    return { n, current: n === slot, empty: !s, name: s && s.name, age: s && s.age, gender: s && s.gender, date: s && s.date, ended: s && s.ended, quick: !!(s && s.quickstart) };
   });
 }
 // 다른 칸으로: 비어 있으면 false (화면이 새 인생 만들기를 열고, newLife가 그 칸에 저장)
@@ -2214,6 +2461,15 @@ window.Game = {
   init, subscribe: f => subs.push(f), state: () => S,
   slots: slotList, useSlot, saveTo, deleteSlot, slot: () => slot,
   newLife, choose, currentEvent,
+  // 20세 시작 (QUICKSTART.md): 만들기, 지나온 20년 요약 확인, 화면용 도구 (포인트 → 등급, 몸 수치, 미리보기 생김새)
+  newLife20, ackIntro: () => { if (S) { S.intro = null; after(); } },
+  quick: {
+    data: () => D.quick, grade: v => gradeOf(qsStat(v)), stat: qsStat,
+    fig: (g, build, c) => customFig(g, build, c), look: quickLook,
+    heightLabel: (g, h) => gradeBy(D.bodyGrades.height[g], h)[1], hipLabel: v => gradeBy(D.bodyGrades.hip, v)[1], shoulderLabel: v => gradeBy(D.bodyGrades.shoulder, v)[1],
+    cupLabel: c => (D.bodyGrades.cup[c] || [0, ''])[1], penisLabel: cm => PG()[pGrade(cm) - 1][2],
+    jobs: () => D.quick.jobs.map(job), tierUnis: tiers => D.universities.filter(u => tiers.includes(u.tier)),
+  },
   // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
   phase, timeInfo, storyNext, nextTurn, eat, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
   actionList, canDo, costOf, doAction, needsSubject,

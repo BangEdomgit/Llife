@@ -101,7 +101,8 @@ function make(seed, gender, opt = {}) {
 // 세부 — make() 값에서 늘 똑같이 나옴 (예전 저장의 얼굴도 그대로 살아남)
 //   뒤쪽 세부(코·쌍꺼풀·수염·점·귀걸이…)는 나중에 더한 것 — 앞 순서를 건드리지 않게 이어서 뽑음
 function extras(a) {
-  const r = rng('x' + [a.g, a.face, a.skin, a.hair, a.hc, a.eyes, a.brows, a.mouth, a.top, a.tc, a.tie, a.gray].join(','));
+  // xseed가 있으면(20세 시작에서 직접 고른 생김새) 그걸로 — 머리·피부·눈을 바꿔도 코·점·귀걸이 같은 세부는 그대로
+  const r = rng('x' + (a.xseed != null ? a.xseed : [a.g, a.face, a.skin, a.hair, a.hc, a.eyes, a.brows, a.mouth, a.top, a.tc, a.tie, a.gray].join(',')));
   const n = k => Math.floor(r() * k);
   const X = { iris: n(3), gaze: [0, 0, 0, -1, 1][n(5)], bang: n(4), lip: n(LIPS.length), teeth: r() < .55, shoe: r(), pants: r(), hem: r() };
   const rare = r(), rareK = n(2);
@@ -1531,6 +1532,14 @@ function univLogo(u, size = 40) {
     `<text x="50" y="${shield ? 61 : 64}" text-anchor="middle" font-size="${shield ? 38 : 42}" font-weight="700" fill="#fff" font-family="'Nanum Gothic Coding', sans-serif" style="paint-order:stroke" stroke="${dark}" stroke-width="2">${ch}</text></svg>`;
 }
 
-window.Avatar = { make, render, topColor, univLogo, anchors: (a, age, fig) => anchorsOf(a, age, fig) };
+// 고를 수 있는 파츠 이름 (20세 시작 외모 단계)
+const PARTS = {
+  hair: { m: ['짧은', '반삭', '투블럭', '덮은', '장발', '묶은', '댄디', '올백', '곱슬 펌', '울프컷'],
+    f: ['단발', '어깨', '긴 머리', '묶은', '포니테일', '반묶음', '숏컷', '긴 웨이브', '똥머리', '땋은 머리', '히메컷', '레이어드'] },
+  hc: ['검정', '갈색', '밝은 갈색', '회색', '와인', '애쉬 금발', '애쉬 브라운', '구릿빛', '밀크티 베이지', '핑크 브라운'].map((label, id) => ({ id, label, color: HAIR[id] })).filter(x => x.id !== GRAY),
+  skin: ['밝은', '보통', '어두운', '진한'].map((label, id) => ({ id, label, color: SKIN[id] })),
+  eyes: ['동그란', '날카로운', '처진', '가는', '무쌍', '큰 눈', '아몬드'].map((label, id) => ({ id, label })),
+};
+window.Avatar = { make, render, topColor, univLogo, parts: PARTS, anchors: (a, age, fig) => anchorsOf(a, age, fig) };
 window.renderAvatar = render;
 })();

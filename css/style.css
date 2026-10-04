@@ -311,3 +311,35 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .ap-nologo{display:inline-block;width:28px;height:28px}
 .ap-add{width:100%;padding:6px;font-size:12.5px}
 .me-uni{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13.5px}
+/* 20세 시작 (QUICKSTART.md): 단계 · 슬라이더 · 오른쪽 전신 미리보기 · 나의 20년 */
+.modal.wide{max-width:700px}
+.qs-steps{display:flex;flex-wrap:wrap;gap:4px}
+.qs-steps button{padding:3px 7px;font-size:11.5px;color:var(--text-dim)}
+.qs-steps button.on{background:var(--btn-on);border-color:var(--accent);color:var(--accent);font-weight:700}
+.qs-steps button.done{color:var(--text)}
+.qs-steps button:disabled{opacity:.45;cursor:default}
+.qs-grid{display:grid;grid-template-columns:minmax(0,1fr) 140px;gap:12px;align-items:start}
+.qs-main{display:grid;gap:12px;min-width:0}
+.qs-side{position:sticky;top:0;text-align:center}
+.qs-side .av{display:block;margin:0 auto}
+.qs-cap{font-size:11.5px;color:var(--text-dim);margin:4px 0 0;line-height:1.35}
+.qs-left{font-size:14px}
+.qs-left b{color:var(--accent);font-size:17px}
+.qs-rs{display:grid;gap:6px}
+.qs-r{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"l v" "r r";gap:0 8px;align-items:center}
+.qs-rl{grid-area:l;font-size:12.5px}
+.qs-rv{grid-area:v;font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.qs-r input[type=range]{grid-area:r;width:100%;margin:2px 0;accent-color:var(--accent);height:22px}
+.chips.unis button{display:inline-flex;align-items:center;gap:4px}
+.chips.unis svg{flex:none}
+.chips.sw i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:-1px;border:1px solid rgba(255,255,255,.35)}
+.cup-i{vertical-align:-3px;margin-right:1px}
+.chips small{color:var(--text-dim);font-size:11px}
+.hint.warn{color:var(--minus)}
+.qs-sum{font-size:13px}
+@media (max-width:520px){.qs-grid{grid-template-columns:minmax(0,1fr) 100px;gap:8px}.qs-side .av{width:100px;height:233px}}
+.intro{display:grid;gap:8px}
+.intro-top{display:flex;gap:10px;align-items:center;margin-bottom:2px}
+.il{display:grid;grid-template-columns:22px 1fr;gap:6px;margin:0;font-size:14px;line-height:1.5}
+.ii{text-align:center}
+.intro-last{text-align:center;margin:8px 0 2px;font-weight:700;color:var(--accent)}
