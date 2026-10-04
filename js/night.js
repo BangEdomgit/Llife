@@ -17,7 +17,7 @@ const ROOM = `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
   <linearGradient id="ntWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#161c33"/><stop offset="1" stop-color="#0d1120"/></linearGradient>
   <linearGradient id="ntSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1533"/><stop offset="1" stop-color="#27356c"/></linearGradient>
   <radialGradient id="ntMoon"><stop offset="0" stop-color="#fff4c8" stop-opacity=".5"/><stop offset="1" stop-color="#fff4c8" stop-opacity="0"/></radialGradient>
-  <mask id="ntCres"><circle cx="268" cy="44" r="8" fill="#fff"/><circle cx="272" cy="41" r="7" fill="#000"/></mask>
+  <mask id="ntCres"><circle cx="236" cy="76" r="8" fill="#fff"/><circle cx="240" cy="73" r="7" fill="#000"/></mask>
   <linearGradient id="ntBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6ff" stop-opacity=".14"/><stop offset="1" stop-color="#c9d6ff" stop-opacity="0"/></linearGradient>
   <radialGradient id="ntLamp"><stop offset="0" stop-color="#ffc77a" stop-opacity=".4"/><stop offset="1" stop-color="#ffc77a" stop-opacity="0"/></radialGradient>
   <linearGradient id="ntWood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6d4a33"/><stop offset="1" stop-color="#4a3122"/></linearGradient>
@@ -32,7 +32,7 @@ const ROOM = `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
   <rect width="320" height="171" fill="url(#ntWall)"/><rect y="170" width="320" height="20" fill="#090b13"/><path d="M0,170.5 H320" stroke="#242b46"/>
   <rect x="214" y="24" width="76" height="68" rx="2" fill="url(#ntSky)"/>
   ${[[224, 34, 0], [240, 48, .8], [233, 78, 1.6], [282, 70, .4], [258, 84, 1.2], [246, 31, 2]].map(([x, y, d]) => `<circle class="nt-star" cx="${x}" cy="${y}" r=".9" fill="#fff" style="animation-delay:${d}s"/>`).join('')}
-  <circle cx="268" cy="44" r="19" fill="url(#ntMoon)"/><circle cx="268" cy="44" r="8" fill="#f6ebc4" mask="url(#ntCres)"/>
+  <circle cx="236" cy="76" r="19" fill="url(#ntMoon)"/><circle cx="236" cy="76" r="8" fill="#f6ebc4" mask="url(#ntCres)"/>
   <path d="M252,24 V92 M214,58 H290" stroke="#303a62" stroke-width="2.4"/>
   <rect x="214" y="24" width="76" height="68" rx="2" fill="none" stroke="#3b4672" stroke-width="3.5"/><rect x="209" y="91" width="86" height="4" rx="1.5" fill="#3b4672"/>
   <path d="M206,18 H222 C220,40 216,60 222,80 C224,90 218,100 214,106 C210,98 206,92 206,84 Z" fill="#2a3558"/><path d="M211,20 C210,40 210,62 212,84 M216,20 C215,44 214,62 217,82" fill="none" stroke="#1c2442" stroke-width="1.4"/>
@@ -60,6 +60,13 @@ const ROOM = `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
   <path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>
   <g class="nt-hearts"></g><g class="nt-fx"></g>
 </g></svg>`;
+
+// 오른쪽 위 ♂♀ 패널 (♂를 먼저 그리고 ♀ 고리를 위에: 화살이 고리를 지나 들어가 보이게)
+const SYM = `<div class="nt-sym"><svg viewBox="0 0 120 64" aria-hidden="true"><defs><radialGradient id="ntSG"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".6"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient></defs>
+  <circle class="sy-glow" cx="88" cy="28" r="28" fill="url(#ntSG)" opacity="0"/>
+  <g class="sy-m" transform="translate(28,28)"><circle r="13" fill="none" stroke="#5aa8ff" stroke-width="4.2"/><path d="M13,0 H31 M23.5,-7.5 L31,0 L23.5,7.5" fill="none" stroke="#5aa8ff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g class="sy-f"><ellipse class="sy-fc" cx="88" cy="28" rx="15" ry="15" fill="#ff6f9a" fill-opacity="0" stroke="#ff6f9a" stroke-width="4.2"/><path d="M88,43 V59 M80.5,51.5 H95.5" stroke="#ff6f9a" stroke-width="4.2" stroke-linecap="round"/></g>
+  <g transform="translate(73,9)"><path class="sy-h" d="${HEART}" fill="#ff4f86"/></g></svg></div>`;
 
 /* ---------- 더미 ---------- */
 // 길이와 반지름(옆에서 본 두께의 절반). [a, b]는 뿌리 → 끝으로 가늘어짐
@@ -240,6 +247,9 @@ function run(stage, job, done) {
   const ms = { d: 0, tr: 0, slump: 0, sink: 0, bs: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } };
   // 출렁이는 살: 붙은 관절이 갑자기 서거나 움직이면 관성으로 어긋났다가 용수철처럼 돌아옴
   const blobs = [['f', 'butt', 'hip'], ['f', 'breast', 'chest'], ['m', 'butt', 'hip']].map(([w, k, at]) => ({ w, k, at, o: [0, 0], v: [0, 0], p1: null, p2: null }));
+  // 오른쪽 위 ♂♀: ♂ 화살표는 d를 따라 드나들고, ♀ 원은 부딪힐 때 눌렸다 튕김(symE), 밀림(symX)
+  const sym = stage.querySelector('.nt-sym'), sq = c => sym.querySelector(c), symM = sq('.sy-m'), symF = sq('.sy-f'), symC = sq('.sy-fc'), symG = sq('.sy-glow'), symH = sq('.sy-h');
+  let symE = 0, symEV = 0, symX = 0, symXV = 0;
   let t = 0, si = 0, hi = 0, sinkV = 0, bsV = 0, jy = 0, jyV = 0, jx = 0, jxV = 0, heat = 0, shakeAt = -9, shakeK = 0, buzz = 0, fount = 0;
   let P = null, capsM = [], capsF = [], lastD = 0, dEnd = null, faceKey = '', finale = false, acc = 0, last = 0;
   const hearts = [];
@@ -287,7 +297,7 @@ function run(stage, job, done) {
   const burstAt = (cnt, o) => { for (let j = 0; j < cnt; j++) { const x = actHip()[0] - 30 + Math.random() * 60; heart(x, at(y, x) - 6, typeof o === 'function' ? o(j) : o); } };
   function impact(s) {
     const str = s.kind === 'final' ? 2.2 : s.kind === 'strong' ? 1.8 : Math.min(1.2, .45 + .75 * s.A / 7);
-    sinkV += 40 * str; bsV -= 24 * str;
+    sinkV += 40 * str; bsV -= 24 * str; symEV += 13 * str; symXV += 45 * str;
     jyV += (s.kind === 'n' ? 7 : 22) * str; jxV -= (s.kind === 'n' ? 2.5 : 9) * str;
     if (s.kind !== 'n') { shakeAt = t; shakeK = str * .8; }
     // 받는 쪽 살을 찰싹 침
@@ -342,7 +352,10 @@ function run(stage, job, done) {
     buzz = 0;
     if (HB && t >= S[S.length - 1].t0 && t < end) { fount += HB.fount * DT; while (fount >= 1) { fount--; burstAt(1, { s: .8 + Math.random() * .5, dy: -(55 + Math.random() * 35) }); } }
     heat = Math.max(heat * Math.exp(-DT * 1.4), t < end ? (good ? .1 + .4 * Math.min(1, t / end) : .05) : 0);
+    symEV += (-900 * symE - 14 * symEV) * DT; symE += symEV * DT;
+    symXV += (-600 * symX - 16 * symXV) * DT; symX += symXV * DT;
     if (!finale && t > end + .45) {
+      if (good) symH.classList.add('on'); else sym.classList.add('sad');
       finale = true;
       if (good) heart(actHip()[0], at(y, actHip()[0]) - 14, { big: true, s: 1.4 + .3 * tier, life: 1.8, dy: -24 });
       else letdown();
@@ -407,6 +420,13 @@ function run(stage, job, done) {
       }
       face.style.transform = sk > .02 ? `translate(${f(cx * 1.2)}px,${f(cy * 1.2)}px)` : '';
     }
+    // ♂ 끝(tip)이 ♀ 원 안으로 드나듦. 깊이 들어갈수록 ♀ 원이 조금 늘어남. 만족감이 낮으면 끝나고 빠지며 고개를 숙임
+    const u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0, tip = 86 - 1.4 * Math.max(-2, ms.d + (good ? 0 : 14 * ease(u))), depth = Math.max(0, tip - 73);
+    symM.setAttribute('transform', `translate(${f(tip - 31)},${f(28 + ms.tr * 1.6)}) rotate(${f(good ? 0 : 35 * ease(u))})`);
+    symF.setAttribute('transform', `translate(${f(symX)},${f(ms.tr * .8)})`);
+    symC.setAttribute('rx', f(15 + .15 * depth - 4.5 * symE)); symC.setAttribute('ry', f(15 - .07 * depth + 4 * symE));
+    symC.setAttribute('fill-opacity', (good ? heat * .35 : 0).toFixed(2)); symG.setAttribute('opacity', (good ? heat : heat * .3).toFixed(2));
+    sym.style.transform = face && face.style.transform || '';
   }
   function frame(now) {
     acc += last ? Math.min(.05, (now - last) / 1000) : 0; last = now;
@@ -426,7 +446,7 @@ function run(stage, job, done) {
 }
 
 window.Night = {
-  html: () => `<div class="nt-stage">${ROOM}<div class="nt-face"></div></div>`,
+  html: () => `<div class="nt-stage">${ROOM}<div class="nt-face"></div>${SYM}</div>`,
   run, stop: () => cancelAnimationFrame(raf),
   // 실험용: 체위 이름과 움직임 상태 → 관절 좌표
   pose: (name, st = {}) => POSES[name](Object.assign({ d: 0, tr: 0, slump: 0, sink: 0, bs: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } }, st), BODY.m, BODY.f),
