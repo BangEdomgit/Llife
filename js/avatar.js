@@ -1510,6 +1510,27 @@ function render(a, size = 48, state = 25) {
 
 const topColor = a => TOP_COLORS[(a && a.tc) || 0];
 // anchors: 전신 앵커(px)를 그대로 꺼내 봄 (test.html 비교용)
-window.Avatar = { make, render, topColor, anchors: (a, age, fig) => anchorsOf(a, age, fig) };
+/* ---------- 대학 로고 (SCHOOL.md): 교색 + 도형 + 이니셜 ----------
+   최상위권: 방패 + 금색 테두리 + 월계수 / 상위권: 방패 + 금색 테두리 / 중·하위권: 이중 원 / 전문대: 둥근 네모 */
+function univLogo(u, size = 40) {
+  if (!u) return '';
+  const c = u.color, dark = shade(c, .68), ch = u.name[0], shield = u.tier <= 2;
+  let shape;
+  if (shield) {
+    shape = `<path d="M50,5 L89,17 L85,57 C81,78 67,90 50,96 C33,90 19,78 15,57 L11,17 Z" fill="${c}" stroke="${dark}" stroke-width="3"/>` +
+      `<path d="M50,13 L81,23 L78,56 C74,72 63,82 50,88 C37,82 26,72 22,56 L19,23 Z" fill="none" stroke="#f3d27a" stroke-width="2.2" opacity=".9"/>` +
+      `<path d="M14,10 L50,0 L86,10" fill="none" stroke="#fff" stroke-width="2" opacity=".18"/>`;
+    if (u.tier === 1) shape += [-1, 1].map(sd => [0, 1, 2, 3].map(i => {
+      const t = .35 + i * .15, x = 50 + sd * (12 + i * 6.5), y = 84 - i * 6;
+      return `<ellipse cx="${f1(x)}" cy="${f1(y)}" rx="4.6" ry="2.2" transform="rotate(${f1(sd * (35 + i * 14))} ${f1(x)} ${f1(y)})" fill="#f3d27a" opacity="${t + .4}"/>`;
+    }).join('')).join('');
+  } else if (u.tier <= 4) shape = `<circle cx="50" cy="50" r="45" fill="${c}" stroke="${dark}" stroke-width="3"/><circle cx="50" cy="50" r="36" fill="none" stroke="#fff" stroke-width="2.4" opacity=".75"/>` +
+    `<path d="M22,30 A36,36 0 0 1 78,30" fill="none" stroke="#fff" stroke-width="5" opacity=".12"/>`;
+  else shape = `<rect x="7" y="7" width="86" height="86" rx="20" fill="${c}" stroke="${dark}" stroke-width="3"/><rect x="16" y="16" width="68" height="68" rx="13" fill="none" stroke="#fff" stroke-width="2" opacity=".6"/>`;
+  return `<svg class="ulogo" width="${Math.round(size)}" height="${Math.round(size)}" viewBox="0 0 100 100" aria-hidden="true">${shape}` +
+    `<text x="50" y="${shield ? 61 : 64}" text-anchor="middle" font-size="${shield ? 38 : 42}" font-weight="700" fill="#fff" font-family="'Nanum Gothic Coding', sans-serif" style="paint-order:stroke" stroke="${dark}" stroke-width="2">${ch}</text></svg>`;
+}
+
+window.Avatar = { make, render, topColor, univLogo, anchors: (a, age, fig) => anchorsOf(a, age, fig) };
 window.renderAvatar = render;
 })();

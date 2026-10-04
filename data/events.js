@@ -61,13 +61,51 @@ GAME_DATA.events = [
     do: (s, a) => { a.meet({ kind: 'classmate', ageRange: [13, 13], close: 25 }); } },
   { id: 'high', type: 'must', at: 16, text: '고등학교에 입학했다. 3년이 길 것 같기도, 짧을 것 같기도 하다.', memory: true,
     do: (s, a) => { a.meet({ kind: 'classmate', ageRange: [16, 16], close: 25 }); } },
-  { id: 'schoolTrip', type: 'must', at: 17, text: '수학여행을 갔다. 밤새 떠드느라 한숨도 못 잤다.', memory: true, effect: { happy: 8 } },
+  // 수학여행 (고2 가을)
+  { id: 'schoolTrip', type: 'must', at: 17, season: ['가을'], text: '수학여행! 버스 안이 시끄럽다.', memory: true,
+    choices: [
+      { label: '짝꿍이랑 얘기한다', do: (s, a) => { const f = a.find(p => p.kind === 'classmate').sort((x, y) => y.close - x.close)[0]; if (f) a.changeP(f, { close: [5, 10] }); }, effect: { happy: 4 }, text: '창밖 풍경보다 짝꿍 이야기가 더 재밌었다. 밤새 떠드느라 한숨도 못 잤다.' },
+      { label: '자리에서 잔다', effect: { health: 3 }, text: '눈을 떠 보니 숙소 앞이었다.' },
+      { label: '뒤에서 몰래 과자 파티', effect: { happy: 5 }, karma: -1, text: '선생님한테 걸려서 다 같이 반성문을 썼다. 그래도 웃겼다.' },
+    ] },
+  // 고1 봄: 계열·선택 과목 (SCHOOL.md) / 고2 봄: 확정하거나 한 번 바꾸기
+  { id: 'trackChoice', type: 'must', at: 16, season: ['봄'], text: '과목 선택의 시간이 왔다. 어떤 길을 갈까?',
+    choices: GAME_DATA.tracks.map(t => ({ label: t.label, do: (s, a) => a.chooseTrack(t.id), text: t.text })) },
+  { id: 'trackConfirm', type: 'must', at: 17, season: ['봄'], text: s => `문·이과를 확정할 때다. 지금은 ${(GAME_DATA.tracks.find(t => t.id === s.school.track) || {}).label || '아직 미정'}.`,
+    choices: [{ label: '이대로 간다', text: '마음을 굳혔다.' }].concat(GAME_DATA.tracks.map(t => ({ label: `${t.label}(으)로 바꾼다`, if: s => s.school.track !== t.id, do: (s, a) => a.chooseTrack(t.id), text: `${t.label}(으)로 바꿨다. 새 교과서가 낯설었다.`, effect: { happy: -1 } }))) },
+  // 고1 동아리 — 자유 턴의 '동아리' 행동이 이쪽으로 (비교과)
+  { id: 'clubJoin', type: 'must', at: 16, season: ['여름'], text: '동아리 가입 신청서를 받았다.',
+    choices: [
+      { label: '밴드부', do: s => { s.school.club = 'music'; }, text: '드럼 스틱을 처음 잡았다.', effect: { art: 1 } },
+      { label: '농구부', do: s => { s.school.club = 'sport'; }, text: '키 큰 선배들 사이에서 공을 튀겼다.', effect: { fit: 1 } },
+      { label: '코딩 동아리', do: s => { s.school.club = 'game'; }, text: '첫날부터 게임을 만들자는 얘기가 나왔다.', effect: { smart: 1 } },
+      { label: '문예부', do: s => { s.school.club = 'book'; }, text: '동아리방 책장이 마음에 들었다.', effect: { art: 1 } },
+      { label: '봉사 동아리', do: s => { s.school.club = 'volunteer'; }, text: '첫 활동은 동네 공부방이었다.', karma: 2 },
+      { label: '안 든다', text: '방과 후엔 집에 가는 게 좋았다.' },
+    ] },
+  // 수능 전날 → 수능 (고3 학교 턴 csat)
+  { id: 'csatEve', type: 'trigger', text: s => s.age >= 19 ? '두 번째 수능 전날. 작년 이맘때가 떠오른다.' : '수능 전날. 내일이다.',
+    choices: [
+      { label: '마지막으로 정리한다', do: (s, a) => { s.vars.csatCond = a.rand(-3, 6); a.takeCSAT(); }, text: '오답 노트를 한 번 더 넘겼다. 새벽 한 시에 불을 껐다.' },
+      { label: '일찍 잔다', do: (s, a) => { s.vars.csatCond = a.rand(3, 8); a.takeCSAT(); }, text: '아홉 시에 누웠다. 생각보다 잠이 잘 왔다.' },
+      { label: '친구들과 서로 응원한다', effect: { happy: 3 }, do: (s, a) => { s.vars.csatCond = a.rand(0, 5); a.takeCSAT(); }, text: '"잘 보자!" 서로 찹쌀떡을 나눠 먹었다.' },
+    ] },
+  // 합격한 곳 고르기 (수시 또는 정시)
+  { id: 'pickUniv', type: 'trigger', text: '합격한 곳 중에서 골라야 한다.',
+    choices: [0, 1, 2, 3, 4, 5].map(i => ({
+      label: (s, a) => { const o = s.school.offers[i]; return `${a.univ(o.u).name} ${a.dept(o.d).name}`; },
+      if: s => !!(s.school.offers && s.school.offers[i]),
+      do: (s, a) => { const o = s.school.offers[i]; a.admit(o.u, o.d); }, memory: true,
+      text: (s, a) => `${a.univ(s.school.univ).name} ${a.dept(s.school.dept).name}에 가기로 했다.`, effect: { happy: 10 },
+    })).concat([{ label: '전부 포기하고 재수한다', if: s => s.age === 18, set: 'retake', do: s => { s.school.offers = null; }, text: '더 높은 곳을 보기로 했다. 1년만 더.', effect: { happy: -4 } }]) },
+  // 어디에도 붙지 못했을 때 (SCHOOL.md 재수 선택)
+  { id: 'retakeChoice', type: 'trigger', text: '어디에도 붙지 못했다. 어떻게 할까?', memory: true,
+    choices: [
+      { label: '재수한다', if: s => s.age === 18, set: 'retake', text: '1년을 더 투자하기로 했다. 길고 외로운 시간이 시작됐다.', effect: { happy: -6 } },
+      { label: '취업한다', set: 'noCollege', unset: 'retake', text: '학교가 전부는 아니다. 내 길을 가기로 했다.', effect: { happy: 1 } },
+      { label: '전문대라도 간다', do: (s, a) => { const u = a.univ('COL1'); a.admit('COL1', a.pick(u.departments)); }, text: '갈 수 있는 곳에 갔다. 여기서 다시 시작이다.' },
+    ] },
   { id: 'dreamSpeech', type: 'must', at: 10, text: '장래희망 발표 시간. "{dreamSpeech}"', memory: true },
-  // 수능은 고3 학교 턴(csat)에서 터짐 (js/game.js schoolTurn)
-  { id: 'suneung', type: 'trigger', req: { noFlags: ['inJail'] },
-    do: (s, a) => a.takeSuneung(0), text: s => s.vars.satText, memory: true, then: 'collegeApply' },
-  { id: 'suneung2', type: 'trigger', req: { flags: ['retake'], noFlags: ['inJail'] },
-    do: (s, a) => a.takeSuneung(6), text: s => '두 번째 수능. ' + s.vars.satText, memory: true, then: 'collegeApply' },
   { id: 'enlist', type: 'must', at: 20, req: { gender: 'm', noFlags: ['inJail'] },
     text: '입영 통지서가 날아왔다. 머리를 짧게 깎았다.', memory: true, set: ['army', 'inArmy'], effect: { happy: -6, health: 4 },
     do: s => {
@@ -153,9 +191,42 @@ GAME_DATA.events = [
 
   /* ═════ 고정 — 10대 ═════ */
   { id: 'puberty', type: 'fixed', age: [13, 14], text: '거울 보는 시간이 부쩍 늘었다.', effect: { style: [3, 6], happy: -2 } },
-  { id: 'midterm', type: 'fixed', age: [13, 15], season: ['봄', '겨울'],
-    text: (s, a) => a.subjAvg() >= 60 ? '중간고사에서 반 5등 안에 들었다.' : '중간고사 성적표를 가방 깊숙이 넣었다.',
-    effect: (s, a) => a.subjAvg() >= 60 ? { happy: 4 } : { happy: -3 } },
+  // 짝사랑 (중학생, 아직 없으면) — 감정만. 고등학교 고백 이벤트로 이어짐
+  { id: 'crushMs', type: 'fixed', age: [14, 15], when: (s, a) => !a.find(p => p.crush).length,
+    onStart: (s, a) => { const p = a.meet({ kind: 'classmate', gender: s.gender === 'm' ? 'f' : 'm', ageRange: [s.age, s.age], close: 20, trust: 15 }); p.crush = true; },
+    text: '{new|이} 지나갈 때마다 괜히 머리를 매만지게 된다.', effect: { happy: 2, style: 1 } },
+  /* ═════ 고등학교 (SCHOOL.md) ═════ */
+  { id: 'sportsFest', type: 'fixed', age: [16, 18], season: ['봄'], once: false, cooldown: 1, text: '체육대회 날이다!',
+    choices: [
+      { label: '전력 질주', check: { stat: 'fit', diff: 60, dice: true },
+        success: { text: '1등! 반 아이들이 환호했다.', effect: { happy: 5, fit: 2 }, memory: true }, fail: { text: '넘어졌다... 무릎이 까졌다.', effect: { happy: -2, health: -3 } } },
+      { label: '적당히 한다', text: '무난하게 끝냈다.', effect: { happy: 1 } },
+    ] },
+  { id: 'festival', type: 'fixed', age: [16, 18], season: ['겨울'], once: false, cooldown: 1, text: '학교 축제. 반에서 무엇을 할까?',
+    choices: [
+      { label: '무대 공연', check: { stat: 'charm', diff: 50, dice: true },
+        success: { text: '환호 속에 무대가 끝났다. 잊을 수 없는 순간이다.', effect: { happy: 8, charm: 3 }, memory: true, extra: 1 }, fail: { text: '삐끗했다. 하지만 나름 즐거웠다.', effect: { happy: 2 } } },
+      { label: '포장마차 운영', effect: { happy: 4, money: [5, 20], craft: 1 }, extra: .5, text: '떡볶이가 동났다. 반 회비가 두둑해졌다.' },
+      { label: '돌아다니기', effect: { happy: 3 }, text: '다른 반 귀신의 집에서 소리를 질렀다.' },
+    ] },
+  // 고백 (짝사랑) — 고등학생은 사귀는 데까지 (손잡기까지만). 19살이 되면 이어지거나 흐지부지
+  { id: 'confess', type: 'random', age: [16, 18], once: true, weight: 2,
+    when: (s, a) => a.find(p => p.crush && !p.teenLove).length > 0,
+    onStart: (s, a) => a.focus(a.pick(a.find(p => p.crush && !p.teenLove))),
+    text: '더 이상 참을 수 없다. {fp}에게 고백할까?',
+    choices: [
+      { label: '고백한다', check: { stat: 'charm', diff: 55, dice: true },
+        success: { text: '{fp|이} "나도..." 라고 했다. 세상이 달라 보였다.', p: { close: [15, 20], trust: [8, 12] }, effect: { happy: 10 }, memory: true, do: (s, a) => { a.focused().teenLove = true; } },
+        fail: { text: '{fp|이} 미안하다고 했다. 가슴이 아팠다.', effect: { happy: -8 }, memory: true, do: (s, a) => { a.focused().crush = false; } } },
+      { label: '아직은 아니다', text: '오늘도 마음을 삼켰다.' },
+    ] },
+  { id: 'teenDate', type: 'fixed', age: [16, 18], once: false, cooldown: 1, when: (s, a) => a.find(p => p.teenLove).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => p.teenLove)[0]),
+    text: '{fp|와} 학교 끝나고 떡볶이를 먹으러 갔다.',
+    choices: [
+      { label: '손을 잡는다', p: { close: [4, 8] }, effect: { happy: 5 }, text: '손바닥에 땀이 났다. {fp|도} 놓지 않았다.', memory: true },
+      { label: '시험 얘기만 한다', p: { close: [1, 3] }, text: '둘 다 수학이 제일 싫다는 걸 알게 됐다.' },
+    ] },
   { id: 'bigFight', type: 'fixed', age: [13, 15],
     onStart: (s, a) => {
       let f = friends(a).sort((x, y) => y.close - x.close)[0];
@@ -1174,29 +1245,7 @@ GAME_DATA.events = [
   { id: 'kLucky', type: 'karma', sign: 1, once: false, text: '이상하게 일이 술술 풀리는 날들이었다.', effect: { happy: 6 } },
 
 
-  /* ═════ 학교 — 대학 지원 (엔진이 수능 뒤에 부름) ═════ */
-  { id: 'collegeApply', type: 'trigger',
-    text: s => `${['가', '나', '다'][s.vars.attempt - 1]}군 원서를 쓴다. 환산 등급 ${s.vars.uniScore.toFixed(2)}.`,
-    choices: GAME_DATA.univTiers.map(t => ({
-      label: (s, a) => `${t.label} (${a.chanceText(t)})`,
-      if: (s, a) => a.reachable(t),
-      chance: (s, a) => a.admitChance(t),
-      success: { do: (s, a) => a.admit(t.id), text: `${t.label}에 합격했다!`, memory: true, effect: { happy: 10 }, then: 'chooseMajor' },
-      fail: { text: `${t.label} 불합격.`, effect: { happy: -4 }, then: s => ++s.vars.attempt <= 3 ? 'collegeApply' : 'collegeFail' },
-    })).concat([
-      { label: '재수한다', if: s => !s.flags.retake, set: 'retake', text: '1년만 더 해보기로 했다.', effect: { happy: -6 } },
-      { label: '대학 대신 사회로 나간다', set: 'noCollege', text: '대학 대신 바로 일을 시작하기로 했다.', effect: { happy: 1 } },
-    ]) },
-  { id: 'collegeFail', type: 'trigger', text: '세 군데 모두 떨어졌다.',
-    choices: [
-      { label: '재수한다', if: s => !s.flags.retake, set: 'retake', text: '이를 악물었다. 1년만 더.', effect: { happy: -4 } },
-      { label: '사회로 나간다', set: 'noCollege', text: '다른 길도 있다고 생각하기로 했다.' },
-    ] },
-  { id: 'chooseMajor', type: 'trigger', text: '어떤 전공으로 갈까?',
-    choices: GAME_DATA.majors.map(m => ({
-      label: m.label, if: (s, a) => a.majorOk(m),
-      do: (s, a) => a.setMajor(m.id), text: `${m.label}에 들어갔다.`,
-    })) },
+  /* ═════ 학교 — 대학 (원서·합격은 js/game.js 학교 턴: 수시 → 수능 → 정시 → 발표, 위 csatEve·pickUniv·retakeChoice) ═════ */
   { id: 'gpaWarning', type: 'fixed', age: [19, 26], req: { flags: ['student'] }, when: s => s.school.gpa > 0 && s.school.gpa < 2.5,
     text: '학사경고 안내 문자가 왔다.',
     choices: [

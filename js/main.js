@@ -130,8 +130,10 @@ function render(S) {
   if (bg.t !== sky) { WeatherBG.setTime(sky, bg.t === null); bg.t = sky; }
 
   maybeScene(S);
-  // 모달
+  // 모달 (이벤트 → 성적표·합격 → 원서)
   if (S.pending.length) openEvent();
+  else if (S.report) openReport();
+  else if (S.apply) openApply();
   else if (S.ended && endingFor !== S.id) { endingFor = S.id; openEnding(); }
   else if (modalMode === 'event') closeModal();
   else if (modalMode === 'people') openPeople();
@@ -311,6 +313,59 @@ function openEvent() {
     `${who}<p>${esc(ev.text)}</p><div class="choices">${ev.choices.map((c, i) => `<button type="button" data-c="${i}">[${i + 1}] ${esc(c)}</button>`).join('')}</div>`, false, ev.text);
 }
 
+/* 성적표 (중간·기말·모의고사·수능) / 합격 — SCHOOL.md */
+const logo = (id, size) => window.Avatar && Avatar.univLogo ? Avatar.univLogo(G.universities.find(u => u.id === id), size) : '';
+function openReport() {
+  const r = G.state().report;
+  if (!r) return;
+  if (r.admit) {
+    const u = G.universities.find(x => x.id === r.admit.u), d = G.departments.find(x => x.id === r.admit.d);
+    showModal('report', '🎉 합격', `<div class="admit">${logo(u.id, 96)}<p class="admit-t">${esc(u.name)}<br><b>${esc(d.icon)} ${esc(d.name)}</b> 합격!</p>
+      <p class="dim">"${esc(u.motto || '')}"</p></div><div class="choices"><button type="button" data-rok>확인</button></div>`, false, 'admit');
+    return;
+  }
+  const extra = r.csat ? '<th>🎲</th>' : r.mock ? '<th>백분위</th>' : '';
+  const rows = r.rows.map(x => `<tr><td>${esc(x.label)}</td><td>${x.score}</td><td><b class="gr gr${x.grade}">${x.grade}등급</b></td>${r.csat ? `<td class="dim">${x.roll > 0 ? '+' : ''}${x.roll}</td>` : r.mock ? `<td class="dim">${x.pct}</td>` : ''}</tr>`).join('');
+  showModal('report', r.csat ? '📜 수능 성적표' : '📋 성적표', `<p class="rc-t">${esc(r.school ? r.school + ' ' : '')}${esc(r.title)}</p>
+    <table class="rc"><thead><tr><th>과목</th><th>점수</th><th>등급</th>${extra}</tr></thead><tbody>${rows}</tbody></table>
+    <p class="rc-avg">평균 <b>${r.avg.toFixed(1)}등급</b></p>${r.note ? `<p class="dim rc-note">${esc(r.note)}</p>` : ''}
+    <div class="choices"><button type="button" data-rok>확인</button></div>`, false, r.title);
+}
+/* 원서 접수: 수시(6장, 내신 — 교과/종합) / 정시(가·나·다, 수능) */
+let applyDraft = null;
+function openApply() {
+  const S = G.state(), ap = S.apply;
+  if (!ap) return;
+  const susi = ap.kind === 'susi';
+  if (!applyDraft || applyDraft.kind !== ap.kind) applyDraft = { kind: ap.kind, rows: susi ? [{ u: '', d: '', type: '교과' }] : [{ u: '', d: '' }, { u: '', d: '' }, { u: '', d: '' }] };
+  const unis = G.universities, uOpt = sel => `<option value="">대학 선택</option>` + unis.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)} (${G.tierLabel(u.tier)})</option>`).join('');
+  const dOpt = (uid, sel) => { const u = unis.find(x => x.id === uid); return `<option value="">학과 선택</option>` + (u ? u.departments.map(id => { const d = G.departments.find(x => x.id === id); return `<option value="${id}"${id === sel ? ' selected' : ''}>${esc(d.icon + ' ' + d.name)}</option>`; }).join('') : ''); };
+  const gun = ['가', '나', '다'];
+  const rows = applyDraft.rows.map((r, i) => {
+    const kind = susi ? r.type : gun[i], p = r.u && r.d ? G.admitP(r.u, r.d, kind) : null;
+    return `<div class="ap-row" data-row="${i}"><span class="ap-k">${susi ? `${i + 1}` : `${gun[i]}군`}</span>${r.u ? logo(r.u, 28) : '<span class="ap-nologo"></span>'}
+      <select data-f="u">${uOpt(r.u)}</select><select data-f="d"${r.u ? '' : ' disabled'}>${dOpt(r.u, r.d)}</select>
+      ${susi ? `<select data-f="type"><option${r.type === '교과' ? ' selected' : ''}>교과</option><option${r.type === '종합' ? ' selected' : ''}>종합</option></select>` : ''}
+      <span class="ap-p${p == null ? '' : p >= .7 ? ' ok' : p >= .35 ? ' mid' : ' low'}">${p == null ? '' : `예상 합격률 ${Math.round(p * 100)}%`}</span></div>`;
+  }).join('');
+  const n = G.naesinAvg(), sat = S.school.sat;
+  showModal('apply', susi ? '📝 수시 원서 접수' : '📝 정시 원서 접수', `
+    <p class="dim">${sat ? `내 수능 평균: <b>${sat.avg.toFixed(1)}등급</b><br>` : ''}내 내신 평균: <b>${n != null ? n.toFixed(1) + '등급' : '없음'}</b>${susi ? ` · 비교과 ${Math.round(S.school.extra || 0)}점` : ''}</p>
+    <div class="ap">${rows}</div>
+    ${susi && applyDraft.rows.length < 6 ? '<button type="button" class="ap-add" data-apadd>＋ 한 장 더</button>' : ''}
+    <p class="hint">${susi ? '교과는 내신만, 종합은 내신 + 비교과(동아리·봉사·독서) + 자소서. 6장까지. 의학과는 기준이 1등급 더 높다.' : '가·나·다군에 한 장씩. 수능 평균 등급으로 본다. 의학과는 기준이 1등급 더 높다.'}</p>
+    <div class="choices"><button type="button" data-apgo>접수하기</button>${susi ? '<button type="button" data-apskip>수시는 안 넣는다</button>' : ''}</div>`, false, 'apply');
+}
+mBody.addEventListener('change', e => {
+  if (modalMode !== 'apply' || !applyDraft) return;
+  const el = e.target.closest('select'), row = el && el.closest('[data-row]');
+  if (!row) return;
+  const r = applyDraft.rows[+row.dataset.row], f = el.dataset.f;
+  r[f] = el.value;
+  if (f === 'u') r.d = '';
+  openApply();
+});
+
 /* 관계 목록 */
 function order(p) {
   if (p.id === 'mom') return 0; if (p.id === 'dad') return 1;
@@ -442,9 +497,9 @@ function openCrime() {
 /* 공부: 과목 고르기 (중·고등학생) */
 function openStudy() {
   const S = G.state();
-  const rows = G.subjects.map(x => `<button type="button" data-s="${x.id}">${x.label} <small>${S.school.subj[x.id]}</small></button>`).join('');
+  const rows = G.studyInfo().map(x => `<button type="button" data-s="${x.id}">${x.label} <small>${x.exp}점${x.prep ? ` (+${x.prep})` : ''}</small></button>`).join('');
   showModal('study', '📚 무슨 공부?', `<div class="igrid">${rows}<button type="button" data-s="all">골고루</button></div>
-    <p class="hint">과목 하나에 집중하면 많이, 골고루 하면 조금씩 오른다. 숫자는 지금 실력.</p>`);
+    <p class="hint">다음 시험까지 쌓이는 공부: 한 과목에 집중하면 +8~10, 골고루 하면 과목마다 +3~5. 숫자는 지금 예상 점수(괄호는 이번 시험을 위해 쌓은 공부).</p>`);
 }
 
 /* 나 */
@@ -456,13 +511,19 @@ function openMe() {
   let school = '';
   const sc = S.school;
   if (S.age >= 13) {
-    const subj = G.subjects.map(x => `<span>${x.label}</span><span class="bar">${bar(sc.subj[x.id])}</span><span class="num">${sc.subj[x.id]}</span>`).join('');
+    const inSch = !sc.sat && !sc.univ && S.age <= 19;
+    const subj = inSch ? G.studyInfo().map(x => `<span>${x.label}</span><span class="bar">${bar(x.exp)}</span><span class="num">${x.exp}</span>`).join('') : '';
     const lines = [];
-    if (G.naesinAvg() != null) lines.push(`내신 평균 ${G.naesinAvg().toFixed(1)}등급 (${sc.naesin.map(v => v.toFixed(1)).join(' → ')})`);
-    if (sc.mock) lines.push(`최근 모의고사 평균 ${sc.mock.avg.toFixed(1)}등급`);
-    if (sc.sat) lines.push(`수능 평균 ${sc.sat.avg.toFixed(1)}등급 (${G.subjects.map(x => x.label + ' ' + sc.sat[x.id]).join(', ')})`);
-    if (G.univLabel()) lines.push(`${G.univLabel()} ${G.majorLabel() || ''}${sc.gpaN ? `, 학점 ${sc.gpa.toFixed(2)}` : ''}${sc.degree ? ' 졸업' : ''}`);
-    school = `<p class="sec-t">성적표</p>${S.age <= 18 && !sc.sat ? `<div class="subj">${subj}</div>` : ''}${lines.map(l => `<p class="dim" style="font-size:13px">${esc(l)}</p>`).join('')}`;
+    const tr = sc.track && G.tracks.find(t => t.id === sc.track);
+    if (tr) lines.push(`계열 ${tr.label} — ${G.subjectsNow().map(x => x.label).join('·')}`);
+    const last = sc.exams.slice(-4).map(e => `${e.title} ${e.avg.toFixed(1)}`).join(' · ');
+    if (last) lines.push(`최근 시험 (평균 등급): ${last}`);
+    if (G.naesinAvg() != null) lines.push(`내신 평균 ${G.naesinAvg().toFixed(1)}등급`);
+    if (G.mockAvg() != null) lines.push(`모의고사 평균 ${G.mockAvg().toFixed(1)}등급 (${sc.mocks.length}회)`);
+    if (sc.sat) lines.push(`수능 평균 ${sc.sat.avg.toFixed(1)}등급${sc.sat.rows && sc.sat.rows.length ? ` (${sc.sat.rows.map(x => (G.subjects.find(y => y.id === x.id) || {}).label + ' ' + x.grade).join(', ')})` : ''}`);
+    if (sc.extra) lines.push(`비교과 ${Math.round(sc.extra)}점 (동아리·봉사·독서)`);
+    const uni = G.univLabel() ? `<div class="me-uni">${logo(sc.univ, 34)}<span>${esc(G.univLabel())} ${esc(G.majorLabel() || '')}${sc.gpaN ? `<br><span class="dim">학점 ${sc.gpa.toFixed(2)}${sc.degree ? ' · 졸업' : ''}</span>` : ''}</span></div>` : '';
+    school = `<p class="sec-t">학교</p>${subj ? `<div class="subj">${subj}</div><p class="hint">예상 점수 (능력치 + 이번 시험을 위해 쌓은 공부·수업)</p>` : ''}${lines.map(l => `<p class="dim" style="font-size:13px">${esc(l)}</p>`).join('')}${uni}`;
   }
   const me = G.myLook() && window.Avatar ? avBtn('me', Avatar.render(G.myLook(), 60, { age: S.age, fig: G.figure(null) })) : '';
   showModal('me', `📋 ${S.name}`, `
@@ -546,7 +607,7 @@ function openEnding() {
 
   showModal('ending', death ? '— 끝 —' : '🎂 50번째 생일', `
     <p>${esc(first)}</p>
-    <p class="dim">${esc(S.name)}<br>${esc(G.roleText())}, 재산 ${G.fmtMoney(S.money)}${S.record ? `, 전과 ${S.record}회` : ''}<br>${G.univLabel() ? esc(`${G.univLabel()} ${G.majorLabel() || ''}${S.school.degree ? ' 졸업' : ''}`) + '<br>' : ''}꿈: ${esc(S.vars.dreamLabel)} — ${dreamDone(S) ? '이뤘다' : '아직'}<br>업보: ${G.karmaLabel()}<br>곁에 있는 사람: ${esc(close)}</p>
+    <p class="dim">${esc(S.name)}<br>${esc(G.roleText())}, 재산 ${G.fmtMoney(S.money)}${S.record ? `, 전과 ${S.record}회` : ''}<br>${G.univLabel() ? logo(S.school.univ, 22) + ' ' + esc(`${G.univLabel()} ${G.majorLabel() || ''}${S.school.degree ? ' 졸업' : ''}`) + '<br>' : ''}꿈: ${esc(S.vars.dreamLabel)} — ${dreamDone(S) ? '이뤘다' : '아직'}<br>업보: ${G.karmaLabel()}<br>곁에 있는 사람: ${esc(close)}</p>
     <div class="stats">${stats}</div>
     <div class="album"><p class="t">✦ 추억 ${S.memories.length}개</p>${album}</div>
     <p class="ending-last">${esc(last)}</p>
@@ -617,6 +678,13 @@ mBody.addEventListener('click', e => {
   if (!b || b.disabled) return;
   const d = b.dataset;
   if (modalMode === 'create') { createClick(b); return; }
+  if ('rok' in d) { G.ackReport(); return; }
+  if (modalMode === 'apply') {
+    if ('apadd' in d) { applyDraft.rows.push({ u: '', d: '', type: '교과' }); openApply(); }
+    else if ('apgo' in d) { const list = applyDraft.rows.filter(r => r.u && r.d); applyDraft = null; G.submitApply(list); }
+    else if ('apskip' in d) { applyDraft = null; G.submitApply([]); }
+    return;
+  }
   if (modalMode === 'slots') {
     if (d.sl) { G.useSlot(+d.sl); closeModal(); logState = { id: null, n: 0 }; render(G.state()); }
     else if (d.sv) { G.saveTo(+d.sv); openSlots(); }

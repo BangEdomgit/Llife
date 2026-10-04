@@ -17,13 +17,13 @@ const STATS = COND.concat(ABIL);
 const PSTATS = ['close', 'trust', 'heart', 'grudge'];
 const LABEL = Object.assign({}, D.statLabel, { close: '친밀', trust: '신뢰', heart: '설렘', grudge: '원한', sat: '만족감' });
 const GR = D.grades;
-const SUBJ = D.subjects.map(x => x.id);
+const SUBJ = D.subjects.map(x => x.id);   // 모든 과목 id (지금 듣는 과목은 subjectsNow)
 const KIND_LABEL = { classmate: '같은 반', friend: '친구', coworker: '동료', rival: '앙숙', child: '아이', family: '가족' };
 const EVENTS = Object.fromEntries(D.events.map(e => [e.id, e]));
 const PLACES = Object.fromEntries(D.places.map(p => [p.id, p]));
 const ACTIONS = Object.fromEntries(D.actions.map(a => [a.id, a]));
 const TIMES = ['아침', '낮', '저녁'];
-const TRANSIENT = ['fp', 'sev', 'late', 'mainId', 'mainName', 'loverId', 'lover', 'debt', 'new', 'newId', 'attempt', 'uniScore', 'signal', 'fline', 'myValue', 'theirValue', 'satText', 'placeLabel'];
+const TRANSIENT = ['classSubj', 'fp', 'sev', 'late', 'mainId', 'mainName', 'loverId', 'lover', 'debt', 'new', 'newId', 'attempt', 'uniScore', 'signal', 'fline', 'myValue', 'theirValue', 'satText', 'placeLabel'];
 
 const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -62,7 +62,6 @@ function gradeInfo(v) {
   const i = gIdx(v), lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : lo + 100;
   return { letter: GR[i][0], idx: i, pct: Math.min(1, (v - lo) / (hi - lo)), value: v };
 }
-const scoreGrade = sc => clamp(Math.round(9 - (sc - 15) / 9), 1, 9);   // 과목 점수 → 1~9등급 (87점 이상이면 1등급)
 const LETTERS = GR.map(g => g[0]);
 const pickKey = obj => weighted(Object.keys(obj), k => obj[k]);
 // 등급 글자 → 그 등급 안의 아무 값
@@ -101,6 +100,7 @@ const heartOk = p => (p.partner || p.spouse || p.secret) ? S.age >= C.romanceMin
 function relLabel(p) {
   if (p.kind === 'family' || p.kind === 'child') return p.role;
   if (p.spouse) return '배우자';
+  if (p.teenLove && S.age < 19) return '사귀는 사이';   // 고등학생 연애 (고백·손잡기까지)
   if (p.partner) return '연인';
   if (p.secret) return '몰래 만나는 사이';
   if (p.grudge >= 50) return '원수';
@@ -696,6 +696,8 @@ function applyOutcome(o, target, resumed) {
   if (o.lean) { S.lean = S.lean || {}; S.lean[o.lean] = (S.lean[o.lean] || 0) + 1; }
   if (o.vlean) { S.vlean = S.vlean || {}; S.vlean[o.vlean] = (S.vlean[o.vlean] || 0) + 1; }
   if (o.hobby) S.hobby = o.hobby;
+  if (o.subjectBonus && S.vars.classSubj) addBonus(S.vars.classSubj, o.subjectBonus);   // 수업 이벤트 → 다음 시험 보정
+  if (o.extra && inSchool()) S.school.extra = (S.school.extra || 0) + val(o.extra);   // 비교과 (수시 종합)
   addKarma(o.karma);
   if (o.heat) S.heat = clamp(S.heat + val(o.heat), 0, 100);
   const ctx = target ? { p: pname(target) } : {};
@@ -849,7 +851,11 @@ function choose(i) {
   S.pending.shift();
   log('▸ ' + fill(resolve(ch.label)), { t: 'pick' });
   let o = ch;
-  if (ch.check) o = (S.stats[ch.check.stat] || 0) + rand(-15, 15) >= ch.check.diff ? ch.success : ch.fail;
+  if (ch.check && ch.check.dice) {   // 주사위: (능력치 lvl / 난이도) × 100 + rand(-20, 20), 5~95%
+    const pc = clamp(Math.round(lvl(S.stats[ch.check.stat]) / ch.check.diff * 100) + rand(-20, 20), 5, 95), roll = rand(1, 100), ok = roll <= pc;
+    log(`🎲 ${LABEL[ch.check.stat]} 판정 ${pc}% → ${ok ? '성공' : '실패'}`, { t: 'info' });
+    o = ok ? ch.success : ch.fail;
+  } else if (ch.check) o = (S.stats[ch.check.stat] || 0) + rand(-15, 15) >= ch.check.diff ? ch.success : ch.fail;
   else if (ch.chance != null) o = Math.random() < resolve(ch.chance) ? ch.success : ch.fail;
   applyOutcome(o);
   if (p.id === 'contraAsk') resumeHeld();
@@ -909,7 +915,8 @@ const semOf = str => str.split('').map(c => T_OF[c]);
 const SCHED = {
   ms:  [semOf('CFCFCFCFMCFCFCFCFXVVVVVVV'), semOf('CFCFCFCFMCFCFCFCFXVVVVVVV')],   // 수업 8 · 중간 · 자유 8 · 기말 · 방학 7
   hs:  [semOf('CFCFCMCFCFXVVVV'), semOf('CFCFCMCFCFXVVVV')],                       // 수업 5 · 중간 · 자유 4 · 기말 · 방학 4
-  hs3: [semOf('CKCFCMCKFFXVVVV'), semOf('CKCMCFNFFARVVVV')],                       // 고3: 3·6월 모의고사 / 9월 모의고사·수능·원서·발표
+  hs2: [semOf('CFCFCMCFCFXVVVV'), semOf('CFCFCMCKFFXVVVV')],                       // 고2: 11월 모의고사 (선택)
+  hs3: [semOf('CKCFCMCFKFXVVVV'), semOf('CKCMCFNFFARVVVV')],                       // 고3: 3·6월 모의고사 / 9월 모의고사·수능·원서·발표
 };
 const TURN_AP = { free: 2, vac: 3 };   // 자유 턴은 방과 후, 방학은 조금 더
 const TURN_LABEL = { class: '수업', free: '자유', mid: '중간고사', final: '기말고사', vac: '방학', mock: '모의고사', csat: '수능', apply: '원서 접수', result: '결과 발표' };
@@ -921,7 +928,7 @@ function phase() {
   if (S.age <= 18 || (S.age === 19 && S.flags.retake && !S.flags.student)) return 'hs';
   return 'adult';
 }
-const schedule = () => { const ph = phase(); return ph === 'ms' ? SCHED.ms : ph === 'hs' ? (S.age >= 18 ? SCHED.hs3 : SCHED.hs) : null; };
+const schedule = () => { const ph = phase(); return ph === 'ms' ? SCHED.ms : ph === 'hs' ? (S.age >= 18 ? SCHED.hs3 : S.age === 17 ? SCHED.hs2 : SCHED.hs) : null; };
 const turnKind = i => { const sc = schedule(); if (!sc) return null; const L = sc[0].length; return sc[i < L ? 0 : 1][i % L]; };
 const turnsInYear = () => { const sc = schedule(); return sc ? sc[0].length * 2 : 0; };
 // 이 학년도(나이)의 3월 1일 / 그 턴의 날짜
@@ -1006,7 +1013,7 @@ function nextTurn() {
   let guard = 0;
   do {
     advanceTurn();
-    if (S.ended || S.report) break;
+    if (S.ended || S.report || S.apply) break;
   } while (!S.pending.length && !S.ap && schedule() && guard++ < 60);
   after();
 }
@@ -1127,7 +1134,7 @@ function eat() {
 function monthly() {
   if (S.date.m === S.month) { birthday(); if (phase() === 'adult') S.stop = S.stop || 'birthday'; }
   // 행복은 익숙해짐: 아주 높거나 낮으면 한 달에 1씩 가운데로
-  if (S.stats.happy > 75) S.stats.happy -= S.stats.happy > 88 ? 2 : 1; else if (S.stats.happy < 35) S.stats.happy++;
+  if (S.stats.happy > 75) S.stats.happy -= Math.ceil((S.stats.happy - 70) / 10); else if (S.stats.happy < 35) S.stats.happy += Math.ceil((40 - S.stats.happy) / 10);
   if (S.job && !jailed()) { const j = job(S.job); S.money += j.volatile ? Math.round(rand(Math.round(S.salary * .2), S.salary * 2) / 12) : Math.round(S.salary / 12); }
   if (S.age >= 20 && !S.flags.student && !S.flags.inArmy && !jailed()) {
     const kids = alive().filter(p => p.kind === 'child').length;
@@ -1177,97 +1184,185 @@ function birthday() {
   log(text, { memory: milestone, deltas: deltas.concat(applyEffect({ happy: 2 })) });
 }
 
-/* ═════════ 학교 ═════════ */
-const inSchool = () => S.age >= D.schoolStart && S.age <= 18 && !jailed();
-const subjAvg = () => SUBJ.reduce((t, k) => t + S.school.subj[k], 0) / SUBJ.length;
-function subjAdd(k, n) { S.school.subj[k] = clamp(S.school.subj[k] + n, 0, 100); }
-function subjAll(n) { SUBJ.forEach(k => subjAdd(k, n)); }
-function subjGain(k, base) {
-  const cur = S.school.subj[k];
-  const g = Math.max(1, Math.round(base * (1 + gIdx(S.stats.smart) * .1) * (1 - cur / 130)));
-  subjAdd(k, g);
-  return g;
+/* ═════════ 학교 (SCHOOL.md) ═════════
+   과목 원점수 = 과목 기본값(능력치 가중합) + 공부량 보정(다음 시험까지 공부한 만큼) + 수업 보정(수업 이벤트) + 컨디션 ±5 + 운
+   → 9등급(data/school.js gradeCuts). 중학교는 공통 4과목, 고등학교는 공통 4 + 계열 선택 과목 */
+const SUB = id => D.subjects.find(x => x.id === id) || D.subjects[0];
+const COMMON = D.subjects.filter(x => x.common).map(x => x.id);
+const UNIV = id => D.universities.find(u => u.id === id);
+const DEPT = id => D.departments.find(d => d.id === id);
+const inSchool = () => S.age >= D.schoolStart && (S.age <= 18 || phase() === 'hs') && !jailed();
+const subjectsNow = () => phase() === 'hs' && S.school.electives && S.school.electives.length ? COMMON.concat(S.school.electives) : COMMON;
+// 능력치(상한 없음) → 0~100
+const lvl = v => Math.min(100, Math.max(0, (v || 0) * .9));
+function subjBase(id) { const w = SUB(id).w; let t = 0; for (const k in w) t += lvl(S.stats[k]) * w[k]; return t; }
+// 공부량 보정: 다음 시험까지 (시험이 끝나면 비워짐). 고등학교에서 공부한 횟수는 수능에 따로 쌓임
+// 한 시험을 위해 쌓을 수 있는 건 과목당 20까지 (방학 내내 공부해도 다음 시험에 몰리지 않게)
+function addPrep(id, n) { const sc = S.school; sc.prep = sc.prep || {}; sc.prep[id] = Math.min(20, Math.round(((sc.prep[id] || 0) + n) * 10) / 10); }
+function addBonus(id, n) { const sc = S.school; sc.bonus = sc.bonus || {}; sc.bonus[id] = (sc.bonus[id] || 0) + n; }
+// 이벤트에서 쓰던 '모든 과목 실력 +n' → 지금 과목들의 다음 시험 보정 (예전 과목 id kor/math/eng/sci도 받음)
+function subjAll(n) { if (inSchool()) subjectsNow().forEach(k => addPrep(k, n)); }
+const OLD_SUBJ = { kor: 'korean', math: 'math', eng: 'english', sci: null };
+function subjAdd(k, n) { if (!inSchool()) return; const L = subjectsNow(); addPrep(k in OLD_SUBJ ? OLD_SUBJ[k] || L[L.length - 1] : k, n); }
+// 지금 실력으로 본 예상 점수 평균 (운·컨디션 빼고)
+const expScore = id => subjBase(id) + ((S.school.prep || {})[id] || 0) + ((S.school.bonus || {})[id] || 0);
+const subjAvg = () => { const L = subjectsNow(); return L.reduce((t, k) => t + expScore(k), 0) / L.length; };
+const gradeOfScore = sc => { const i = D.gradeCuts.findIndex(c => sc >= c); return i < 0 ? 9 : i + 1; };
+const condBonus = () => clamp(Math.round((S.stats.health - 60) / 10 + (S.stats.happy - 55) / 10 - (S.fatigue || 0)), -5, 5);
+// 시험 한 번: 과목마다 원점수·등급(+굴린 운), 평균 등급 → 성적표(S.report)
+function sitExam(title, luck, extra) {
+  const rows = subjectsNow().map(id => {
+    const roll = rand(-luck, luck), sc = clamp(Math.round(expScore(id) + condBonus() + (extra ? extra(id) : 0) + roll), 0, 100);
+    return { id, label: SUB(id).label, score: sc, grade: gradeOfScore(sc), roll };
+  });
+  return { title, rows, avg: Math.round(rows.reduce((t, r) => t + r.grade, 0) / rows.length * 10) / 10 };
 }
-function examGrades(bonus) {
-  const g = {};
-  SUBJ.forEach(k => { g[k] = scoreGrade(S.school.subj[k] + (bonus || 0) + rand(-10, 10)); });
-  g.avg = SUBJ.reduce((t, k) => t + g[k], 0) / SUBJ.length;
-  return g;
-}
-const gradeLine = g => D.subjects.map(x => `${x.label} ${g[x.id]}`).join(', ');
-// 학교 턴 — 수업 주간은 진도(과목 실력 조금) + 가끔 학교 이벤트, 시험 턴은 성적, 고3은 모의고사·수능·원서·발표
+const naesinAvg = () => S.school.naesin.length ? Math.round(S.school.naesin.reduce((a, b) => a + b, 0) / S.school.naesin.length * 10) / 10 : null;
+const mockAvg = () => (S.school.mocks || []).length ? S.school.mocks.reduce((a, b) => a + b, 0) / S.school.mocks.length : null;
+const gradeLabel = () => { const ph = phase(), g = S.age - (ph === 'ms' ? 12 : 15); return g > 3 ? '재수' : `${ph === 'ms' ? '중' : '고'}${g}`; };
+// 수업 턴: 중학교는 자동(과목 하나에 진도 ±), 고등학교는 과목 하나를 골라 수업 이벤트
 const CLASS_LINES = { ms: ['수업 주간. 졸린 5교시를 버텼다.', '수업 주간. 수행평가 공지가 떴다.', '수업 주간. 선생님 농담에 반 전체가 웃었다.', '수업 주간. 진도가 빠르게 나갔다.'],
-  hs: ['수업 주간. 야간 자율학습이 끝나니 밤 10시였다.', '수업 주간. 판서를 받아 적느라 손목이 아팠다.', '수업 주간. 매점 빵으로 버틴 한 주였다.', '수업 주간. 모두가 조금씩 지쳐 있었다.'] };
-function schoolTurn(k) {
-  const ph = phase();
-  if (k === 'class') {
-    SUBJ.forEach(x => subjAdd(x, rand(0, 1)));
-    log(pick(CLASS_LINES[ph] || CLASS_LINES.ms), { t: 'info' });
+  hs: ['야간 자율학습이 끝나니 밤 10시였다.', '판서를 받아 적느라 손목이 아팠다.', '매점 빵으로 버틴 한 주였다.', '모두가 조금씩 지쳐 있었다.'] };
+function classTurn() {
+  const ph = phase(), L = subjectsNow(), id = pick(L);
+  if (ph === 'ms' || S.age >= 19) {   // 중학교·재수학원은 자동
+    const d = rand(-1, 2);
+    if (d) addBonus(id, d);
+    log(`${pick(CLASS_LINES.ms)} ${SUB(id).label} 진도가 ${d > 0 ? '귀에 쏙쏙 들어왔다' : d < 0 ? '버거웠다' : '평소대로 나갔다'}.`, { t: 'info' });
     maybeRandom(['school', 'class'], C.randomEventChance);
-  } else if (k === 'mid' || k === 'final') {
-    const g = examGrades(0), L = schedule()[0].length, semNo = S.turn < L ? 1 : 2, grade = S.age - (ph === 'ms' ? 12 : 15);
-    S.school.semExam = S.school.semExam || [];
-    S.school.semExam.push(g.avg);
-    log(`${grade}학년 ${semNo}학기 ${TURN_LABEL[k]}: ${gradeLine(g)}. 평균 ${g.avg.toFixed(1)}등급.`, { t: 'info' });
-    if (k === 'final' && ph === 'hs') {
-      const v = Math.round(S.school.semExam.reduce((x, y) => x + y, 0) / S.school.semExam.length * 10) / 10;
-      S.school.naesin.push(clamp(v, 1, 9));
-      log(`${grade}학년 ${semNo}학기 내신 ${clamp(v, 1, 9).toFixed(1)}등급.`, { t: 'info' });
-    }
-    if (k === 'final') S.school.semExam = [];
-  } else if (k === 'mock') {
-    const g = examGrades(0);
-    S.school.mock = g;
-    log(`모의고사: ${gradeLine(g)}. 평균 ${g.avg.toFixed(1)}등급.`, { t: 'info' });
-  } else if (k === 'csat') trigger(S.age >= 19 ? 'suneung2' : 'suneung');
-  else if (k === 'vac' && turnKind(S.turn - 1) !== 'vac') log(S.date.m >= 6 && S.date.m <= 8 ? '여름방학이 시작됐다.' : '겨울방학이 시작됐다.', { t: 'info', deltas: applyEffect({ happy: 2 }) });
+    return;
+  }
+  const pool = D.classEvents.filter(e => e.subject === id), fresh = pool.filter(e => S.last[e.id] !== S.age);
+  const ev = pick(fresh.length ? fresh : pool);
+  if (!ev) { log(pick(CLASS_LINES.hs), { t: 'info' }); return; }
+  S.vars.classSubj = id;
+  S.done[ev.id] = (S.done[ev.id] || 0) + 1; S.last[ev.id] = S.age;
+  const text = fill(ev.text), tv = {}; TRANSIENT.forEach(k => { tv[k] = S.vars[k]; });
+  S.pending.push({ id: ev.id, text, tv, who: null });
+  log(`📖 ${SUB(id).label} · ${text}`, { t: 'ask' });
 }
-const naesinAvg = () => S.school.naesin.length ? S.school.naesin.reduce((a, b) => a + b, 0) / S.school.naesin.length : null;
-function uniScore() {
-  const sat = S.school.sat ? S.school.sat.avg : 9, n = naesinAvg();
-  return n == null ? sat : sat * .7 + n * .3;
+// 중간·기말: 성적표. 고등학교는 시험마다 평균 등급이 내신에 쌓임
+function examTurn(k) {
+  const ph = phase(), Lh = schedule()[0].length, sem = S.turn < Lh ? 1 : 2, g = S.age - (ph === 'ms' ? 12 : 15);
+  const r = sitExam(`${g > 3 ? '재수' : `${g}학년`} ${sem}학기 ${TURN_LABEL[k]}`, 10);
+  r.school = ph === 'ms' ? '중학교' : '고등학교';
+  S.school.exams.push({ title: r.title, avg: r.avg, age: S.age, ms: ph === 'ms' });
+  if (ph === 'hs' && g <= 3) { S.school.naesin.push(r.avg); r.note = `내신 평균: ${naesinAvg().toFixed(1)}등급`; }
+  S.school.prep = {}; S.school.bonus = {};
+  log(`${r.school} ${r.title} — 평균 ${r.avg.toFixed(1)}등급.`, { t: 'info', deltas: applyEffect({ happy: r.avg <= 3 ? 3 : r.avg >= 7 ? -3 : 0 }) });
+  S.report = r;
 }
-function takeSuneung(bonus) {
-  const g = examGrades(bonus);
-  S.school.sat = g;
-  S.vars.satText = `수능 결과: ${gradeLine(g)}. 평균 ${g.avg.toFixed(1)}등급.`;
-  S.vars.attempt = 1;
-  S.vars.uniScore = uniScore();
+// 모의고사 (고2 11월, 고3 3·6·9월): 운이 더 크고(±15) 백분위로. 이대로면 어디까지 가능한지
+function mockTurn() {
+  const r = sitExam(`${S.date.m}월 모의고사`, 15);
+  r.mock = true; r.rows.forEach(x => { x.pct = clamp(x.score + rand(-3, 3), 1, 99); });
+  S.school.mocks.push(r.avg); S.school.mock = { avg: r.avg };
+  const pred = mockAvg(), u = bestReach(pred);
+  r.note = `모의고사 평균 ${pred.toFixed(1)}등급 · ` + (u ? `이대로 가면 ${u.name} 가능` : '이러다 큰일이다');
+  log(`${r.title} — 평균 ${r.avg.toFixed(1)}등급. ${u ? `이대로 가면 ${u.short}도 노려볼 만하다.` : '이러다 큰일이다. 등골이 서늘했다.'}`, { t: 'info' });
+  S.report = r;
 }
-function admitChance(t) {
-  const d = uniScore() - t.need;
-  return d <= 0 ? .9 : d <= .5 ? .45 : d <= 1 ? .15 : 0;
+// 이 등급(정시 가군 기준 ±.5)으로 갈 수 있는 가장 높은 대학
+const bestReach = g => D.universities.filter(u => u.tier < 5).sort((a, b) => a.cut.정시가 - b.cut.정시가).find(u => g <= u.cut.정시가 + .5) || null;
+// 수능: 과목 기본값 + 고교 공부 횟수 × .3(최대 18) + 내신·모의고사 보정(±4) + 전날 컨디션 + 운(±12). 재수면 +3
+function takeCSAT() {
+  const sc = S.school, n = naesinAvg(), m = mockAvg();
+  const base = Math.min(18, (sc.studyN || 0) * .3) + (n != null ? clamp(5 - n, -4, 4) : 0) + (m != null ? clamp((5 - m) * .8, -4, 4) : 0) + (S.vars.csatCond || 0) + (S.age >= 19 ? 3 : 0);
+  const r = sitExam(S.age >= 19 ? '두 번째 수능' : '대학수학능력시험', 12, () => base);
+  r.csat = true;
+  sc.sat = { avg: r.avg, rows: r.rows.map(x => ({ id: x.id, grade: x.grade, score: x.score })) };
+  const exp = m ?? n ?? r.avg;
+  r.note = r.avg <= exp - .5 ? '믿기지 않았다. 손이 떨렸다.' : r.avg <= exp + .5 ? '예상대로다.' : '눈물이 났다.';
+  S.vars.satText = `수능 평균 ${r.avg.toFixed(1)}등급. ${r.note}`;
+  log(`수능이 끝났다. 한 달 뒤, 성적표가 나왔다. 평균 ${r.avg.toFixed(1)}등급. ${r.note}`, { memory: true });
+  S.report = r;
 }
-const reachable = t => admitChance(t) > 0;
-function chanceText(t) { const c = admitChance(t); return c >= .8 ? '안정' : c >= .4 ? '적정' : '상향'; }
-function admit(tid) {
-  const t = D.univTiers.find(x => x.id === tid);
-  S.school.tier = tid; S.school.start = S.age + 1; S.school.years = t.years;
-  S.school.gpa = 0; S.school.gpaN = 0;
+/* ── 원서: 수시(고3 1학기, 6개까지 — 내신) / 정시 가·나·다(수능). 합격 확률은 내 등급과 기준 등급의 차이로 ── */
+// 의학과는 기준이 1등급 더 높음(cut_bonus). 수시 종합은 비교과(동아리·봉사·독서)와 자소서(성격)가 내신을 조금 끌어올림
+function myGradeFor(kind) {
+  if (kind === '종합') { const n = naesinAvg() ?? 9; return n - Math.min(.8, (S.school.extra || 0) * .04) - (['bold', 'sunny', 'warm'].includes(S.personality) ? .1 : 0); }
+  if (kind === '교과') return naesinAvg() ?? 9;
+  return S.school.sat ? S.school.sat.avg : 9;
+}
+function admitP(uid, did, kind) {
+  const u = UNIV(uid), d = DEPT(did);
+  if (!u || !d || !u.departments.includes(did)) return 0;
+  const cut = (kind === '교과' || kind === '종합' ? u.cut.수시 : u.cut['정시' + kind]) + (d.cut_bonus || 0);
+  const x = myGradeFor(kind) - cut;
+  const p = x <= -.5 ? .92 + Math.min(.03, (-.5 - x) * .03) : x <= 0 ? lerp(.92, .65, (x + .5) / .5) : x <= .5 ? lerp(.65, .35, x / .5) : x <= 1.5 ? lerp(.3, .1, (x - .5)) : Math.max(.01, .05 - (x - 1.5) * .02);
+  return Math.round(clamp(p, .01, .95) * 100) / 100;
+}
+const lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
+// 원서를 쓰는 동안 시간은 멈춤 (S.apply) — 화면이 고르고 submitApply로 냄
+function submitApply(list) {
+  const ap = S.apply;
+  if (!ap) return;
+  list = (list || []).filter(x => x && UNIV(x.u) && DEPT(x.d) && UNIV(x.u).departments.includes(x.d)).slice(0, ap.kind === 'susi' ? 6 : 3);
+  if (ap.kind === 'susi') {
+    S.school.susi = list.map(x => ({ u: x.u, d: x.d, type: x.type === '종합' ? '종합' : '교과', p: admitP(x.u, x.d, x.type === '종합' ? '종합' : '교과') }));
+    log(list.length ? `수시 원서 ${list.length}장을 냈다. ${list.map(x => UNIV(x.u).short).join(', ')}.` : '수시는 넣지 않았다. 정시로 승부한다.', { t: 'info' });
+  } else {
+    const gun = ['가', '나', '다'];
+    S.school.jeongsi = list.map((x, i) => ({ u: x.u, d: x.d, gun: gun[i], p: admitP(x.u, x.d, gun[i]) }));
+    log(list.length ? `정시 원서를 냈다. ${S.school.jeongsi.map(x => `${x.gun}군 ${UNIV(x.u).short} ${DEPT(x.d).name}`).join(' · ')}.` : '정시 원서를 내지 않았다.', { t: 'info' });
+  }
+  S.apply = null;
+  after();
+}
+// 원서 접수 턴: 수시 결과 먼저 → 붙었으면 고르기, 아니면 정시 원서
+function applyTurn() {
+  const susi = S.school.susi || [];
+  if (susi.length && !S.school.susiDone) {
+    S.school.susiDone = true;
+    const passed = susi.filter(x => Math.random() < x.p);
+    log(passed.length ? `수시 발표. ${passed.map(x => `${UNIV(x.u).short} ${DEPT(x.d).name}`).join(', ')} 합격!` : '수시 발표. 모두 불합격이었다.', { t: passed.length ? 'mem' : 'info', memory: !!passed.length });
+    if (passed.length) { S.school.offers = passed; trigger('pickUniv'); return; }
+  }
+  if (!S.flags.student) { S.apply = { kind: 'jeongsi', max: 3 }; log('정시 원서를 쓸 때다. 가·나·다군에 한 장씩.', { t: 'info' }); }
+}
+// 결과 발표 턴: 정시 합격(떨어졌어도 가능성이 남은 곳은 30% 추가 합격) → 고르기 / 전부 떨어지면 재수·취업·전문대
+function resultTurn() {
+  if (S.flags.student) return;
+  const js = S.school.jeongsi || [], passed = [];
+  for (const x of js) {
+    if (Math.random() < x.p) passed.push(x);
+    else if (x.p >= .15 && Math.random() < .3) { passed.push(x); log(`추가합격 통보가 왔다! ${UNIV(x.u).short} ${DEPT(x.d).name}.`, { memory: true }); }
+  }
+  if (js.length) log(passed.length ? `정시 발표. ${passed.map(x => `${UNIV(x.u).short}`).join(', ')} 합격!` : '정시 발표. 불합격...', { t: 'info' });
+  if (passed.length) { S.school.offers = passed; trigger('pickUniv'); }
+  else trigger('retakeChoice');
+}
+// 합격한 곳 중 하나로 (화면에서 큰 로고와 함께)
+function admit(uid, did) {
+  const u = UNIV(uid), d = DEPT(did);
+  if (!u || !d) return;
+  const sc = S.school;
+  sc.univ = uid; sc.dept = did; sc.tier = u.tier; sc.start = S.age + 1;
+  sc.years = d.years || (u.tier === 5 && did !== 'nursing' ? 2 : 4);
+  sc.gpa = 0; sc.gpaN = 0; sc.offers = null;
   S.flags.student = true; delete S.flags.retake;
-}
-function majorOk(m) {
-  const t = D.univTiers.find(x => x.id === S.school.tier);
-  if (!t) return false;
-  if (t.college ? !(m.college || (m.tierMax || 0) >= 6) : (m.college || (m.tierMax || 0) < t.id)) return false;
-  if (m.need) for (const k in m.need) if (S.school.subj[k] < m.need[k]) return false;
-  if (m.needAb) for (const k in m.needAb) if (S.stats[k] < gradeMin(m.needAb[k])) return false;
-  return true;
-}
-function setMajor(id) {
-  const m = D.majors.find(x => x.id === id);
-  S.school.major = id;
-  if (m && m.years) S.school.years = m.years;
+  S.report = { title: '합격', admit: { u: uid, d: did }, rows: [], note: `${u.name} ${d.name} 합격!` };
 }
 function graduate() {
-  const t = D.univTiers.find(x => x.id === S.school.tier);
-  S.school.degree = t && t.college ? 'associate' : 'bachelor';
+  S.school.degree = (S.school.tier || 0) >= 5 ? 'associate' : 'bachelor';
   if (S.school.degree === 'bachelor') S.flags.degree = true;
   S.flags.anyDegree = true;
   delete S.flags.student;
 }
-const univLabel = () => { const t = D.univTiers.find(x => x.id === S.school.tier); return t ? t.label : null; };
-const majorLabel = () => { const m = D.majors.find(x => x.id === S.school.major); return m ? m.label : null; };
+const univLabel = () => { const u = UNIV(S.school.univ); return u ? u.name : null; };
+const majorLabel = () => { const d = DEPT(S.school.dept); return d ? d.name : null; };
+// 학교 턴 종류마다
+function schoolTurn(k) {
+  if (k === 'class') classTurn();
+  else if (k === 'mid' || k === 'final') examTurn(k);
+  else if (k === 'mock') mockTurn();
+  else if (k === 'csat') trigger('csatEve');
+  else if (k === 'apply') applyTurn();
+  else if (k === 'result') resultTurn();
+  else if (k === 'vac' && turnKind(S.turn - 1) !== 'vac') log(S.date.m >= 6 && S.date.m <= 8 ? '여름방학이 시작됐다.' : '겨울방학이 시작됐다.', { t: 'info', deltas: applyEffect({ happy: 2 }) });
+  // 고3 1학기, 6월 모의고사 뒤 첫 자유 턴: 수시 원서
+  if (k === 'free' && S.age === 18 && S.turn < schedule()[0].length && S.turn > 8 && !S.school.susi && !S.flags.student) { S.apply = { kind: 'susi', max: 6 }; log('수시 원서를 쓸 때다. 내신으로 6장까지.', { t: 'info' }); }
+}
 
 /* ═════════ 형제 ═════════ */
 function sibRole(sib, older, sg) {
@@ -1389,12 +1484,10 @@ function yearly() {
   syncMyBody();
   if (st.happy > 65) st.happy--; else if (st.happy < 40) st.happy++;
 
-  // 중학교 입학: 그동안 쌓은 지능이 과목 실력의 바탕
-  if (a === D.schoolStart) SUBJ.forEach(k => { S.school.subj[k] = clamp(Math.round(st.smart / 2) + rand(5, 15), 0, 100); });
-  // 학교: 안 쓰면 잊어버림 / 대학 학점
-  if (a >= D.schoolStart + 1 && a <= 18) SUBJ.forEach(k => subjAdd(k, -rand(0, 1)));
+  // 대학 학점: 공부한 만큼 + 지능 + 학과와 맞는 능력치
   if (S.flags.student && S.school.start != null && a > S.school.start) {
-    const y = clamp(1.8 + Math.min(S.school.studyYear, 6) * .3 + gIdx(st.smart) * .12 + rand(-3, 3) / 10, 1, 4.5);
+    const d = DEPT(S.school.dept), fit = d && d.stat ? gIdx(st[d.stat]) * .06 : 0;
+    const y = clamp(1.8 + Math.min(S.school.studyYear, 6) * .3 + gIdx(st.smart) * .1 + fit + rand(-3, 3) / 10, 1, 4.5);
     S.school.gpa = (S.school.gpa * S.school.gpaN + y) / (S.school.gpaN + 1);
     S.school.gpaN++;
   }
@@ -1473,7 +1566,7 @@ function after() {
   // 단계가 바뀌면(예: 재수하다 대학에 붙음) 그 단계로 시작
   if (!S.ended && S.date) { const ph = phase(); if (S.ph !== ph) { const was = S.ph; S.ph = ph; if (was) beginPhase(); } }
   // 학교: 자유·방학 턴의 행동을 다 쓰면 다음 턴으로 / 어른: 18칸을 다 쓰면 쓰러지듯 잠듦
-  if (!S.ended && !S.pending.length && !S.report) {
+  if (!S.ended && !S.pending.length && !S.report && !S.apply) {
     const ph = phase();
     if ((ph === 'ms' || ph === 'hs') && S.ap <= 0 && TURN_AP[S.tkind]) { nextTurn(); return; }
     if (ph === 'adult' && S.ap <= 0) { log('더는 버틸 수 없어 그대로 잠들었다.', { t: 'info' }); endDay(false); }
@@ -1487,6 +1580,12 @@ function advanceYear() {
   S.drunk = 0;
   S.log.push({ n: ++S.seq, t: 'year', age: S.age });
   if (S.age === 13) settleChildhood();
+  // 고등학교 때 사귄 사이: 스무 살을 앞두고 이어지거나(친밀 50+) 흐지부지
+  if (S.age === 19) for (const p of alive().filter(x => x.teenLove)) {
+    p.teenLove = false;
+    if (p.close >= 50 && canRomance(p) && !mainPartner()) { startRelation(p, false); p.heart = Math.max(p.heart, 50); log(`졸업하고도 ${josa(pname(p), '와')}는 계속 만나기로 했다.`, { memory: true }); }
+    else log(`${josa(pname(p), '와')}는 졸업과 함께 자연스럽게 멀어졌다.`, { t: 'info' });
+  }
   yearly();
 }
 // 13살: 어린 시절 선택들이 기운 쪽으로 성격·가치관이 굳어짐 (처음 고른 쪽은 3점에서 시작)
@@ -1498,7 +1597,7 @@ function settleChildhood() {
 }
 
 /* ═════════ 행동 ═════════ */
-const busy = () => !!S.ended || S.pending.length > 0 || !!S.report;
+const busy = () => !!S.ended || S.pending.length > 0 || !!S.report || !!S.apply;
 // 행동력 쓰기 (어른은 시계가 1.5시간씩 감)
 function spend(n = 1) { S.ap -= n; S.used = (S.used || 0) + n; updateTime(); if (phase() !== 'adult') libidoTick(); }
 const apOf = a => phase() === 'adult' ? (a.ap || 1) : 1;
@@ -1508,10 +1607,12 @@ function actionList() {
   if (jailed()) return D.jailActions;
   const pl = PLACES[S.place];
   if (!pl) return [];
-  return pl.actions.map(id => ACTIONS[id]).filter(a => a && S.age >= a.minAge && meets(a.req) && (!a.if || a.if(S)) && !(a.id === 'parttime' && S.flags.inArmy));
+  return pl.actions.map(id => ACTIONS[id]).filter(a => a && S.age >= a.minAge && (a.maxAge == null || S.age <= a.maxAge) && meets(a.req) && (!a.if || a.if(S)) && !(a.id === 'parttime' && S.flags.inArmy));
 }
 function canDo(a) { return !busy() && S.ap >= apOf(a) && !dutyPending() && (!costOf(a) || S.money >= costOf(a)); }
 const needsSubject = a => a.id === 'study' && inSchool();
+// 공부할 과목 고르기 화면용: 지금 과목들의 예상 점수
+const studyInfo = () => subjectsNow().map(id => ({ id, label: SUB(id).label, exp: Math.round(expScore(id)), prep: Math.round((S.school.prep || {})[id] || 0) }));
 function doAction(id, subj) {
   const a = actionList().find(x => x.id === id);
   if (!a || !canDo(a)) return;
@@ -1519,10 +1620,10 @@ function doAction(id, subj) {
   const gk = gainK();
   if (a.id === 'study') {
     const deltas = applyEffect(a.effect, gk);
-    if (inSchool()) {
-      const list = subj && SUBJ.includes(subj) ? [subj] : SUBJ;
-      const per = list.length > 1 ? 3 : 7;
-      list.forEach(k => { const g = subjGain(k, rand(per - 1, per + 1) * gk * 2); deltas.push([D.subjects.find(x => x.id === k).label, g]); });
+    if (inSchool()) {   // 다음 시험 보정: 골고루면 과목마다 3~5, 한 과목이면 8~10. 고등학교 공부 횟수는 수능에도
+      const L = subjectsNow(), list = subj && L.includes(subj) ? [subj] : L;
+      list.forEach(k => { const g = list.length > 1 ? rand(3, 5) : rand(8, 10); addPrep(k, g); deltas.push([SUB(k).label, g]); });
+      if (phase() === 'hs') S.school.studyN = (S.school.studyN || 0) + 1;
     }
     if (S.flags.student) S.school.studyYear += gk;
     log(fill(textOf(a.text)), { deltas });
@@ -1543,7 +1644,8 @@ function doAction(id, subj) {
   const deltas = libidoDelta(a.libido, null).concat(applyEffect(a.effect, gk));
   const c = costOf(a);
   if (c) deltas.push(...applyEffect({ money: -c }));
-  if (a.subjAll && inSchool()) SUBJ.forEach(k => { const g = subjGain(k, val(a.subjAll) * gk * 2); deltas.push([D.subjects.find(x => x.id === k).label, g]); });
+  if (a.subjAll && inSchool()) { const g = val(a.subjAll); subjectsNow().forEach(k => addPrep(k, g)); deltas.push(['모든 과목', g]); if (phase() === 'hs') S.school.studyN = (S.school.studyN || 0) + .5; }
+  if (a.extra && inSchool()) S.school.extra = (S.school.extra || 0) + val(a.extra);   // 비교과: 동아리·봉사·독서 (수시 종합)
   addKarma(a.karma);
   log(fill(textOf(a.text)), { deltas, memory: a.memoryChance ? Math.random() < a.memoryChance : false });
   maybeRandom([a.id, S.place]);
@@ -1734,8 +1836,8 @@ function jobChecks(j) {
   const r = j.req || {}, out = [];
   if (r.degree === true) out.push([S.school.degree === 'bachelor', '4년제 졸업']);
   if (r.degree === 'any') out.push([!!S.school.degree, '대학 졸업']);
-  if (r.tier) out.push([S.school.degree === 'bachelor' && S.school.tier <= r.tier, `${D.univTiers[r.tier - 1].label} 이상`]);
-  if (r.major) out.push([r.major.includes(S.school.major), `${r.major.map(m => (D.majors.find(x => x.id === m) || {}).label || m).join('/')} 전공`]);
+  if (r.tier) out.push([S.school.degree === 'bachelor' && S.school.tier <= r.tier, `${D.tierLabel[r.tier]} 대학 이상`]);
+  if (r.major) out.push([r.major.includes(S.school.dept), `${r.major.map(m => (DEPT(m) || {}).name || m).join('/')}`]);
   if (r.gpa) out.push([S.school.gpa >= r.gpa, `학점 ${r.gpa}+`]);
   for (const k of ABIL) if (r[k]) out.push([S.stats[k] >= gradeMin(r[k]), `${LABEL[k]} ${r[k]}+`]);
   if (j.clean) out.push([S.record === 0, '전과 없음']);
@@ -1746,7 +1848,7 @@ const canJobHunt = () => !busy() && S.ap > 0 && !dutyPending() && S.age >= 19 &&
 const jobInfo = () => D.jobs.map(j => Object.assign({}, j, { ok: meetsJob(j), checks: jobChecks(j) }));
 function jobOdds(j) {
   let o = j.odds ?? .7;
-  if (j.major && j.major.includes(S.school.major)) o += .15;   // 관련 전공이면 유리
+  if (j.major && j.major.includes(S.school.dept)) o += .15;   // 관련 학과면 유리
   if (S.record) o *= .5;
   return clamp(o, .05, .95);
 }
@@ -1931,11 +2033,15 @@ const api = {
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,
-  subjAvg, subjAll, subjAdd, takeSuneung, admitChance, reachable, chanceText, admit, majorOk, setMajor, graduate,
+  subjAvg, subjAll, subjAdd, takeCSAT, admit, graduate, admitP, univ: UNIV, dept: DEPT, naesinAvg, mockAvg,
+  chooseTrack: id => { const t = D.tracks.find(x => x.id === id); if (t) { S.school.track = t.id; S.school.electives = t.electives.slice(); } },
   addSibling,
 };
 
 /* ═════════ 새 인생 / 저장 ═════════ */
+// 학교 기록: 계열·선택 과목, 다음 시험 보정(prep·bonus), 성적표, 내신, 모의고사, 수능, 원서, 대학·학과·학점, 비교과
+const newSchool = () => ({ track: null, electives: [], prep: {}, bonus: {}, exams: [], naesin: [], mocks: [], mock: null, sat: null, susi: null, susiDone: false, jeongsi: null, offers: null,
+  univ: null, dept: null, tier: null, start: null, years: null, gpa: 0, gpaN: 0, studyYear: 0, studyN: 0, extra: 0, degree: null, club: null });
 const labelOf = (list, id) => (list.find(x => x.id === id) || {}).label || '';
 function newLife(opt = {}) {
   const gender = opt.gender === 'm' || opt.gender === 'f' ? opt.gender : (Math.random() < .5 ? 'm' : 'f');
@@ -1954,7 +2060,7 @@ function newLife(opt = {}) {
     sibling: sib.id,
     month: clamp(+opt.month || rand(1, 12), 1, 12),
     stats: { happy: rand(60, 80), health: rand(65, 90), libido: 0, smart: rand(5, 20), fit: rand(5, 20), face: gradeValue(pickKey(tr.face || D.faceStart)), style: rand(0, 10), charm: rand(5, 20), art: rand(5, 20), craft: rand(5, 20) },
-    school: { subj: { kor: 0, math: 0, eng: 0, sci: 0 }, naesin: [], mock: null, sat: null, tier: null, major: null, start: null, years: null, gpa: 0, gpaN: 0, studyYear: 0, degree: null },
+    school: newSchool(),
     karma: 0, heat: 0, record: 0, crimes: 0, jail: 0, rank: 0, perf: 0, preg: null,
     sexSkill: 0, penis: gender === 'm' ? rollPenis() : null, drunk: 0, scene: null, lust: {}, lustTop: null,
     flags: {}, vars: {}, done: {}, last: {},
@@ -2013,6 +2119,15 @@ function patch(s) {
   for (const x of [s, ...s.people]) {
     if (x.gender === 'm' && x.penis == null) x.penis = cmFromSize(x.size);
     delete x.size;
+  }
+  // 예전 학교 기록 → SCHOOL.md 형식 (전공 → 학과, 대학 등급 → 대학)
+  if (!s.school.exams) {
+    const o = s.school, n = newSchool();
+    n.naesin = o.naesin || []; n.sat = o.sat ? { avg: o.sat.avg, rows: [] } : null; n.mocks = o.mock ? [o.mock.avg] : [];
+    if (o.tier) { n.univ = D.oldTier[o.tier] || 'UNI7'; n.tier = UNIV(n.univ).tier; }
+    if (o.major) n.dept = D.oldMajor[o.major] || 'business';
+    for (const k of ['start', 'years', 'gpa', 'gpaN', 'studyYear', 'degree']) if (o[k] != null) n[k] = o[k];
+    s.school = n;
   }
   // 1년 10행동 → 달력 (GAMEFLOW): 지금 계절의 첫날로 옮기고 단계에 맞게 시작
   if (!s.date) {
@@ -2111,7 +2226,9 @@ window.Game = {
   crimes: () => D.crimes.filter(c => S.age >= c.minAge && meets(c.req)), canCrime, crimeOdds, commitCrime,
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,
   roleText, karmaLabel, trait, job, mainPartner, season, fmtMoney, josa,
-  gradeInfo, abilities: ABIL, conds: COND, subjects: D.subjects, naesinAvg, univLabel, majorLabel,
+  gradeInfo, abilities: ABIL, conds: COND, subjects: D.subjects, naesinAvg, mockAvg, univLabel, majorLabel, studyInfo, subjectsNow: () => subjectsNow().map(SUB),
+  // 학교 화면: 성적표 확인, 원서 (대학·학과 목록, 합격 확률, 내기)
+  ackReport: () => { S.report = null; after(); }, universities: D.universities, departments: D.departments, tracks: D.tracks, tierLabel: t => D.tierLabel[t], admitP, submitApply, gradeLabel: () => gradeLabel(),
   creation: { traits: D.traits, personalities: D.personalities, wealth: D.wealth, hobbies: D.hobbies, values: D.values, dreams: D.dreams, siblings: D.siblings },
   LABEL, config: C, seasons: SEASONS,
   // 개발·테스트용 (브라우저 콘솔이나 헤드리스 검사에서 이벤트를 직접 터뜨려볼 때)

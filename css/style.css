@@ -286,3 +286,28 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 /* 저장 칸 */
 .slot-btns{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
 .slot-btns button{padding:5px 9px;font-size:12.5px}
+
+/* 성적표·합격·원서 (SCHOOL.md) */
+.rc-t{margin:0 0 8px;font-weight:700}
+.rc{width:100%;border-collapse:collapse;font-size:13.5px}
+.rc th,.rc td{padding:5px 6px;border-bottom:1px dashed var(--line,rgba(255,255,255,.15));text-align:center}
+.rc th{font-size:12px;color:var(--text-dim);font-weight:400}
+.rc td:first-child{text-align:left}
+.gr{font-weight:700}.gr1,.gr2{color:#7fd6a0}.gr3,.gr4{color:#9cc7ff}.gr5,.gr6{color:var(--text)}.gr7,.gr8,.gr9{color:var(--minus)}
+.rc-avg{margin:10px 0 2px;font-size:14px;text-align:right}
+.rc-note{margin:4px 0 0;text-align:right;font-size:13px}
+.admit{display:grid;justify-items:center;gap:8px;text-align:center;padding:6px 0}
+.admit-t{margin:0;font-size:16px;line-height:1.5}
+.admit .ulogo{filter:drop-shadow(0 4px 10px rgba(0,0,0,.35));animation:admitPop .7s cubic-bezier(.2,1.6,.4,1)}
+@keyframes admitPop{from{transform:scale(.3) rotate(-12deg);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.admit .ulogo{animation:none}}
+.ap{display:grid;gap:7px;margin:8px 0}
+.ap-row{display:grid;grid-template-columns:auto 28px 1fr 1fr auto;gap:5px;align-items:center;font-size:12.5px}
+.ap-row:has(select[data-f=type]){grid-template-columns:auto 28px 1fr 1fr auto}
+.ap-row select{min-width:0;padding:5px 4px;font:inherit;font-size:12.5px;background:var(--btn,#222);color:var(--text);border:1px solid var(--line,#555);border-radius:6px}
+.ap-row .ap-p{grid-column:3/-1;font-size:12px;color:var(--text-dim)}
+.ap-p.ok{color:#7fd6a0}.ap-p.mid{color:#e8c46a}.ap-p.low{color:var(--minus)}
+.ap-k{font-weight:700;min-width:26px}
+.ap-nologo{display:inline-block;width:28px;height:28px}
+.ap-add{width:100%;padding:6px;font-size:12.5px}
+.me-uni{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13.5px}

@@ -56,7 +56,7 @@ GAME_DATA.places = [
     regulars: ['classmate'], regularsN: [1, 3], crowd: 'peer', kind: 'classmate',
     doing: ['엎드려 자고 있다', '친구들과 떠들고 있다', '창밖을 멍하니 보고 있다', '숙제를 베끼고 있다', '매점 빵을 먹고 있다', '교과서 귀퉁이에 낙서를 하고 있다', '복도를 뛰어가고 있다'],
     arrive: s => s.age < 13 ? ['교문 앞에서 실내화 주머니를 흔들었다.', '교실에 들어서자 떠드는 소리가 쏟아졌다.'] : ['교실 문을 열었다. 다들 엎드려 있었다.', '1교시 종이 울리기 직전에 도착했다.', '교복 넥타이를 대충 매고 등교했다.'],
-    actions: ['study', 'exercise', 'read'] },
+    actions: ['study', 'club', 'exercise', 'read'] },
 
   { id: 'academy', ms: true, label: '학원', icon: '📝', minAge: 7, maxAge: 18, routine: true,
     regulars: ['friend', 'classmate'], crowd: 'peer',
