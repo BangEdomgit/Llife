@@ -204,12 +204,12 @@ function morningCard(sc, p) {
   return `<p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
     <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
-// 그날 밤: 달빛 드는 방의 침대. 이불이 점점 빠르게 들썩이다 두 번 크게 들썩이고 멈춤, 하트가 피어오름. 행위 자체는 그리지 않음
-// 이불 윗선은 용수철로 이어진 점들(천 시뮬레이션). 이불 아래 두 사람 윤곽(머리·몸통·엉덩이·다리·발)이 쉬는 모양
+// 그날 밤: 달빛 드는 방의 침대. 이불 속 두 사람은 보이지 않는 더미(캡슐 몸통)이고, 무거운 이불이 중력으로 그 위에 얹혀 함께 출렁임
+// 박자: 점점 빨라짐 → 세게 두 번 → 세게 누른 채 떨림 두 번 → 축 늘어짐. 행위 자체는 그리지 않음
+// 상대 만족감이 높을수록 하트가 많이 터짐. 50 아래면 하트 없이 짧게 흔들리다 실망(말풍선 …, 깨진 하트)
+// 주소에 ?dummy 를 붙이면 이불을 반투명하게 하고 더미를 보여줌 (실험용)
 const HEART = 'M0,5 C-7,0 -6,-6 -2.5,-6 C-1,-6 0,-5 0,-4 C0,-5 1,-6 2.5,-6 C6,-6 7,0 0,5 Z';
-const QX = Array.from({ length: 28 }, (_, i) => 70 + 214 * i / 27);
-const QREST = QX.map(x => 127 - 5 * Math.log([[100, 15, 14], [152, 21, 36], [192, 26, 26], [180, 14, 78], [240, 12, 30], [271, 11, 10]]
-  .reduce((sum, [c, h, w]) => sum + Math.exp(h * Math.exp(-(((x - c) / w) ** 2)) / 5), 0) - 5));
+const CX = Array.from({ length: 44 }, (_, i) => 68 + 216 * i / 43);   // 이불 윗선 점들의 x
 const FOLDS = [[112, -4, .8], [146, 3, 1], [176, -3, .7], [212, 4, 1], [250, -2, .8]];
 const NIGHT = `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
   <linearGradient id="ntWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#161c33"/><stop offset="1" stop-color="#0d1120"/></linearGradient>
@@ -249,86 +249,215 @@ const NIGHT = `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
     <path class="nt-q" fill="url(#ntQuilt)"/><path class="nt-st" fill="none" stroke="#efdcf5" stroke-width=".9" stroke-dasharray="2.2 2.6" opacity=".45"/>
     <g fill="none" stroke-linecap="round">${FOLDS.map(([, , o]) => `<path class="nt-f" stroke="#5c3f70" stroke-width="2.2" opacity="${.26 * o}"/><path class="nt-f" stroke="#f1e0f7" stroke-width="1.1" opacity="${.18 * o}"/>`).join('')}</g>
     <path class="nt-hem" fill="none" stroke="#5a3e6e" stroke-width="2.2" opacity=".55"/><path class="nt-rim" fill="none" stroke="#f3e6f8" stroke-width="1.3" stroke-linecap="round" opacity=".6"/>
+    <g class="nt-dummy" stroke-linecap="round" opacity=".6"></g>
   </g>
   <ellipse class="nt-warm" cx="182" cy="116" rx="122" ry="54" fill="url(#ntWarm)" opacity="0"/>
   <path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>
-  <g class="nt-hearts"></g>
+  <g class="nt-hearts"></g><g class="nt-fx"></g>
 </g></svg>`;
-let nightRaf = 0;
-function runNight(svg, done) {
-  const q = c => svg.querySelector(c), f = v => v.toFixed(1);
-  const cam = q('.nt-cam'), bed = q('.nt-bed'), quilt = q('.nt-q'), stitch = q('.nt-st'), hemEl = q('.nt-hem'), rim = q('.nt-rim'), warm = q('.nt-warm'), heartsEl = q('.nt-hearts');
-  const folds = svg.querySelectorAll('.nt-f'), n = QX.length, u = new Float64Array(n), v = new Float64Array(n), DT = 1 / 240;
-  // 박자: 점점 빨라지고 세짐 → 잠깐 멈칫 → 크게 두 번 → 멈춤
-  const beats = [];
-  let bt = .35, iv = .58;
-  while (bt < 3.5) { beats.push({ t: bt, a: .5 + .75 * Math.min(1, bt / 3.3) ** 1.3, iv, k: bt / 3.5 }); bt += iv; iv = Math.max(.18, iv * .86); }
-  const s1 = bt + .3, s2 = s1 + .62, END = s2 + 1.5;
-  beats.push({ t: s1, a: 3.3, iv: .6, strong: true }, { t: s2, a: 3.9, iv: .6, strong: true });
-  // 한 박자 = 엉덩이 쪽을 들어 올리는 힘 + 조금 늦게 몸통 쪽
-  const pushes = beats.flatMap(b => [{ t: b.t, x: 190 + (Math.random() - .5) * 8, w: 30, m: b.a, b }, { t: b.t + .3 * b.iv, x: 150, w: 34, m: .4 * b.a }]).sort((x, y) => x.t - y.t);
-  const hearts = [];
-  let t = 0, pi = 0, jolt = 0, joltV = 0, heat = 0, shakeAt = -9, finale = false, acc = 0, last = 0;
-  const at = (arr, x) => { const k = Math.max(0, Math.min(n - 1.001, (x - QX[0]) / (QX[n - 1] - QX[0]) * (n - 1))), i = Math.floor(k); return arr[i] + (arr[i + 1] - arr[i]) * (k - i); };
-  const hemY = x => 150 + .9 * Math.sin(x * .13 + .6) + FOLDS.reduce((d, [c, lean]) => d + 1.6 * Math.exp(-(((x - c - lean) / 6) ** 2)), 0) + .35 * at(u, x);
-  function heart(x, y, o = {}) {
-    const el = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+// 더미 자세 → 캡슐 [ax, ay, bx, by, 반지름]
+//   d: 위 사람 엉덩이 앞뒤 (+ 뒤로 뺌 / − 밀어 넣음), up: 더 들림, tr: 떨림, slump: 축 늘어짐 0~1, sink: 매트리스 눌림, bs: 아래 사람이 머리 쪽으로 밀린 거리
+function dummies(d, up, tr, slump, sink, bs) {
+  const hx = 178 + .8 * d, hy = 104 - .6 * d - up + tr + 5 * slump + sink;
+  const sx = 120 + .2 * d, sy = 100 - .22 * d + 6 * slump + sink * .6;
+  const k = sink * .5;
+  return [
+    [86 + bs, 112 + k, 86 + bs, 112 + k, 8.5], [99 + bs, 119.5 + k, 146 + bs, 120 + sink, 8.5], [146 + bs, 121 + sink, 164 + bs, 121 + sink, 8],
+    [164 + bs, 121 + sink, 194, 107 + k, 6.2], [194, 107 + k, 212, 125, 5.2],                                    // 아래 사람: 머리·몸통·골반·세운 다리
+    [sx - 12, sy - 3 + 2 * slump, sx - 12, sy - 3 + 2 * slump, 8.5], [sx, sy, hx, hy, 10], [sx - 2, sy + 2, 112, 122, 4.2],
+    [hx, hy, 206, 123, 7.5], [206, 123, 250, 125, 5.5],                                                            // 위 사람: 머리·몸통·짚은 팔·꿇은 다리
+  ];
+}
+const PILLOW = [62, 122, 98, 122, 6];
+// 캡슐 윗면의 y (x에서). 없으면 Infinity
+function capTop([ax, ay, bx, by, r], x) {
+  let top = Infinity;
+  for (const [px, py] of [[ax, ay], [bx, by]]) { const dx = x - px; if (dx * dx < r * r) top = Math.min(top, py - Math.sqrt(r * r - dx * dx)); }
+  const vx = bx - ax, vy = by - ay, l = Math.hypot(vx, vy);
+  if (l > .01) {
+    let nx = -vy / l, ny = vx / l;
+    if (ny > 0) { nx = -nx; ny = -ny; }
+    const x0 = ax + nx * r, x1 = bx + nx * r;
+    if (Math.abs(x1 - x0) > .01 && x >= Math.min(x0, x1) && x <= Math.max(x0, x1)) top = Math.min(top, ay + ny * r + (x - x0) * vy / (x1 - x0));
+  }
+  return top;
+}
+// 박자표: { t0, T, A(세기), kind: n 보통 | strong 세게 | final 누른 채 떨림 }
+// 한 박자 = (세게·마지막이면) 크게 뺐다가 wu → 밀어 넣기 sl(끝이 부딪힘 hit) → (마지막이면) 누른 채 떨림 → 다음 박자 시작점(to)으로
+function nightPlan(tier) {
+  const S = [], good = tier >= 2, rampEnd = good ? 3.1 : tier === 1 ? 2.5 : 1.8;
+  let t = .3;
+  const add = (T, A, kind = 'n') => { S.push({ t0: t, T, A, kind }); t += T; };
+  for (let T = .62; t < rampEnd; T = Math.max(good ? .2 : .32, T * .87)) add(T, good ? 3.5 + 3.5 * t / rampEnd : 2.6 + 1.2 * t / rampEnd);
+  if (good) { add(.66, 10, 'strong'); add(.66, 11, 'strong'); add(.95, 12, 'final'); add(.9, 12.5, 'final'); }
+  else if (tier === 1) { add(.6, 6, 'strong'); add(.48, 5, 'final'); }
+  else add(.44, 4.2, 'final');
+  S.forEach((s, k) => {
+    const nx = S[k + 1];
+    s.wu = s.kind === 'n' ? 0 : s.kind === 'strong' ? .2 : .22;
+    s.sl = s.kind === 'n' ? s.T * .3 : .12;
+    s.hit = s.t0 + s.wu + s.sl;
+    s.to = !nx || s.kind === 'final' ? -s.A + 3 : nx.kind === 'n' ? nx.A : 2;
+    s.from = k ? S[k - 1].to : 0;
+  });
+  return { S, end: t };
+}
+const ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+let nightRaf = 0, nightJob = null;
+function runNight(svg, job, done) {
+  const q = c => svg.querySelector(c), f = v => v.toFixed(1), NS = 'http://www.w3.org/2000/svg';
+  const cam = q('.nt-cam'), bed = q('.nt-bed'), quilt = q('.nt-q'), stitch = q('.nt-st'), hemEl = q('.nt-hem'), rim = q('.nt-rim'), warm = q('.nt-warm');
+  const heartsEl = q('.nt-hearts'), fx = q('.nt-fx'), dummyEl = q('.nt-dummy'), face = svg.parentNode.querySelector('.nt-face'), folds = svg.querySelectorAll('.nt-f');
+  const { sc, p } = job, tier = Math.max(0, Math.min(4, [30, 50, 70, 90].filter(v => (sc.sat ?? 50) >= v).length)), good = tier >= 2;
+  const debug = /[?&#]dummy/.test(location.href);
+  const { S, end } = nightPlan(tier), SLUMP = .7, END = end + SLUMP + (good ? 1.9 : 2.3);
+  const HB = [null, null, { n: .5, strong: 3, fount: 6 }, { n: 1.4, strong: 6, fount: 12 }, { n: 2.4, strong: 9, fount: 20, ring: 10 }][tier];
+  const n = CX.length, y = new Float64Array(n), v = new Float64Array(n), surf = new Float64Array(n), sv = new Float64Array(n), rest = new Float64Array(n), hemL = new Float64Array(n), DT = 1 / 240;
+  let t = 0, si = 0, hi = 0, sink = 0, sinkV = 0, bs = 0, bsV = 0, jy = 0, jyV = 0, jx = 0, jxV = 0, heat = 0, shakeAt = -9, shakeK = 0, buzz = 0, fount = 0;
+  let pose = dummies(0, 0, 0, 0, 0, 0), dEnd = null, faceKey = '', finale = false, acc = 0, last = 0;
+  // 위 사람 엉덩이 위치 d, 추가 들림 up, 떨림 tr
+  function drive() {
+    while (si < S.length - 1 && t >= S[si].t0 + S[si].T) si++;
+    const s = S[si];
+    if (t >= end) {
+      if (dEnd == null) dEnd = drive.last;
+      const u = Math.min(1, (t - end) / SLUMP);
+      return [dEnd + (-2 - dEnd) * ease(u), 0, 0, ease(u)];
+    }
+    if (t < s.t0) return [0, 0, 0, 0];
+    const tau = t - s.t0, rel = s.t0 + s.T - (s.kind === 'final' ? .14 : 0);
+    let d, up = 0, tr = 0;
+    if (tau < s.wu) d = s.from + (s.A - s.from) * ease(tau / s.wu);
+    else if (tau < s.wu + s.sl) { const st = s.wu ? s.A : s.from; d = st + (-s.A - st) * ((tau - s.wu) / s.sl) ** 2.2; }
+    else if (s.kind === 'final') {
+      // 세게 누른 채 부들부들 떨림, 끝에 살짝 풀림
+      const u = t - s.hit, env = (1 - Math.exp(-u * 30)) * (good ? 1 : .35) * (t > rel ? 1 - (t - rel) / .14 : 1);
+      tr = env * .8 * Math.sin(6.283 * 15 * u);
+      d = -s.A + env * (1.3 * Math.sin(6.283 * 12 * u) + .6 * Math.sin(6.283 * 19 * u)) + (t > rel ? 3 * ease((t - rel) / .14) : 0);
+      buzz = env;
+    } else d = -s.A + (s.to + s.A) * ease((t - s.hit) / (s.t0 + s.T - s.hit));
+    if (d > 0) up = (s.kind === 'n' ? .15 : .35) * d;
+    drive.last = d;
+    return [d, up, tr, 0];
+  }
+  drive.last = 0;
+  function surface(i) {
+    const x = CX[i];
+    let top = Math.min(129, capTop(PILLOW, x));
+    for (const c of pose) top = Math.min(top, capTop(c, x));
+    return top - 3.2;
+  }
+  function heart(x, y0, o = {}) {
+    const el = document.createElementNS(NS, 'use');
     el.setAttribute('href', '#ntH');
     heartsEl.appendChild(el);
-    hearts.push({ el, t0: t, x, y, life: o.life || 1.7 + Math.random() * .6, rise: o.rise || 40 + Math.random() * 22, sway: (Math.random() < .5 ? -1 : 1) * (3 + Math.random() * 4), fq: .8 + Math.random() * .5, ph: Math.random() * 6.3, s: o.s || .7 + Math.random() * .35, big: !!o.big });
+    hearts.push({ el, t0: t, x, y: y0, life: o.life || 1.6 + Math.random() * .7, dx: o.dx || 0, dy: o.dy ?? -(40 + Math.random() * 26), sway: o.dx ? 0 : (Math.random() < .5 ? -1 : 1) * (3 + Math.random() * 4), fq: .8 + Math.random() * .5, ph: Math.random() * 6.3, s: o.s || .65 + Math.random() * .4, big: !!o.big });
+  }
+  const hearts = [];
+  const at = (arr, x) => { const k = Math.max(0, Math.min(n - 1.001, (x - CX[0]) / (CX[n - 1] - CX[0]) * (n - 1))), i = Math.floor(k); return arr[i] + (arr[i + 1] - arr[i]) * (k - i); };
+  const burstAt = (cnt, o) => { for (let j = 0; j < cnt; j++) { const x = 150 + Math.random() * 70; heart(x, at(y, x) - 6, typeof o === 'function' ? o(j) : o); } };
+  function impact(s) {
+    const str = s.kind === 'final' ? 2.2 : s.kind === 'strong' ? 1.7 : s.A / 6.5;
+    sinkV += 34 * str; bsV -= 16 * str;
+    if (s.kind !== 'n') { jyV += 22 * str; jxV -= 9 * str; shakeAt = t; shakeK = str; }
+    heat = Math.max(heat, good ? Math.min(1, .3 + .3 * str) : .12);
+    if (!HB) return;
+    if (s.kind === 'n') { const k = (s.t0 / end) * .6 + .4, m = HB.n * k; burstAt(Math.floor(m) + (Math.random() < m % 1 ? 1 : 0), {}); }
+    else burstAt(HB.strong, () => ({ s: .95 + Math.random() * .45, dy: -(60 + Math.random() * 26) }));
+    if (s.kind === 'final' && HB.ring) for (let j = 0; j < HB.ring; j++) { const a = Math.PI * (1.05 + .9 * j / (HB.ring - 1)), r = 46 + Math.random() * 16, hx = pose[6][2]; heart(hx, at(y, hx) - 4, { dx: Math.cos(a) * r, dy: Math.sin(a) * r * .8 - 10, s: .8 + Math.random() * .3, life: 1.3 }); }
+  }
+  // 실망: 말풍선(…), 만족감이 아주 낮으면 깨진 하트
+  function letdown() {
+    const g = document.createElementNS(NS, 'g');
+    g.innerHTML = `<g transform="translate(64,24)"><g class="nt-bub"><path d="M6,0 H38 A6,6 0 0 1 44,6 V16 A6,6 0 0 1 38,22 H6 A6,6 0 0 1 0,16 V14 L-7,10.5 L0,8 V6 A6,6 0 0 1 6,0 Z" fill="#f2eee6"/>${[13, 22, 31].map((x, j) => `<circle class="nt-dot" cx="${x}" cy="11" r="2" fill="#6b6478" style="animation-delay:${.35 + j * .3}s"/>`).join('')}</g></g>` +
+      (tier === 0 ? `<g transform="translate(196,70) scale(2.2)"><g class="nt-broke"><path class="l" d="M0,5 C-7,0 -6,-6 -2.5,-6 C-1,-6 0,-5 0,-4 L-1.2,-1.6 L1,.4 L-.9,2.6 Z" fill="#a39bb3"/><path class="r" d="M0,-4 C0,-5 1,-6 2.5,-6 C6,-6 7,0 0,5 L-.9,2.6 L1,.4 L-1.2,-1.6 Z" fill="#a39bb3"/></g></g>` : '');
+    fx.appendChild(g);
   }
   function step() {
     t += DT;
-    while (pi < pushes.length && pushes[pi].t <= t) {
-      const p = pushes[pi++];
-      for (let i = 1; i < n - 1; i++) v[i] -= 110 * p.m * Math.exp(-(((QX[i] - p.x) / p.w) ** 2));
-      if (!p.b) continue;
-      const hx = () => 150 + Math.random() * 64;
-      if (p.b.strong) {
-        joltV += 60; shakeAt = t; heat = 1;
-        for (let j = 0; j < 5; j++) { const x = hx(); heart(x, at(QREST, x) - 8, { s: 1 + Math.random() * .4, rise: 62 + Math.random() * 20 }); }
-      } else {
-        heat = Math.max(heat, .25 + .45 * p.b.k);
-        if (Math.random() < .3 + .7 * p.b.k) { const x = hx(); heart(x, at(QREST, x) - 6); }
-      }
+    const [d, up, tr, slump] = drive();
+    while (hi < S.length && S[hi].hit <= t) impact(S[hi++]);
+    sinkV += (-500 * sink - 22 * sinkV) * DT; sink += sinkV * DT;
+    bsV += (-300 * bs - 18 * bsV) * DT; bs += bsV * DT;
+    jyV += (-900 * jy - 24 * jyV) * DT; jy += jyV * DT;
+    jxV += (-700 * jx - 20 * jxV) * DT; jx += jxV * DT;
+    pose = dummies(d, up, tr, slump, sink, bs);
+    // 이불: 중력 + 장력(옆 점과의 차이) + 내부 감쇠, 몸에 닿으면 그 위에 얹히고 몸이 올라가는 속도를 받음
+    for (let i = 0; i < n; i++) {
+      const s0 = surf[i], s1 = surface(i);
+      surf[i] = s1;
+      const vs = Math.max(-150, Math.min(150, (s1 - s0) / DT));
+      const yl = y[i - 1] ?? y[i], yr = y[i + 1] ?? y[i], vl = v[i - 1] ?? v[i], vr = v[i + 1] ?? v[i];
+      v[i] += (1500 + 2200 * (yl - 2 * y[i] + yr) + 40 * (vl - 2 * v[i] + vr) - 2 * v[i]) * DT;
+      sv[i] = vs;
     }
-    if (!finale && t > s2 + .45) { finale = true; heart(186, 92, { big: true, s: 2, life: 2, rise: 22 }); }
-    for (let i = 1; i < n - 1; i++) v[i] += (-(u[i] > 0 ? 1900 : 520) * u[i] - 9 * v[i] + 40 * (u[i - 1] - 2 * u[i] + u[i + 1])) * DT;
-    for (let i = 1; i < n - 1; i++) u[i] += v[i] * DT;
-    joltV += (-900 * jolt - 24 * joltV) * DT; jolt += joltV * DT;
-    heat = Math.max(heat * Math.exp(-DT * 1.6), t < s1 ? .08 + .45 * Math.min(1, t / 3.5) : 0);
+    for (let i = 0; i < n; i++) {
+      y[i] += v[i] * DT;
+      if (y[i] >= surf[i]) { y[i] = surf[i]; v[i] = Math.min(v[i], sv[i]); }
+      hemL[i] += ((y[i] - rest[i]) * .32 - hemL[i]) * Math.min(1, DT * 7);
+    }
+    if (buzz) { shakeK = Math.max(shakeK, .35 * buzz); if (t - shakeAt > .05) shakeAt = t - .02; }
+    buzz = 0;
+    if (HB && t >= S[S.length - 1].t0 && t < end) { fount += HB.fount * DT; while (fount >= 1) { fount--; burstAt(1, { s: .8 + Math.random() * .5, dy: -(55 + Math.random() * 35) }); } }
+    heat = Math.max(heat * Math.exp(-DT * 1.4), t < end ? (good ? .1 + .4 * Math.min(1, t / end) : .05) : 0);
+    if (!finale && t > end + .45) {
+      finale = true;
+      if (good) heart(188, 86, { big: true, s: 1.4 + .3 * tier, life: 1.8, dy: -24 });
+      else letdown();
+    }
   }
+  // 상대 표정 (관계 중 초상화)
+  function faceNow() {
+    const k = Math.min(1, t / end), ramp = S.find(s => s.kind !== 'n');
+    if (t >= end + .3) return good ? (tier >= 3 ? 'bliss' : 'content') : 'disappointed';
+    if (!good) return k < (tier ? .4 : .25) ? 'p0' : 'bored';
+    if (t >= ramp.t0) return 'p3';
+    return 'p' + (k < .3 ? 0 : k < .62 ? 1 : 2);
+  }
+  const yWithRest = () => { for (let i = 0; i < n; i++) { surf[i] = surface(i); y[i] = surf[i]; } for (let j = 0; j < 300; j++) { const tt = t; step(); t = tt; } rest.set(y); hemL.fill(0); };
   const curve = P => P.slice(0, -1).map((b, i) => {
     const a = P[i - 1] || b, c = P[i + 1], e = P[i + 2] || c;
     return ` C${f(b[0] + (c[0] - a[0]) / 6)},${f(b[1] + (c[1] - a[1]) / 6)} ${f(c[0] - (e[0] - b[0]) / 6)},${f(c[1] - (e[1] - b[1]) / 6)} ${f(c[0])},${f(c[1])}`;
   }).join('');
+  const hemY = x => 150 - 17 * Math.exp(-(((x - 66) / 22) ** 2)) + .9 * Math.sin(x * .13 + .6) + FOLDS.reduce((s, [c, lean]) => s + 1.6 * Math.exp(-(((x - c - lean) / 6) ** 2)), 0) + at(hemL, x);
   function draw() {
-    const top = QX.map((x, i) => [x, QREST[i] + u[i]]), hem = Array.from({ length: 9 }, (_, i) => { const x = 284 - 214 * i / 8; return [x, hemY(x)]; });
-    const [l, r] = [top[0], top[n - 1]], [hr, hl] = [hem[0], hem[8]];
-    quilt.setAttribute('d', `M${f(l[0])},${f(l[1])}${curve(top)} C285.5,${f(r[1] + 8)} 285.5,${f(hr[1] - 8)} ${f(hr[0])},${f(hr[1])}${curve(hem)} C66,${f(hl[1] - 8)} 66,${f(l[1] + 8)} ${f(l[0])},${f(l[1])} Z`);
-    rim.setAttribute('d', `M${f(l[0])},${f(l[1] + .8)}${curve(top.map(([x, y]) => [x, y + .8]))}`);
-    hemEl.setAttribute('d', `M${f(hr[0])},${f(hr[1] - 1)}${curve(hem.map(([x, y]) => [x, y - 1]))}`);
-    const sp = top.slice(2, -2).map(([x, y]) => [x, Math.min(143, y + 8)]);
+    const top = CX.map((x, i) => [x, y[i]]), hem = Array.from({ length: 9 }, (_, i) => { const x = 284 - 216 * i / 8; return [x, hemY(x)]; });
+    const l = top[0], r = top[n - 1], hr = hem[0], hl = hem[8];
+    quilt.setAttribute('d', `M${f(l[0])},${f(l[1])}${curve(top)} C285.5,${f(r[1] + 8)} 285.5,${f(hr[1] - 8)} ${f(hr[0])},${f(hr[1])}${curve(hem)} C${f(hl[0] - 5)},${f(hl[1] - 4)} ${f(l[0] - 5)},${f(l[1] + 6)} ${f(l[0])},${f(l[1])} Z`);
+    rim.setAttribute('d', `M${f(l[0])},${f(l[1] + .8)}${curve(top.map(([x, yy]) => [x, yy + .8]))}`);
+    hemEl.setAttribute('d', `M${f(hr[0])},${f(hr[1] - 1)}${curve(hem.map(([x, yy]) => [x, yy - 1]))}`);
+    const sp = top.slice(3, -3).map(([x, yy]) => [x, Math.min(143, yy + 8)]);
     stitch.setAttribute('d', `M${f(sp[0][0])},${f(sp[0][1])}${curve(sp)}`);
     FOLDS.forEach(([x, lean], j) => {
-      const yt = at(QREST, x) + at(u, x), y0 = yt + Math.max(6, (147 - yt) * .3), y1 = hemY(x + lean) - 1.2, dyn = Math.max(-5, Math.min(5, -at(v, x) * .02));
+      const yt = at(y, x), y0 = yt + Math.max(6, (147 - yt) * .3), y1 = hemY(x + lean) - 1.2, dyn = Math.max(-5, Math.min(5, -at(v, x) * .02));
       for (let k = 0; k < 2; k++) {
         const o = k * 1.8;
         folds[j * 2 + k].setAttribute('d', `M${f(x + o)},${f(y0 + k)} C${f(x + o - dyn * .4)},${f(y0 + (y1 - y0) * .45)} ${f(x + o + lean * .6 - dyn * .7)},${f(y1 - 5)} ${f(x + o + lean + dyn)},${f(y1)}`);
       }
     });
-    const sk = t - shakeAt < .5 ? 1.8 * Math.exp(-(t - shakeAt) * 12) : 0;
-    cam.setAttribute('transform', sk ? `translate(${f(sk * Math.sin((t - shakeAt) * 95))},${f(sk * .6 * Math.sin((t - shakeAt) * 120 + 1))})` : '');
-    bed.setAttribute('transform', `translate(0,${jolt.toFixed(2)})`);
+    if (debug) dummyEl.innerHTML = pose.map(([ax, ay, bx, by, r], k) => `<line x1="${f(ax)}" y1="${f(ay)}" x2="${f(bx)}" y2="${f(by)}" stroke="${k < 5 ? '#7fc4ff' : '#ffb36b'}" stroke-width="${2 * r}"/>`).join('');
+    const ago = t - shakeAt, sk = ago < .6 ? 1.5 * shakeK * Math.exp(-ago * 10) : 0;
+    const cx = sk * Math.sin(ago * 95), cy = sk * .6 * Math.sin(ago * 120 + 1);
+    cam.setAttribute('transform', sk > .02 ? `translate(${f(cx)},${f(cy)})` : '');
+    bed.setAttribute('transform', `translate(${jx.toFixed(2)},${jy.toFixed(2)})`);
     warm.setAttribute('opacity', (heat * .9).toFixed(3));
     for (let i = hearts.length - 1; i >= 0; i--) {
       const h = hearts[i], age = t - h.t0, k = age / h.life;
       if (k >= 1) { h.el.remove(); hearts.splice(i, 1); continue; }
       const pop = k < .12 ? .4 + .7 * k / .12 : k < .2 ? 1.1 - (k - .12) / .8 : 1;
       const lub = h.big ? 1 + .16 * Math.exp(-((((age % .9) - .15) / .045) ** 2)) + .1 * Math.exp(-((((age % .9) - .35) / .045) ** 2)) : 1;
-      const w = Math.sin(6.283 * h.fq * age + h.ph);
-      h.el.setAttribute('transform', `translate(${f(h.x + h.sway * w)},${f(h.y - h.rise * (1 - (1 - k) ** 2))}) rotate(${f(h.sway * 1.6 * Math.cos(6.283 * h.fq * age + h.ph))}) scale(${(h.s * pop * lub).toFixed(3)})`);
+      const w = Math.sin(6.283 * h.fq * age + h.ph), m = 1 - (1 - k) ** 2;
+      h.el.setAttribute('transform', `translate(${f(h.x + h.dx * m + h.sway * w)},${f(h.y + h.dy * m)}) rotate(${f(h.sway * 1.6 * Math.cos(6.283 * h.fq * age + h.ph))}) scale(${(h.s * pop * lub).toFixed(3)})`);
       h.el.setAttribute('opacity', (k < .1 ? k / .1 : k > .6 ? (1 - k) / .4 : 1).toFixed(2));
+    }
+    if (face) {
+      const key = faceNow();
+      if (key !== faceKey) {
+        faceKey = key;
+        const during = key[0] === 'p' && key.length === 2 ? { lv: +key[1] } : { mood: key };
+        face.innerHTML = Avatar.render(G.look(p), 64, { age: G.npcAge(p), during: Object.assign(during, { personality: p.personality, fig: sc.fig }) });
+      }
+      face.style.transform = sk > .02 ? `translate(${f(cx * 1.2)}px,${f(cy * 1.2)}px)` : '';
     }
   }
   function frame(now) {
@@ -338,6 +467,8 @@ function runNight(svg, done) {
     if (t < END) nightRaf = requestAnimationFrame(frame);
     else done();
   }
+  if (debug) quilt.setAttribute('opacity', '.45');
+  yWithRest();
   draw();
   nightRaf = requestAnimationFrame(frame);
 }
@@ -353,7 +484,8 @@ function playScene(sc) {
   }
   const morningQ = [`<div class="sc-card sc-morning">${morningCard(sc, p)}</div>`];
   const pregQ = sc.preg ? [`<div class="sc-card">${CONCEIVE}<p class="sc-later">몇 주 뒤…</p><button type="button" data-sc-next>계속</button></div>`] : [];
-  sceneQueue = (calm ? [] : [`<div class="sc-night"><p class="sc-t">그날 밤</p>${NIGHT}</div>`]).concat(morningQ, pregQ);
+  nightJob = { sc, p };
+  sceneQueue = (calm ? [] : [`<div class="sc-night"><p class="sc-t">그날 밤</p><div class="nt-stage">${NIGHT}<div class="nt-face"></div></div></div>`]).concat(morningQ, pregQ);
   nextScene();
 }
 function nextScene() {
@@ -362,7 +494,7 @@ function nextScene() {
     const html = sceneQueue.shift();
     sceneCard(html);
     const night = sceneBox.querySelector('.sc-night svg');
-    if (night) runNight(night, () => { sceneTimer = setTimeout(nextScene, 500); });
+    if (night) runNight(night, nightJob, () => { sceneTimer = setTimeout(nextScene, 500); });
     return;
   }
   sceneEl.hidden = true; sceneBox.innerHTML = '';
