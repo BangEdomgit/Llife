@@ -213,11 +213,17 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .sil{width:220px;height:auto;fill:var(--text);opacity:.85}
 .sil .sil-heart{fill:var(--minus)}
 .floor{width:200px;height:auto;opacity:.9}
-.sc-night{height:220px;display:grid;place-items:center;position:relative;background:#000;border-radius:4px;animation:scDark 2.3s ease-in forwards}
-.sc-night .sym{font-size:46px;color:var(--text);display:flex}
-.sc-night .m{display:inline-block;animation:symL .8s ease-out both}
-.sc-night .f{display:inline-block;margin-left:-14px;animation:symR .8s ease-out both}
-.sc-night .beat{position:absolute;bottom:42px;font-size:26px;opacity:0;animation:beat .45s ease-in-out .8s 3 alternate}
+.sc-night{display:grid;justify-items:center;gap:6px;padding:16px 12px 10px;background:#0b0d14;border-radius:4px;cursor:pointer;animation:scFade .5s ease-out}
+.sc-night .sc-t{margin:0}
+.bed{width:100%;max-width:300px;height:auto;overflow:visible}
+.bed .win{fill:#141a2a;stroke:#2a3350;stroke-width:1.5}
+.bed .moon{fill:#f4e7b8;opacity:.85}
+.bed .wood{fill:#5a4030}
+.bed .mat{fill:#d9d2c4}
+.bed .pillow{fill:#f1ebe0}
+.bed .quilt{fill:#c8a2c8;transform-box:fill-box;transform-origin:50% 100%;animation:quilt .46s ease-in-out infinite}
+.bed .quilt .fold{fill:none;stroke:#9c7aa0;stroke-width:1.4;stroke-linecap:round;opacity:.7}
+.bed .ht{fill:#ff6b8a;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:heartUp 1.8s ease-out infinite}
 .conceive{width:100%;max-width:300px;background:#0b0d14;border-radius:4px}
 .conceive .glow{opacity:0;animation:glow .5s ease-out 1.3s forwards}
 .conceive .sp{transform-box:fill-box}
@@ -226,80 +232,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .conceive .sp3{animation:sp3 1.5s ease-in forwards}
 .conceive .tail{animation:wig .18s ease-in-out infinite alternate;transform-origin:-5px 0}
 @keyframes scFade{from{opacity:0}to{opacity:1}}
-@keyframes scDark{0%,70%{opacity:1}100%{opacity:.15}}
-@keyframes symL{from{transform:translateX(-70px);opacity:0}to{transform:translateX(0);opacity:1}}
-@keyframes symR{from{transform:translateX(70px);opacity:0}to{transform:translateX(0);opacity:1}}
-@keyframes beat{from{opacity:.4;transform:scale(.9)}to{opacity:1;transform:scale(1.2)}}
+@keyframes quilt{0%,100%{transform:scale(1,1) skewX(0)}25%{transform:scale(1.015,.95) skewX(-2deg)}50%{transform:scale(.99,1.05) skewX(0)}75%{transform:scale(1.015,.96) skewX(2deg)}}
+@keyframes heartUp{0%{opacity:0;transform:translateY(6px) scale(.5)}20%{opacity:1;transform:translateY(-6px) scale(1.1)}100%{opacity:0;transform:translateY(-58px) scale(.8)}}
 @keyframes glow{to{opacity:.55}}
 @keyframes sp1{from{transform:translate(18px,60px)}to{transform:translate(196px,60px)}}
 @keyframes sp2{0%{transform:translate(6px,36px);opacity:1}80%{opacity:.8}100%{transform:translate(150px,46px);opacity:0}}
 @keyframes sp3{0%{transform:translate(0,86px);opacity:1}80%{opacity:.8}100%{transform:translate(140px,76px);opacity:0}}
 @keyframes wig{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
-/* 진행 중 장면 (multi-phase night scene) */
-.sc-phase{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px 10px;background:#0a0a0a;border-radius:4px;min-height:260px;align-items:center;position:relative;overflow:hidden}
-.sc-phase .portrait{display:flex;justify-content:center;align-items:center}
-.sc-phase .blanket-side{display:flex;flex-direction:column;align-items:center;gap:6px}
-.sc-phase .sym{text-align:center;white-space:nowrap}
-.sc-phase .sym svg{width:80px;height:auto;display:block;margin:0 auto}
-.sc-phase .blanket-wrap{width:100%;position:relative}
-.sc-phase .blanket-svg{width:100%;height:auto}
-.sc-phase .beat-icon{font-size:20px;text-align:center;opacity:.8}
-.sc-phase .sc-sweat{position:absolute;font-size:12px;opacity:0;animation:swDrop 1.2s ease-in forwards}
-.sc-redden{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(180,40,40,.15),transparent 70%);opacity:0;transition:opacity .6s}
-.sc-phase.phase2 .sc-redden{opacity:.4}
-.sc-phase.phase3 .sc-redden{opacity:.7}
-.sc-phase.phase-climax .sc-redden{opacity:0}
-.sc-flash{position:absolute;inset:0;pointer-events:none;background:#fff;opacity:0}
-.sc-phase.phase-climax .sc-flash{animation:flash .4s ease-out forwards}
-.sc-particles{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.sc-particle{position:absolute;width:6px;height:6px;background:#fff;border-radius:50%;opacity:0}
-.sc-phase.phase-climax .sc-particle{animation:pDrift 1.2s ease-out forwards}
-@keyframes portrait-shake{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-.phase1 .portrait{animation:portrait-shake .7s ease-in-out infinite}
-.phase2 .portrait{animation:portrait-shake .42s ease-in-out infinite}
-.phase3 .portrait{animation:portrait-shake .22s ease-in-out infinite}
-.phase-climax .portrait{animation:none}
-.phase-end .portrait{animation:none}
-/* pose thrust — elastic snap forward, settle, slow pull back */
-.phase1 .blanket-svg .pose-active{animation:thr1 .7s infinite}
-.phase2 .blanket-svg .pose-active{animation:thr2 .42s infinite}
-.phase3 .blanket-svg .pose-active{animation:thr3 .22s infinite}
-.phase-climax .blanket-svg .pose-active{animation:none;transform:translate(-8px,2px)}
-.phase-end .blanket-svg .pose-active{animation:none}
-@keyframes thr1{0%{transform:translate(10px,-2px)}14%{transform:translate(-12px,4px)}24%{transform:translate(-4px,1.5px)}34%{transform:translate(-10px,3px)}52%{transform:translate(-8px,2.5px)}100%{transform:translate(10px,-2px)}}
-@keyframes thr2{0%{transform:translate(9px,-2px)}12%{transform:translate(-14px,5px)}22%{transform:translate(-5px,2px)}32%{transform:translate(-12px,4px)}50%{transform:translate(-10px,3px)}100%{transform:translate(9px,-2px)}}
-@keyframes thr3{0%{transform:translate(7px,-1px)}15%{transform:translate(-16px,5.5px)}28%{transform:translate(-7px,2.5px)}40%{transform:translate(-14px,4.5px)}100%{transform:translate(7px,-1px)}}
-/* base reacts to impact */
-.phase1 .blanket-svg .pose-base{animation:rct1 .7s infinite}
-.phase2 .blanket-svg .pose-base{animation:rct2 .42s infinite}
-.phase3 .blanket-svg .pose-base{animation:rct3 .22s infinite}
-.phase-climax .blanket-svg .pose-base,.phase-end .blanket-svg .pose-base{animation:none}
-@keyframes rct1{0%,50%,100%{transform:translate(0,0)}14%{transform:translate(-3px,1px)}28%{transform:translate(0,0)}}
-@keyframes rct2{0%,45%,100%{transform:translate(0,0)}12%{transform:translate(-4px,1.5px)}26%{transform:translate(0,0)}}
-@keyframes rct3{0%,40%,100%{transform:translate(0,0)}15%{transform:translate(-4px,2px)}30%{transform:translate(0,0)}}
-/* symbol thrust */
-.phase1 .sym .m-sym{animation:symT1 .7s infinite}
-.phase2 .sym .m-sym{animation:symT2 .42s infinite}
-.phase3 .sym .m-sym{animation:symT3 .22s infinite}
-.phase-climax .sym .m-sym{animation:none;transform:translateX(10px)}
-.phase-end .sym .m-sym{animation:none;transform:translateX(10px)}
-@keyframes symT1{0%{transform:translateX(-6px)}14%{transform:translateX(10px)}28%{transform:translateX(4px)}40%{transform:translateX(9px)}55%{transform:translateX(8px)}100%{transform:translateX(-6px)}}
-@keyframes symT2{0%{transform:translateX(-4px)}12%{transform:translateX(10px)}24%{transform:translateX(4px)}36%{transform:translateX(9px)}100%{transform:translateX(-4px)}}
-@keyframes symT3{0%{transform:translateX(-2px)}15%{transform:translateX(10px)}30%{transform:translateX(5px)}45%{transform:translateX(9px)}100%{transform:translateX(-2px)}}
-@keyframes flash{0%{opacity:.9}100%{opacity:0}}
-@keyframes swDrop{0%{opacity:.7;transform:translateY(0)}100%{opacity:0;transform:translateY(40px)}}
-@keyframes pDrift{0%{opacity:.85;transform:translate(0,0)}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
-/* foreplay */
-.sc-foreplay{display:flex;justify-content:center;align-items:center;min-height:260px;background:#0a0a0a;border-radius:4px;position:relative;overflow:hidden}
-.sc-foreplay svg{width:220px;height:auto}
-.sc-foreplay .fp-fill{fill:#222}
-.sc-foreplay .fp-stroke{fill:none;stroke:#333;stroke-width:2}
-/* uterus cross-section */
-.sc-uterus{display:flex;justify-content:center;align-items:center;padding:14px;background:#0b0d14;border-radius:4px;min-height:240px}
-.sc-uterus svg{width:100%;max-width:400px}
-.sc-uterus .organ{fill:none;stroke:#e4a8a0;stroke-width:2.5;stroke-linecap:round}
-.sc-uterus .organ-fill{fill:#fde0d8;opacity:.3}
-.sc-uterus .ovary{fill:#fce4de;stroke:#d98a7e;stroke-width:2}
-.sc-uterus .sp-u{transform-box:fill-box}
-.sc-uterus .sp-u .tail{animation:wig .18s ease-in-out infinite alternate;transform-origin:-5px 0}
-@media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *,.sc-phase *,.sc-phase,.sc-foreplay *,.sc-uterus *{animation:none!important}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}.phase1 .portrait,.phase2 .portrait,.phase3 .portrait{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.scene-wrap,.sc-card,.sc-night,.sc-night *,.conceive *{animation:none!important}.bed .ht{opacity:.8}.conceive .glow{opacity:.55}.conceive .sp1{transform:translate(196px,60px)}.conceive .sp2,.conceive .sp3{opacity:0}}

@@ -966,132 +966,11 @@ function renderPreIntimate(a, size, st) {
   return o + '</svg>';
 }
 
-/* ---------- 진행 중 표정 클로즈업 (duringIntimate, 20살 이상만) ---------- */
-function duringEye(phase, x, y, s, nLash, X) {
-  const irC = IRIS[X.iris];
-  if (phase === 0) return `<path d="M${x - 4.8},${y + 1} Q${x},${y - 2.5} ${x + 4.8},${y + 1}" fill="${WHITE}" stroke="${LINE}" stroke-width="2" stroke-linecap="round"/>
-    <ellipse cx="${f1(x + X.gaze * .6)}" cy="${f1(y + .8)}" rx="2.6" ry="1.6" fill="${irC}"/>
-    <circle cx="${f1(x + 1)}" cy="${f1(y - .2)}" r="1" fill="#fff"/>${nLash ? `<path d="M${f1(x + 4.4 * s)},${f1(y + .6)} l${f1(1.6 * s)},-1.2" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>` : ''}`;
-  if (phase <= 2) {
-    const sq = phase === 2 ? 1.4 : 0;
-    let o = `<path d="M${x - 5},${y + sq} Q${x},${y + 2.8 + sq} ${x + 5},${y + sq}" fill="none" stroke="${LINE}" stroke-width="2.4" stroke-linecap="round"/>`;
-    if (nLash) o += `<path d="M${f1(x + 4.2 * s)},${f1(y + .4 + sq)} l${f1(1.8 * s)},${f1(1.2 + sq * .4)} M${f1(x + 3 * s)},${f1(y + 1.4 + sq)} l${f1(1.2 * s)},${f1(1.4 + sq * .3)}" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>`;
-    if (phase === 2) o += `<ellipse cx="${f1(x + 3.8 * s)}" cy="${f1(y + 2)}" rx="1.8" ry="1" fill="#fff" opacity=".55"/>`;
-    return o;
-  }
-  if (phase === 3) {
-    const e = eyeShape(0, x, y, s), id = `av${UID}d${s > 0 ? 'r' : 'l'}`;
-    const shape = `M${P(...e.i)} Q${P(...e.u)} ${P(...e.o)} Q${P(...e.l)} ${P(...e.i)} Z`;
-    return `<clipPath id="${id}"><path d="${shape}"/></clipPath><path d="${shape}" fill="${WHITE}"/>
-      <g clip-path="url(#${id})"><ellipse cx="${f1(x)}" cy="${f1(y - 3.5)}" rx="3.2" ry="3.4" fill="${irC}"/>
-      <ellipse cx="${f1(x)}" cy="${f1(y - 3)}" rx="1.6" ry="1.8" fill="${PUPIL}"/></g>
-      <path d="M${P(...e.i)} Q${P(...e.u)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width="2.3" stroke-linecap="round"/>
-      ${nLash ? lashes(e, s, nLash) : ''}
-      <path d="M${f1(x + 4 * s)},${f1(y + 4)} Q${f1(x + 4.5 * s)},${f1(y + 10)} ${f1(x + 3 * s)},${f1(y + 14)}" fill="none" stroke="#87ceeb" stroke-width="1.4" opacity=".7" stroke-linecap="round"/>`;
-  }
-  return `<path d="M${x - 4.6},${y + .8} Q${x},${y - 1.5} ${x + 4.6},${y + .8}" fill="${WHITE}" stroke="${LINE}" stroke-width="2" stroke-linecap="round"/>
-    <ellipse cx="${f1(x + .5)}" cy="${f1(y + 1)}" rx="2.4" ry="1.3" fill="${irC}" opacity=".7"/>
-    <circle cx="${f1(x + 1.5)}" cy="${y}" r=".8" fill="#fff" opacity=".4"/>
-    ${nLash ? `<path d="M${f1(x + 4.2 * s)},${f1(y + .4)} l${f1(1.4 * s)},-1" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>` : ''}`;
-}
-function duringMouth(phase, lip, female) {
-  if (phase === 0) return `<path d="M55.4,87.5 Q60,86 64.6,87.5 Q64,92 60,92.2 Q56,92 55.4,87.5 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>`;
-  if (phase === 1) return `<path d="M54.4,87 Q60,85.5 65.6,87 Q65,93.5 60,94 Q55,93.5 54.4,87 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>
-    <ellipse cx="60" cy="92.5" rx="3" ry="1.6" fill="#c96a6e" opacity=".85"/>`;
-  if (phase === 2) return `<path d="M53,86.5 Q60,84.5 67,86.5 Q66.5,95 60,95.6 Q53.5,95 53,86.5 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>
-    <ellipse cx="60" cy="93.6" rx="3.8" ry="2" fill="#c96a6e" opacity=".85"/>
-    <path d="M59,93 Q61,96.5 63,93.5" fill="#d4737e" opacity=".75"/>
-    <path d="M66.5,91 Q69,93 68,96" fill="none" stroke="${shade(lip.c, .7)}" stroke-width="1" opacity=".6" stroke-linecap="round"/>`;
-  if (phase === 3) return `<path d="M52,86 Q60,83.5 68,86 Q67.5,96 60,97 Q52.5,96 52,86 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.4"/>
-    <ellipse cx="60" cy="94" rx="4.2" ry="2.6" fill="#c96a6e" opacity=".9"/>
-    <path d="M58.5,93.5 Q60.5,98 62.5,93.5" fill="#d4737e" opacity=".8"/>
-    <path d="M67,91 Q70,94 69,98" fill="none" stroke="${shade(lip.c, .7)}" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>
-    <path d="M67.5,96 Q68,100 67,104" fill="none" stroke="#fff" stroke-width="1" opacity=".35" stroke-linecap="round"/>`;
-  return `<path d="M54.5,87.5 Q60,86 65.5,87.5 Q65,93 60,93.5 Q55,93 54.5,87.5 Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3"/>
-    <path d="M57,94 Q60,98 63,94" fill="none" stroke="#ddd" stroke-width="1" opacity=".4" stroke-linecap="round"/>`;
-}
+/* ---------- 성적 흥분 시각 (aroused) ---------- */
 function sweatDrops(n) {
   const spots = [[78, 62], [38, 66], [82, 78], [35, 74], [85, 55]];
   return spots.slice(0, n).map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="1.6" ry="2.2" fill="#87ceeb" opacity=".55"/>`).join('');
 }
-function renderDuringIntimate(a, size, st) {
-  UID++;
-  const X = extras(a), age = st.age || 25, skin = SKIN[a.skin] || SKIN[1];
-  const old = age >= 40 && a.gray < (age - 38) / 22;
-  const hc = HAIR[old ? GRAY : a.hc] || HAIR[0];
-  const female = a.g === 'f', phase = st.duringIntimate, personality = st.personality || 'warm';
-  const nLash = female ? 3 : 0, ey = 72, exx = [48, 72];
-  const lip = { c: female ? LIPS[X.lip] : NATURAL_LIP[a.skin] || NATURAL_LIP[1], teeth: X.teeth };
-  const skinD = shade(skin, .86);
-  const w = Math.round(size), h = Math.round(size * 64 / 45);
-  const nh = female ? 10.5 : 12, shHalf = female ? 36 : 42;
-  const bustW = female && st.fig && st.fig.cup ? (CUP_OUT[st.fig.cup] || 7) + 5 : 14;
-  const vbH = female ? 160 : 138;
-  let o = `<svg class="av av-during" width="${w}" height="${Math.round(w * vbH / 90)}" viewBox="15 5 90 ${vbH}" aria-hidden="true">`;
-  o += `<rect class="av-bg" x="15.5" y="5.5" width="89" height="${vbH - 1}" rx="6"/>`;
-  o += `<rect x="${f1(60 - nh)}" y="95" width="${f1(nh * 2)}" height="22" fill="${skinD}"/>`;
-  o += `<path d="M${f1(60 - nh)},115 C${f1(60 - nh - 6)},116 ${f1(60 - shHalf + 6)},118 ${f1(60 - shHalf)},121 L${f1(60 - shHalf)},${female ? 158 : 143} L${f1(60 + shHalf)},${female ? 158 : 143} L${f1(60 + shHalf)},121 C${f1(60 + shHalf - 6)},118 ${f1(60 + nh + 6)},116 ${f1(60 + nh)},115 Z" fill="${skin}"/>`;
-  o += `<path d="M57,110 Q${f1(60 - shHalf * .55)},112 ${f1(60 - shHalf + 6)},111 M63,110 Q${f1(60 + shHalf * .55)},112 ${f1(60 + shHalf - 6)},111" fill="none" stroke="${shade(skin, .74)}" stroke-width="1.1" opacity=".7" stroke-linecap="round"/>`;
-  if (female) {
-    const bustY = 126, bustDrop = Math.min(bustW * .35, 5);
-    const lx = 60 - bustW * .6, rx = 60 + bustW * .6;
-    o += `<path d="M${f1(60 - shHalf + 6)},122 Q${f1(lx - 2)},${f1(bustY - 1)} ${f1(lx)},${f1(bustY + bustDrop)} Q${f1(lx + bustW * .3)},${f1(bustY + bustDrop + 4)} 60,${f1(bustY + 2)}" fill="${skin}"/>`;
-    o += `<path d="M${f1(60 + shHalf - 6)},122 Q${f1(rx + 2)},${f1(bustY - 1)} ${f1(rx)},${f1(bustY + bustDrop)} Q${f1(rx - bustW * .3)},${f1(bustY + bustDrop + 4)} 60,${f1(bustY + 2)}" fill="${skin}"/>`;
-    o += `<path d="M${f1(lx + 1)},${f1(bustY + bustDrop - 1)} Q${f1(lx + bustW * .2)},${f1(bustY + bustDrop + 3)} ${f1(60 - 2)},${f1(bustY + 1)}" fill="none" stroke="${shade(skin, .55)}" stroke-width="1.2" opacity=".45" stroke-linecap="round"/>`;
-    o += `<path d="M${f1(rx - 1)},${f1(bustY + bustDrop - 1)} Q${f1(rx - bustW * .2)},${f1(bustY + bustDrop + 3)} ${f1(60 + 2)},${f1(bustY + 1)}" fill="none" stroke="${shade(skin, .55)}" stroke-width="1.2" opacity=".45" stroke-linecap="round"/>`;
-    o += `<ellipse cx="${f1(lx + 2)}" cy="${f1(bustY + bustDrop)}" rx="1.8" ry="1.8" fill="${shade(skin, .65)}" opacity=".6"/>`;
-    o += `<ellipse cx="${f1(rx - 2)}" cy="${f1(bustY + bustDrop)}" rx="1.8" ry="1.8" fill="${shade(skin, .65)}" opacity=".6"/>`;
-    o += `<path d="M${f1(60 - 1)},${f1(bustY)} L${f1(60 - 1)},${f1(bustY + bustDrop + 6)}" fill="none" stroke="${shade(skin, .5)}" stroke-width="1" opacity=".3" stroke-linecap="round"/>`;
-  } else {
-    o += `<path d="M${f1(60 - shHalf + 10)},124 L${f1(60 + shHalf - 10)},124" fill="none" stroke="${shade(skin, .7)}" stroke-width="1" opacity=".25"/>`;
-  }
-  if (phase >= 2) o += `<ellipse cx="50" cy="113" rx="1.4" ry="2" fill="#87ceeb" opacity=".5"/>`;
-  if (phase >= 3) o += `<ellipse cx="72" cy="116" rx="1.2" ry="1.8" fill="#87ceeb" opacity=".45"/>`;
-  o += `<ellipse cx="33.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
-  o += `<ellipse cx="86.5" cy="73" rx="4.5" ry="6.5" fill="${skinD}"/>`;
-  o += `<path d="${FACES[a.face] || FACES[0]}" fill="${skin}"/>`;
-  const blO = f1(Math.min(.2 + phase * .12, .65) * 100) / 100;
-  o += `<ellipse cx="44" cy="84" rx="6.5" ry="4" fill="#e8857a" opacity="${blO}"/><ellipse cx="76" cy="84" rx="6.5" ry="4" fill="#e8857a" opacity="${blO}"/>`;
-  if (personality === 'shy') {
-    const sq = Math.min(phase, 3) * .5;
-    o += exx.map((x, i) => {
-      const s = i ? 1 : -1;
-      let e = `<path d="M${x - 5},${ey + sq} Q${x},${ey + 3 + sq} ${x + 5},${ey + sq}" fill="none" stroke="${LINE}" stroke-width="2.4" stroke-linecap="round"/>`;
-      if (nLash) e += `<path d="M${f1(x + 4.2 * s)},${f1(ey + .4 + sq)} l${f1(1.8 * s)},${f1(1.2 + sq * .3)} M${f1(x + 3 * s)},${f1(ey + 1.4 + sq)} l${f1(1.2 * s)},${f1(1.4 + sq * .3)}" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>`;
-      if (phase >= 2) e += `<path d="M${f1(x + 4.5 * s)},${ey + 4} Q${f1(x + 5 * s)},${ey + 10} ${f1(x + 3.5 * s)},${ey + 14}" fill="none" stroke="#87ceeb" stroke-width="1.4" opacity=".7" stroke-linecap="round"/>`;
-      return e;
-    }).join('');
-  } else if (personality === 'sensitive') {
-    const sq = Math.min(phase, 3) * .7;
-    o += exx.map((x, i) => {
-      const s = i ? 1 : -1;
-      let e = `<path d="M${x - 5},${ey + sq} Q${x},${ey + 3.5 + sq} ${x + 5},${ey + sq}" fill="none" stroke="${LINE}" stroke-width="2.6" stroke-linecap="round"/>`;
-      if (nLash) e += `<path d="M${f1(x + 4.2 * s)},${f1(ey + .4 + sq)} l${f1(1.8 * s)},${f1(1.2 + sq * .3)}" stroke="${LINE}" stroke-width="1" stroke-linecap="round"/>`;
-      if (phase >= 1) e += `<path d="M${f1(x + 4.5 * s)},${ey + 4} Q${f1(x + 5.5 * s)},${ey + 12} ${f1(x + 3 * s)},${ey + 18}" fill="none" stroke="#87ceeb" stroke-width="1.6" opacity=".75" stroke-linecap="round"/>`;
-      return e;
-    }).join('');
-  } else if (phase === 3 && personality === 'bold') o += exx.map((x, i) => duringEye(3, x, ey, i ? 1 : -1, nLash, X)).join('');
-  else if (phase === 3 && personality === 'playful') { o += duringEye(3, 48, ey, -1, nLash, X); o += HAPPY(72, ey); }
-  else o += exx.map((x, i) => duringEye(phase, x, ey, i ? 1 : -1, nLash, X)).join('');
-  const bExpr = phase === 2 ? 'angry' : phase === 3 ? 'surprised' : null;
-  o += `<path d="${exx.map((x, i) => brow(phase >= 1 && phase <= 2 ? 1 : a.brows, x, ey - 10, i ? 1 : -1, bExpr)).join(' ')}" fill="none" stroke="${shade(hc, .72)}" stroke-width="${a.thick ? 3.6 : female ? 2.2 : 2.8}" stroke-linecap="round" stroke-linejoin="round"/>`;
-  o += `<path d="M61.2,76.4 L58.4,82.8 Q60.2,84.2 62.6,83.2" fill="none" stroke="${shade(skin, .66)}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-  o += `<ellipse cx="60.6" cy="84.6" rx="3" ry="1" fill="${shade(skin, .62)}" opacity=".16"/>`;
-  o += duringMouth(phase, lip, female);
-  if (phase >= 1) o += sweatDrops(phase === 1 ? 1 : phase === 2 ? 3 : phase >= 3 ? 2 : 1);
-  if (phase >= 2 && phase <= 4) {
-    o += `<path d="M${f1(48 - 4.5)},${ey + 4} Q${f1(48 - 5)},${ey + 10} ${f1(48 - 3.5)},${ey + 14}" fill="none" stroke="#87ceeb" stroke-width="1.4" opacity=".65" stroke-linecap="round"/>`;
-    if (phase >= 3 || personality === 'sensitive') o += `<path d="M${f1(72 + 4.5)},${ey + 4} Q${f1(72 + 5)},${ey + 10} ${f1(72 + 3.5)},${ey + 14}" fill="none" stroke="#87ceeb" stroke-width="1.4" opacity=".65" stroke-linecap="round"/>`;
-  }
-  if (phase === 4) o += `<path d="M42,78 Q40,86 41,94" fill="none" stroke="#87ceeb" stroke-width="1.2" opacity=".3" stroke-linecap="round"/>`;
-  const hp = hairPieces(a, X, age, hc, { sy: 115, chest: 146 });
-  o += hp.front;
-  if (a.glasses === 1) o += `<g fill="none" stroke="${LINE}" stroke-width="1.7"><circle cx="48" cy="72" r="7.8"/><circle cx="72" cy="72" r="7.8"/><path d="M55.8,71 Q60,68.5 64.2,71 M40.2,71 L35,69 M79.8,71 L85,69"/></g>`;
-  if (a.glasses === 2) o += `<g fill="none" stroke="${LINE}" stroke-width="1.7"><rect x="39.5" y="65.5" width="17" height="12.5" rx="2.5"/><rect x="63.5" y="65.5" width="17" height="12.5" rx="2.5"/><path d="M56.5,71 L63.5,71 M39.5,70 L35,69 M80.5,70 L85,69"/></g>`;
-  return o + '</svg>';
-}
-
-/* ---------- 성적 흥분 시각 (aroused) ---------- */
 function arousalFX(level) {
   if (!level || level <= 30) return '';
   let o = '';
@@ -1219,7 +1098,6 @@ function render(a, size = 48, state = 25) {
   const age = st.age ?? 25, full = !!st.full, adult = age >= 20;
   const w = Math.round(size), h = Math.round(size * (full ? 7 / 3 : 4 / 3));
   if (!a) return `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 ${full ? 280 : 160}" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="${full ? 279 : 159}" rx="10"/></svg>`;
-  if (adult && st.duringIntimate != null) return renderDuringIntimate(a, size, st);
   if (adult && st.preIntimate) return renderPreIntimate(a, size, st);
   if (full) return renderFull(a, size, st);
   // 상반신 (0 0 120 160): 머리·어깨만

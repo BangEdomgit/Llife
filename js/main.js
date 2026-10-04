@@ -160,7 +160,7 @@ function renderWhere(S) {
 }
 
 /* ---------- 연출 (S.scene) ---------- */
-// 함께 밤을 보낸 뒤: ♂♀ 맞물림 → 💓 → 암전 → 다음 날 아침(초상화 + 아침 한 줄 + 바닥의 옷) → (임신이면) 정자·난자
+// 함께 밤을 보낸 뒤: 이불 들썩임 + 하트 → 다음 날 아침(초상화 + 아침 한 줄 + 바닥의 옷) → (임신이면) 정자·난자
 // 키스·포옹·끌어당기기: 실루엣 한 장. 행위 자체는 그리지 않음
 const sceneEl = $('#scene'), sceneBox = $('#sceneBox');
 const calm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -204,229 +204,16 @@ function morningCard(sc, p) {
   return `<p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
     <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
-function blanketSVG(shape, build) {
-  const bm = build === 'slim' ? .88 : build === 'chubby' ? 1.12 : 1;
-  const fsk = '#e2c3a0', fskD = '#b89071', fskL = '#f0d4b2'; // female: lighter
-  const msk = '#b89675', mskD = '#8a6a4a';                    // male: darker
-  const hrF = '#2a1e18', hrM = '#1e1612', nip = '#9a6650';
-  const mattress = `<rect x="0" y="92" width="200" height="10" rx="3" fill="#1e1814" opacity=".55"/><rect x="0" y="102" width="200" height="6" rx="2" fill="#261e18"/>`;
-  const pillow = `<ellipse cx="28" cy="80" rx="22" ry="9" fill="#e8dfd0" opacity=".7"/><ellipse cx="28" cy="78" rx="18" ry="6" fill="#f4ece0" opacity=".4"/>`;
-  let base = '', active = '';
-  if (shape === 'A') {
-    // 정상위: 여자 누움(아래), 남자 위에서 (base=여, active=남)
-    base = `<g class="pose-base">${pillow}
-      <!-- 여자 긴 머리 베개 위 퍼짐 -->
-      <path d="M12,72 Q8,80 10,88 Q16,90 22,86 Q18,78 20,70 Z" fill="${hrF}" opacity=".85"/>
-      <path d="M14,70 Q10,74 12,80 L18,80 Q20,74 20,70 Z" fill="${hrF}" opacity=".7"/>
-      <!-- 여자 머리 -->
-      <circle cx="30" cy="72" r="8.5" fill="${fsk}"/>
-      <path d="M22,70 Q22,62 30,61 Q38,62 38,70 Q38,74 36,76 L24,76 Q22,74 22,70 Z" fill="${hrF}" opacity=".92"/>
-      <!-- 얼굴 디테일: 눈 감김 + 입 -->
-      <path d="M26,72 Q27.5,71.5 29,72" stroke="${mskD}" stroke-width=".6" fill="none" opacity=".6"/>
-      <path d="M32,72 Q33.5,71.5 35,72" stroke="${mskD}" stroke-width=".6" fill="none" opacity=".6"/>
-      <ellipse cx="30.5" cy="76" rx="1.5" ry=".6" fill="#c75858" opacity=".55"/>
-      <!-- 목 -->
-      <path d="M27,78 L34,78 L35,82 L26,82 Z" fill="${fsk}"/>
-      <!-- 어깨→토르소→가슴(옆에서 본 반원) -->
-      <path d="M26,82 L35,82 Q42,82 48,83 L56,85 Q62,86 68,86 L80,88 L80,94 L38,94 Z" fill="${fsk}" opacity=".92"/>
-      <!-- 가슴 두 봉우리 (옆얼굴 뷰) -->
-      <path d="M48,83 Q52,78 56,79 Q58,82 56,85 Q53,86 48,85 Z" fill="${fsk}"/>
-      <circle cx="55" cy="81.5" r="${1.1 * bm}" fill="${nip}" opacity=".7"/>
-      <path d="M60,85 Q64,80 68,81 Q70,84 68,87 Q65,88 60,87 Z" fill="${fsk}" opacity=".9"/>
-      <circle cx="67" cy="83" r="${1 * bm}" fill="${nip}" opacity=".6"/>
-      <!-- 무릎 세운 다리(V자): 왼다리 세움 -->
-      <path d="M68,88 Q78,70 92,58 Q98,56 102,60 Q104,66 98,70 Q86,78 80,90 Z" fill="${fsk}" opacity=".9"/>
-      <!-- 오른다리 세움 -->
-      <path d="M76,90 Q90,74 106,66 Q112,66 114,72 Q112,76 108,78 Q94,86 86,94 Z" fill="${fsk}" opacity=".88"/>
-      <!-- 다리 음영 -->
-      <path d="M86,82 Q94,72 102,66" stroke="${fskD}" stroke-width=".8" fill="none" opacity=".5"/>
-    </g>`;
-    active = `<g class="pose-active">
-      <!-- 남자: 위에서 덮친 자세, 상체 아치 -->
-      <!-- 머리 (앞쪽 보고 숙임) -->
-      <circle cx="80" cy="40" r="7.5" fill="${msk}"/>
-      <path d="M72,38 Q72,30 80,30 Q88,30 88,38 Q88,42 86,44 L74,44 Q72,42 72,38 Z" fill="${hrM}" opacity=".95"/>
-      <path d="M74,36 L86,36" stroke="${hrM}" stroke-width="1" opacity=".7"/>
-      <!-- 목 뒤 -->
-      <path d="M77,46 L84,46 L84,50 L77,50 Z" fill="${msk}"/>
-      <!-- 넓은 어깨+등 아치(위에서 아래로 숙임) -->
-      <path d="M73,48 Q66,52 68,56 L74,60 Q78,66 82,72 L88,80 L96,82 Q100,80 98,76 L94,70 Q92,62 92,56 L94,50 Q92,46 86,46 Z" fill="${msk}" opacity=".95"/>
-      <!-- 등근육 음영 -->
-      <path d="M78,54 Q82,60 86,66" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
-      <!-- 왼팔 (여자 옆 바닥 짚기) -->
-      <path d="M70,52 Q58,58 52,70 Q50,76 54,80 Q58,80 60,76 Q66,66 74,60 Z" fill="${msk}" opacity=".92"/>
-      <circle cx="54" cy="78" r="3" fill="${msk}"/>
-      <!-- 오른팔 (여자 어깨 옆 짚기) -->
-      <path d="M90,50 Q104,54 112,66 Q114,72 110,76 Q106,76 104,72 Q96,62 88,56 Z" fill="${msk}" opacity=".9"/>
-      <circle cx="110" cy="74" r="3" fill="${msk}"/>
-      <!-- 엉덩이+다리 (뒤에서 보임) -->
-      <path d="M88,80 Q94,84 96,88 L100,94 L108,94 L106,88 Q104,82 100,80 Z" fill="${msk}" opacity=".88"/>
-      <path d="M94,88 L112,92 L118,94 L96,94 Z" fill="${msk}" opacity=".82"/>
-      <!-- 엉덩이 라인 -->
-      <path d="M94,84 Q98,86 102,88" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
-    </g>`;
-  } else if (shape === 'B') {
-    // 기승위: 남자 아래 누움(base), 여자 위에 올라탐(active)
-    base = `<g class="pose-base">${pillow}
-      <!-- 남자 머리 (베개 위) -->
-      <circle cx="30" cy="78" r="8" fill="${msk}"/>
-      <path d="M22,76 Q22,69 30,69 Q38,69 38,76 Q38,80 36,82 L24,82 Q22,80 22,76 Z" fill="${hrM}" opacity=".95"/>
-      <!-- 얼굴: 입 벌림 (쾌감) -->
-      <path d="M27,78 Q28,77.5 29,78" stroke="${mskD}" stroke-width=".7" fill="none" opacity=".65"/>
-      <path d="M31,78 Q32,77.5 33,78" stroke="${mskD}" stroke-width=".7" fill="none" opacity=".65"/>
-      <ellipse cx="30" cy="82" rx="1.6" ry="1" fill="#4a2a20" opacity=".65"/>
-      <!-- 목 -->
-      <path d="M27,84 L34,84 L35,88 L26,88 Z" fill="${msk}"/>
-      <!-- 남자 넓은 가슴·몸통 (누운) -->
-      <path d="M24,86 Q22,88 24,92 L80,92 Q86,92 90,90 L82,86 L46,84 Z" fill="${msk}" opacity=".92"/>
-      <!-- 가슴근육 라인 -->
-      <path d="M44,86 Q48,89 52,90" stroke="${mskD}" stroke-width=".9" fill="none" opacity=".55"/>
-      <path d="M58,86 Q62,89 66,90" stroke="${mskD}" stroke-width=".9" fill="none" opacity=".55"/>
-      <!-- 왼팔 (여자 허리 잡음) -->
-      <path d="M46,88 Q50,80 60,76 Q66,74 70,78 Q72,82 68,84 Q60,86 54,90 Z" fill="${msk}" opacity=".88"/>
-      <!-- 오른팔 -->
-      <path d="M66,88 Q70,80 80,76 Q86,74 90,78 Q92,82 88,84 Q80,86 74,90 Z" fill="${msk}" opacity=".88"/>
-    </g>`;
-    active = `<g class="pose-active">
-      <!-- 여자: 위에 올라타 상체 세움 (측면 뷰) -->
-      <!-- 긴 머리 등 뒤 -->
-      <path d="M74,24 Q68,28 68,38 Q68,48 72,52 Q76,46 76,36 Q76,28 74,24 Z" fill="${hrF}" opacity=".88"/>
-      <path d="M70,34 Q66,42 68,52" stroke="${hrF}" stroke-width=".8" fill="none" opacity=".6"/>
-      <!-- 머리 -->
-      <circle cx="80" cy="26" r="7.5" fill="${fsk}"/>
-      <path d="M72,24 Q72,16 80,16 Q88,16 88,24 Q88,28 86,30 L74,30 Q72,28 72,24 Z" fill="${hrF}" opacity=".95"/>
-      <!-- 얼굴 -->
-      <path d="M77,27 Q78,26.5 79,27" stroke="${mskD}" stroke-width=".6" fill="none" opacity=".7"/>
-      <path d="M82,27 Q83,26.5 84,27" stroke="${mskD}" stroke-width=".6" fill="none" opacity=".7"/>
-      <ellipse cx="80.5" cy="30.5" rx="1.3" ry=".6" fill="#c75858" opacity=".7"/>
-      <!-- 목 -->
-      <path d="M77,32 L84,32 L85,36 L76,36 Z" fill="${fsk}"/>
-      <!-- 상체 세움 (허리 S라인) -->
-      <path d="M74,36 Q68,46 70,58 Q72,70 76,78 L92,78 Q96,70 98,58 Q100,46 94,36 Z" fill="${fsk}" opacity=".93"/>
-      <!-- 가슴 두 봉우리 (측면이지만 정면 쪽) -->
-      <path d="M74,42 Q76,36 82,37 Q84,42 82,46 Q77,47 74,46 Z" fill="${fsk}"/>
-      <circle cx="81" cy="40" r="${1.3 * bm}" fill="${nip}" opacity=".75"/>
-      <path d="M86,42 Q88,36 94,37 Q96,42 94,46 Q89,47 86,46 Z" fill="${fskL}" opacity=".95"/>
-      <circle cx="93" cy="40" r="${1.3 * bm}" fill="${nip}" opacity=".75"/>
-      <!-- 배꼽 -->
-      <circle cx="84" cy="56" r=".8" fill="${fskD}" opacity=".5"/>
-      <!-- 허리 음영 -->
-      <path d="M72,52 Q84,54 96,52" stroke="${fskD}" stroke-width=".6" fill="none" opacity=".4"/>
-      <!-- 왼팔 (뒤로 짚음) -->
-      <path d="M72,46 Q62,54 58,66 Q58,72 62,74 Q66,74 66,70 Q68,60 76,52 Z" fill="${fsk}" opacity=".9"/>
-      <circle cx="62" cy="72" r="2.8" fill="${fsk}"/>
-      <!-- 오른팔 (앞으로 가슴/허리) -->
-      <path d="M96,46 Q106,54 110,66 Q110,72 106,74 Q102,74 102,70 Q100,60 92,52 Z" fill="${fsk}" opacity=".9"/>
-      <circle cx="106" cy="72" r="2.8" fill="${fsk}"/>
-      <!-- 다리: 남자 허리 양옆으로 벌림 (무릎 접음) -->
-      <path d="M76,78 Q68,84 64,92 L58,92 Q58,86 62,80 Q66,76 70,76 Z" fill="${fsk}" opacity=".88"/>
-      <path d="M92,78 Q100,84 104,92 L110,92 Q110,86 106,80 Q102,76 98,76 Z" fill="${fsk}" opacity=".88"/>
-    </g>`;
-  } else {
-    // 후배위: 여자 네발 (base), 남자 뒤에서 (active)
-    base = `<g class="pose-base">
-      <!-- 여자 긴 머리 아래로 -->
-      <path d="M24,52 Q18,62 20,74 Q24,78 30,74 Q28,66 30,56 Z" fill="${hrF}" opacity=".88"/>
-      <path d="M22,60 Q18,70 22,76" stroke="${hrF}" stroke-width=".8" fill="none" opacity=".6"/>
-      <!-- 머리 (앞으로 숙임) -->
-      <circle cx="30" cy="52" r="7.5" fill="${fsk}"/>
-      <path d="M22,50 Q22,42 30,42 Q38,42 38,50 Q38,54 36,56 L24,56 Q22,54 22,50 Z" fill="${hrF}" opacity=".95"/>
-      <!-- 목 (앞으로) -->
-      <path d="M30,58 L36,58 L38,64 L32,64 Z" fill="${fsk}"/>
-      <!-- 등 아치 (어깨→허리→엉덩이) -->
-      <path d="M32,60 Q40,58 50,58 L68,60 Q82,62 92,66 L102,72 Q104,76 102,80 L96,86 Q82,86 68,84 Q50,80 36,72 Q30,66 32,60 Z" fill="${fsk}" opacity=".94"/>
-      <!-- 등 중앙 음영 -->
-      <path d="M42,62 Q60,66 78,70 Q88,74 96,78" stroke="${fskD}" stroke-width=".9" fill="none" opacity=".5"/>
-      <!-- 엉덩이 라인 -->
-      <path d="M92,74 Q98,78 102,82" stroke="${fskD}" stroke-width=".9" fill="none" opacity=".55"/>
-      <!-- 아래로 늘어진 가슴 -->
-      <ellipse cx="48" cy="72" rx="${5 * bm}" ry="${7 * bm}" fill="${fsk}" opacity=".92"/>
-      <circle cx="48" cy="77" r="${1.3 * bm}" fill="${nip}" opacity=".75"/>
-      <ellipse cx="62" cy="72" rx="${5 * bm}" ry="${7 * bm}" fill="${fskL}" opacity=".95"/>
-      <circle cx="62" cy="77" r="${1.3 * bm}" fill="${nip}" opacity=".7"/>
-      <!-- 양팔 바닥 짚음 -->
-      <path d="M34,66 Q28,76 26,86 Q26,92 32,92 Q34,86 36,76 Z" fill="${fsk}" opacity=".9"/>
-      <circle cx="30" cy="90" r="3" fill="${fsk}"/>
-      <path d="M46,68 Q42,76 40,86 Q40,92 46,92 Q48,86 50,78 Z" fill="${fsk}" opacity=".88"/>
-      <circle cx="44" cy="90" r="3" fill="${fsk}"/>
-      <!-- 무릎 꿇은 다리 -->
-      <path d="M86,80 Q88,86 86,92 L78,92 Q76,86 78,80 Z" fill="${fsk}" opacity=".88"/>
-      <path d="M98,80 Q102,86 100,92 L92,92 Q90,86 92,80 Z" fill="${fsk}" opacity=".88"/>
-    </g>`;
-    active = `<g class="pose-active">
-      <!-- 남자: 여자 뒤에서 무릎 꿇음, 허리 잡음 -->
-      <!-- 머리 -->
-      <circle cx="140" cy="40" r="7.5" fill="${msk}"/>
-      <path d="M132,38 Q132,30 140,30 Q148,30 148,38 Q148,42 146,44 L134,44 Q132,42 132,38 Z" fill="${hrM}" opacity=".95"/>
-      <path d="M134,36 L146,36" stroke="${hrM}" stroke-width="1" opacity=".7"/>
-      <!-- 목 -->
-      <path d="M137,46 L144,46 L144,50 L137,50 Z" fill="${msk}"/>
-      <!-- 상체 (앞으로 숙임) -->
-      <path d="M132,50 Q126,54 128,62 L132,72 Q136,78 142,80 L150,80 Q156,78 158,72 L160,62 Q162,54 156,50 Z" fill="${msk}" opacity=".94"/>
-      <!-- 가슴근육 -->
-      <path d="M136,58 Q140,60 142,62" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
-      <path d="M150,58 Q154,60 156,62" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
-      <!-- 왼팔 (여자 허리 잡음, 앞으로) -->
-      <path d="M130,56 Q118,62 108,70 Q104,74 108,78 Q112,78 116,74 Q124,66 134,62 Z" fill="${msk}" opacity=".9"/>
-      <circle cx="110" cy="76" r="2.8" fill="${msk}"/>
-      <!-- 오른팔 -->
-      <path d="M158,56 Q166,62 168,70 Q168,74 164,74 Q160,72 158,66 Z" fill="${msk}" opacity=".88"/>
-      <!-- 엉덩이+다리 (무릎 꿇음, 뒤에서) -->
-      <path d="M138,80 Q134,86 134,92 L144,92 L146,86 Z" fill="${msk}" opacity=".88"/>
-      <path d="M150,80 Q154,86 154,92 L164,92 L162,86 Z" fill="${msk}" opacity=".88"/>
-      <!-- 엉덩이 음영 -->
-      <path d="M140,82 Q148,82 156,82" stroke="${mskD}" stroke-width=".8" fill="none" opacity=".5"/>
-    </g>`;
-  }
-  return `<svg class="blanket-svg" viewBox="0 0 200 110">${mattress}${base}${active}</svg>`;
-}
-function phaseCard(sc, p, phase, shape, icon) {
-  const look = G.look(p), age = G.npcAge(p);
-  const avatarPhase = phase === 'climax' ? 3 : phase === 'end' ? 4 : phase;
-  const duringState = { age, duringIntimate: avatarPhase, personality: sc.personality || p.personality, fig: sc.fig };
-  const portrait = Avatar.render(look, 90, duringState);
-  const particles = phase === 'climax' ? Array.from({ length: 4 }, (_, i) => {
-    const dx = (Math.random() * 120 - 60) + 'px', dy = -(40 + Math.random() * 60) + 'px';
-    return `<div class="sc-particle" style="left:${20 + Math.random() * 60}%;top:${30 + Math.random() * 40}%;--dx:${dx};--dy:${dy};animation-delay:${i * .15}s"></div>`;
-  }).join('') : '';
-  const cls = typeof phase === 'number' ? `phase${phase + 1}` : phase === 'climax' ? 'phase-climax' : 'phase-end';
-  return `<div class="sc-phase ${cls}"><div class="portrait">${portrait}</div><div class="blanket-side"><div class="sym"><svg viewBox="0 0 100 56" aria-hidden="true"><g class="f-sym"><circle cx="58" cy="28" r="11" fill="none" stroke="#ff69b4" stroke-width="2.4"/><line x1="58" y1="39" x2="58" y2="52" stroke="#ff69b4" stroke-width="2.4"/><line x1="52" y1="46" x2="64" y2="46" stroke="#ff69b4" stroke-width="2.4"/></g><g class="m-sym"><circle cx="28" cy="28" r="11" fill="none" stroke="#4da6ff" stroke-width="2.4"/><line x1="39" y1="28" x2="66" y2="28" stroke="#4da6ff" stroke-width="2.4"/><polyline points="60,22 66,28 60,34" fill="none" stroke="#4da6ff" stroke-width="2.4"/></g></svg></div>${blanketSVG(shape, p.body && p.body.build)}<div class="beat-icon">${icon}</div></div><div class="sc-redden"></div>${particles ? `<div class="sc-particles">${particles}</div>` : ''}<div class="sc-flash"></div></div>`;
-}
-function foreplayCard(sc, p) {
-  const fl = p.gender === 'f';
-  const head = (cx, cy) => `<path d="M${cx},${cy - 13} C${cx - 12},${cy - 13} ${cx - 14},${cy - 4} ${cx - 13},${cy + 2} C${cx - 12},${cy + 8} ${cx - 8},${cy + 13} ${cx - 3},${cy + 15} L${cx + 3},${cy + 15} C${cx + 8},${cy + 13} ${cx + 12},${cy + 8} ${cx + 13},${cy + 2} C${cx + 14},${cy - 4} ${cx + 12},${cy - 13} ${cx},${cy - 13} Z" class="fp-fill"/>`;
-  const fBodyL = '<path d="M64,46 C56,48 52,56 51,64 C50,70 52,76 55,82 C51,88 49,98 49,110 C49,122 50,134 52,150 L62,150 L64,116 L68,150 L78,150 C80,134 82,122 82,110 C82,98 80,88 76,82 C79,76 80,70 79,64 C78,56 74,48 66,46 Z" class="fp-fill"/>';
-  const fBodyR = '<path d="M128,46 C120,48 116,56 115,64 C114,70 116,76 119,82 C115,88 113,98 113,110 C113,122 114,134 116,150 L126,150 L128,116 L132,150 L142,150 C144,134 146,122 146,110 C146,98 144,88 140,82 C143,76 144,70 143,64 C142,56 138,48 130,46 Z" class="fp-fill"/>';
-  const mBodyL = '<path d="M62,46 C54,48 48,54 47,64 C46,72 48,80 52,86 C48,92 46,102 46,114 C46,126 48,138 50,150 L62,150 L64,116 L68,150 L80,150 C82,138 84,126 84,114 C84,102 82,92 78,86 C82,80 84,72 83,64 C82,54 76,48 68,46 Z" class="fp-fill"/>';
-  const mBodyR = '<path d="M126,46 C118,48 112,54 111,64 C110,72 112,80 116,86 C112,92 110,102 110,114 C110,126 112,138 114,150 L126,150 L128,116 L132,150 L144,150 C146,138 148,126 148,114 C148,102 146,92 142,86 C146,80 148,72 147,64 C146,54 140,48 132,46 Z" class="fp-fill"/>';
-  const lBody = fl ? fBodyL : mBodyL, rBody = fl ? mBodyR : fBodyR;
-  const lH = fl ? 28 : 30, rH = fl ? 30 : 28;
-  const arm = '<path d="M78,68 Q92,60 110,66 Q114,72 110,76 Q94,66 80,74 Z" class="fp-fill"/>';
-  return `<div class="sc-foreplay"><svg viewBox="0 0 200 160">${head(64, lH)}${lBody}${head(128, rH)}${rBody}${arm}</svg></div>`;
-}
-function uterusSVG(preg) {
-  const anim = preg ? 'G' : 'B';
-  const sperm = [1, 2, 3, 4, 5, 6, 7].map(i => {
-    const x = 195 + (i % 3) * 12 - 12, delay = (i * .3).toFixed(1);
-    const dx = preg && i <= 2 ? -135 : -60 - i * 12, dy = preg && i <= 2 ? -155 : -80 - i * 8;
-    const fade = preg && i <= 2 ? 1 : 0;
-    return `<g class="sp-u" style="animation:spU${anim}${i} 3s ease-in ${delay}s forwards"><ellipse cx="${x}" cy="240" rx="4.5" ry="3" fill="#f4f4f4"/><path class="tail" d="M${x - 4.5},240 q-5,-4 -10,0 t-10,0 t-10,0" fill="none" stroke="#f4f4f4" stroke-width="1.3"/></g>
-      <style>@keyframes spU${anim}${i}{0%{transform:translate(0,0);opacity:1}60%{opacity:${fade || .8}}100%{transform:translate(${dx}px,${dy}px);opacity:${fade}}}</style>`;
-  }).join('');
-  return `<div class="sc-uterus"><svg viewBox="0 0 400 280">
-    <defs><radialGradient id="ug" cx="50%" cy="40%"><stop offset="0" stop-color="#fde0d8" stop-opacity=".5"/><stop offset="1" stop-color="#e4a098" stop-opacity=".3"/></radialGradient></defs>
-    <path d="M155,85 C155,55 170,40 200,40 C230,40 245,55 245,85 L245,185 Q245,225 200,225 Q155,225 155,185 Z" fill="url(#ug)"/>
-    <path d="M155,85 C155,55 170,40 200,40 C230,40 245,55 245,85 L245,185 Q245,225 200,225 Q155,225 155,185 Z" fill="none" stroke="#d98a7e" stroke-width="5" stroke-linejoin="round"/>
-    <path d="M161,85 C161,58 174,46 200,46 C226,46 239,58 239,85 L239,183 Q239,219 200,219 Q161,219 161,183 Z" fill="none" stroke="#e4a8a0" stroke-width="2" opacity=".5"/>
-    <path d="M155,85 Q130,60 95,52 Q72,48 55,55 Q42,62 38,78" fill="none" stroke="#d98a7e" stroke-width="5" stroke-linecap="round"/>
-    <path d="M38,78 Q34,86 28,88 Q20,90 16,84 Q12,76 18,68 Q24,60 36,56" fill="none" stroke="#d98a7e" stroke-width="3.5" stroke-linecap="round"/>
-    <path d="M245,85 Q270,60 305,52 Q328,48 345,55 Q358,62 362,78" fill="none" stroke="#d98a7e" stroke-width="5" stroke-linecap="round"/>
-    <path d="M362,78 Q366,86 372,88 Q380,90 384,84 Q388,76 382,68 Q376,60 364,56" fill="none" stroke="#d98a7e" stroke-width="3.5" stroke-linecap="round"/>
-    <ellipse class="ovary" cx="28" cy="75" rx="16" ry="12"/><circle cx="24" cy="72" r="4" fill="#fff2e6" opacity=".7"/><circle cx="32" cy="78" r="3" fill="#fff2e6" opacity=".5"/>
-    <ellipse class="ovary" cx="372" cy="75" rx="16" ry="12"/><circle cx="368" cy="72" r="4" fill="#fff2e6" opacity=".7"/><circle cx="376" cy="78" r="3" fill="#fff2e6" opacity=".5"/>
-    <path d="M185,230 Q200,245 215,230" fill="none" stroke="#d98a7e" stroke-width="4" stroke-linecap="round"/>
-    ${sperm}${preg ? '<circle class="egg-target" cx="38" cy="72" r="6" fill="#ffd9a8" opacity="0" style="animation:eggGlow .6s ease-out 3.2s forwards"/><style>@keyframes eggGlow{to{opacity:.85;r:14}}</style>' : ''}</svg></div>`;
-}
+// 그날 밤: 침대 위 이불이 들썩이고 하트가 피어오름. 행위 자체는 그리지 않음
+const HEART = 'M0,5 C-7,0 -6,-6 -2.5,-6 C-1,-6 0,-5 0,-4 C0,-5 1,-6 2.5,-6 C6,-6 7,0 0,5 Z';
+const NIGHT = `<svg class="bed" viewBox="0 0 240 140" aria-hidden="true">
+  <rect x="178" y="14" width="40" height="34" rx="2" class="win"/><path d="M206,24 a8,8 0 1 0 4,14 a6.5,6.5 0 1 1 -4,-14 Z" class="moon"/>
+  <rect x="22" y="48" width="9" height="66" rx="2" class="wood"/><rect x="24" y="102" width="194" height="12" rx="2" class="wood"/>
+  <rect x="28" y="114" width="6" height="10" class="wood"/><rect x="208" y="114" width="6" height="10" class="wood"/>
+  <rect x="31" y="90" width="185" height="13" rx="4" class="mat"/><ellipse cx="52" cy="85" rx="19" ry="7" class="pillow"/>
+  <g class="quilt"><path d="M38,99 C36,78 58,66 82,72 C98,58 140,58 158,72 C180,66 214,76 216,99 Z"/>
+    <path d="M74,96 C78,86 82,78 86,74 M118,98 Q124,82 120,66 M166,96 C170,88 172,80 168,74" class="fold"/></g>
+  ${[[92, 0], [128, .35], [110, .7], [146, 1.05], [100, 1.4], [136, 1.75]].map(([x, d]) => `<g transform="translate(${x},62)"><path class="ht" d="${HEART}" style="animation-delay:${d}s"/></g>`).join('')}</svg>`;
 function playScene(sc) {
   const p = G.person(sc.pid);
   if (!p || !window.Avatar) { G.clearScene(); return; }
@@ -437,24 +224,9 @@ function playScene(sc) {
     sceneCard(`<div class="sc-card">${SIL[sc.kind] || ''}<p>${esc(sc.text || '')}</p><button type="button" data-sc-next>계속</button></div>`);
     return;
   }
-  const internal = sc.contra === 'none' || sc.contra === 'pill';
-  const uterusQ = internal ? [`<div class="sc-card">${uterusSVG(!!sc.preg)}<p class="sc-later" style="color:#aaa;margin-top:8px">${sc.preg ? '몇 주 뒤…' : ''}</p><button type="button" data-sc-next>계속</button></div>`] : [];
   const morningQ = [`<div class="sc-card sc-morning">${morningCard(sc, p)}</div>`];
   const pregQ = sc.preg ? [`<div class="sc-card">${CONCEIVE}<p class="sc-later">몇 주 뒤…</p><button type="button" data-sc-next>계속</button></div>`] : [];
-  if (calm) {
-    sceneQueue = morningQ.concat(pregQ);
-    nextScene();
-    return;
-  }
-  sceneQueue = [
-    foreplayCard(sc, p),
-    phaseCard(sc, p, 0, 'A', '💓'),
-    phaseCard(sc, p, 1, 'A', '💓💓'),
-    phaseCard(sc, p, 2, 'B', '🔥'),
-    phaseCard(sc, p, 3, 'C', '🔥🔥'),
-    phaseCard(sc, p, 'climax', 'C', '💦'),
-    phaseCard(sc, p, 'end', 'A', ''),
-  ].concat(uterusQ, morningQ, pregQ);
+  sceneQueue = (calm ? [] : [`<div class="sc-night"><p class="sc-t">그날 밤</p>${NIGHT}</div>`]).concat(morningQ, pregQ);
   nextScene();
 }
 function nextScene() {
@@ -462,8 +234,7 @@ function nextScene() {
   if (sceneQueue.length) {
     const html = sceneQueue.shift();
     sceneCard(html);
-    const isPhase = sceneBox.querySelector('.sc-phase') || sceneBox.querySelector('.sc-foreplay') || sceneBox.querySelector('.sc-uterus');
-    if (isPhase) sceneTimer = setTimeout(nextScene, sceneBox.querySelector('.sc-foreplay') ? 1800 : sceneBox.querySelector('.sc-uterus') ? 3500 : sceneBox.querySelector('.phase-climax') ? 2200 : sceneBox.querySelector('.phase-end') ? 2000 : 2500);
+    if (sceneBox.querySelector('.sc-night')) sceneTimer = setTimeout(nextScene, 2800);
     return;
   }
   sceneEl.hidden = true; sceneBox.innerHTML = '';
@@ -477,7 +248,7 @@ function maybeScene(S) {
 }
 sceneEl.addEventListener('click', e => {
   if (e.target.closest('[data-sc-next]')) { nextScene(); return; }
-  if (sceneBox.querySelector('.sc-night') || sceneBox.querySelector('.sc-phase') || sceneBox.querySelector('.sc-foreplay') || sceneBox.querySelector('.sc-uterus')) nextScene();
+  if (sceneBox.querySelector('.sc-night')) nextScene();
 });
 
 /* ---------- 모달 ---------- */
