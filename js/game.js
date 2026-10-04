@@ -268,6 +268,7 @@ function applyP(p, delta, mult, gk) {
 function breakUp(p, grudge) {
   if (!p) return;
   p.partner = false; p.secret = false; p.ex = true; p.fling = false; p.fwb = false; p.livesWith = false;
+  p.wx = Object.assign({}, p.wx, { mono: (S.dayN || 0) + 60 });   // 이별하면 한동안 무채색 옷
   p.grudge = clamp(p.grudge + (grudge || 0), 0, 100);
   p.heart = Math.min(p.heart, 15);
 }
@@ -286,6 +287,7 @@ function endMain(grudge) {
 }
 function startRelation(p, sneaky) {
   if (sneaky || p.married) p.secret = true; else p.partner = true;   // 기혼인 상대와는 공개 연애가 안 됨
+  p.wx = Object.assign({}, p.wx, { extra: Math.min(3, ((p.wx && p.wx.extra) || 0) + 1), mono: 0 });   // 연애 시작 → 옷장에 새 옷 한 벌
   p.taken = false; p.ex = false; p.fling = false; p.fwb = false;
   p.since = S.age;
 }
@@ -294,6 +296,7 @@ function startRelation(p, sneaky) {
 function night(p, fling) {
   if (!p) return;
   S.flags.intimate = true;
+  if (S.place && S.place !== 'home') S.sameClothes = (S.dayN || 0) + 1;   // 밖에서 밤을 보냄 → 다음 날 같은 옷 (동기·동료가 알아챌 수 있음)
   p.nights = (p.nights || 0) + 1;
   if (p.nightsAt !== S.age) { p.nightsAt = S.age; p.nightsYr = 0; }
   p.nightsYr++;
@@ -906,7 +909,7 @@ function currentEvent() {
   if (!ev) { S.pending.shift(); return currentEvent(); }
   Object.assign(S.vars, p.tv);
   const wp = p.who && person(p.who);
-  const who = wp ? { look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp), fig: figure(wp), libido: canSex(wp) ? wp.libido || 0 : 0 } : null;   // 나를 향한 성욕 → 표정
+  const who = wp ? { look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp), fig: figure(wp), libido: canSex(wp) ? wp.libido || 0 : 0, ctx: outfitCtx(wp, p.id) } : null;   // 나를 향한 성욕 → 표정
   return { text: p.text, who, choices: choicesOf(ev).map(c => fill(resolve(c.label))) };
 }
 function choose(i) {
@@ -1126,6 +1129,7 @@ function doDuty(auto) {
   S.ap -= n; S.used += n; S.zone = d.zone; S.place = null; S.here = [];
   updateTime();
   const tired = (S.fatigue || 0) >= 3 ? .6 : 1;
+  if (!auto && S.sameClothes === (S.dayN || 0) && (d.id === 'work' || d.id === 'class') && Math.random() < .55 && EVENTS.sameClothes) { S.sameClothes = -1; S.vars.dutyKind = d.id; fire(EVENTS.sameClothes); }   // 어제 옷 그대로 출근·등교
   if (d.id === 'work') {
     S.perf = clamp(S.perf + probRound((.12 + gIdx(S.stats.smart) * .02) * tired), 0, 100);
     if (!auto) log(pick(['출근했다. 하루가 길었다.', '회의, 메일, 회의. 퇴근길 하늘이 벌써 어두웠다.', '일을 마치고 퇴근했다.', '점심시간만 기다리며 오전을 버텼다.']), { t: 'info' });
@@ -1550,6 +1554,7 @@ function yearly() {
   // 외모 3층: 생김새는 40대부터 5년에 한 등급 / 꾸밈은 안 하면 떨어짐 / 몸은 운동 안 하면 빠짐 (40대는 운동해도 조금씩)
   if (a === 40 || a === 45) { st.face = gradeStep(st.face, -1); log('거울 속 얼굴에 세월이 보이기 시작했다.', { t: 'info' }); }
   if (a >= 13) st.style = Math.max(0, st.style - rand(D.styleDecay[0], D.styleDecay[1]));
+  if (S.closet) S.closet = S.closet.map(x => Object.assign({}, x, { q: Math.max(0, x.q - rand(8, 14)) })).filter(x => x.q > 5);   // 옷도 낡음
   const ex = S.vars.exN || 0;
   if (a >= 20) {
     const loss = a < 30 ? (ex ? 0 : rand(0, 2)) : a < 40 ? (ex >= 2 ? 0 : rand(1, 3)) : (ex >= 3 ? rand(0, 1) : rand(2, 5));
@@ -1692,7 +1697,7 @@ function actionList() {
   return pl.actions.map(id => ACTIONS[id]).filter(a => a && S.age >= a.minAge && (a.maxAge == null || S.age <= a.maxAge) && meets(a.req) && (!a.if || a.if(S)) && !(a.id === 'parttime' && S.flags.inArmy));
 }
 function canDo(a) { return !busy() && S.ap >= apOf(a) && !dutyPending() && (!costOf(a) || S.money >= costOf(a)); }
-const needsSubject = a => a.id === 'study' && inSchool();
+const needsSubject = a => (a.id === 'study' && inSchool()) || (a.id === 'shop' && S.age >= 13 && !!window.Outfit && !!S.look);
 // 공부할 과목 고르기 화면용: 지금 과목들의 예상 점수
 const studyInfo = () => subjectsNow().map(id => ({ id, label: SUB(id).label, exp: Math.round(expScore(id)), prep: Math.round((S.school.prep || {})[id] || 0) }));
 function doAction(id, subj) {
@@ -1718,6 +1723,15 @@ function doAction(id, subj) {
     else { escape(false); log('탈옥하다 붙잡혔다. 형기가 2년 늘었다.'); }
     after(); return;
   }
+  if (a.id === 'shop' && subj != null) {   // 오늘 파는 옷 중 하나 (가격만큼 돈, 꾸밈은 옷장 평균 쪽으로)
+    const it = shopToday()[+subj];
+    if (it) {
+      const d = buyItem(it), deltas = applyEffect({ money: -it.price, happy: rand(2, 4) });
+      if (d) deltas.push([LABEL.style, d]);
+      log(`${it.label}${josa(it.label, '을').slice(-1)} 샀다. 다음에 나갈 때 입어야지.`, { deltas });
+      maybeRandom([a.id, S.place]); after(); return;
+    }
+  }
   if (a.id === 'exercise' || a.id === 'play') S.vars.exN = (S.vars.exN || 0) + 1;
   asList(a.set).forEach(f => { S.flags[f] = true; });
   asList(a.unset).forEach(f => { delete S.flags[f]; });
@@ -1732,6 +1746,59 @@ function doAction(id, subj) {
   log(fill(textOf(a.text)), { deltas, memory: a.memoryChance ? Math.random() < a.memoryChance : false });
   maybeRandom([a.id, S.place]);
   after();
+}
+
+/* ═════════ 옷 (HAIR_CLOTHES_BODY 3부) ═════════ */
+// 그릴 때 넘기는 상황: 계절·날씨·장소·시간·요일 + 근무 중(출근복)·학교(교복)·집 밤(잠옷)·군복무 + 사람 정보(성격·취미·직업·꾸밈·산 옷)
+const SEASON_EN = { 봄: 'spring', 여름: 'summer', 가을: 'fall', 겨울: 'winter' };
+const JOB_PLACE = { 회사원: 'office', 은행원: 'office', 공무원: 'office', 프로그래머: 'office', 디자이너: 'office', 간호사: 'hospital', 선생님: 'school', 요리사: 'market', 자영업자: 'market', '배달 라이더': 'mall', 대학원생: 'campus', 프리랜서: 'cafe' };
+const EVENT_DRESS = [[/wedding|marry|Wedd/i, 'wedding'], [/funeral|Funeral/, 'funeral'], [/interview/i, 'interview'], [/beach|sea|swim/i, 'beach']];
+function outfitCtx(p, evId) {
+  const me = !p, age = me ? S.age : npcAge(p), hour = hourOf(S.used), wk = isWeekend(), dayN = S.dayN || 0;
+  const here = me ? S.place : (S.place && hereEntry(p.id) ? S.place : null);
+  const ctx = { season: SEASON_EN[season().id] || 'spring', weather: S.weather, place: here, hour, weekend: wk, dayN };
+  if (me) {
+    ctx.home = !S.place || S.place === 'home';
+    ctx.army = !!S.flags.inArmy;
+    ctx.working = !!S.job && !wk && phase() === 'adult' && hour < 20 && !jailed();
+    ctx.school = age >= 13 && age <= 18 && ((!wk && hour < 18) || ['school', 'academy'].includes(S.place));
+    if (S.sameClothes === dayN) ctx.dayN = dayN - 1;   // 외박한 다음 날: 어제 옷 그대로
+    if (S.vars.dateWear && S.vars.dateWear.day === dayN && !ctx.working) ctx.outfitIx = S.vars.dateWear.ix;
+    ctx.who = { personality: S.personality, hobby: S.hobby, job: S.job, styleG: gIdx(S.stats.style), closet: S.closet || [], wx: S.wx };
+  } else {
+    const jp = p.npcJob && JOB_PLACE[p.npcJob];
+    ctx.working = !!p.npcJob && age >= 23 && !wk && hour >= 9 && hour < 19 && (!here || here === jp || here === orgPlace(p));
+    ctx.school = age >= 13 && age <= 18 && ((!wk && hour < 17) || here === 'school');
+    ctx.home = !!(p.livesWith || p.spouse) && (!S.place || S.place === 'home') && (hour >= 22 || hour < 7);
+    ctx.who = { personality: p.personality, hobby: p.hobby, job: age >= 23 ? p.npcJob : null, styleG: p.style ?? 2, wx: p.wx };
+  }
+  if (evId) for (const [re, ev] of EVENT_DRESS) if (re.test(evId)) { ctx.event = ev; break; }
+  return ctx;
+}
+// 쇼핑 (3-7): 번화가·쇼핑몰에서 오늘 파는 옷 3벌 → 사면 옷장에 들어가 다음 외출부터 입음. 꾸밈은 옷장 평균 쪽으로 움직임
+const shopToday = () => window.Outfit && S.look ? Outfit.shopItems(S.gender, S.age, SEASON_EN[season().id] || 'spring', `${S.id}:${S.dayN}:${S.place}`) : [];
+const closetAvg = () => { const q = (S.closet || []).map(x => x.q).sort((a, b) => b - a).slice(0, 5); return q.length ? q.reduce((a, b) => a + b, 0) / q.length : null; };
+function buyItem(it) {
+  S.closet = (S.closet || []).concat([{ slot: it.slot, k: it.k, c: it.c, q: it.q, w: it.w, cut: it.cut, day: S.dayN || 0 }]).slice(-20);
+  const before = S.stats.style, avg = closetAvg();
+  S.stats.style = clamp(Math.round(Math.max(before + 2, lerp(before, avg, .35))), 0, 100);
+  return S.stats.style - before;
+}
+// 데이트 옷 고르기: 옷장에서 지금 계절에 맞는 3벌 (꾸밈 점수 순 + 다양하게) → 상대 성격 취향과 맞으면 설렘 보너스
+function dateOutfits() {
+  if (!window.Outfit || !S.look) return [];
+  const ctx = outfitCtx(null), W = Outfit.wardrobe(S.look, S.age, ctx.who), list = W.list.map((o, ix) => ({ o, ix })).filter(x => x.o.season === ctx.season);
+  const seen = new Set(), pick3 = (list.length ? list : W.list.map((o, ix) => ({ o, ix }))).sort((a, b) => b.o.score - a.o.score).filter(x => { const d = Outfit.describe(x.o); if (seen.has(d)) return false; seen.add(d); return true; }).slice(0, 3);
+  return pick3.map(x => ({ ix: x.ix, label: Outfit.describe(x.o), score: Math.round(x.o.score * 10) / 10 }));
+}
+function dateDress(p) {
+  const ix = S.vars.dateOutfit;
+  delete S.vars.dateOutfit;
+  if (ix == null || !window.Outfit || !S.look) return null;
+  const ctx = outfitCtx(null), o = Outfit.wardrobe(S.look, S.age, ctx.who).list[ix];
+  if (!o) return null;
+  S.vars.dateWear = { ix, day: S.dayN || 0 };   // 오늘 하루는 이 옷
+  return { liked: Outfit.likes(p.personality, o), score: o.score, label: Outfit.describe(o) };
 }
 
 /* ═════════ 장소 ═════════ */
@@ -2104,6 +2171,7 @@ function jobOdds(j) {
   let o = j.odds ?? .7;
   if (j.major && j.major.includes(S.school.dept)) o += .15;   // 관련 학과면 유리
   if (S.record) o *= .5;
+  if ((S.closet || []).some(x => ['blazer', 'slacks', 'pencil', 'suitdress', 'longcoat'].includes(x.k)) || gIdx(S.stats.style) >= 4) o += .05;   // 면접에 입고 갈 단정한 옷
   return clamp(o, .05, .95);
 }
 function hire(j) {
@@ -2273,7 +2341,7 @@ function myProfile() {
 
 /* ═════════ 데이터에서 쓰는 도구 ═════════ */
 const api = {
-  rand, pick, josa, money: fmtMoney,
+  rand, pick, josa, money: fmtMoney, dateDress,
   givenName: g => pick(g === 'm' ? D.namesM : g === 'f' ? D.namesF : D.namesM.concat(D.namesF)),
   meet: spec => addPerson(spec),
   person, npcAge, canRomance, heartOk, jailed, gradeMin, gradeOf, pGrade,
@@ -2665,6 +2733,7 @@ function upgrade(s) {
   s.v = 5;
   if (s.stats.face == null) { s.stats.face = s.stats.looks ?? gradeValue(pickKey(D.faceStart)); delete s.stats.looks; }
   if (s.stats.style == null) s.stats.style = 20;
+  if (!s.closet) s.closet = [];   // 옷장 (산 옷)
   if (s.stats.libido == null) s.stats.libido = s.age >= C.sexMinAge ? 30 : 0;
   if (s.sexSkill == null) { s.sexSkill = s.flags.intimate ? 40 : 0; s.drunk = 0; }
   if (s.flags.intimate) s.flags.hadSex = true;
@@ -2730,7 +2799,7 @@ window.Game = {
   },
   // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
   phase, timeInfo, storyNext, nextTurn, eat, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
-  actionList, canDo, costOf, doAction, needsSubject,
+  actionList, canDo, costOf, doAction, needsSubject, shopToday, outfitCtx: (p, evId) => outfitCtx(p || null, evId), dateOutfits, setDateOutfit: ix => { S.vars.dateOutfit = ix; },
   places: placeList, goPlace, leavePlace, here: hereList, talkTo, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
   intimacy: p => canSex(p) && (p.nights || lover(p) || p.teased) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,

@@ -155,6 +155,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .tag{font-size:11.5px;padding:2px 7px;border:1px solid var(--panel-border);border-radius:3px;color:var(--text-dim)}
 .tag.warn{color:var(--minus);border-color:currentColor}
 .igrid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.shop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.shop-it{display:grid;justify-items:center;gap:4px;padding:6px 4px;font-size:12px;text-align:center;line-height:1.3}
+.shop-it small{color:var(--text-dim);font-size:11px}
 .igrid button{padding:9px 6px;font-size:13px;text-align:left}
 .igrid small{color:var(--text-dim);font-size:11px}
 .back{justify-self:start;padding:6px 12px;font-size:13px}

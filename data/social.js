@@ -262,8 +262,10 @@ GAME_DATA.social = [
   { id: 'date', label: '데이트', icon: '💕',
     if: (s, p, a) => lover(p) && s.age >= 19 && !a.jailed(),
     cost: () => 10,
-    run: (s, p) => ({ p: { heart: [5, 10], close: [3, 5] }, effect: { happy: [2, 4] }, risk: p.secret ? .18 : 0,
-      text: ['{p|와} 처음 가보는 동네를 걸었다.', '{p|와} 늦게까지 이야기를 나눴다.', '{p|와} 바다를 보러 갔다.', '{p|와} 집에서 영화를 봤다.'] }) },
+    // 데이트 옷 (HAIR_CLOTHES_BODY 3-7): "뭐 입고 갈까?"에서 고른 옷이 상대 취향이면 설렘 보너스
+    run: (s, p, a) => { const dd = a.dateDress(p), base = ['{p|와} 처음 가보는 동네를 걸었다.', '{p|와} 늦게까지 이야기를 나눴다.', '{p|와} 바다를 보러 갔다.', '{p|와} 집에서 영화를 봤다.'];
+      return { p: { heart: dd && dd.liked ? [9, 14] : [5, 10], close: [3, 5] }, effect: { happy: dd && dd.liked ? [3, 5] : [2, 4] }, risk: p.secret ? .18 : 0,
+        text: dd && dd.liked ? base.map(t => t + ' {p|은} 오늘 옷이 잘 어울린다며 몇 번이나 다시 쳐다봤다.') : base }; } },
 
   { id: 'propose', label: '청혼하기', icon: '💍',
     if: (s, p, a) => p.partner && p.heart >= 65 && p.trust >= 50 && s.age >= 22 && !a.jailed(),

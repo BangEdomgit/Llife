@@ -30,7 +30,9 @@
 <div class="checks" id="checks"></div>
 <div id="rows"></div>
 <div id="faces"></div>
+<div id="hcb"></div>
 <script src="js/face.js"></script>
+<script src="js/outfit.js"></script>
 <script src="js/avatar.js"></script>
 <script>
 const A = window.Avatar;
@@ -103,6 +105,26 @@ function drawFaces() {
     + `<section><h2>얼굴 3 · 같은 시드 남·녀 (머리 없이)</h2><div class="row" style="flex-wrap:wrap">${row3}</div></section>`;
 }
 drawFaces();
+
+// ── 체형·머리·옷 (HAIR_CLOTHES_BODY.md 테스트 시트) ──
+// 1. 같은 얼굴·같은 옷으로 build 4종 × 남녀 = 8명 (체형이 구분되는지)
+// 2. 같은 얼굴·같은 체형으로 머리 스타일 32종 (실루엣만 봐도 구분되는지) + 앞머리 9종
+// 3. 한 NPC의 사계절 + 출근 + 데이트 + 잠옷 = 7벌 (같은 사람으로 보이는지)
+function drawHCB() {
+  const box = document.getElementById('hcb'), cell = (svg, lab) => `<div class="fig">${svg}<span class="lab">${lab}</span></div>`, O = window.Outfit;
+  const same = g => ({ inner: { k: 'tee', c: '#8d8d92' }, bottom: { k: 'jeans', c: O.N.denim, cut: 'straight' }, shoes: { k: 'sneaker', c: O.N.white }, acc: {} });
+  const BL = { slim: '마름', avg: '보통', fit: '근육', chubby: '통통' };
+  const row1 = ['f', 'm'].flatMap(g => Object.keys(BL).map(b => { const a = A.make('hcb-' + g, g); a.body = Object.assign({}, a.body, { build: b }); a.hacc = null; return cell(A.render(a, 96, { age: 27, full: true, outfit: same(g), pose: 'default' }), `${g === 'f' ? '여' : '남'} ${BL[b]}`); })).join('');
+  const row2 = ['f', 'm'].flatMap(g => A.parts.hair[g].map((lab, i) => { const a = A.make('hcb-h' + g, g); a.hair = i; a.hv = 2; a.hc = 1; a.hacc = null; return cell(A.render(a, 64, { age: 26 }), `${g === 'f' ? '여' : '남'} ${lab}`); })).join('')
+    + A.parts.front.map(f => { const a = A.make('hcb-hf', 'f'); a.hair = 0; a.hv = 2; a.hc = 1; a.front = f.id; a.hacc = null; return cell(A.render(a, 64, { age: 26 }), f.label); }).join('');
+  const who = { personality: 'warm', hobby: 'fashion', job: '회사원', styleG: 3 }, npc = A.make('hcb-npc', 'f', who);
+  const CT = [['봄', { season: 'spring', dayN: 3 }], ['여름', { season: 'summer', dayN: 4 }], ['가을', { season: 'fall', dayN: 5 }], ['겨울', { season: 'winter', dayN: 6 }], ['출근', { season: 'spring', working: true, dayN: 7 }], ['데이트', { season: 'fall', event: 'date', dayN: 8 }], ['잠옷', { season: 'fall', home: true, hour: 23, dayN: 9 }]];
+  const row3 = CT.map(([lab, c]) => { const ctx = Object.assign({ who }, c); return cell(A.render(npc, 96, { age: 29, full: true, ctx, personality: who.personality }), `${lab}<br><span class="num">${O.describe(O.pick(npc, 29, ctx))}</span>`); }).join('');
+  box.innerHTML = `<section><h2>체형 1 · 같은 얼굴·같은 옷 — build 4종 × 남녀</h2><div class="row" style="flex-wrap:wrap">${row1}</div></section>`
+    + `<section><h2>머리 · 같은 얼굴 — 스타일 여 18 · 남 14 + 앞머리 9종</h2><div class="row" style="flex-wrap:wrap">${row2}</div></section>`
+    + `<section><h2>옷 · 한 사람의 사계절 + 출근 + 데이트 + 잠옷</h2><div class="row" style="flex-wrap:wrap">${row3}</div></section>`;
+}
+drawHCB();
 </script>
 </body>
 </html>

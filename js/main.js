@@ -22,11 +22,12 @@ const genderKo = g => g === 'm' ? '남' : '여';
 const isMoney = k => k === 'money';
 const pbar = p => { const n = Math.round(p * 5); return '▰'.repeat(n) + '▱'.repeat(5 - n); };
 // 아바타 크기: 관계 목록 32×42 / 장소 48×64 / 상세·이벤트 60×80
-const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, { age: G.npcAge(p), libido: G.canSex(p) ? p.libido || 0 : 0, fig: G.figure(p) }) : '';   // 화면 속 사람은 늘 나를 대하고 있음 → 나를 향한 성욕(p.libido)만큼 표정이 달라짐 (어른 이성만). 체형 수치 → 전신과 같은 어깨·가슴
+const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, { age: G.npcAge(p), libido: G.canSex(p) ? p.libido || 0 : 0, fig: G.figure(p), ctx: G.outfitCtx(p) }) : '';   // 화면 속 사람은 늘 나를 대하고 있음 → 나를 향한 성욕(p.libido)만큼 표정이 달라짐 (어른 이성만). 체형 수치 → 전신과 같은 어깨·가슴
 // 누르면 전신으로 펼쳐지는 초상화 (20살부터 키·허리·골반 수치가 실루엣에 반영)
 const avBtn = (key, html) => `<button type="button" class="av-btn" data-full="${key}" aria-label="${fullView === key ? '접기' : '전신 보기'}" title="${fullView === key ? '접기' : '전신 보기'}">${html}</button>`;
 // 전신: 성격에 따라 기본 자세가 다름 (직진형·낙천형 한 손 허리, 냉철형·무심형 팔짱)
-const fullAv = (look, age, fig, personality, ring) => window.Avatar ? `<div class="p-full">${Avatar.render(look, 132, { age, full: age >= 20 && fig ? fig : true, personality, ring })}</div>` : '';
+//   ctx: 지금 상황(계절·장소·시간·근무…) → 그 상황에 맞게 옷장에서 꺼내 입은 옷 (js/outfit.js)
+const fullAv = (look, age, fig, personality, ring, ctx) => window.Avatar ? `<div class="p-full">${Avatar.render(look, 132, { age, full: age >= 20 && fig ? fig : true, personality, ring, ctx })}</div>` : '';
 function abHTML(k, v) {
   const g = G.gradeInfo(v);
   return `<span class="ab" title="${v}"><span>${G.LABEL[k]}</span><span class="g g-${g.letter}">${g.letter}</span><span class="pb">${pbar(g.pct)}</span></span>`;
@@ -149,7 +150,8 @@ function render(S) {
   else if (modalMode === 'jobs') openJobs();
   else if (modalMode === 'crime') openCrime();
   else if (modalMode === 'me') openMe();
-  else if (modalMode === 'study') closeModal();
+  else if (modalMode === 'study' || modalMode === 'shop') closeModal();
+  else if (modalMode === 'dateDress') openPerson(modalArg);   // 데이트 옷을 고르고 나면 그 사람 창으로
 }
 
 /* ---------- 하단: 장소 고르기 → 거기 있는 사람 + 할 수 있는 것 ---------- */
@@ -341,7 +343,7 @@ function openEvent() {
   const ev = G.currentEvent();
   if (!ev) { if (modalMode === 'event') closeModal(); return; }   // 사라진 이벤트 창이 남지 않게
   const S = G.state(), se = G.season();
-  const who = ev.who && window.Avatar ? `<div class="ev-who">${Avatar.render(ev.who.look, 60, { age: ev.who.age, fig: ev.who.fig, libido: ev.who.libido || 0 })}<span><b>${esc(ev.who.name)}</b><br><span class="dim">${ev.who.age}살, ${esc(ev.who.rel)}</span></span></div>` : '';
+  const who = ev.who && window.Avatar ? `<div class="ev-who">${Avatar.render(ev.who.look, 60, { age: ev.who.age, fig: ev.who.fig, libido: ev.who.libido || 0, ctx: ev.who.ctx })}<span><b>${esc(ev.who.name)}</b><br><span class="dim">${ev.who.age}살, ${esc(ev.who.rel)}</span></span></div>` : '';
   showModal('event', `${S.age}살 ${se.icon} ${se.id} ${wxIcon(S.weather)}`,
     `${who}<p>${esc(ev.text)}</p><div class="choices">${ev.choices.map((c, i) => `<button type="button" data-c="${i}">[${i + 1}] ${esc(c)}</button>`).join('')}</div>`, false, ev.text);
 }
@@ -470,7 +472,7 @@ function openPerson(id) {
     `<button type="button" data-i="${it.id}"${it.ok ? '' : ' disabled'}>${it.icon} ${it.label}${it.cost ? ` <small>${G.fmtMoney(it.cost)}</small>` : ''}${anyFree && !it.free ? ' <small>행동 1</small>' : ''}</button>`).join('');
   showModal('person', `${G.pname(p)}`, `
     <div class="p-top">${avBtn(id, av(p, 60))}<div class="p-who"><b>${esc(G.pname(p))}${G.marker(p) ? ` <span class="mk">${G.marker(p)}</span>` : ''}</b><span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}, ${esc(G.relLabel(p))}${G.acquaintance(p) ? ' (얼굴만 아는 사이)' : ''}</span></div></div>
-    ${fullView === id ? fullAv(G.look(p), G.npcAge(p), G.figure(p), p.personality, G.ringVisible(p)) : ''}
+    ${fullView === id ? fullAv(G.look(p), G.npcAge(p), G.figure(p), p.personality, G.ringVisible(p), G.outfitCtx(p)) : ''}
     <div class="stats">${stats}</div>
     ${imHTML}
     ${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}
@@ -549,6 +551,26 @@ function openStudy() {
     <p class="hint">다음 시험까지 쌓이는 공부: 한 과목에 집중하면 +8~10, 골고루 하면 과목마다 +3~5. 숫자는 지금 예상 점수(괄호는 이번 시험을 위해 쌓은 공부).</p>`);
 }
 
+// 쇼핑 (HAIR_CLOTHES_BODY 3-7): 오늘 파는 옷 3벌 — 내가 입은 모습 미리보기, 사면 옷장에 들어가 다음 외출부터 입음
+function openShop() {
+  const S = G.state(), look = G.myLook(), ctx = Object.assign(G.outfitCtx(null), { working: false, home: false }), fig = G.figure(null);
+  const base = window.Outfit && look ? Outfit.pick(look, S.age, ctx) : null;
+  const rows = G.shopToday().map((it, i) => {
+    const of = base ? JSON.parse(JSON.stringify(base)) : null;
+    if (of) { if (it.slot === 'dress') { delete of.inner; delete of.bottom; of.dress = { k: it.k, c: it.c }; } else { if (it.slot === 'inner') delete of.dress; of[it.slot] = { k: it.k, c: it.c, cut: it.cut }; if (it.slot === 'inner' && !of.bottom) of.bottom = { k: 'jeans', c: '#4a5f86', cut: 'straight' }; } }
+    const pv = of && window.Avatar ? Avatar.render(look, 54, { age: S.age, full: S.age >= 20 && fig ? fig : true, outfit: of, pose: 'default' }) : '';
+    return `<button type="button" class="shop-it" data-shop="${i}"${S.money < it.price ? ' disabled' : ''}>${pv}<span><b>${esc(it.label)}</b><br><small>${G.fmtMoney(it.price)} · ${G.gradeInfo(it.q).letter}급</small></span></button>`;
+  }).join('');
+  showModal('shop', '🛍 뭘 살까?', `<div class="shop-grid">${rows}</div><div class="choices"><button type="button" data-shopskip>구경만 하기</button></div>
+    <p class="hint">산 옷은 옷장에 들어가 다음에 나갈 때 입는다. 꾸밈은 옷장에 있는 좋은 옷들의 평균 쪽으로 오른다 (옷은 해마다 낡음).</p>`);
+}
+// 데이트: 뭐 입고 갈까? — 내 옷장에서 지금 계절의 3벌. 상대 취향(성격)에 맞으면 설렘 보너스
+function openDateDress(pid) {
+  const S = G.state(), look = G.myLook(), ctx = G.outfitCtx(null), fig = G.figure(null), list = G.dateOutfits();
+  const rows = list.map(x => `<button type="button" class="shop-it" data-dd="${x.ix}">${window.Avatar ? Avatar.render(look, 54, { age: S.age, full: S.age >= 20 && fig ? fig : true, ctx: Object.assign({}, ctx, { outfitIx: x.ix, working: false }), pose: 'default' }) : ''}<span><b>${esc(x.label)}</b><br><small>꾸밈 ${x.score}</small></span></button>`).join('');
+  showModal('dateDress', '👗 뭐 입고 갈까?', `<div class="shop-grid">${rows}</div><p class="hint">상대 취향에 맞는 옷이면 설렘이 더 오른다 (다정형은 부드럽고 단정한 옷, 직진형은 과감한 옷, 냉철형은 단정한 정장 쪽…).</p>`, true, pid);
+}
+
 /* 나 */
 function openMe() {
   const S = G.state();
@@ -572,10 +594,10 @@ function openMe() {
     const uni = G.univLabel() ? `<div class="me-uni">${logo(sc.univ, 34)}<span>${esc(G.univLabel())} ${esc(G.majorLabel() || '')}${sc.gpaN ? `<br><span class="dim">학점 ${sc.gpa.toFixed(2)}${sc.degree ? ' · 졸업' : ''}</span>` : ''}</span></div>` : '';
     school = `<p class="sec-t">학교</p>${subj ? `<div class="subj">${subj}</div><p class="hint">예상 점수 (능력치 + 이번 시험을 위해 쌓은 공부·수업)</p>` : ''}${lines.map(l => `<p class="dim" style="font-size:13px">${esc(l)}</p>`).join('')}${uni}`;
   }
-  const me = G.myLook() && window.Avatar ? avBtn('me', Avatar.render(G.myLook(), 60, { age: S.age, fig: G.figure(null) })) : '';
+  const me = G.myLook() && window.Avatar ? avBtn('me', Avatar.render(G.myLook(), 60, { age: S.age, fig: G.figure(null), ctx: G.outfitCtx(null) })) : '';
   showModal('me', `📋 ${S.name}`, `
     <div class="me-top">${me}<dl class="prof">${prof}</dl></div>
-    ${fullView === 'me' && G.myLook() ? fullAv(G.myLook(), S.age, G.figure(null), S.personality) : ''}
+    ${fullView === 'me' && G.myLook() ? fullAv(G.myLook(), S.age, G.figure(null), S.personality, false, G.outfitCtx(null)) : ''}
     ${S.preg && S.preg.mode ? `<p class="dim" style="font-size:13px">${S.gender === 'f' ? '임신 중' : '곧 아이가 태어난다'} — ${S.preg.due > S.age ? '내년' : '올해'} 출산 예정</p>` : ''}
     <p class="sec-t">능력치</p>
     <div class="stats">${ab}</div>
@@ -856,7 +878,7 @@ mBody.addEventListener('input', e => {
 function openIntro() {
   const S = G.state(), it = S.intro;
   if (!it) return;
-  const me = G.myLook() && window.Avatar ? Avatar.render(G.myLook(), 58, { age: S.age, fig: G.figure(null) }) : '';
+  const me = G.myLook() && window.Avatar ? Avatar.render(G.myLook(), 58, { age: S.age, fig: G.figure(null), ctx: G.outfitCtx(null) }) : '';
   const lines = it.lines.map(([i, t, sub]) => `<p class="il"><span class="ii">${i}</span><span>${esc(t)}${sub ? `<br><small class="dim">${esc(sub)}</small>` : ''}</span></p>`).join('');
   showModal('intro', '나의 20년', `<div class="intro">
     <div class="intro-top">${me}<span><b>${esc(S.name)}</b><br><span class="dim">스무 살 · ${S.date.y}년 3월 1일</span></span></div>
@@ -931,7 +953,7 @@ $('#where').addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   const d = b.dataset;
-  if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) openStudy(); else G.doAction(d.a); }
+  if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) (a.id === 'shop' ? openShop() : openStudy()); else G.doAction(d.a); }
   else if (d.pl) G.goPlace(d.pl);
   else if ('leave' in d) G.leavePlace();
   else if ('endco' in d) G.endCompany();
@@ -984,11 +1006,15 @@ mBody.addEventListener('click', e => {
     return;
   }
   if (d.s) { G.doAction('study', d.s === 'all' ? null : d.s); return; }
+  if (d.shop != null) { closeModal(); G.doAction('shop', +d.shop); return; }
+  if ('shopskip' in d) { closeModal(); G.doAction('shop'); return; }
+  if (d.dd != null) { const pid = modalArg; G.setDateOutfit(+d.dd); G.interact(pid, 'date'); return; }
   if (d.c != null) G.choose(+d.c);
   else if (d.full) { fullView = fullView === d.full ? null : d.full; if (d.full === 'me') openMe(); else openPerson(d.full); }
   else if (d.pv) { personFrom = 'people'; openPerson(d.pv); }
   else if ('acq' in d) { showAcq = !showAcq; openPeople(); }
   else if (d.pf) { peopleFilter = d.pf; openPeople(); }
+  else if (d.i === 'date' && G.dateOutfits().length) openDateDress(modalArg);
   else if (d.i) G.interact(modalArg, d.i);
   else if (d.talk) { const id = G.talkTo(d.talk); if (id && !G.state().pending.length) { personFrom = 'here'; openPerson(id); } }
   else if ('back' in d) { if (modalMode === 'stranger' || personFrom === 'here') closeModal(); else openPeople(); }

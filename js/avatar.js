@@ -669,7 +669,7 @@ const HACC = ['claw', 'snap', 'tie', 'scrunchie', 'ribbon', 'band', 'cap', 'bean
 const HACC_LABEL = { claw: '집게핀', snap: '똑딱핀', tie: '머리끈', scrunchie: '곱창밴드', ribbon: '리본', band: '헤어밴드', cap: '볼캡', beanie: '비니', scarf: '헤어 스카프' };
 function hairAcc(a, X, st, plan, age, ctx) {
   if (age < 4) return null;
-  let id = a.hacc !== undefined ? a.hacc : null;
+  let id = ctx && ctx.hat ? ctx.hat : a.hacc !== undefined ? a.hacc : null;
   if (id === null && a.hacc === undefined) {   // 예전 저장: 실핀(1)·머리띠(2)는 그대로, 새로 만든 사람은 20%
     if (X.pin === 1) id = 'snap'; else if (X.pin === 2) id = 'band';
     else if (plan.roll.acc < (a.g === 'f' ? .2 : .1)) {   // 여자 20%, 남자 10% (남자는 볼캡·비니만)
@@ -679,6 +679,7 @@ function hairAcc(a, X, st, plan, age, ctx) {
     }
   }
   if (!id) return null;
+  if (ctx && ctx.noHat && (id === 'cap' || id === 'beanie' || id === 'scarf')) return null;   // 함께 밤·다음 날 아침엔 모자 없음
   if (id === 'beanie' && ctx && ctx.season && ctx.season !== 'winter') return null;   // 비니는 겨울
   if (id === 'cap' && ctx && ctx.weekend === false) return null;                      // 볼캡은 주말
   if (st.buzz && (id === 'snap' || id === 'claw' || id === 'band' || id === 'ribbon')) return null;
@@ -901,43 +902,33 @@ function legPath(F, s) {
     L${X(ax - ah)},${f1(F.ankle)} C${X(ax - ah)},${f1(F.ankle - 10)} ${X(kx - ch * .78)},${f1(calfY + 4)} ${X(kx - ch * .8)},${f1(calfY - F.legs * .03)} C${X(kx - kh - .4)},${f1(F.knee + F.legs * .05)} ${X(kx - kh)},${f1(F.knee)} ${X(kx - kh)},${f1(F.knee - 2)}
     C${X(kx - kh - .6)},${f1(F.knee - F.legs * .2)} ${X(2.4)},${f1(F.crotch + F.legs * .1)} ${X(1.2)},${f1(F.crotch)} Z`, kx, kh, ax, ah, cx };
 }
-// 하의 종류와 색. 바지 cut: skinny(다리 윤곽 +0.5) / straight(무릎 아래 일자) / wide(골반부터 벌어짐)
-function bottomOf(a, X, age, F) {
-  const kid = age <= 12, teen = age >= 13 && age <= 18;
-  if (teen) return F.f ? { k: 'skirt', c: UNIFORM.skirt, uniform: true } : { k: 'slacks', c: UNIFORM.blazer, cut: 'straight' };
-  if (kid) return F.f ? (X.pants < .55 ? { k: 'skirt', c: ['#c25a6b', '#6aa3c8', '#d0a443'][a.tc % 3] } : { k: 'shorts', c: ['#4a5f86', '#c25a6b', '#5f8f6a'][a.tc % 3] })
-    : (X.pants < .6 ? { k: 'shorts', c: ['#4a5f86', '#7a8a5a', '#3b3e48'][a.tc % 3] } : { k: 'jeans', c: '#4a5f86', cut: 'straight' });
-  if (F.f && (a.tc + a.top) % 3 !== 0) return { k: 'skirt', c: ['#2e2e36', '#8a6f5a', '#5b4a78', '#7d2f3d'][a.tc % 4] };
-  if (!F.f && a.top === 1) return { k: 'slacks', c: X.pants < .5 ? '#3b3e48' : '#2e3440', tucked: true, cut: 'straight' };
-  const cut = X.hem < .5 ? 'skinny' : 'straight';
-  return X.pants < .6 ? { k: 'jeans', c: '#4a5f86', cut } : X.pants < .8 ? { k: 'slacks', c: F.f ? '#3b3e48' : '#a08a63', chino: !F.f, cut: F.f && X.hem < .45 ? 'wide' : 'straight' } : { k: 'jeans', c: '#2f3b55', cut };
-}
-// 신발: 운동화 / 구두 / 굽 있는 구두 / 슬리퍼 — 나이·하의에 따라
-function shoeOf(X, age, F, bt) {
-  if (age <= 12) return 'sneaker';
-  if (age <= 18) return X.shoe < .5 ? 'loafer' : 'sneaker';
-  if (F.f) return bt.k === 'skirt' ? (X.shoe < .7 ? 'heel' : 'sneaker') : X.shoe < .25 ? 'heel' : X.shoe < .88 ? 'sneaker' : 'slipper';
-  return bt.k === 'slacks' && !bt.chino ? 'loafer' : X.shoe < .87 ? 'sneaker' : 'slipper';
-}
-function shoe(type, x, y, s, w, skin, a) {
+// 신발 (정면, 발목 x·y가 기준, s 바깥쪽 방향, w 발 반폭) — 운동화·러닝화·로퍼·구두·힐·앵클부츠·롱부츠·슬리퍼·샌들·어그·장화
+//   부츠의 목(종아리까지 올라오는 부분)은 lowerFull이 다리 윤곽을 따라 따로 그림
+function shoe(type, x, y, s, w, skin, c) {
   const X = dx => f1(x + s * dx), Y = dy => f1(y + dy);
+  const body_ = `M${X(-w - 2.6)},${Y(1)} Q${X(-w - 3.8)},${Y(8)} ${X(-w)},${Y(9)} L${X(w + 2.6)},${Y(9)} Q${X(w + 6)},${Y(8.6)} ${X(w + 4.8)},${Y(3)} Q${X(w + 1.4)},${Y(-1.8)} ${f1(x)},${Y(-2)} Q${X(-w - 1)},${Y(-1.8)} ${X(-w - 2.6)},${Y(1)} Z`;
   if (type === 'heel') {   // 뾰족한 앞코 + 굽, 발등이 보임
-    const c = ['#2b2724', '#8c2f3a', '#c9a98b'][a.tc % 3];
     return `<path d="M${X(-3.4)},${Y(-1)} Q${f1(x)},${Y(1.6)} ${X(3.6)},${Y(-1)} L${X(3.4)},${Y(2.6)} Q${f1(x)},${Y(4)} ${X(-3.2)},${Y(2.6)} Z" fill="${skin}"/>
       <path d="M${X(2.4)},${Y(5)} l${f1(s * 1.5)},0 l${f1(-s * .2)},5.4 l${f1(-s * 1)},0 Z" fill="${shade(c, .7)}"/>
       <path d="M${X(-4.8)},${Y(1.6)} Q${f1(x)},${Y(5)} ${X(4.8)},${Y(1.6)} L${X(3.4)},${Y(8.4)} Q${f1(x)},${Y(11.4)} ${X(-3.4)},${Y(8.4)} Z" fill="${c}"/>
       <path d="M${X(-1.6)},${Y(4.6)} q1.4,1.2 3,0" fill="none" stroke="#fff" stroke-width=".9" opacity=".35"/>`;
   }
   if (type === 'slipper') return `<ellipse cx="${f1(x)}" cy="${Y(6.4)}" rx="${f1(w + 2.4)}" ry="2.6" fill="${skin}"/>
-    <path d="M${X(-w - 4)},${Y(6.4)} Q${f1(x)},${Y(11.6)} ${X(w + 4)},${Y(6.4)} L${X(w + 4)},${Y(8.6)} Q${f1(x)},${Y(12.6)} ${X(-w - 4)},${Y(8.6)} Z" fill="#5b6b7a"/>
-    <path d="M${X(-w - 2.6)},${Y(5.2)} Q${f1(x)},${Y(2.2)} ${X(w + 2.6)},${Y(5.2)} L${X(w + 3)},${Y(8)} Q${f1(x)},${Y(5.4)} ${X(-w - 3)},${Y(8)} Z" fill="#3e8a7a"/>`;
-  const body_ = `M${X(-w - 2.6)},${Y(1)} Q${X(-w - 3.8)},${Y(8)} ${X(-w)},${Y(9)} L${X(w + 2.6)},${Y(9)} Q${X(w + 6)},${Y(8.6)} ${X(w + 4.8)},${Y(3)} Q${X(w + 1.4)},${Y(-1.8)} ${f1(x)},${Y(-2)} Q${X(-w - 1)},${Y(-1.8)} ${X(-w - 2.6)},${Y(1)} Z`;
-  if (type === 'loafer') return `<path d="${body_}" fill="#2a211d"/><path d="M${X(-w - 2.6)},${Y(8)} Q${f1(x)},${Y(10.4)} ${X(w + 4.6)},${Y(8)}" fill="none" stroke="#120d0b" stroke-width="1.4"/>
-    <path d="M${X(-1.4)},${Y(2)} q2.4,-1.2 4.6,.4" fill="none" stroke="#fff" stroke-width="1" opacity=".25"/>`;
-  const c = ['#eceae6', '#e2e4ea', '#d9534f', '#3b3e48'][(a.tc + a.top) % 4], light = c === '#eceae6' || c === '#e2e4ea';   // 운동화: 밑창 + 끈
+    <path d="M${X(-w - 4)},${Y(6.4)} Q${f1(x)},${Y(11.6)} ${X(w + 4)},${Y(6.4)} L${X(w + 4)},${Y(8.6)} Q${f1(x)},${Y(12.6)} ${X(-w - 4)},${Y(8.6)} Z" fill="${shade(c, .8)}"/>
+    <path d="M${X(-w - 2.6)},${Y(5.2)} Q${f1(x)},${Y(2.2)} ${X(w + 2.6)},${Y(5.2)} L${X(w + 3)},${Y(8)} Q${f1(x)},${Y(5.4)} ${X(-w - 3)},${Y(8)} Z" fill="${c}"/>`;
+  if (type === 'sandal') return `<path d="${body_}" fill="${skin}"/><path d="M${X(-w - 3.2)},${Y(7.6)} Q${f1(x)},${Y(10.6)} ${X(w + 5.4)},${Y(7.6)} L${X(w + 5)},${Y(9.6)} Q${f1(x)},${Y(11.8)} ${X(-w - 3)},${Y(9.6)} Z" fill="${shade(c, .75)}"/>
+    <path d="M${X(-w - 2)},${Y(2.4)} L${X(w + 4)},${Y(2.4)} M${X(-w - 2.6)},${Y(6)} L${X(w + 4.8)},${Y(6)}" stroke="${c}" stroke-width="1.7" stroke-linecap="round"/>`;
+  if (type === 'loafer' || type === 'dress' || type === 'ankleboot' || type === 'longboot') {
+    const pointy = type === 'dress';
+    return `<path d="${body_}" fill="${c}"/><path d="M${X(-w - 2.6)},${Y(8)} Q${f1(x)},${Y(10.4)} ${X(w + 4.6)},${Y(8)}" fill="none" stroke="${shade(c, .55)}" stroke-width="1.4"/>
+      <path d="M${X(-1.4)},${Y(2)} q2.4,-1.2 4.6,.4" fill="none" stroke="#fff" stroke-width="1" opacity="${pointy ? .4 : .25}"/>` + (type === 'loafer' ? `<path d="M${X(-2.6)},${Y(1)} L${X(3.4)},${Y(1)}" stroke="${shade(c, .6)}" stroke-width="1"/>` : pointy ? `<path d="M${X(-1)},${Y(-.6)} L${X(2.4)},${Y(-.6)}" stroke="${shade(c, .6)}" stroke-width=".8"/>` : '');
+  }
+  if (type === 'ugg' || type === 'rainboot') return `<path d="${body_}" fill="${c}"/><path d="M${X(-w - 3)},${Y(8.2)} Q${f1(x)},${Y(10.6)} ${X(w + 5)},${Y(8.2)}" fill="none" stroke="${shade(c, .65)}" stroke-width="1.6"/>` + (type === 'rainboot' ? `<path d="M${X(-.6)},${Y(1.6)} q2.4,-1.4 4.6,.4" fill="none" stroke="#fff" stroke-width="1.2" opacity=".55"/>` : '');
+  const light = c === '#f2efe9' || c === '#eceae6' || c === '#e2e4ea' || c === '#c9c7c2';   // 운동화·러닝화: 밑창 + 끈 (러닝화는 옆 줄)
   return `<path d="${body_}" fill="${c}"/>
     <path d="M${X(-w - 3.2)},${Y(6.8)} Q${f1(x)},${Y(9.6)} ${X(w + 5.4)},${Y(6.8)} L${X(w + 5)},${Y(9.4)} Q${f1(x)},${Y(11.6)} ${X(-w - 3)},${Y(9.4)} Z" fill="#f7f6f3" stroke="${light ? '#b9b5ad' : shade(c, .75)}" stroke-width=".6"/>
-    <path d="M${X(-1.8)},${Y(.4)} L${X(2.4)},${Y(2)} M${X(-1.8)},${Y(2.4)} L${X(2.4)},${Y(.6)}" stroke="${light ? '#9aa2ad' : '#fff'}" stroke-width=".9" stroke-linecap="round"/>`;
+    <path d="M${X(-1.8)},${Y(.4)} L${X(2.4)},${Y(2)} M${X(-1.8)},${Y(2.4)} L${X(2.4)},${Y(.6)}" stroke="${light ? '#9aa2ad' : '#fff'}" stroke-width=".9" stroke-linecap="round"/>` +
+    (type === 'runner' ? `<path d="M${X(w - 1)},${Y(4.6)} Q${X(w + 2.4)},${Y(3)} ${X(w + 4.4)},${Y(5.4)}" fill="none" stroke="${light ? '#e2722b' : '#fff'}" stroke-width="1.3" stroke-linecap="round"/>` : '');
 }
 // 손: 엄지만 분리된 벙어리장갑 모양 (손목이 원점, 아래로 길이 약 15.7)
 const mittIn = skin => `<path d="M-4.4,-1.5 C-5.2,4.5 -4.8,10.6 -1.4,12.6 C1.8,14.2 4.9,11.8 4.8,7.6 L4.8,-1.5 Z" fill="${skin}"/>
@@ -994,16 +985,17 @@ function anchorsOf(a, age, fig) {
   // 둘레 (cm). 데이터에 없는 둘레는 추정
   let C, cup = null;
   if (adult && f) {
-    const waist = (fig && fig.waist) || ({ slim: 59, fit: 62, chubby: 73 }[build] || 64);
-    const hip = (fig && fig.hip) || ({ slim: 85, fit: 91, chubby: 99 }[build] || 90);
+    // 체형 4종이 눈에 보이게 (1-9): 마름은 허리·골반이 좁고, 통통은 허리·골반·허벅지가 넓음
+    const waist = (fig && fig.waist) || ({ slim: 57, fit: 62, chubby: 78 }[build] || 64);
+    const hip = (fig && fig.hip) || ({ slim: 83, fit: 91, chubby: 104 }[build] || 90);
     cup = fig && CUP_DIFF[fig.cup] != null ? fig.cup : ({ small: 'A', large: 'D' }[b.chest] || 'B');
     const ub = (fig && fig.under) || waist + 8;
     C = { shoulder: 37 + ({ slim: -1, fit: 1, chubby: 2 }[build] || 0), underbust: ub, bust: ub + CUP_DIFF[cup], waist, hip, thigh: hip * .58 };
     C.calf = C.thigh * .62;
   } else if (adult) {
     const shoulder = (fig && fig.shoulder) || ({ narrow: 39.5, wide: 48 }[b.shoulder] || 43.5);
-    const waist = (fig && fig.waist) || ({ slim: 71, fit: 76, chubby: 90 }[build] || 78);
-    C = { shoulder, chest: (fig && fig.bust) || shoulder * 2.1, waist, hip: (fig && fig.hip) || waist + 10 };
+    const waist = (fig && fig.waist) || ({ slim: 68, fit: 74, chubby: 96 }[build] || 78);
+    C = { shoulder: shoulder + (!(fig && fig.shoulder) ? ({ slim: -1.5, fit: 2 }[build] || 0) : 0), chest: (fig && fig.bust) || shoulder * 2.1 + ({ fit: 4, chubby: 6 }[build] || 0), waist, hip: (fig && fig.hip) || waist + (build === 'slim' ? 12 : 10) };
     C.thigh = C.hip * .56; C.calf = C.thigh * .64;
   } else {   // 어린이: 가슴·허리·골반이 거의 같은 일자 몸 → 10대: 성별 평균 체형 쪽으로
     const t = clamp((age - 11) / 8, 0, 1), T = f ? { shoulder: 36, chest: 78, waist: 65, hip: 88 } : { shoulder: 42, chest: 88, waist: 73, hip: 89 };
@@ -1025,7 +1017,7 @@ function anchorsOf(a, age, fig) {
   // 팔·손·발
   // 팔 (HAIR_CLOTHES_BODY 1-2): 상완 굵기 기준 앵커 5개 — 어깨 1 / 상완 중간 .95(근육형 1.05, 이두 볼록) / 팔꿈치 .75 / 전완 .85 / 손목 .55
   //   남자가 굵고 여자는 가늘게. 손 길이 = 머리 .55 (= 키 .1), 폭 = 손목 1.3 (손바닥이 허벅지를 향해 옆에서 보이는 손)
-  const bm = adult ? { slim: .9, fit: 1.13, chubby: 1.24 }[build] || 1 : 1;
+  const bm = adult ? { slim: .84, fit: 1.15, chubby: 1.3 }[build] || 1 : 1;
   const arm = { uw: H * lerp(.0425, f ? .0385 : .047, grown) * bm, hand: H * .1 };
   arm.mw = arm.uw * (adult && build === 'fit' ? 1.05 : .95); arm.ew = arm.uw * .75; arm.fw = arm.uw * .85; arm.ww = arm.uw * .55;
   // 반폭
@@ -1033,7 +1025,7 @@ function anchorsOf(a, age, fig) {
   w.waist = half(E.waist, KW.waist) - (fitM ? 2 : 0);
   w.hip = half(E.hip, KW.hip);
   // 여자 어깨는 골반 폭쯤 (어깨 ≤ 골반, 1-8) — 10대 중반부터 점점
-  if (f && age >= 13) w.sh = lerp(w.sh, 12 + w.hip * .45 + ({ slim: -.4, fit: .6 }[build] || 0), grown);
+  if (f && age >= 13) w.sh = lerp(w.sh, 12 + w.hip * .45 + ({ slim: -.4, fit: 1.4 }[build] || 0), grown);
   if (f && adult) w.sh = Math.max(w.sh, half(E.underbust || E.waist + 8, KW.underbust) + 3.2);   // 가슴 둘레보다 어깨가 좁으면 팔이 벌어짐
   if (adult && f) {
     w.ub = half(E.underbust, KW.underbust); w.rib = w.ub + 1;   // rib: 가슴 높이의 몸통 (가슴 볼륨 뺀 폭)
@@ -1052,7 +1044,7 @@ function anchorsOf(a, age, fig) {
   // 다리 (한쪽): 허벅지 → 무릎(허벅지의 .68) → 종아리 → 발목(종아리의 .55)
   // 다리 (1-5): 허벅지(굵음) → 무릎(좁음, 살짝 안쪽) → 종아리(바깥 볼록) → 발목(가장 좁음). 허벅지 사이: 마름 넓게 / 보통 조금 / 근육·통통 붙음
   const gap = adult ? ({ slim: 4, avg: 1.2 }[build] ?? 0) : kid ? 2 : 1.5;
-  const thighW = Math.min(pxW(E.thigh, 1) * (adult && build === 'chubby' ? 1.06 : 1), w.hip - .8 - gap / 2), kneeW = thighW * (adult && build === 'slim' ? .64 : .68);
+  const thighW = Math.min(pxW(E.thigh, 1) * (adult && build === 'chubby' ? 1.1 : adult && build === 'slim' ? .92 : 1), w.hip - .8 - gap / 2), kneeW = thighW * (adult && build === 'slim' ? .64 : .68);
   const calfW = clamp(pxW(E.calf, 1) * (adult && build === 'fit' ? 1.08 : 1), kneeW * 1.04, thighW * .92), ankleW = calfW * .55, foot = H * .136;
   const leg = { gap, thighW, kneeW, calfW, ankleW, ct: gap / 2 + thighW / 2, ck: kneeW / 2 + (f ? .2 : 1.2) + gap * .3, cc: calfW / 2 + (f ? 1.2 : 2.2) + gap * .3 };
   leg.ca = Math.max(ankleW / 2 + (f ? 2 : 3) + gap * .3, foot * .28);
@@ -1108,74 +1100,109 @@ function shoulderR(A, e = 0, drop = 0) {
     [w.sh + e * .6 + A.delt + drop * .3, y.sh + uw * .55 + drop]];
 }
 
-// 하의 + 다리 + 신발. 바지·치마는 다리·골반 윤곽 + 여유분
-function lowerFull(a, X, age, A, skin, bt, ST) {   // ST: 짝다리 (renderFull의 stanceOf) — 신발 위치·뒤꿈치
-  const { y, w, leg: L } = A, k = A.hs, dk = shade(bt.c, .72), sw = v => f1(v * k);
+// 하의 + 다리 + 신발 (3-3·3-6). 바지·치마는 다리·골반 윤곽 + 여유분. OF: 지금 입은 한 벌 (js/outfit.js)
+//   바지 cut: skinny(다리 윤곽 +0.5) / straight(무릎 아래 일자) / wide(골반부터 벌어짐) / jogger(발목 골지) / short(허벅지에서 끝)
+//   치마: mini·pleats·aline·pencil·longskirt·denimskirt·uniSkirt. 원피스면 하의 없이 다리·신발만
+const SKIRTS = { mini: 1, pleats: 1, aline: 1, pencil: 1, longskirt: 1, denimskirt: 1, uniSkirt: 1 };
+const BOOT_TOP = { ankleboot: 'ankle', longboot: 'knee', ugg: 'calf', rainboot: 'calf' };
+function lowerFull(a, X, age, A, skin, OF, ST) {   // ST: 짝다리 (renderFull의 stanceOf) — 신발 위치·뒤꿈치
+  const { y, w, leg: L } = A, k = A.hs, sw = v => f1(v * k);
+  const bt = OF.dress ? { k: 'none', c: '#000' } : OF.bottom || { k: 'jeans', c: '#4a5f86', cut: 'straight' };
+  const dk = shade(bt.c, .72);
   // 신발 (1-6): 머리 .75 크기, 발끝이 살짝 바깥(6°), 바닥에 작은 타원 그림자 → 떠 보이지 않게
-  const shoeT = shoeOf(X, age, A, bt), kf = A.foot / 31 * (shoeT === 'heel' ? 1.2 : 1.06), sy0 = FLOOR - 10.4 * kf;
+  const sh = OF.shoes || { k: 'sneaker', c: '#eceae6' }, shoeT = sh.k, kf = A.foot / 31 * (shoeT === 'heel' ? 1.2 : 1.06), sy0 = FLOOR - 10.4 * kf;
   const shoes = `<ellipse cx="60" cy="${f1(FLOOR - .4)}" rx="${f1(L.ca + 11 * kf)}" ry="${f1(2.4 * kf)}" fill="#3a2a22" opacity=".13"/>` +
     [-1, 1].map(s => {
       const x0 = 60 + s * L.ca, fr = ST && s === ST.fs, x = ST ? ST.W(x0, FLOOR)[0] : x0, up = fr ? ST.heel : 0, rot = s * 6 + (fr ? s * 5 : 0);   // 짝다리: 쉬는 발은 뒤꿈치가 살짝 들리고 더 바깥으로
-      return `<g transform="translate(0,${f1(-up)}) rotate(${rot},${f1(x)},${FLOOR}) translate(${f1(x)},${f1(sy0)}) scale(${kf.toFixed(3)}) translate(${f1(-x)},${f1(-sy0)})">${shoe(shoeT, x, sy0, s, 4.4, skin, a)}</g>`;
+      return `<g transform="translate(0,${f1(-up)}) rotate(${rot},${f1(x)},${FLOOR}) translate(${f1(x)},${f1(sy0)}) scale(${kf.toFixed(3)}) translate(${f1(-x)},${f1(-sy0)})">${shoe(shoeT, x, sy0, s, 4.4, skin, sh.c)}</g>`;
     }).join('');
   const legD = s => { const { outer, inner } = legSide(A, s); return `M${P(60 + s * .2, y.hip)} L${P(...outer[0])}${crThrough(outer)} L${P(...inner[0])}${crThrough(inner)} Z`; };
   const bare = `<path d="${legD(-1)} ${legD(1)}" fill="${skin}"/>` +
-    `<path d="${[-1, 1].map(s => `M${P(60 + s * (L.ck - L.kneeW * .3), y.knee + 1)} q${f1(s * L.kneeW * .3)},${sw(1.4)} ${f1(s * L.kneeW * .6)},0`).join(' ')}" fill="none" stroke="${shade(skin, .78)}" stroke-width="${sw(1)}" opacity=".55"/>`;
+    `<path d="${[-1, 1].map(s => `M${P(60 + s * (L.ck - L.kneeW * .3), y.knee + 1)} q${f1(s * L.kneeW * .3)},${sw(1.4)} ${f1(s * L.kneeW * .6)},0`).join(' ')}" fill="none" stroke="${shade(skin, .78)}" stroke-width="${sw(1)}" opacity="${A.build === 'slim' ? .8 : .55}"/>`;
   const rl = legSide(A, 1), outAt = yy => edgeAt(rl.outer.map(([x, v]) => [x - 60, v]), yy), inAt = yy => edgeAt(rl.inner.slice().reverse().map(([x, v]) => [x - 60, v]), yy);
-  if (bt.k === 'skirt') {
-    const hemY = bt.uniform ? lerp(y.crotch, y.knee, .82) : age <= 12 ? lerp(y.crotch, y.knee, .55) : lerp(lerp(y.crotch, y.knee, .45), lerp(y.knee, y.calf, .6), X.hem);
-    const topY = y.waist + 1, pencil = !bt.uniform && age > 12 && X.hem > .6;
-    const ex = pencil ? 1 : 2, flare = pencil ? 0 : (hemY - y.hip) * .18 + (bt.uniform ? 2 : .5);
+  // 부츠 목: 발목에서 종아리·무릎까지 다리 윤곽 + 1.2
+  const bootTop = BOOT_TOP[shoeT], bootY = bootTop === 'ankle' ? y.ankle - 7 : bootTop === 'calf' ? lerp(y.calf, y.knee, .15) : bootTop === 'knee' ? y.knee - 2 : 0;
+  const shafts = bootTop ? [-1, 1].map(s => {
+    const X0 = dx => f1(60 + s * dx), o0 = outAt(bootY) + (shoeT === 'ugg' ? 2 : 1.2), i0 = Math.max(.6, inAt(bootY) - 1.2), oA = outAt(y.ankle) + 1.6, iA = Math.max(.6, inAt(y.ankle) - 1.6);
+    return `<path d="M${X0(i0)},${f1(bootY)} L${X0(o0)},${f1(bootY)} Q${X0(outAt(lerp(bootY, y.ankle, .5)) + 1.6)},${f1(lerp(bootY, y.ankle, .5))} ${X0(oA)},${f1(y.ankle + 3)} L${X0(iA)},${f1(y.ankle + 3)} Q${X0(Math.max(.6, inAt(lerp(bootY, y.ankle, .5)) - 1.2))},${f1(lerp(bootY, y.ankle, .5))} ${X0(i0)},${f1(bootY)} Z" fill="${sh.c}" stroke="${shade(sh.c, .6)}" stroke-width=".5"/>` +
+      (shoeT === 'ugg' ? `<path d="M${X0(i0)},${f1(bootY + 1)} L${X0(o0)},${f1(bootY + 1)}" stroke="${shade(sh.c, 1.25)}" stroke-width="${sw(2.4)}" stroke-linecap="round"/>` : shoeT === 'rainboot' ? `<path d="M${X0((i0 + o0) / 2 + 1)},${f1(bootY + 3)} L${X0((iA + oA) / 2 + 1)},${f1(y.ankle - 2)}" stroke="#fff" stroke-width="${sw(1.2)}" opacity=".45"/>` : '');
+  }).join('') : '';
+  const kind = bt.k;
+  if (kind === 'none') return { svg: bare + shoes + shafts, legs: bare, shoes: shoes + shafts, cloth: '', belt: '', hipEdge: w.hip };
+  if (SKIRTS[kind]) {
+    const uni = kind === 'uniSkirt', hemSel = bt.hem ?? X.hem;
+    const hemY = uni ? lerp(y.crotch, y.knee, .82) : age <= 12 ? lerp(y.crotch, y.knee, .55)
+      : kind === 'mini' || kind === 'denimskirt' ? lerp(y.crotch, y.knee, .42) : kind === 'longskirt' ? lerp(y.knee, y.calf, .9) : kind === 'pencil' ? lerp(y.knee, y.calf, .1 + hemSel * .3)
+      : kind === 'pleats' ? lerp(y.knee, y.calf, .35) : lerp(lerp(y.crotch, y.knee, .5), lerp(y.knee, y.calf, .5), hemSel);
+    const topY = y.waist + 1, pencil = kind === 'pencil';
+    const ex = pencil ? 1 : 2, flare = pencil ? 0 : (hemY - y.hip) * (kind === 'longskirt' ? .12 : kind === 'pleats' || uni ? .2 : .18) + (uni ? 2 : .5);
     const R = [[w.waist + 1, topY], [w.hipUp + ex * .8, y.hipUp], [w.hip + ex, y.hip], [pencil ? Math.max(outAt(hemY) + 1.5, w.hip - (hemY - y.hip) * .12) : w.hip + ex + flare, hemY]];
     const hw = R[3][0];
     let det;
-    if (bt.uniform) {   // 교복 치마: 주름선 + 체크 선
+    if (uni || kind === 'pleats') {   // 주름선 (교복은 + 체크 선)
       let pl = '';
-      for (let i = -2; i <= 2; i++) pl += `M${f1(60 + i * (w.hip + 2) * .36)},${f1(y.hip - 2)} L${f1(60 + i * hw * .42)},${f1(hemY)} `;
-      det = `<path d="${pl}" stroke="${dk}" stroke-width="${sw(1.1)}" opacity=".55"/><path d="M${f1(60 - hw + 1)},${f1(hemY - 9 * k)} L${f1(60 + hw - 1)},${f1(hemY - 9 * k)} M${f1(60 - w.hip)},${f1(y.hip + 6 * k)} L${f1(60 + w.hip)},${f1(y.hip + 6 * k)}" stroke="${shade(bt.c, 1.45)}" stroke-width="${sw(.9)}" opacity=".45"/>`;
+      for (let i = -3; i <= 3; i++) pl += `M${f1(60 + i * (w.hip + 2) * .27)},${f1(y.hip - 2)} L${f1(60 + i * hw * .31)},${f1(hemY)} `;
+      det = `<path d="${pl}" stroke="${dk}" stroke-width="${sw(1.1)}" opacity=".5"/>` + (uni ? `<path d="M${f1(60 - hw + 1)},${f1(hemY - 9 * k)} L${f1(60 + hw - 1)},${f1(hemY - 9 * k)} M${f1(60 - w.hip)},${f1(y.hip + 6 * k)} L${f1(60 + w.hip)},${f1(y.hip + 6 * k)}" stroke="${shade(bt.c, 1.45)}" stroke-width="${sw(.9)}" opacity=".45"/>` : '');
     } else if (pencil) det = `<path d="M60,${f1(hemY)} L60,${f1(hemY - 9 * k)} M${f1(60 - w.hip * .5)},${f1(y.hip + 2)} Q${f1(60 - w.hip * .45)},${f1(hemY - 6 * k)} ${f1(60 - w.hip * .38)},${f1(hemY - 2 * k)}" fill="none" stroke="${dk}" stroke-width="${sw(1.1)}" opacity=".4"/>`;   // 뒤트임 + 주름
     else det = `<path d="M${f1(60 - w.hip * .45)},${f1(y.hip + 3)} Q${f1(60 - w.hip * .55)},${f1(hemY - 8 * k)} ${f1(60 - hw * .7)},${f1(hemY)} M${f1(60 + w.hip * .4)},${f1(y.hip + 4)} Q${f1(60 + w.hip * .5)},${f1(hemY - 8 * k)} ${f1(60 + hw * .62)},${f1(hemY)}" fill="none" stroke="${dk}" stroke-width="${sw(1.2)}" opacity=".35"/>`;   // A라인 주름
+    if (kind === 'denimskirt') det += `<path d="M${f1(60 - w.waist)},${f1(topY + 5 * k)} Q${f1(60 - w.waist * .5)},${f1(y.hip)} ${f1(60 - w.hip * .9)},${f1(y.hip + 1)} M${f1(60 + w.waist)},${f1(topY + 5 * k)} Q${f1(60 + w.waist * .5)},${f1(y.hip)} ${f1(60 + w.hip * .9)},${f1(y.hip + 1)} M60,${f1(topY + 4 * k)} L60,${f1(hemY - 1)} M${f1(60 - hw + 1)},${f1(hemY - 2.4 * k)} L${f1(60 + hw - 1)},${f1(hemY - 2.4 * k)}" fill="none" stroke="#d2a659" stroke-width="${sw(.8)}" stroke-dasharray="${sw(2)} ${sw(1.4)}" opacity=".7"/>`;
     const band = `<path d="M${f1(60 - w.waist - 1)},${f1(topY)} L${f1(60 + w.waist + 1)},${f1(topY)} L${f1(60 + w.waist + 1.3)},${f1(topY + 4 * k)} L${f1(60 - w.waist - 1.3)},${f1(topY + 4 * k)} Z" fill="${dk}" opacity=".7"/>`;
     const cloth = `<path d="${symShape(R, hemY + 1.4, topY)}" fill="${bt.c}"/>` + det + band;
-    return { svg: bare + shoes + cloth, legs: bare, shoes, cloth, belt: '', hipEdge: w.hip + ex };
+    const over = shafts && bootTop !== 'ankle' ? shafts : '';   // 치마 아래 부츠는 다리 위로
+    return { svg: bare + shoes + (over ? '' : shafts) + cloth + over, legs: bare, shoes: shoes + shafts, cloth, belt: '', hipEdge: w.hip + ex };
   }
   // 바지·반바지: 허리 → 골반 → 다리 윤곽 + 여유분 (반바지는 허벅지에서 끝남)
-  const cut = bt.k === 'shorts' ? 'short' : bt.cut || 'straight', e = cut === 'skinny' ? .5 : 2;
-  const topY = pantsTop(A, bt), tw = A.at(topY) + .6, hemY = cut === 'short' ? lerp(y.crotch, y.knee, .35) : FLOOR - 9.5 * A.foot / 30;
-  const sh = { cK: L.ck + .3, cA: (L.ck + L.ca) / 2 + .5, hw: Math.max(L.kneeW / 2 + 2.6, L.calfW / 2 + 2.2) };   // 일자: 무릎 아래 직선
+  const short = kind === 'shorts' || kind === 'boardshorts';
+  const cut = short ? 'short' : kind === 'jogger' ? 'skinny' : kind === 'fireP' || kind === 'pajamaP' ? 'wide' : bt.cut || 'straight', e = cut === 'skinny' ? (kind === 'jogger' ? 1.4 : .5) : 2 + (kind === 'cargo' || kind === 'fireP' ? 1 : 0);
+  const tucked = !!OF.tuck;
+  const topY = tucked ? y.waist + 1 : lerp(y.waist, y.hip, .28), tw = A.at(topY) + .6;
+  const hemY = short ? lerp(y.crotch, y.knee, kind === 'boardshorts' ? .62 : .35) : kind === 'jogger' ? y.ankle + 1 : FLOOR - 9.5 * A.foot / 30;
+  const shp = { cK: L.ck + .3, cA: (L.ck + L.ca) / 2 + .5, hw: Math.max(L.kneeW / 2 + 2.6, L.calfW / 2 + 2.2) };   // 일자: 무릎 아래 직선
   const wd = { cA: Math.max(L.ca + 1.5, L.ct), hw: L.thighW * .5 + 2.5 };   // 와이드
   const hems = [];   // [[바깥 x, 안쪽 x], ...] 오른쪽
   const side = s => {
-    const X = dx => 60 + s * Math.max(-.3, dx), lo = legSide(A, s, e), crotch = [X(-.3), y.crotch + 1.5];
-    let oc = [[X(tw), topY], [X(w.hip + e), y.hip]], ol = [], ic;
-    if (cut === 'short') { oc.push([X(outAt(hemY) + e), hemY]); ic = [[X(inAt(hemY) - e), hemY], crotch]; }
-    else if (cut === 'skinny') { oc.push(...lo.outer.slice(1, -1), [X(L.ca + L.ankleW / 2 + e + .3), hemY]); ic = [[X(L.ca - L.ankleW / 2 - e - .3), hemY], ...lo.inner.slice(1, -1), crotch]; }
-    else if (cut === 'straight') { oc.push(lo.outer[1], [X(sh.cK + sh.hw), y.knee]); ol = [[X(sh.cA + sh.hw), hemY], [X(sh.cA - sh.hw), hemY]]; ic = [[X(sh.cK - sh.hw), y.knee], lo.inner[3], crotch]; }
-    else { oc.push([X(L.ct + L.thighW / 2 + e + 1), y.thigh]); ol = [[X(wd.cA + wd.hw), hemY], [X(Math.max(.8, wd.cA - wd.hw)), hemY]]; ic = [lo.inner[3], crotch]; }
+    const X0 = dx => 60 + s * Math.max(-.3, dx), lo = legSide(A, s, e), crotch = [X0(-.3), y.crotch + 1.5];
+    let oc = [[X0(tw), topY], [X0(w.hip + e), y.hip]], ol = [], ic;
+    if (cut === 'short') { oc.push([X0(outAt(hemY) + e + (kind === 'boardshorts' ? 1.5 : 0)), hemY]); ic = [[X0(inAt(hemY) - e - (kind === 'boardshorts' ? 1 : 0)), hemY], crotch]; }
+    else if (cut === 'skinny') { oc.push(...lo.outer.slice(1, -1), [X0(L.ca + L.ankleW / 2 + e + .3), hemY]); ic = [[X0(L.ca - L.ankleW / 2 - e - .3), hemY], ...lo.inner.slice(1, -1), crotch]; }
+    else if (cut === 'straight') { oc.push(lo.outer[1], [X0(shp.cK + shp.hw), y.knee]); ol = [[X0(shp.cA + shp.hw), hemY], [X0(shp.cA - shp.hw), hemY]]; ic = [[X0(shp.cK - shp.hw), y.knee], lo.inner[3], crotch]; }
+    else { oc.push([X0(L.ct + L.thighW / 2 + e + 1), y.thigh]); ol = [[X0(wd.cA + wd.hw), hemY], [X0(Math.max(.8, wd.cA - wd.hw)), hemY]]; ic = [lo.inner[3], crotch]; }
     if (s > 0) hems.push(ol.length ? [ol[0][0] - 60, ol[1][0] - 60] : [oc[oc.length - 1][0] - 60, ic[0][0] - 60]);
     return `M${P(60 - s * .6, topY)} L${P(...oc[0])}${crThrough(oc)}${ol.map(p => ` L${P(...p)}`).join('')} L${P(...ic[0])}${crThrough(ic)} L${P(60 - s * .6, y.crotch + 1.5)} Z`;
   };
-  let out = `<path d="${side(-1)}" fill="${bt.c}"/><path d="${side(1)}" fill="${bt.c}"/>`;   // 좌우를 한 path에 넣으면 겹친 가운데가 뚫림
+  const pid = `av${UID}b`, dL = side(-1), dR = side(1);
+  let out = `<path d="${dL}" fill="${bt.c}"/><path d="${dR}" fill="${bt.c}"/>`;   // 좌우를 한 path에 넣으면 겹친 가운데가 뚫림
   const [ho, hi] = hems[0], hc = (ho + hi) / 2;
-  const thighIn = L.ct - L.thighW / 2 - e, kneeIn = (cut === 'straight' ? sh.cK - sh.hw : L.ck - L.kneeW / 2 - e);
+  // 무늬: 잠옷 도트·체크, 셰프 바지 잔체크, 군복 위장, 보드숏 줄
+  const pat = bt.pat === 'same' && OF.inner ? OF.inner.pat : bt.pat || (kind === 'chefP' ? 'check' : kind === 'boardshorts' ? 'band' : null);
+  if (pat) out += `<clipPath id="${pid}"><path d="${dL} ${dR}"/></clipPath><g clip-path="url(#${pid})">${patternSVG(pat, bt.c, topY, hemY, 60 - ho - 3, 60 + ho + 3, k, pid)}</g>`;
+  const thighIn = L.ct - L.thighW / 2 - e, kneeIn = (cut === 'straight' ? shp.cK - shp.hw : L.ck - L.kneeW / 2 - e);
   const seamTo = cut === 'short' ? hemY : thighIn > .3 ? y.crotch + 1 : kneeIn > .3 ? lerp(y.thigh, y.knee, .5) : cut === 'wide' ? hemY : y.knee;   // 다리가 붙은 곳까지 안쪽 솔기
   out += `<path d="M60,${f1(topY + 2 * k)} L60,${f1(seamTo)}" stroke="${dk}" stroke-width="${sw(1)}" opacity=".6"/>`;
-  out += `<path d="M${f1(60 - ho)},${f1(hemY - 3.5 * k)} L${f1(60 - hi)},${f1(hemY - 3.5 * k)} M${f1(60 + hi)},${f1(hemY - 3.5 * k)} L${f1(60 + ho)},${f1(hemY - 3.5 * k)}" stroke="${dk}" stroke-width="${sw(1.1)}" opacity=".55"/>`;   // 밑단 접힘
-  if (cut !== 'short') {   // 무릎 가로 주름
-    const kc = cut === 'straight' ? sh.cK : L.ck, kw = cut === 'straight' ? sh.hw : L.kneeW / 2 + e;
-    out += `<path d="${[-1, 1].map(s => `M${P(60 + s * (kc - kw * .6), y.knee)} q${f1(s * kw * .6)},${sw(1.3)} ${f1(s * kw * 1.2)},0`).join(' ')}" fill="none" stroke="${dk}" stroke-width="${sw(1.1)}" opacity=".5"/>`;
+  if (kind === 'jogger') out += `<path d="${[-1, 1].map(s => `M${f1(60 + s * (L.ca - L.ankleW / 2 - e))},${f1(hemY - 4 * k)} L${f1(60 + s * (L.ca + L.ankleW / 2 + e))},${f1(hemY - 4 * k)}`).join(' ')}" stroke="${dk}" stroke-width="${sw(1.2)}" opacity=".7"/><path d="M58.4,${f1(topY + 2 * k)} l-1,${sw(6)} M61.6,${f1(topY + 2 * k)} l1,${sw(6)}" stroke="${shade(bt.c, 1.5)}" stroke-width="${sw(.9)}" stroke-linecap="round"/>`;   // 발목 골지 + 허리끈
+  else out += `<path d="M${f1(60 - ho)},${f1(hemY - 3.5 * k)} L${f1(60 - hi)},${f1(hemY - 3.5 * k)} M${f1(60 + hi)},${f1(hemY - 3.5 * k)} L${f1(60 + ho)},${f1(hemY - 3.5 * k)}" stroke="${dk}" stroke-width="${sw(1.1)}" opacity=".55"/>`;   // 밑단 접힘
+  if (cut !== 'short') {   // 무릎 뒤 주름 (3-6) — 가로 곡선 2개, 옷 색 -15%
+    const kc = cut === 'straight' ? shp.cK : L.ck, kw = cut === 'straight' ? shp.hw : L.kneeW / 2 + e;
+    out += `<path d="${[-1, 1].map(s => `M${P(60 + s * (kc - kw * .6), y.knee)} q${f1(s * kw * .6)},${sw(1.3)} ${f1(s * kw * 1.2)},0 M${P(60 + s * (kc - kw * .4), y.knee + 3 * k)} q${f1(s * kw * .4)},${sw(.9)} ${f1(s * kw * .8)},0`).join(' ')}" fill="none" stroke="${shade(bt.c, .85)}" stroke-width="${sw(1.1)}" opacity=".9"/>`;
   }
-  if (bt.k === 'jeans') out += `<path d="M${f1(60 - w.hip - e + .6)},${f1(y.hip)} L${f1(60 - ho + .8)},${f1(hemY - 5 * k)} M${f1(60 + w.hip + e - .6)},${f1(y.hip)} L${f1(60 + ho - .8)},${f1(hemY - 5 * k)}" stroke="#d2a659" stroke-width="${sw(.8)}" stroke-dasharray="${sw(2)} ${sw(1.6)}" opacity=".6"/>` +
+  if (kind === 'jeans') out += `<path d="M${f1(60 - w.hip - e + .6)},${f1(y.hip)} L${f1(60 - ho + .8)},${f1(hemY - 5 * k)} M${f1(60 + w.hip + e - .6)},${f1(y.hip)} L${f1(60 + ho - .8)},${f1(hemY - 5 * k)}" stroke="#d2a659" stroke-width="${sw(.8)}" stroke-dasharray="${sw(2)} ${sw(1.6)}" opacity=".6"/>` +
     `<path d="M${f1(60 - tw + 2 * k)},${f1(topY + k)} Q${f1(60 - tw + 5 * k)},${f1(y.hip - 4 * k)} ${f1(60 - w.hip - e)},${f1(y.hip - 2 * k)} M${f1(60 + tw - 2 * k)},${f1(topY + k)} Q${f1(60 + tw - 5 * k)},${f1(y.hip - 4 * k)} ${f1(60 + w.hip + e)},${f1(y.hip - 2 * k)}" fill="none" stroke="#d2a659" stroke-width="${sw(.8)}" opacity=".55"/>`;   // 옆선 스티치, 주머니
-  if (bt.k === 'slacks' && cut !== 'short') out += `<path d="M${f1(60 - L.ct)},${f1(y.hip + 6 * k)} L${f1(60 - hc)},${f1(hemY - 6 * k)} M${f1(60 + L.ct)},${f1(y.hip + 6 * k)} L${f1(60 + hc)},${f1(hemY - 6 * k)}" stroke="${shade(bt.c, 1.3)}" stroke-width="${sw(.9)}" opacity=".45"/>`;   // 다림질 선
-  const belt = bt.tucked ? `<path d="M${f1(60 - tw - .3)},${f1(topY - 2.5 * k)} L${f1(60 + tw + .3)},${f1(topY - 2.5 * k)} L${f1(60 + tw + .5)},${f1(topY + 2.5 * k)} L${f1(60 - tw - .5)},${f1(topY + 2.5 * k)} Z" fill="#2a211d"/><rect x="${f1(60 - 3 * k)}" y="${f1(topY - 3 * k)}" width="${sw(6)}" height="${sw(6)}" rx="${sw(1)}" fill="none" stroke="#c8a24a" stroke-width="${sw(1.2)}"/>` : '';
-  const legs = cut === 'short' ? bare : '';
-  return { svg: legs + shoes + out, legs, shoes, cloth: out, belt, hipEdge: w.hip + e };
+  if ((kind === 'slacks' || kind === 'scrubP') && cut !== 'short') out += `<path d="M${f1(60 - L.ct)},${f1(y.hip + 6 * k)} L${f1(60 - hc)},${f1(hemY - 6 * k)} M${f1(60 + L.ct)},${f1(y.hip + 6 * k)} L${f1(60 + hc)},${f1(hemY - 6 * k)}" stroke="${shade(bt.c, 1.3)}" stroke-width="${sw(.9)}" opacity=".45"/>`;   // 다림질 선
+  if (kind === 'cargo') out += [-1, 1].map(s => { const x0 = 60 + s * (outAt(y.thigh) + e - 1), yy = lerp(y.thigh, y.knee, .3); return `<path d="M${f1(x0)},${f1(yy)} l${f1(-s * 7 * k)},0 l0,${sw(9)} l${f1(s * 7 * k)},0 Z M${f1(x0)},${f1(yy + 2.4 * k)} l${f1(-s * 7 * k)},0" fill="${shade(bt.c, .92)}" stroke="${dk}" stroke-width="${sw(.8)}"/>`; }).join('');   // 옆 주머니
+  if (kind === 'training' || kind === 'fireP') { const sc = kind === 'fireP' ? '#d9e04a' : '#f2efe9'; out += kind === 'fireP' ? `<path d="${[-1, 1].map(s => `M${f1(60 + s * hi)},${f1(lerp(y.knee, y.calf, .5))} L${f1(60 + s * ho)},${f1(lerp(y.knee, y.calf, .5))}`).join(' ')}" stroke="${sc}" stroke-width="${sw(3.2)}"/>` : `<path d="M${f1(60 - w.hip - e + 1.2)},${f1(y.hip)} L${f1(60 - ho + 1.2)},${f1(hemY - 2)} M${f1(60 + w.hip + e - 1.2)},${f1(y.hip)} L${f1(60 + ho - 1.2)},${f1(hemY - 2)}" stroke="${sc}" stroke-width="${sw(1.6)}" opacity=".85"/>`; }   // 옆줄 / 반사띠
+  const belt = tucked && !['training', 'jogger', 'pajamaP', 'scrubP', 'boardshorts'].includes(kind) ? `<path d="M${f1(60 - tw - .3)},${f1(topY - 2.5 * k)} L${f1(60 + tw + .3)},${f1(topY - 2.5 * k)} L${f1(60 + tw + .5)},${f1(topY + 2.5 * k)} L${f1(60 - tw - .5)},${f1(topY + 2.5 * k)} Z" fill="#2a211d"/><rect x="${f1(60 - 3 * k)}" y="${f1(topY - 3 * k)}" width="${sw(6)}" height="${sw(6)}" rx="${sw(1)}" fill="none" stroke="#c8a24a" stroke-width="${sw(1.2)}"/>` : '';
+  const legs = cut === 'short' ? bare : '', skinnyBoot = bootTop && (cut === 'skinny' || cut === 'short');   // 스키니·조거·반바지는 부츠 안으로
+  return { svg: legs + shoes + (skinnyBoot ? '' : shafts) + out + (skinnyBoot ? shafts : ''), legs, shoes: shoes + (skinnyBoot ? '' : shafts), cloth: out + (skinnyBoot ? shafts : ''), belt, hipEdge: w.hip + e };
 }
-
-// 윗옷 종류별 [여유분(한쪽 px), 헐렁함 0~1, 밑단 높이(허리→가랑이 비율), 가슴 볼록 반영]
-//   티 / 셔츠 / 후디 / 니트(밑단 골지가 허리 바로 아래) / 교복 재킷 / 터틀넥 / 가디건(안에 티) / 재킷 / 줄무늬 보트넥
-const TOP_FIT = [[1, 0, .55, 1], [2, .3, .62, 1], [5, .85, .6, .5], [3, .35, .3, 1], [4, .25, .75, .5], [1.2, .1, .5, 1], [3.5, .5, .64, .75], [4, .45, .74, .6], [1.5, .15, .56, 1]];
+// 무늬 (3-5): 줄무늬는 이너에서 따로(가슴에서 휨). check 체크 / dot 도트 / camo 위장 / band 가로 띠 / logo는 이너 가슴에
+function patternSVG(pat, c, y0, y1, x0, x1, k, id) {
+  const r = rng(id), lc = shade(c, .72), hc = shade(c, 1.3);
+  if (pat === 'check') { let d = '', d2 = ''; for (let x = x0; x <= x1; x += 6 * k) d += `M${f1(x)},${f1(y0)} L${f1(x)},${f1(y1)} `; for (let yy = y0; yy <= y1; yy += 6 * k) d2 += `M${f1(x0)},${f1(yy)} L${f1(x1)},${f1(yy)} `; return `<path d="${d}" stroke="${lc}" stroke-width="${f1(1.4 * k)}" opacity=".55"/><path d="${d2}" stroke="${hc}" stroke-width="${f1(1.4 * k)}" opacity=".45"/>`; }
+  if (pat === 'dot') { let o = ''; for (let yy = y0 + 3 * k; yy <= y1; yy += 6 * k) for (let x = x0 + (Math.round((yy - y0) / (6 * k)) % 2 ? 3 * k : 0); x <= x1; x += 6 * k) o += `M${f1(x)},${f1(yy)} m-.9,0 a.9,.9 0 1 0 1.8,0 a.9,.9 0 1 0 -1.8,0 `; return `<path d="${o}" fill="${c === '#f2efe9' || c === '#ece3cf' ? '#3b3e48' : '#fbf8f2'}" opacity=".75"/>`; }
+  if (pat === 'camo') { let o = ''; for (let i = 0; i < 26; i++) { const x = lerp(x0, x1, r()), yy = lerp(y0, y1, r()), rr = (2 + r() * 3) * k; o += `<ellipse cx="${f1(x)}" cy="${f1(yy)}" rx="${f1(rr * 1.4)}" ry="${f1(rr)}" transform="rotate(${Math.round(r() * 180)} ${f1(x)} ${f1(yy)})" fill="${['#3f4733', '#8a8a5c', '#2f2a22'][i % 3]}" opacity=".85"/>`; } return o; }
+  if (pat === 'band') return `<path d="M${f1(x0)},${f1(lerp(y0, y1, .55))} L${f1(x1)},${f1(lerp(y0, y1, .55))}" stroke="#fbf8f2" stroke-width="${f1(2.4 * k)}" opacity=".8"/>`;
+  return '';
+}
 const STRIPE_BASE = '#f2eee5';
 // 가슴 입체감 — 가슴 자리(가운데에서 ±bx, 꼭짓점 높이 cy, 반지름 r)에만: 윗면 하이라이트 + 아래쪽 둥근 그림자(위 절반은 마스크로 지움)
 //   + valley면 가운데 골 그림자. dk 그림자 색, op 세기. 옷·맨몸 공용 (좌표는 전신 px)
@@ -1223,137 +1250,298 @@ function stripeRows(rows, half, bust, c, th) {
 }
 // 밑단 골지 (세로줄)
 const hemRib = (hemW, hemY, k, c) => `<path d="${Array.from({ length: 9 }, (_, i) => { const x = 60 - hemW + 1.5 + i * (hemW * 2 - 3) / 8; return `M${f1(x)},${f1(hemY - 6 * k)} L${f1(x)},${f1(hemY)}`; }).join(' ')}" stroke="${c}" stroke-width="${f1(1.2 * k)}"/>`;
-// 윗옷 (전신): 몸 앵커 + 여유분. 헐렁할수록 허리 곡선이 덜 드러남. 어른 여자는 옆 볼록·밑단 들림 + 가슴 자리 입체 그림자
-//   상반신 초상화도 이 함수를 머리 좌표로 옮겨서 씀 → 어깨 폭·가슴 위치가 전신과 같음. X: 세부(목걸이)
-function topFull(a, top, A, skin, bt, X) {
-  const stripe = top === 8, base = TOP_COLORS[a.tc];
-  const c = top === 4 ? UNIFORM.blazer : stripe ? (base === '#ece7dd' ? '#3b4a6b' : base) : base, dark = shade(c, .78), fold = shade(c, .58);
-  const [e, loose, hemR, bustF] = TOP_FIT[top] || TOP_FIT[0];
-  const { y, w } = A, k = A.hs, sw = v => f1(v * k), nh = w.nh, ny = y.neck, sig = A.adult && A.f ? A.sig : null, tid = `av${UID}t`;
-  let pocketT = null;
-  const tucked = !!bt.tucked, rib = top === 2 || top === 3 || top === 5 || top === 6, fitted = top === 0 || top === 1 || top === 3 || top === 5 || top === 8;
-  const hemY = tucked ? pantsTop(A, bt) + 2.5 : y.waist + (y.crotch - y.waist) * hemR;
-  const lift = tucked ? 0 : (sig ? sig[4] : 0) + (A.chubbyM ? 2 : 0);
-  const bustW = w.rib + (w.bust - w.rib) * bustF;   // 헐렁한 옷은 옆 볼록이 절반
+// 이너 모양 (3-3): e 여유분(한쪽 px), loose 헐렁함 0~1, hem 밑단(허리→가랑이 비율, 음수면 허리 위 = 크롭), bust 가슴 볼록 반영,
+//   neck 목선, sl 소매(short·long·none·puff), rib 밑단 골지, fit 몸에 붙음(허리 옆 주름), drop 오버핏 어깨선, cuff 소매 끝(1 넘으면 손등을 덮음)
+const GARM = {
+  tee:        { e: 1, loose: 0, hem: .55, bust: 1, neck: 'round', sl: 'short', fit: 1 },
+  longtee:    { e: 1.2, loose: .05, hem: .55, bust: 1, neck: 'round', sl: 'long', fit: 1 },
+  crop:       { e: .8, loose: 0, hem: -.2, bust: 1, neck: 'round', sl: 'short', fit: 1 },
+  sleeveless: { e: .6, loose: 0, hem: .5, bust: 1, neck: 'scoop', sl: 'none', fit: 1 },
+  sweat:      { e: 4, loose: .7, hem: .62, bust: .5, neck: 'crew', sl: 'long', rib: 1 },
+  hoodie:     { e: 5, loose: .85, hem: .6, bust: .5, neck: 'hood', sl: 'long', rib: 1 },
+  shirt:      { e: 2, loose: .3, hem: .62, bust: 1, neck: 'collar', sl: 'long', fit: 1, placket: 1 },
+  overshirt:  { e: 5, loose: .8, hem: .82, bust: .5, neck: 'collar', sl: 'long', drop: 3.4, cuff: 1.1, placket: 1 },
+  blouse:     { e: 2, loose: .25, hem: .55, bust: 1, neck: 'blouse', sl: 'puff', fit: 1 },
+  knit:       { e: 3, loose: .35, hem: .3, bust: 1, neck: 'crew', sl: 'long', rib: 1, fit: 1, knit: 1 },
+  turtle:     { e: 1.2, loose: .1, hem: .5, bust: 1, neck: 'turtle', sl: 'long', rib: 1, fit: 1 },
+  polo:       { e: 2, loose: .2, hem: .55, bust: 1, neck: 'polo', sl: 'short', fit: 1 },
+  stripe:     { e: 1.5, loose: .15, hem: .56, bust: 1, neck: 'boat', sl: 'long', fit: 1, stripe: 1 },
+  check:      { e: 2.2, loose: .35, hem: .62, bust: .8, neck: 'collar', sl: 'long', pat: 'check', placket: 1 },
+  uniform:    { e: 4, loose: .25, hem: .75, bust: .5, neck: 'uniform', sl: 'long' },
+  summerUni:  { e: 2, loose: .2, hem: .55, bust: 1, neck: 'collar', sl: 'short', fit: 1, school: 1, placket: 1 },
+  track:      { e: 3, loose: .5, hem: .55, bust: .6, neck: 'zip', sl: 'long', rib: 1, stripes: 1 },
+  wind:       { e: 3.4, loose: .55, hem: .58, bust: .5, neck: 'zip', sl: 'long' },
+  scrub:      { e: 2.6, loose: .4, hem: .62, bust: .7, neck: 'v', sl: 'short', pocket: 1 },
+  chef:       { e: 3, loose: .3, hem: .7, bust: .6, neck: 'mandarin', sl: 'long', double: 1 },
+  police:     { e: 2, loose: .25, hem: .6, bust: .8, neck: 'collar', sl: 'long', fit: 1, patch: 1, placket: 1 },
+  fire:       { e: 6, loose: .8, hem: .85, bust: .3, neck: 'mandarin', sl: 'long', reflect: 1 },
+  work:       { e: 4, loose: .6, hem: .7, bust: .4, neck: 'collar', sl: 'long', zipC: 1, pocket: 2 },
+  army:       { e: 4, loose: .5, hem: .75, bust: .4, neck: 'collar', sl: 'long', pocket: 2, placket: 1 },
+  pajama:     { e: 3, loose: .55, hem: .62, bust: .6, neck: 'collar', sl: 'long', piping: 1, placket: 1 },
+  rash:       { e: .8, loose: 0, hem: .5, bust: 1, neck: 'zip', sl: 'long', fit: 1 },
+};
+// 원피스 = 이너 윗부분 + 허리에서 이어지는 치마. len: 무릎→종아리 비율, flare 벌어짐
+const DRESSG = { sundress: { as: 'sleeveless', len: .25, flare: .2, seam: 1 }, shirtdress: { as: 'shirt', len: .02, flare: .14, belt: 1 }, knitdress: { as: 'knit', len: .45, flare: .04 }, suitdress: { as: 'tee', len: .05, flare: .03, seam: 1 } };
+// 겉옷 (3-6): 이너 위에, 앞이 열려 이너가 세로로 보임, 칼라·라펠이 목 둘레에, 겉옷 소매가 이너 소매를 덮음
+//   len 길이, open 앞여밈(v 가디건 / straight 열린 재킷 / lapel 라펠 / asym 비스듬한 지퍼 / zip 지퍼 / closed 잠긴 패딩), collar 깃
+const OUTG = {
+  cardigan: { e: 3.5, loose: .5, len: 'hip', open: 'v', rib: 1, btn: 4 },
+  denim:    { e: 3.6, loose: .4, len: 'waist', open: 'straight', collar: 'shirt', denim: 1 },
+  wind:     { e: 4.4, loose: .6, len: 'hip', open: 'zip', collar: 'stand' },
+  blazer:   { e: 3.2, loose: .3, len: 'thigh', open: 'lapel', btn: 2 },
+  leather:  { e: 3.2, loose: .3, len: 'waist', open: 'asym', collar: 'notch', shine: 1 },
+  trench:   { e: 4.2, loose: .4, len: 'knee', open: 'lapel', belt: 1, btn: 3 },
+  longcoat: { e: 4.6, loose: .4, len: 'knee', open: 'lapel', btn: 2 },
+  shortpad: { e: 7, loose: .9, len: 'hip', open: 'closed', collar: 'stand', quilt: 1 },
+  longpad:  { e: 7.4, loose: .9, len: 'calf', open: 'closed', collar: 'hood', quilt: 1 },
+  fleece:   { e: 5, loose: .7, len: 'hip', open: 'closed', collar: 'stand', fluffy: 1 },
+  gown:     { e: 4, loose: .5, len: 'knee', open: 'lapel', pocket: 1, btn: 3 },
+  vest:     { e: 3.4, loose: .5, len: 'hip', open: 'zip', sleeveless: 1 },
+};
+// 몸통 윤곽 (오른쪽 반 [dx, y]): 어깨 → 겨드랑이 → 가슴 → 밑가슴 → 허리 → 골반 (→ 허벅지·무릎·종아리: 긴 옷) → 밑단
+function torsoR(A, g, hemY, opt = {}) {
+  const { y, w } = A, k = A.hs, e = g.e, loose = g.loose, bustF = g.bust ?? 1;
+  const bustW = w.rib + (w.bust - w.rib) * bustF;
   const straight = lerp(w.waist, Math.max(w.ub, Math.min(bustW, w.hip) * .97), loose);
   const below = yy => Math.max(A.at(yy), lerp(A.at(yy), straight, loose)) + e;
-  const R = [...shoulderR(A, e), [w.armpit + e, y.armpit], [bustW + e, y.bust], [lerp(w.ub, bustW, loose * .7) + e, y.underbust]];
+  let R = shoulderR(A, e, g.drop || 0);
+  if (opt.sleeveless) R = [[w.nh + 3.2 * k, y.neck + 1.4 * k], [lerp(w.nh, w.sh - A.arm.uw * .5, .62), lerp(y.neck, y.sh, .7)], [w.sh - A.arm.uw * .95, y.sh + 1], [w.armpit - .2, y.armpit + 2.6 * k]];
+  else R.push([w.armpit + e, y.armpit]);
+  R.push([bustW + e, y.bust], [lerp(w.ub, bustW, loose * .7) + e, y.underbust]);
   if (hemY > y.waist + 2) R.push([straight + e, y.waist]);
   for (const yy of [y.hipUp, y.hip]) if (yy < hemY - 2) R.push([below(yy), yy]);
-  const hemW = (hemY > y.waist ? below(hemY) : A.at(hemY) + e) - (rib ? 1.4 : 0);   // 후디·니트는 밑단 골지가 조임
-  R.push([hemW, hemY]);
-  const shapeD = symShape(R, hemY + 1.4 - 2 * lift, ny + 2), fillC = stripe ? STRIPE_BASE : c;
-  let o = `<defs><clipPath id="${tid}c"><path d="${shapeD}"/></clipPath>${stripe ? `<pattern id="${tid}p" patternUnits="userSpaceOnUse" x="0" y="${f1(ny)}" width="40" height="${sw(7)}"><rect width="40" height="${sw(7)}" fill="${STRIPE_BASE}"/><rect y="${sw(4.2)}" width="40" height="${sw(2.8)}" fill="${c}"/></pattern>` : ''}</defs>`;
+  if (hemY > y.hip + 4) {   // 긴 옷: 골반 아래로 다리를 감싸며 조금씩 벌어짐
+    const ls = legSide(A, 1, 0).outer.map(([x, v]) => [x - 60, v]), fl = opt.flare ?? .05;
+    for (const yy of [y.crotch, y.thigh, y.knee, y.calf]) if (yy < hemY - 2) R.push([Math.max(below(y.hip) + (yy - y.hip) * fl, edgeAt(ls, yy) + e), yy]);
+    R.push([Math.max(below(y.hip) + (hemY - y.hip) * fl, edgeAt(ls, hemY) + e), hemY]);
+  } else R.push([(hemY > y.waist ? below(hemY) : A.at(hemY) + e) - (g.rib ? 1.4 : 0), hemY]);   // 후디·니트는 밑단 골지가 조임
+  return { R, bustW, straight };
+}
+// 맨살 몸통 (크롭·민소매·목선 사이로 보임)
+//   cutY: 하의 윗선까지만 (하의 위로 살이 덮이지 않게)
+const bodySkinD = (A, cutY) => { const { y, w } = A, pts = [[w.armpit, y.armpit], [w.bust, y.bust], [w.ub, y.underbust], [w.waist, y.waist], [w.hipUp, y.hipUp], [w.hip - .5, y.hip]].filter(p => p[1] < cutY - 1); return symShape([...shoulderR(A, 0), ...pts, [A.at(cutY), cutY]], cutY + .5, y.neck + 1); };
+// 윗옷 (전신): 이너(또는 원피스) → 겉옷 → 소품. 상반신 초상화도 이 함수를 머리 좌표로 옮겨서 씀 → 어깨 폭·가슴 위치가 전신과 같음. X: 세부(목걸이)
+function topFull(a, OF, A, skin, X) {
+  const { y, w } = A, k = A.hs, sw = v => f1(v * k), nh = w.nh, ny = y.neck, sig = A.adult && A.f ? A.sig : null, tid = `av${UID}t`;
+  const dr = OF.dress && DRESSG[OF.dress.k], inner = dr ? { k: dr.as, c: OF.dress.c, pat: OF.dress.pat } : OF.inner || { k: 'tee', c: '#4f6d8f' };
+  const G = Object.assign({}, GARM[inner.k] || GARM.tee, inner.sl ? { sl: inner.sl } : {});
+  const c = inner.k === 'stripe' ? inner.c : inner.c, dark = shade(c, .78), fold = shade(c, .85), fold2 = shade(c, .58);
+  const bottomTop = OF.bottom && SKIRTS[OF.bottom.k] ? y.waist + 1 : lerp(y.waist, y.hip, .28);
+  const tucked = !dr && !!OF.tuck && !!OF.bottom && G.hem > 0;
+  const hemY = dr ? lerp(y.knee, y.calf, dr.len) : tucked ? y.waist + 3.5 : y.waist + (y.crotch - y.waist) * G.hem;
+  const lift = tucked || dr ? 0 : (sig ? sig[4] : 0) + (A.chubbyM || A.chubbyF ? 2 : 0);   // 가슴·배 때문에 밑단 가운데가 들림
+  const { R, bustW, straight } = torsoR(A, G, hemY, { sleeveless: G.sl === 'none', flare: dr ? dr.flare : .05 });
+  const shapeD = symShape(R, hemY + 1.4 - 2 * lift, ny + 2), stripe = !!G.stripe, fillC = stripe ? STRIPE_BASE : c;
+  let pocketT = null, o = `<path d="${bodySkinD(A, dr ? y.waist : bottomTop + (OF.tuck ? 0 : 1.5))}" fill="${skin}"/>`;
+  if (G.sl === 'none' || G.hem < 0) o += clav(ny + 4.5 * k, nh + 3 * k, skin, k);
+  o += `<defs><clipPath id="${tid}c"><path d="${shapeD}"/></clipPath>${stripe ? `<pattern id="${tid}p" patternUnits="userSpaceOnUse" x="0" y="${f1(ny)}" width="40" height="${sw(7)}"><rect width="40" height="${sw(7)}" fill="${STRIPE_BASE}"/><rect y="${sw(4.2)}" width="40" height="${sw(2.8)}" fill="${c}"/></pattern>` : ''}</defs>`;
   o += `<path d="${shapeD}" fill="${fillC}" stroke="${shade(c, .6)}" stroke-width=".55" stroke-opacity=".55"/>`;
-  if (stripe) {   // 줄무늬: 몸통은 가슴에서 휘는 줄, 소매는 패턴
+  // 무늬: 줄무늬(가슴에서 휨) / 체크 / 도트 / 위장 / 로고
+  if (stripe) {
     const rows = []; for (let yy = ny + 5.6 * k; yy < hemY; yy += 7 * k) rows.push(yy);
     const bz = sig && A.ci >= 1 ? { bx: bustW * .5, cy: y.bust, r: bustW * (.42 + A.ci * .022), amp: Math.min(2.6, .5 + A.ci * .4) * k } : null;
     o += `<g clip-path="url(#${tid}c)">${stripeRows(rows, yy => edgeAt(R, yy), bz, c, 2.8 * k)}</g>`;
   }
-  if (top === 4) {   // 교복: 셔츠 V + 라펠 + 넥타이/리본 + 단추 + 왼가슴 마크
-    const tie = UNIFORM.tie[a.tie], vy = lerp(y.armpit, y.bust, .85);
-    o += `<path d="M${f1(60 - nh - k)},${f1(ny)} L60,${f1(vy)} L${f1(60 + nh + k)},${f1(ny)} Z" fill="${UNIFORM.shirt}"/>
-      <path d="M${f1(60 - nh - k)},${f1(ny)} L60,${f1(vy)} L${f1(60 - nh - 8 * k)},${f1(vy - 4 * k)} L${f1(60 - nh - 9 * k)},${f1(ny + 4 * k)} Z M${f1(60 + nh + k)},${f1(ny)} L60,${f1(vy)} L${f1(60 + nh + 8 * k)},${f1(vy - 4 * k)} L${f1(60 + nh + 9 * k)},${f1(ny + 4 * k)} Z" fill="${shade(c, 1.25)}"/>
-      ${A.f ? `<path d="M60,${f1(ny + 7 * k)} L${f1(60 - 8.5 * k)},${f1(ny + 2.5 * k)} L${f1(60 - 8.5 * k)},${f1(ny + 11.5 * k)} Z M60,${f1(ny + 7 * k)} L${f1(60 + 8.5 * k)},${f1(ny + 2.5 * k)} L${f1(60 + 8.5 * k)},${f1(ny + 11.5 * k)} Z" fill="${tie}"/><circle cx="60" cy="${f1(ny + 7 * k)}" r="${sw(2.4)}" fill="${shade(tie, .8)}"/>`
-        : `<path d="M${f1(60 - 3 * k)},${f1(ny + 3 * k)} L${f1(60 + 3 * k)},${f1(ny + 3 * k)} L${f1(60 + 2 * k)},${f1(ny + 7 * k)} L${f1(60 + 4 * k)},${f1(vy - 4 * k)} L60,${f1(vy + k)} L${f1(60 - 4 * k)},${f1(vy - 4 * k)} L${f1(60 - 2 * k)},${f1(ny + 7 * k)} Z" fill="${tie}"/>`}
-      <circle cx="60" cy="${f1(y.waist - 6 * k)}" r="${sw(1.6)}" fill="${shade(c, 1.5)}"/><circle cx="60" cy="${f1(y.waist + 6 * k)}" r="${sw(1.6)}" fill="${shade(c, 1.5)}"/>
-      <path d="M${f1(60 + w.rib * .45)},${f1(y.bust - 5 * k)} l${sw(7)},0 l0,${sw(5.6)} q${sw(-3.5)},${sw(3.4)} ${sw(-7)},0 Z" fill="#c8a24a" opacity=".85"/>
-      <path d="M60,${f1(vy)} L60,${f1(hemY)}" stroke="${shade(c, .6)}" stroke-width="${sw(1)}" opacity=".6"/>`;
-  } else if (top === 0) {   // 티셔츠: 라운드 넥 + 쇄골
-    const nl = `M${f1(60 - nh - 3 * k)},${f1(ny)} Q60,${f1(ny + 13 * k)} ${f1(60 + nh + 3 * k)},${f1(ny)}`;
-    o += `<path d="${nl}" fill="${skin}"/>${clav(ny + 4.5 * k, nh + 2 * k, skin, k)}<path d="${nl}" fill="none" stroke="${dark}" stroke-width="${sw(3)}"/>`;
-  } else if (top === 1) {   // 셔츠: 뾰족한 칼라 + 단추 + 가슴 주머니(남)
-    o += `<path d="M${f1(60 - nh + 1.5 * k)},${f1(ny)} L60,${f1(ny + 15 * k)} L${f1(60 + nh - 1.5 * k)},${f1(ny)} Z" fill="${skin}"/>${clav(ny + 4 * k, nh - 2 * k, skin, k)}
-      <path d="M${f1(60 - nh)},${f1(ny - k)} L60,${f1(ny + 15 * k)} L${f1(60 - nh + 3 * k)},${f1(ny + 19 * k)} L${f1(60 - nh - 6 * k)},${f1(ny + 5 * k)} Z M${f1(60 + nh)},${f1(ny - k)} L60,${f1(ny + 15 * k)} L${f1(60 + nh - 3 * k)},${f1(ny + 19 * k)} L${f1(60 + nh + 6 * k)},${f1(ny + 5 * k)} Z" fill="${shade(c, 1.35)}" stroke="${dark}" stroke-width="${sw(1)}"/>
-      <path d="M60,${f1(ny + 15 * k)} L60,${f1(hemY)}" stroke="${dark}" stroke-width="${sw(1.2)}"/>
-      ${[0, 1, 2, 3].map(i => `<circle cx="60" cy="${f1(ny + 22 * k + i * (hemY - ny - 28 * k) / 3)}" r="${sw(1.3)}" fill="${dark}"/>`).join('')}
-      ${!A.f ? `<path d="M${f1(60 + w.rib * .3)},${f1(y.bust - 6 * k)} l${sw(9)},0 l0,${sw(9)} l${sw(-9)},0 Z" fill="none" stroke="${dark}" stroke-width="${sw(1)}" opacity=".6"/>` : ''}`;
-    if (sig && A.ci >= 5) o += `<path d="M60,${f1(y.bust - 2.4)} Q61.4,${f1(y.bust)} 60,${f1(y.bust + 2.4)} Q58.6,${f1(y.bust)} 60,${f1(y.bust - 2.4)} Z" fill="${shade(skin, .92)}" stroke="${dark}" stroke-width=".5"/>`;   // 단추 사이 벌어짐
-  } else if (top === 2) {   // 후디: 후드 + 끈 + 캥거루 주머니 + 밑단 골지
-    const pw = straight * .62 + e * .3, py = y.waist - 6 * k;
+  const pat = inner.pat || G.pat;
+  if (pat && pat !== 'logo') o += `<g clip-path="url(#${tid}c)">${patternSVG(pat, c, ny - 2, hemY + 2, 60 - w.sh - 8, 60 + w.sh + 8, k, tid + 'q')}</g>`;
+  // 원피스 치마 부분: 허리 이음선 / 벨트, 주름
+  if (dr) {
+    if (dr.seam) o += `<path d="M${f1(60 - edgeAt(R, y.waist))},${f1(y.waist)} Q60,${f1(y.waist + 1.6 * k)} ${f1(60 + edgeAt(R, y.waist))},${f1(y.waist)}" fill="none" stroke="${fold2}" stroke-width="${sw(1)}" opacity=".5"/>`;
+    if (dr.belt) o += `<path d="M${f1(60 - edgeAt(R, y.waist) - .3)},${f1(y.waist - 2 * k)} L${f1(60 + edgeAt(R, y.waist) + .3)},${f1(y.waist - 2 * k)} L${f1(60 + edgeAt(R, y.waist) + .3)},${f1(y.waist + 2 * k)} L${f1(60 - edgeAt(R, y.waist) - .3)},${f1(y.waist + 2 * k)} Z" fill="${shade(c, .62)}"/>`;
+    const hw = edgeAt(R, hemY);
+    o += `<path d="M${f1(60 - w.hip * .4)},${f1(y.hip + 3)} Q${f1(60 - w.hip * .5)},${f1(hemY - 8 * k)} ${f1(60 - hw * .66)},${f1(hemY)} M${f1(60 + w.hip * .38)},${f1(y.hip + 4)} Q${f1(60 + w.hip * .48)},${f1(hemY - 8 * k)} ${f1(60 + hw * .6)},${f1(hemY)}" fill="none" stroke="${fold2}" stroke-width="${sw(1.1)}" opacity=".35"/>`;
+  }
+  // 목선·디테일
+  const nl = (d, edge) => `<path d="${d}" fill="${skin}"/>${clav(ny + 4.4 * k, nh + 1.5 * k, skin, k)}<path d="${d}" fill="none" stroke="${edge || dark}" stroke-width="${sw(2.4)}"/>`;
+  const buttons = (x, y0, y1, n, col) => Array.from({ length: n }, (_, i) => `<circle cx="${f1(x)}" cy="${f1(y0 + i * (y1 - y0) / Math.max(1, n - 1))}" r="${sw(1.25)}" fill="${col}"/>`).join('');
+  const collar = (open, col) => `<path d="M${f1(60 - nh + 1.5 * k)},${f1(ny)} L60,${f1(ny + (open ? 15 : 7) * k)} L${f1(60 + nh - 1.5 * k)},${f1(ny)} Z" fill="${skin}"/>${open ? clav(ny + 4 * k, nh - 2 * k, skin, k) : ''}` +
+    `<path d="M${f1(60 - nh)},${f1(ny - k)} L60,${f1(ny + (open ? 15 : 7) * k)} L${f1(60 - nh + 3 * k)},${f1(ny + (open ? 19 : 12) * k)} L${f1(60 - nh - 6 * k)},${f1(ny + 5 * k)} Z M${f1(60 + nh)},${f1(ny - k)} L60,${f1(ny + (open ? 15 : 7) * k)} L${f1(60 + nh - 3 * k)},${f1(ny + (open ? 19 : 12) * k)} L${f1(60 + nh + 6 * k)},${f1(ny + 5 * k)} Z" fill="${col}" stroke="${dark}" stroke-width="${sw(1)}"/>`;
+  const tie = (col, f) => f ? `<path d="M60,${f1(ny + 7 * k)} L${f1(60 - 7 * k)},${f1(ny + 3 * k)} L${f1(60 - 7 * k)},${f1(ny + 11 * k)} Z M60,${f1(ny + 7 * k)} L${f1(60 + 7 * k)},${f1(ny + 3 * k)} L${f1(60 + 7 * k)},${f1(ny + 11 * k)} Z" fill="${col}"/><circle cx="60" cy="${f1(ny + 7 * k)}" r="${sw(2.2)}" fill="${shade(col, .8)}"/>`
+    : `<path d="M${f1(60 - 2.4 * k)},${f1(ny + 4.6 * k)} L${f1(60 + 2.4 * k)},${f1(ny + 4.6 * k)} L${f1(60 + 1.6 * k)},${f1(ny + 8 * k)} L${f1(60 + 3.4 * k)},${f1(y.bust + 2 * k)} L60,${f1(y.bust + 6 * k)} L${f1(60 - 3.4 * k)},${f1(y.bust + 2 * k)} L${f1(60 - 1.6 * k)},${f1(ny + 8 * k)} Z" fill="${col}"/>`;
+  const nk = G.neck;
+  if (nk === 'round') o += nl(`M${f1(60 - nh - 3 * k)},${f1(ny)} Q60,${f1(ny + 13 * k)} ${f1(60 + nh + 3 * k)},${f1(ny)}`);
+  else if (nk === 'scoop') o += nl(`M${f1(60 - nh - 4 * k)},${f1(ny + 1)} Q60,${f1(ny + 19 * k)} ${f1(60 + nh + 4 * k)},${f1(ny + 1)}`, shade(c, .7));
+  else if (nk === 'crew') {   // 맨투맨·니트: 골지 라운드 넥 (+ 니트 짜임 물결)
+    o += `<path d="M${f1(60 - nh - 3 * k)},${f1(ny - k)} Q60,${f1(ny + 9 * k)} ${f1(60 + nh + 3 * k)},${f1(ny - k)} L${f1(60 + nh + 3 * k)},${f1(ny + 4 * k)} Q60,${f1(ny + 14 * k)} ${f1(60 - nh - 3 * k)},${f1(ny + 4 * k)} Z" fill="${dark}"/><path d="M${f1(60 - nh - k)},${f1(ny - k)} Q60,${f1(ny + 7 * k)} ${f1(60 + nh + k)},${f1(ny - k)}" fill="${skin}"/>`;
+    if (G.knit) {
+      const cable = hash(String(a.fs || a.tc)) % 2;   // 꽈배기 / 무지
+      if (cable) o += `<g clip-path="url(#${tid}c)"><path d="${[-1, 0, 1].map(i => { let d = `M${f1(60 + i * bustW * .55)},${f1(ny + 10 * k)}`; for (let yy = ny + 10 * k; yy < hemY - 6 * k; yy += 6 * k) d += ` q${sw(2.4)},${sw(3)} 0,${sw(6)}`; return d; }).join(' ')}" fill="none" stroke="${dark}" stroke-width="${sw(1.6)}" opacity=".35"/></g>`;
+      else { const rows = [lerp(y.armpit, y.bust, .5), lerp(y.bust, y.waist, .55)].map(yy => { const half = edgeAt(R, yy) - 2 * k; let d = `M${f1(60 - half)},${f1(yy)}`; for (let x = 60 - half, i = 0; x < 60 + half - 5 * k; x += 6 * k, i++) d += ` q${sw(3)},${sw(i % 2 ? 2.4 : -2.4)} ${sw(6)},0`; return d; }).join(' '); o += `<path d="${rows}" fill="none" stroke="${dark}" stroke-width="${sw(1)}" opacity="${sig ? .18 : .3}"/>`; }
+    }
+  } else if (nk === 'hood') {   // 후디: 후드 + 끈 + 캥거루 주머니
+    const pw = straight * .62 + G.e * .3, py = y.waist - 6 * k;
     const pkD = `M${f1(60 - pw)},${f1(py + 16 * k)} L${f1(60 - pw + 5 * k)},${f1(py)} Q60,${f1(py - 4 * k)} ${f1(60 + pw - 5 * k)},${f1(py)} L${f1(60 + pw)},${f1(py + 16 * k)} Z`;
-    pocketT = { x: pw - 2.4 * k, y: py + 7 * k, svg: `<path d="${pkD}" fill="${c}" stroke="${fold}" stroke-width="${sw(1.3)}" stroke-opacity=".45"/>` };   // 캥거루 주머니 (주머니 자세에서 손 위로 다시 그림)
+    pocketT = { x: pw - 2.4 * k, y: py + 7 * k, svg: `<path d="${pkD}" fill="${c}" stroke="${fold2}" stroke-width="${sw(1.3)}" stroke-opacity=".45"/>` };
     o += `<path d="M${f1(60 - nh - 10 * k)},${f1(ny + 5 * k)} C${f1(60 - nh - 9 * k)},${f1(ny - 9 * k)} ${f1(60 + nh + 9 * k)},${f1(ny - 9 * k)} ${f1(60 + nh + 10 * k)},${f1(ny + 5 * k)} C${f1(60 + nh)},${f1(ny + 14 * k)} ${f1(60 - nh)},${f1(ny + 14 * k)} ${f1(60 - nh - 10 * k)},${f1(ny + 5 * k)} Z" fill="${dark}"/>
       <path d="M${f1(60 - nh - k)},${f1(ny)} Q60,${f1(ny + 10 * k)} ${f1(60 + nh + k)},${f1(ny)}" fill="${skin}"/>
       <path d="M${f1(60 - 5 * k)},${f1(ny + 9 * k)} L${f1(60 - 6 * k)},${f1(ny + 28 * k)} M${f1(60 + 5 * k)},${f1(ny + 9 * k)} L${f1(60 + 6 * k)},${f1(ny + 28 * k)}" stroke="${shade(c, 1.5)}" stroke-width="${sw(1.6)}" stroke-linecap="round"/>
-      <path d="M${f1(60 - pw)},${f1(py + 16 * k)} L${f1(60 - pw + 5 * k)},${f1(py)} Q60,${f1(py - 4 * k)} ${f1(60 + pw - 5 * k)},${f1(py)} L${f1(60 + pw)},${f1(py + 16 * k)} Z" fill="none" stroke="${fold}" stroke-width="${sw(1.3)}" opacity=".45"/>
-      <path d="M${f1(60 - hemW)},${f1(hemY - 5 * k)} L${f1(60 + hemW)},${f1(hemY - 5 * k)}" stroke="${fold}" stroke-width="${sw(1.2)}" opacity=".4"/>`;
-  } else if (top === 5) {   // 터틀넥: 목을 감싸며 접힌 깃(세로 골지) + 밑단 골지
+      <path d="${pkD}" fill="none" stroke="${fold2}" stroke-width="${sw(1.3)}" opacity=".45"/>`;
+  } else if (nk === 'turtle') {   // 터틀넥: 목을 감싸며 접힌 깃(세로 골지)
     const t0 = ny - 6.5 * k, t1 = ny + 3 * k, c0 = nh + 1.6 * k, c1 = nh + 3.4 * k;
     let ribs = '';
     for (let i = -3; i <= 3; i++) ribs += `M${f1(60 + i * c0 / 3.7)},${f1(t0 + 1.4 * k)} L${f1(60 + i * c1 / 3.7)},${f1(t1 + 1.8 * k)} `;
     o += `<path d="M${f1(60 - c0)},${f1(t0)} Q60,${f1(t0 + 1.8 * k)} ${f1(60 + c0)},${f1(t0)} L${f1(60 + c1)},${f1(t1)} Q60,${f1(t1 + 3.2 * k)} ${f1(60 - c1)},${f1(t1)} Z" fill="${c}" stroke="${shade(c, .6)}" stroke-width=".5"/>
-      <path d="${ribs}" stroke="${dark}" stroke-width="${sw(.8)}" opacity=".5"/><path d="M${f1(60 - c0 - .4 * k)},${f1(t0 + 3 * k)} Q60,${f1(t0 + 5 * k)} ${f1(60 + c0 + .4 * k)},${f1(t0 + 3 * k)}" fill="none" stroke="${fold}" stroke-width="${sw(1.1)}" opacity=".4"/>
-      <path d="M${f1(60 - c1)},${f1(t1)} Q60,${f1(t1 + 3.2 * k)} ${f1(60 + c1)},${f1(t1)}" fill="none" stroke="${fold}" stroke-width="${sw(1.6)}" opacity=".3"/>${hemRib(hemW, hemY, k, dark)}`;
-  } else if (top === 6) {   // 가디건: 앞이 V로 트여 안의 티가 보임 + 앞단 + 단추 + 밑단 골지
-    const ic = c === '#ece7dd' || c === '#d0a443' ? '#3b3e48' : '#f1ede4', vy = lerp(y.bust, y.underbust, .35);
-    const band = sd => `M${f1(60 + sd * (nh + 2.2 * k))},${f1(ny - .5 * k)} L${f1(60 + sd * .7 * k)},${f1(vy)} L${f1(60 + sd * .7 * k)},${f1(hemY)}`;
-    o += `<path d="M${f1(60 - nh - 2.2 * k)},${f1(ny - .5 * k)} L${f1(60 - .7 * k)},${f1(vy)} L${f1(60 + .7 * k)},${f1(vy)} L${f1(60 + nh + 2.2 * k)},${f1(ny - .5 * k)} Z" fill="${ic}"/>
-      <path d="M${f1(60 - nh)},${f1(ny - .4 * k)} Q60,${f1(ny + 10 * k)} ${f1(60 + nh)},${f1(ny - .4 * k)}" fill="${skin}"/>${clav(ny + 3.4 * k, nh - 2 * k, skin, k)}
-      <path d="M${f1(60 - nh)},${f1(ny - .4 * k)} Q60,${f1(ny + 10 * k)} ${f1(60 + nh)},${f1(ny - .4 * k)}" fill="none" stroke="${shade(ic, .78)}" stroke-width="${sw(1.6)}"/>
-      <path d="${band(-1)} ${band(1)}" fill="none" stroke="${shade(c, .74)}" stroke-width="${sw(2.4)}" stroke-linejoin="round"/>
-      ${[0, 1, 2].map(i => `<circle cx="${f1(60 - .7 * k)}" cy="${f1(vy + 3 * k + i * (hemY - vy - 9 * k) / 2)}" r="${sw(1.4)}" fill="${shade(c, 1.4)}" stroke="${shade(c, .6)}" stroke-width="${sw(.4)}"/>`).join('')}${hemRib(hemW, hemY, k, dark)}`;
-  } else if (top === 7) {   // 재킷: 노치드 라펠 + 안에 셔츠·넥타이(남) / 둥근 목 이너(여) + 단추 2개 + 주머니
-    const ic = '#f4f1ea', vy = lerp(y.armpit, y.bust, A.f ? 1.08 : .95), tie = ['#7d2f3d', '#2c4a7a', '#3b3e48'][a.tie % 3];
-    o += `<path d="M${f1(60 - nh - k)},${f1(ny - .5 * k)} L60,${f1(vy)} L${f1(60 + nh + k)},${f1(ny - .5 * k)} Z" fill="${A.f ? skin : ic}"/>`;
-    if (A.f) o += `<path d="M${f1(60 - nh - k)},${f1(ny + 7 * k)} Q60,${f1(ny + 13 * k)} ${f1(60 + nh + k)},${f1(ny + 7 * k)} L60,${f1(vy)} Z" fill="${ic}"/>${clav(ny + 3.6 * k, nh - 2.5 * k, skin, k)}`;
-    else o += `<path d="M${f1(60 - nh + .5 * k)},${f1(ny - k)} L${f1(60 - 1.2 * k)},${f1(ny + 5.5 * k)} L${f1(60 - nh - 2.4 * k)},${f1(ny + 4 * k)} Z M${f1(60 + nh - .5 * k)},${f1(ny - k)} L${f1(60 + 1.2 * k)},${f1(ny + 5.5 * k)} L${f1(60 + nh + 2.4 * k)},${f1(ny + 4 * k)} Z" fill="#fff" stroke="#c9c4b8" stroke-width="${sw(.5)}"/>` +
-      `<path d="M${f1(60 - 2.4 * k)},${f1(ny + 3.6 * k)} L${f1(60 + 2.4 * k)},${f1(ny + 3.6 * k)} L${f1(60 + 1.6 * k)},${f1(ny + 7 * k)} L${f1(60 + 3.4 * k)},${f1(vy - 2 * k)} L60,${f1(vy + 2 * k)} L${f1(60 - 3.4 * k)},${f1(vy - 2 * k)} L${f1(60 - 1.6 * k)},${f1(ny + 7 * k)} Z" fill="${tie}"/>`;
-    const lap = sd => { const X = v => f1(60 + sd * v); return `M${X(nh + k)},${f1(ny - .8 * k)} L${X(.4 * k)},${f1(vy)} L${X(nh + 7.6 * k)},${f1(lerp(ny, vy, .32))} L${X(nh + 8.4 * k)},${f1(ny + 5.6 * k)} L${X(nh + 5.4 * k)},${f1(ny + 5 * k)} L${X(nh + 6.4 * k)},${f1(ny + 1.2 * k)} Z`; };
-    o += `<path d="${lap(-1)} ${lap(1)}" fill="${shade(c, 1.12)}" stroke="${shade(c, .6)}" stroke-width="${sw(.6)}" stroke-linejoin="round"/>
-      <path d="M60,${f1(vy)} L60,${f1(hemY)}" stroke="${shade(c, .6)}" stroke-width="${sw(1)}"/>
-      <circle cx="${f1(60 + 1.2 * k)}" cy="${f1(vy + 5 * k)}" r="${sw(1.5)}" fill="${shade(c, .62)}"/><circle cx="${f1(60 + 1.2 * k)}" cy="${f1(vy + 17 * k)}" r="${sw(1.5)}" fill="${shade(c, .62)}"/>
-      <path d="M${f1(60 + w.rib * .42)},${f1(y.bust - 3 * k)} l${sw(8)},${sw(-.6)} M${f1(60 - straight * .62)},${f1(hemY - 9 * k)} l${sw(9)},0 M${f1(60 + straight * .62)},${f1(hemY - 9 * k)} l${sw(-9)},0" stroke="${shade(c, .6)}" stroke-width="${sw(1.1)}" stroke-linecap="round" opacity=".7"/>`;
-  } else if (stripe) {   // 줄무늬 보트넥: 넓고 얕은 목선
-    const nl = `M${f1(60 - nh - 7 * k)},${f1(ny - .8 * k)} Q60,${f1(ny + 9 * k)} ${f1(60 + nh + 7 * k)},${f1(ny - .8 * k)}`;
-    o += `<g clip-path="url(#${tid}c)"><path d="${nl}" fill="${skin}"/>${clav(ny + 3.2 * k, nh + 3 * k, skin, k)}<path d="${nl}" fill="none" stroke="${shade(STRIPE_BASE, .82)}" stroke-width="${sw(1.8)}"/></g>`;
-  } else {   // 니트: 라운드 넥 골지 + 짜임 물결 + 밑단 골지
-    const rows = [lerp(y.armpit, y.bust, .5), lerp(y.bust, y.waist, .55)].map(yy => {
-      const half = edgeAt(R, yy) - 2 * k; let d = `M${f1(60 - half)},${f1(yy)}`;
-      for (let x = 60 - half, i = 0; x < 60 + half - 5 * k; x += 6 * k, i++) d += ` q${sw(3)},${sw(i % 2 ? 2.4 : -2.4)} ${sw(6)},0`;
-      return d;
-    }).join(' ');
-    o += `<path d="M${f1(60 - nh - 3 * k)},${f1(ny - k)} Q60,${f1(ny + 9 * k)} ${f1(60 + nh + 3 * k)},${f1(ny - k)} L${f1(60 + nh + 3 * k)},${f1(ny + 4 * k)} Q60,${f1(ny + 14 * k)} ${f1(60 - nh - 3 * k)},${f1(ny + 4 * k)} Z" fill="${dark}"/>
-      <path d="M${f1(60 - nh - k)},${f1(ny - k)} Q60,${f1(ny + 7 * k)} ${f1(60 + nh + k)},${f1(ny - k)}" fill="${skin}"/>
-      <path d="${rows}" fill="none" stroke="${dark}" stroke-width="${sw(1)}" opacity="${sig ? .18 : .3}"/>${hemRib(hemW, hemY, k, dark)}`;
+      <path d="${ribs}" stroke="${dark}" stroke-width="${sw(.8)}" opacity=".5"/><path d="M${f1(60 - c0 - .4 * k)},${f1(t0 + 3 * k)} Q60,${f1(t0 + 5 * k)} ${f1(60 + c0 + .4 * k)},${f1(t0 + 3 * k)}" fill="none" stroke="${fold2}" stroke-width="${sw(1.1)}" opacity=".4"/>`;
+  } else if (nk === 'boat') {   // 줄무늬 보트넥
+    const d = `M${f1(60 - nh - 7 * k)},${f1(ny - .8 * k)} Q60,${f1(ny + 9 * k)} ${f1(60 + nh + 7 * k)},${f1(ny - .8 * k)}`;
+    o += `<g clip-path="url(#${tid}c)"><path d="${d}" fill="${skin}"/>${clav(ny + 3.2 * k, nh + 3 * k, skin, k)}<path d="${d}" fill="none" stroke="${shade(STRIPE_BASE, .82)}" stroke-width="${sw(1.8)}"/></g>`;
+  } else if (nk === 'collar') {   // 셔츠·체크·작업복·군복·잠옷·경찰·하복: 칼라 + 단추 선
+    const open = !inner.tie && !G.school, col = G.piping ? '#fbf8f2' : shade(c, 1.12);
+    o += collar(open, col);
+    if (G.placket) o += `<path d="M60,${f1(ny + (open ? 15 : 7) * k)} L60,${f1(hemY - 1)}" stroke="${dark}" stroke-width="${sw(1.2)}"/>` + buttons(60, ny + 20 * k, hemY - 6 * k, 4, dark);
+    if (G.zipC) o += `<path d="M60,${f1(ny + 7 * k)} L60,${f1(hemY - 1)}" stroke="${shade(c, .55)}" stroke-width="${sw(1.4)}" stroke-dasharray="${sw(.8)} ${sw(.6)}"/>`;
+    if (inner.tie || G.school) o += tie(inner.tieC || (G.school ? UNIFORM.tie[a.tie % 3] : ['#7d2f3d', '#2c4a7a', '#3b3e48'][a.tie % 3]), G.school && A.f);
+    if (G.school) o += `<path d="M${f1(60 + w.rib * .45)},${f1(y.bust - 5 * k)} l${sw(6)},0 l0,${sw(5)} q${sw(-3)},${sw(3)} ${sw(-6)},0 Z" fill="#2f3a5a" opacity=".85"/>`;
+    if (G.patch) o += `<path d="M${f1(60 + w.rib * .38)},${f1(y.bust - 6 * k)} l${sw(8)},0 l0,${sw(7)} l${sw(-4)},${sw(2.6)} l${sw(-4)},${sw(-2.6)} Z" fill="#c8a24a"/><path d="M${f1(60 - w.rib * .62)},${f1(y.bust - 5 * k)} l${sw(9)},0" stroke="#e8e6df" stroke-width="${sw(2)}"/>`;
+    if (G.pocket) o += [-1, 1].slice(0, G.pocket).map(s => `<path d="M${f1(60 + s * w.rib * .58 - 4.5 * k)},${f1(y.bust - 6 * k)} l${sw(9)},0 l0,${sw(9)} l${sw(-9)},0 Z M${f1(60 + s * w.rib * .58 - 4.5 * k)},${f1(y.bust - 3.4 * k)} l${sw(9)},0" fill="${shade(c, .94)}" stroke="${dark}" stroke-width="${sw(.8)}"/>`).join('');
+    if (!A.f && !G.pocket && !G.patch && G.placket && inner.k === 'shirt') o += `<path d="M${f1(60 + w.rib * .3)},${f1(y.bust - 6 * k)} l${sw(9)},0 l0,${sw(9)} l${sw(-9)},0 Z" fill="none" stroke="${dark}" stroke-width="${sw(1)}" opacity=".6"/>`;
+    if (G.piping) o += `<path d="${shapeD}" fill="none" stroke="#fbf8f2" stroke-width="${sw(1.2)}" opacity=".7"/>`;
+    if (sig && A.ci >= 5 && G.placket && !G.pocket) o += `<path d="M60,${f1(y.bust - 2.4)} Q61.4,${f1(y.bust)} 60,${f1(y.bust + 2.4)} Q58.6,${f1(y.bust)} 60,${f1(y.bust - 2.4)} Z" fill="${shade(skin, .92)}" stroke="${dark}" stroke-width=".5"/>`;   // 단추 사이 벌어짐
+  } else if (nk === 'blouse') {   // 블라우스: 리본 / 프릴 칼라 / 라운드 넥 + 퍼프소매 중 하나
+    const v = hash(String(a.fs || a.tc) + 'bl') % 3;
+    o += nl(`M${f1(60 - nh - 2 * k)},${f1(ny)} Q60,${f1(ny + 10 * k)} ${f1(60 + nh + 2 * k)},${f1(ny)}`, shade(c, .7));
+    if (v === 0) o += `<path d="M60,${f1(ny + 6 * k)} l${sw(-6)},${sw(-3.4)} l0,${sw(6.8)} Z M60,${f1(ny + 6 * k)} l${sw(6)},${sw(-3.4)} l0,${sw(6.8)} Z M60,${f1(ny + 6 * k)} l${sw(-3)},${sw(10)} M60,${f1(ny + 6 * k)} l${sw(3.4)},${sw(10)}" fill="${shade(c, .9)}" stroke="${shade(c, .65)}" stroke-width="${sw(1)}" stroke-linecap="round"/>`;
+    else if (v === 1) o += `<path d="M${f1(60 - nh - 3 * k)},${f1(ny + k)} ${scallop(60 - nh - 3 * k, 60 + nh + 3 * k, ny + 7 * k, 2.6 * k, 8).replace(/^/, '')}" fill="none" stroke="${shade(c, 1.2)}" stroke-width="${sw(2.2)}"/>`;
+    o += buttons(60, ny + 14 * k, hemY - 6 * k, 3, shade(c, 1.25));
+  } else if (nk === 'polo') {   // 폴로: 짧은 칼라 + 단추 2개
+    o += `<path d="M${f1(60 - 2 * k)},${f1(ny)} L${f1(60 - 2 * k)},${f1(ny + 12 * k)} L${f1(60 + 2 * k)},${f1(ny + 12 * k)} L${f1(60 + 2 * k)},${f1(ny)} Z" fill="${skin}"/>` + buttons(60, ny + 5 * k, ny + 10 * k, 2, shade(c, 1.4)) +
+      `<path d="M${f1(60 - nh - k)},${f1(ny - k)} L${f1(60 - 2 * k)},${f1(ny + 2 * k)} L${f1(60 - nh - 5 * k)},${f1(ny + 5 * k)} Z M${f1(60 + nh + k)},${f1(ny - k)} L${f1(60 + 2 * k)},${f1(ny + 2 * k)} L${f1(60 + nh + 5 * k)},${f1(ny + 5 * k)} Z" fill="${shade(c, 1.1)}" stroke="${dark}" stroke-width="${sw(.8)}"/>`;
+  } else if (nk === 'zip') {   // 집업 트레이닝·바람막이·래시가드: 스탠드 칼라 + 지퍼 + (트레이닝) 옆줄
+    o += `<path d="M${f1(60 - nh - 1.4 * k)},${f1(ny + 2 * k)} L${f1(60 - nh - 1.2 * k)},${f1(ny - 4 * k)} Q60,${f1(ny - 2 * k)} ${f1(60 + nh + 1.2 * k)},${f1(ny - 4 * k)} L${f1(60 + nh + 1.4 * k)},${f1(ny + 2 * k)} Q60,${f1(ny + 4 * k)} ${f1(60 - nh - 1.4 * k)},${f1(ny + 2 * k)} Z" fill="${shade(c, .9)}" stroke="${dark}" stroke-width="${sw(.7)}"/>` +
+      `<path d="M60,${f1(ny - 2.6 * k)} L60,${f1(hemY - 1)}" stroke="${shade(c, .55)}" stroke-width="${sw(1.3)}" stroke-dasharray="${sw(.8)} ${sw(.6)}"/>`;
+    if (G.stripes) o += `<g clip-path="url(#${tid}c)"><path d="M${f1(60 - edgeAt(R, y.armpit) + 1.6 * k)},${f1(y.armpit)} L${f1(60 - edgeAt(R, hemY) + 1.6 * k)},${f1(hemY)} M${f1(60 + edgeAt(R, y.armpit) - 1.6 * k)},${f1(y.armpit)} L${f1(60 + edgeAt(R, hemY) - 1.6 * k)},${f1(hemY)}" stroke="#f2efe9" stroke-width="${sw(1.6)}"/></g>`;
+  } else if (nk === 'v') {   // 간호복: V넥 + 가슴 주머니
+    o += nl(`M${f1(60 - nh - 1.5 * k)},${f1(ny)} L60,${f1(ny + 14 * k)} L${f1(60 + nh + 1.5 * k)},${f1(ny)}`, shade(c, .7)) + `<path d="M${f1(60 - w.rib * .62)},${f1(y.bust - 3 * k)} l${sw(9)},0 l0,${sw(8)} l${sw(-9)},0 Z" fill="none" stroke="${dark}" stroke-width="${sw(.9)}"/><path d="M${f1(60 - w.rib * .5)},${f1(y.bust - 6 * k)} l0,${sw(4)}" stroke="#2b5fa8" stroke-width="${sw(1)}"/>`;
+  } else if (nk === 'mandarin') {   // 셰프복(이중 단추) / 방화복(반사띠): 스탠드 칼라
+    o += `<path d="M${f1(60 - nh - 1.4 * k)},${f1(ny + 2 * k)} L${f1(60 - nh - 1.2 * k)},${f1(ny - 3.4 * k)} Q60,${f1(ny - 1.6 * k)} ${f1(60 + nh + 1.2 * k)},${f1(ny - 3.4 * k)} L${f1(60 + nh + 1.4 * k)},${f1(ny + 2 * k)} Q60,${f1(ny + 4 * k)} ${f1(60 - nh - 1.4 * k)},${f1(ny + 2 * k)} Z" fill="${shade(c, .94)}" stroke="${dark}" stroke-width="${sw(.7)}"/>`;
+    if (G.double) o += buttons(60 - 4.6 * k, ny + 9 * k, hemY - 8 * k, 4, shade(c, .5)) + buttons(60 + 4.6 * k, ny + 9 * k, hemY - 8 * k, 4, shade(c, .5)) + `<path d="M${f1(60 + 6.8 * k)},${f1(ny + 3 * k)} Q${f1(60 + 8 * k)},${f1(lerp(ny, hemY, .5))} ${f1(60 + 6.8 * k)},${f1(hemY - 1)}" fill="none" stroke="${dark}" stroke-width="${sw(.9)}" opacity=".6"/>`;
+    if (G.reflect) o += `<g clip-path="url(#${tid}c)"><path d="M0,${f1(lerp(y.bust, y.waist, .4))} L120,${f1(lerp(y.bust, y.waist, .4))} M0,${f1(lerp(y.waist, hemY, .6))} L120,${f1(lerp(y.waist, hemY, .6))}" stroke="#d9e04a" stroke-width="${sw(3.4)}"/><path d="M0,${f1(lerp(y.bust, y.waist, .4))} L120,${f1(lerp(y.bust, y.waist, .4))} M0,${f1(lerp(y.waist, hemY, .6))} L120,${f1(lerp(y.waist, hemY, .6))}" stroke="#c9ced6" stroke-width="${sw(1.2)}"/></g><path d="M60,${f1(ny + 2 * k)} L60,${f1(hemY - 1)}" stroke="${shade(c, .5)}" stroke-width="${sw(1.4)}"/>`;
+  } else if (nk === 'uniform') {   // 교복 동복: 셔츠 V + 라펠 + 넥타이/리본 + 단추 + 왼가슴 마크
+    const tc = UNIFORM.tie[a.tie % 3], vy = lerp(y.armpit, y.bust, .85);
+    o += `<path d="M${f1(60 - nh - k)},${f1(ny)} L60,${f1(vy)} L${f1(60 + nh + k)},${f1(ny)} Z" fill="${UNIFORM.shirt}"/>
+      <path d="M${f1(60 - nh - k)},${f1(ny)} L60,${f1(vy)} L${f1(60 - nh - 8 * k)},${f1(vy - 4 * k)} L${f1(60 - nh - 9 * k)},${f1(ny + 4 * k)} Z M${f1(60 + nh + k)},${f1(ny)} L60,${f1(vy)} L${f1(60 + nh + 8 * k)},${f1(vy - 4 * k)} L${f1(60 + nh + 9 * k)},${f1(ny + 4 * k)} Z" fill="${shade(c, 1.25)}"/>` +
+      (A.f ? tie(tc, true) : `<path d="M${f1(60 - 3 * k)},${f1(ny + 3 * k)} L${f1(60 + 3 * k)},${f1(ny + 3 * k)} L${f1(60 + 2 * k)},${f1(ny + 7 * k)} L${f1(60 + 4 * k)},${f1(vy - 4 * k)} L60,${f1(vy + k)} L${f1(60 - 4 * k)},${f1(vy - 4 * k)} L${f1(60 - 2 * k)},${f1(ny + 7 * k)} Z" fill="${tc}"/>`) +
+      `<circle cx="60" cy="${f1(y.waist - 6 * k)}" r="${sw(1.6)}" fill="${shade(c, 1.5)}"/><circle cx="60" cy="${f1(y.waist + 6 * k)}" r="${sw(1.6)}" fill="${shade(c, 1.5)}"/>
+      <path d="M${f1(60 + w.rib * .45)},${f1(y.bust - 5 * k)} l${sw(7)},0 l0,${sw(5.6)} q${sw(-3.5)},${sw(3.4)} ${sw(-7)},0 Z" fill="#c8a24a" opacity=".85"/>
+      <path d="M60,${f1(vy)} L60,${f1(hemY)}" stroke="${shade(c, .6)}" stroke-width="${sw(1)}" opacity=".6"/>`;
   }
+  if (pat === 'logo') {   // 가슴 작은 프린트 (원 / 글자 줄 / 별)
+    const v = hash(String(a.fs || a.tc) + inner.k) % 3, lx = 60 + (v === 1 ? w.rib * .4 : 0), ly = lerp(y.armpit, y.bust, .7), lc = shade(c, c === '#2a2a2e' || c === '#3b3e48' ? 2 : .45);
+    o += v === 0 ? `<circle cx="${f1(lx)}" cy="${f1(ly)}" r="${sw(4.6)}" fill="none" stroke="${lc}" stroke-width="${sw(1.4)}"/><circle cx="${f1(lx)}" cy="${f1(ly)}" r="${sw(1.6)}" fill="${lc}"/>`
+      : v === 1 ? `<path d="M${f1(lx - 3 * k)},${f1(ly - 2 * k)} l${sw(7)},0 M${f1(lx - 3 * k)},${f1(ly + .4 * k)} l${sw(5)},0" stroke="${lc}" stroke-width="${sw(1.3)}" stroke-linecap="round"/>`
+      : `<path d="M${f1(lx - 9 * k)},${f1(ly - 2 * k)} L${f1(lx + 9 * k)},${f1(ly - 2 * k)} M${f1(lx - 7 * k)},${f1(ly + 2 * k)} L${f1(lx + 7 * k)},${f1(ly + 2 * k)}" stroke="${lc}" stroke-width="${sw(2)}" stroke-linecap="round"/>`;
+  }
+  if (G.rib && !dr) o += hemRib(edgeAt(R, hemY), hemY, k, dark);
   // 목걸이 (어른 여자, 목선이 트인 옷)
-  if (X && X.chain && A.adult && A.f && [0, 1, 6, 7, 8].includes(top)) {
-    const m = METAL[X.metal], cy0 = ny - .8 * k, d = top === 1 || top === 7 ? 10 : 7.5;
-    o += `<path d="M${f1(60 - nh + .8 * k)},${f1(cy0)} Q60,${f1(cy0 + d * 2 * k)} ${f1(60 + nh - .8 * k)},${f1(cy0)}" fill="none" stroke="${m}" stroke-width="${sw(.55)}"/><circle cx="60" cy="${f1(cy0 + d * k + .6 * k)}" r="${sw(1.1)}" fill="${m}"/><circle cx="${f1(60 - .35 * k)}" cy="${f1(cy0 + d * k + .25 * k)}" r="${sw(.35)}" fill="#fff" opacity=".7"/>`;
+  if (X && X.chain && A.adult && A.f && ['round', 'scoop', 'collar', 'boat', 'v', 'blouse'].includes(nk) && !(OF.outer && OUTG[OF.outer.k] && OUTG[OF.outer.k].open === 'closed')) {
+    const m = METAL[X.metal], cy0 = ny - .8 * k, d = nk === 'collar' ? 10 : 7.5;
+    o += `<path d="M${f1(60 - nh + .8 * k)},${f1(cy0)} Q60,${f1(cy0 + d * 2 * k)} ${f1(60 + nh - .8 * k)},${f1(cy0)}" fill="none" stroke="${m}" stroke-width="${sw(.55)}"/><circle cx="60" cy="${f1(cy0 + d * k + .6 * k)}" r="${sw(1.1)}" fill="${m}"/>`;
   }
-  // 주름·그림자: 겨드랑이, 옷깃 아래, 허리 옆(몸에 붙는 옷)
-  const sf = `fill="none" stroke="${fold}" stroke-linecap="round"`, ax = w.armpit + e;
-  o += `<path d="M${f1(60 - ax + .4)},${f1(y.armpit)} L${f1(60 - ax + 4.5 * k)},${f1(y.armpit + 3 * k)} L${f1(60 - ax + k)},${f1(y.armpit + 10 * k)} Z M${f1(60 + ax - .4)},${f1(y.armpit)} L${f1(60 + ax - 4.5 * k)},${f1(y.armpit + 3 * k)} L${f1(60 + ax - k)},${f1(y.armpit + 10 * k)} Z" fill="${fold}" opacity=".2"/>`;
-  if (top !== 4 && top !== 5 && top !== 7) o += `<path d="M${f1(60 - nh - 4 * k)},${f1(ny + 4 * k)} Q60,${f1(ny + 19 * k)} ${f1(60 + nh + 4 * k)},${f1(ny + 4 * k)}" ${sf} stroke-width="${sw(2)}" opacity=".14"/>`;
-  if (fitted && hemY > y.waist + 2) {
-    const wx = straight + e;
-    o += `<path d="${[-1, 1].map(s => `M${f1(60 + s * (wx - 2.5 * k))},${f1(y.waist - 7 * k)} L${f1(60 + s * (wx - 2 * k))},${f1(y.waist + k)} M${f1(60 + s * (wx - 5.5 * k))},${f1(y.waist - 5 * k)} L${f1(60 + s * (wx - 5 * k))},${f1(y.waist + 1.5 * k)}`).join(' ')}" ${sf} stroke-width="${sw(1.2)}" opacity=".2"/>`;
-  }
-  if (sig && A.ci >= 1) {   // 가슴: 밑가슴 그림자 곡선 + 윗면 옅은 빛 (컵이 클수록 짙게, 헐렁한 옷은 약하게, 몸에 붙는 옷은 가운데 골)
-    const bx = bustW * .5, r = bustW * (.42 + A.ci * .022), op = Math.min(.34, .08 + A.ci * .04) * (fitted ? 1 : .6);
-    o += `<g clip-path="url(#${tid}c)">${bustCloth(tid + 'b', bx, y.bust, r, shade(stripe ? '#8d8679' : c, .5), op, fitted && A.ci >= 4, k)}</g>`;
-    if (fitted && A.ci >= 4) {   // 옷 장력 주름: 가슴에서 겨드랑이 쪽으로 (D 1개, E 이상 2개)
-      let dd = '';
-      for (let i = 0; i < (A.ci >= 5 ? 2 : 1); i++) for (const s of [-1, 1]) dd += `M${f1(60 + s * bustW * .62)},${f1(y.bust - 1 - i * 2.4 * k)} Q${f1(60 + s * bustW * .82)},${f1(y.bust - 3 - i * 2.4 * k)} ${f1(60 + s * (ax - 1.2))},${f1(y.armpit + 2.5 - i * 1.2 * k)} `;
-      o += `<path d="${dd}" ${sf} stroke-width=".7" opacity=".3"/>`;
-    }
-  } else if (!A.f && A.adult && A.fitM) o += `<path d="M${f1(60 - w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 - w.rib * .35)},${f1(y.bust + 3)} 59,${f1(y.bust + 1.5)} M${f1(60 + w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 + w.rib * .35)},${f1(y.bust + 3)} 61,${f1(y.bust + 1.5)}" ${sf} stroke-width=".9" opacity=".22"/>`;   // 가슴 근육선
-  return { svg: o, color: c, fill: stripe ? `url(#${tid}p)` : null, gw: yy => edgeAt(R, yy), bustEdge: bustW + e, hemY, pocket: pocketT, lowC: bt.c };
+  // 주름 (3-6, 위치 고정): 겨드랑이, 허리(넣어 입으면 위로 부풀어 겹침 / 몸에 붙는 옷은 옆 주름) — 옷 색 -15%
+  const sf = `fill="none" stroke="${fold}" stroke-linecap="round"`, ax = edgeAt(R, y.armpit);
+  o += `<path d="M${f1(60 - ax + 1.2 * k)},${f1(y.armpit + 1)} q${sw(2.6)},${sw(2)} ${sw(1.4)},${sw(6)} M${f1(60 + ax - 1.2 * k)},${f1(y.armpit + 1)} q${sw(-2.6)},${sw(2)} ${sw(-1.4)},${sw(6)}" ${sf} stroke-width="${sw(1.1)}" opacity=".9"/>`;
+  if (tucked) o += `<path d="${[-1, 1].map(s => `M${f1(60 + s * (straight + G.e - 1.5 * k))},${f1(hemY - 3 * k)} q${f1(-s * 3 * k)},${sw(-1.6)} ${f1(-s * 6.5 * k)},${sw(.4)} M${f1(60 + s * (straight * .55))},${f1(hemY - 2.6 * k)} q${f1(-s * 2.4 * k)},${sw(-1.4)} ${f1(-s * 5 * k)},${sw(.2)}`).join(' ')}" ${sf} stroke-width="${sw(1.1)}" opacity=".9"/>`;
+  else if (G.fit && hemY > y.waist + 2 && !dr) { const wx = straight + G.e; o += `<path d="${[-1, 1].map(s => `M${f1(60 + s * (wx - 2.5 * k))},${f1(y.waist - 7 * k)} L${f1(60 + s * (wx - 2 * k))},${f1(y.waist + k)}`).join(' ')}" ${sf} stroke-width="${sw(1.1)}" opacity=".8"/>`; }
+  // 가슴: 밑가슴 그림자 곡선 + 윗면 옅은 빛 (컵이 클수록 짙게, 헐렁한 옷은 약하게, 몸에 붙는 옷은 가운데 골)
+  if (sig && A.ci >= 1) {
+    const bx = bustW * .5, r = bustW * (.42 + A.ci * .022), op = Math.min(.34, .08 + A.ci * .04) * (G.fit ? 1 : .6);
+    o += `<g clip-path="url(#${tid}c)">${bustCloth(tid + 'b', bx, y.bust, r, shade(stripe ? '#8d8679' : c, .5), op, G.fit && A.ci >= 4 && !['collar', 'uniform'].includes(nk), k)}</g>`;
+  } else if (!A.f && A.adult && A.fitM && G.fit) o += `<path d="M${f1(60 - w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 - w.rib * .35)},${f1(y.bust + 3)} 59,${f1(y.bust + 1.5)} M${f1(60 + w.rib * .7)},${f1(y.bust + 1)} Q${f1(60 + w.rib * .35)},${f1(y.bust + 3)} 61,${f1(y.bust + 1.5)}" ${sf} stroke-width=".9" opacity=".5"/>`;   // 가슴 근육 아래 옅은 선 하나 (근육형만)
+  // 오버핏: 내려온 어깨 솔기
+  if (G.drop) o += `<path d="${[-1, 1].map(s => `M${f1(60 + s * (w.sh - A.arm.uw * .6 + G.e * .3))},${f1(y.sh + A.arm.uw * .6 + G.drop)} q${f1(s * A.arm.uw * .3)},${sw(1.2)} ${f1(s * A.arm.uw * .7)},${sw(.8)}`).join(' ')}" fill="none" stroke="${shade(c, .7)}" stroke-width="${sw(.9)}" opacity=".7"/>`;
+  let T = { color: c, fill: stripe ? `url(#${tid}p)` : null, sleeve: G.sl === 'puff' ? 'short' : G.sl, puff: G.sl === 'puff', cuff: G.cuff, sleeveE: G.e * .7, R, hemY, bustEdge: bustW + G.e, straight };
+  // 겉옷
+  if (OF.outer && OUTG[OF.outer.k]) T = outerSVG(a, OF.outer, A, skin, G, R, T, (s2) => { o += s2; }, tid);
+  // 소품: 앞치마 / 사원증 / 목도리 / 가방 끈
+  o += accTop(OF, A, T, skin, tid);
+  return { svg: o, color: T.color, fill: T.fill, sleeve: T.sleeve, puff: T.puff, cuff: T.cuff, sleeveE: T.sleeveE, gw: yy => edgeAt(T.R, yy), bustEdge: T.bustEdge, hemY: T.hemY, pocket: OF.outer && !OUTG[OF.outer.k]?.sleeveless ? null : pocketT, lowC: OF.bottom ? OF.bottom.c : null, watch: !!(OF.acc && OF.acc.watch), umbrella: !!(OF.acc && OF.acc.umbrella) };
 }
-
+// 겉옷 그리기: 이너 위에, 앞이 열려(evenodd 구멍) 이너가 보임. 반환: 소매·윤곽은 겉옷 기준
+function outerSVG(a, OU, A, skin, Gi, Ri, Ti, put, tid) {
+  const { y, w } = A, k = A.hs, sw = v => f1(v * k), nh = w.nh, ny = y.neck, OG = OUTG[OU.k], oc = OU.c, dk = shade(oc, .62), fold = shade(oc, .85);
+  const g = { e: Math.max(OG.e, Gi.e + 1.2), loose: Math.max(OG.loose, Gi.loose * .8), bust: .55, rib: OG.rib };
+  const lenY = { waist: lerp(y.waist, y.hip, .45), hip: lerp(y.hip, y.crotch, .5), thigh: lerp(y.crotch, y.thigh, .7), knee: y.knee + 2, calf: lerp(y.knee, y.calf, .9) }[OG.len];
+  const { R, bustW } = torsoR(A, g, lenY, { flare: OG.len === 'knee' || OG.len === 'calf' ? .07 : .02, sleeveless: !!OG.sleeveless });
+  if (OG.sleeveless) { R[0][0] += 1.5 * k; }
+  const od = symShape(R, lenY + 1.2, ny + 2), nw = nh + 1.2 * k, top = ny + 1.8 * k;
+  const vy = { v: lerp(y.bust, y.underbust, .5), lapel: OG.len === 'thigh' ? lerp(y.bust, y.underbust, .7) : lerp(y.armpit, y.bust, .9), asym: y.bust, zip: lerp(ny, y.bust, .3) }[OG.open];
+  const gap = 2.6 * k;
+  let open = '';
+  if (OG.open === 'straight') open = `M${f1(60 - nw)},${f1(top)} L${f1(60 - gap)},${f1(top + 8 * k)} L${f1(60 - gap)},${f1(lenY - 2.4)} L${f1(60 + gap)},${f1(lenY - 2.4)} L${f1(60 + gap)},${f1(top + 8 * k)} L${f1(60 + nw)},${f1(top)} Z`;
+  else if (OG.open === 'asym') open = `M${f1(60 - nw)},${f1(top)} L${f1(60 + 5 * k)},${f1(vy)} L${f1(60 + nw)},${f1(top)} Z`;
+  else if (vy) open = `M${f1(60 - nw)},${f1(top)} L60,${f1(vy)} L${f1(60 + nw)},${f1(top)} Z`;
+  let o = '';
+  if (OG.collar === 'hood') o += `<path d="M${f1(60 - nh - 12 * k)},${f1(ny + 6 * k)} C${f1(60 - nh - 11 * k)},${f1(ny - 10 * k)} ${f1(60 + nh + 11 * k)},${f1(ny - 10 * k)} ${f1(60 + nh + 12 * k)},${f1(ny + 6 * k)} Z" fill="${dk}"/>`;   // 롱패딩 후드 (목 뒤)
+  o += `<path d="${od} ${open}" fill="${oc}" fill-rule="evenodd" stroke="${shade(oc, .55)}" stroke-width=".6"/>`;
+  o += `<defs><clipPath id="${tid}o" clip-rule="evenodd"><path d="${od} ${open}"/></clipPath></defs>`;
+  const inC = `clip-path="url(#${tid}o)"`;
+  // 디테일
+  if (OG.quilt) { let d = ''; for (let yy = y.armpit; yy < lenY - 2; yy += 8 * k) d += `M0,${f1(yy)} Q60,${f1(yy + 2.6 * k)} 120,${f1(yy)} `; o += `<g ${inC}><path d="${d}" fill="none" stroke="${fold}" stroke-width="${sw(1.4)}"/><path d="${d}" fill="none" stroke="${shade(oc, 1.35)}" stroke-width="${sw(.7)}" transform="translate(0,${sw(-1.6)})" opacity=".5"/></g>`; }
+  if (OG.fluffy) o += `<path d="${od}" fill="none" stroke="${shade(oc, 1.15)}" stroke-width="${sw(1.6)}" stroke-dasharray="${sw(.6)} ${sw(1.4)}" opacity=".6"/>`;
+  if (OG.shine) o += `<g ${inC}><path d="M${f1(60 - bustW * .7)},${f1(y.armpit + 3)} q${sw(-2)},${sw(10)} ${sw(-1)},${sw(20)} M${f1(60 + bustW * .55)},${f1(y.bust)} q${sw(1.4)},${sw(8)} ${sw(.6)},${sw(14)}" fill="none" stroke="#fff" stroke-width="${sw(1.6)}" opacity=".25"/></g>`;
+  if (OG.denim) o += `<g ${inC}><path d="M${f1(60 - edgeAt(R, y.armpit))},${f1(y.armpit)} Q60,${f1(y.armpit + 3 * k)} ${f1(60 + edgeAt(R, y.armpit))},${f1(y.armpit)}" fill="none" stroke="#d2a659" stroke-width="${sw(.8)}" stroke-dasharray="${sw(2)} ${sw(1.4)}" opacity=".8"/>${[-1, 1].map(s => `<path d="M${f1(60 + s * bustW * .55 - 4.5 * k)},${f1(y.armpit + 4 * k)} l${sw(9)},0 l0,${sw(7)} l${sw(-4.5)},${sw(2)} l${sw(-4.5)},${sw(-2)} Z" fill="none" stroke="#d2a659" stroke-width="${sw(.8)}" stroke-dasharray="${sw(1.6)} ${sw(1.2)}"/>`).join('')}</g>`;
+  if (OG.belt) { const yb = y.waist, hw = edgeAt(R, yb); o += `<path d="M${f1(60 - hw)},${f1(yb - 2.4 * k)} L${f1(60 + hw)},${f1(yb - 2.4 * k)} L${f1(60 + hw)},${f1(yb + 2.4 * k)} L${f1(60 - hw)},${f1(yb + 2.4 * k)} Z" fill="${shade(oc, .9)}" stroke="${dk}" stroke-width="${sw(.6)}"/><rect x="${f1(60 - 3 * k)}" y="${f1(yb - 3 * k)}" width="${sw(6)}" height="${sw(6)}" rx="${sw(.8)}" fill="none" stroke="${dk}" stroke-width="${sw(1.1)}"/><path d="M${f1(60 + 2 * k)},${f1(yb + 2 * k)} q${sw(2)},${sw(6)} ${sw(-1)},${sw(12)}" fill="none" stroke="${shade(oc, .9)}" stroke-width="${sw(3.2)}" stroke-linecap="round"/>`; }
+  if (OG.pocket || OG.len === 'knee' || OG.len === 'thigh') o += [-1, 1].map(s => `<path d="M${f1(60 + s * edgeAt(R, y.hip) * .45 - 5 * k)},${f1(y.hip + 1)} l${sw(10)},0" stroke="${dk}" stroke-width="${sw(1.2)}" stroke-linecap="round" opacity=".8"/>`).join('');
+  if (OG.btn && OG.open !== 'straight') { const x0 = OG.open === 'lapel' ? 60 + 1.4 * k : 60; const yy0 = (vy || ny) + 4 * k, yy1 = Math.min(OG.belt ? y.waist - 5 * k : lenY - 6 * k, (vy || ny) + (OG.btn - 1) * 11 * k); o += Array.from({ length: OG.btn }, (_, i) => `<circle cx="${f1(x0)}" cy="${f1(yy0 + i * (yy1 - yy0) / Math.max(1, OG.btn - 1))}" r="${sw(1.4)}" fill="${shade(oc, OG.open === 'v' ? 1.35 : .55)}"/>`).join(''); }
+  if (OG.open === 'lapel' || OG.collar === 'notch') {   // 노치드 라펠
+    const lv = OG.open === 'lapel' ? vy : vy - 4 * k, lap = sd => { const X = v => f1(60 + sd * v); return `M${X(nw)},${f1(top - .6 * k)} L${X(.4 * k)},${f1(lv)} L${X(nh + 7.6 * k)},${f1(lerp(ny, lv, .32))} L${X(nh + 8.4 * k)},${f1(ny + 5.6 * k)} L${X(nh + 5.4 * k)},${f1(ny + 5 * k)} L${X(nh + 6.4 * k)},${f1(ny + 1.2 * k)} Z`; };
+    o += `<path d="${lap(-1)} ${lap(1)}" fill="${shade(oc, 1.1)}" stroke="${dk}" stroke-width="${sw(.6)}" stroke-linejoin="round"/>`;
+    if (OG.open === 'lapel') o += `<path d="M60,${f1(vy)} L60,${f1(lenY)}" stroke="${dk}" stroke-width="${sw(1)}"/>`;
+  }
+  if (OG.open === 'v') o += `<path d="M${f1(60 - nw)},${f1(top)} L60,${f1(vy)} L${f1(60 + nw)},${f1(top)} M60,${f1(vy)} L60,${f1(lenY)}" fill="none" stroke="${shade(oc, .74)}" stroke-width="${sw(2.2)}" stroke-linejoin="round"/>`;   // 가디건 앞단
+  if (OG.open === 'straight') o += `<path d="M${f1(60 - gap)},${f1(top + 8 * k)} L${f1(60 - gap)},${f1(lenY - 1)} M${f1(60 + gap)},${f1(top + 8 * k)} L${f1(60 + gap)},${f1(lenY - 1)}" stroke="${dk}" stroke-width="${sw(1.2)}"/>`;
+  if (OG.open === 'zip' || OG.open === 'closed' || OG.open === 'asym') { const zx = OG.open === 'asym' ? 60 + 5 * k : 60; o += `<path d="M${f1(zx)},${f1(vy || ny + 2 * k)} L${f1(OG.open === 'asym' ? 60 + 3 * k : 60)},${f1(lenY - 1)}" stroke="${shade(oc, .5)}" stroke-width="${sw(1.4)}" stroke-dasharray="${sw(.8)} ${sw(.6)}"/>`; }
+  if (OG.collar === 'stand') o += `<path d="M${f1(60 - nh - 2 * k)},${f1(ny + 3 * k)} L${f1(60 - nh - 1.6 * k)},${f1(ny - 4.4 * k)} Q60,${f1(ny - 2.6 * k)} ${f1(60 + nh + 1.6 * k)},${f1(ny - 4.4 * k)} L${f1(60 + nh + 2 * k)},${f1(ny + 3 * k)} Q60,${f1(ny + 5 * k)} ${f1(60 - nh - 2 * k)},${f1(ny + 3 * k)} Z" fill="${shade(oc, .92)}" stroke="${dk}" stroke-width="${sw(.7)}"/>`;
+  if (OG.collar === 'shirt') o += `<path d="M${f1(60 - nw)},${f1(top - k)} L${f1(60 - nw + 4 * k)},${f1(top + 10 * k)} L${f1(60 - nw - 7 * k)},${f1(top + 5 * k)} Z M${f1(60 + nw)},${f1(top - k)} L${f1(60 + nw - 4 * k)},${f1(top + 10 * k)} L${f1(60 + nw + 7 * k)},${f1(top + 5 * k)} Z" fill="${shade(oc, 1.08)}" stroke="#d2a659" stroke-width="${sw(.7)}"/>`;
+  if (OU.reflect) o += `<g ${inC}><path d="M0,${f1(lerp(y.bust, y.waist, .3))} L120,${f1(lerp(y.bust, y.waist, .3))} M0,${f1(lerp(y.waist, lenY, .55))} L120,${f1(lerp(y.waist, lenY, .55))}" stroke="#c9ced6" stroke-width="${sw(3)}"/></g>`;
+  if (OG.rib) o += hemRib(edgeAt(R, lenY), lenY, k, shade(oc, .78));
+  // 겉옷 겨드랑이 주름
+  const ax = edgeAt(R, y.armpit);
+  o += `<path d="M${f1(60 - ax + 1.2 * k)},${f1(y.armpit + 1)} q${sw(2.6)},${sw(2)} ${sw(1.4)},${sw(6)} M${f1(60 + ax - 1.2 * k)},${f1(y.armpit + 1)} q${sw(-2.6)},${sw(2)} ${sw(-1.4)},${sw(6)}" fill="none" stroke="${fold}" stroke-width="${sw(1.1)}" stroke-linecap="round"/>`;
+  put(o);
+  if (OG.sleeveless) return Object.assign({}, Ti, { R: R.map((p, i) => p), hemY: Math.max(Ti.hemY, lenY), bustEdge: Math.max(Ti.bustEdge, bustW + g.e) });
+  return { color: oc, fill: null, sleeve: 'long', puff: false, cuff: .9, sleeveE: g.e * .7, R, hemY: lenY, bustEdge: bustW + g.e, straight: Ti.straight };
+}
+// 소품 (윗몸): 앞치마 / 사원증 / 목도리 / 가방 끈 (크로스·숄더·백팩)
+function accTop(OF, A, T, skin, tid) {
+  const { y, w } = A, k = A.hs, sw = v => f1(v * k), ny = y.neck, nh = w.nh, ac = OF.acc || {};
+  let o = '';
+  if (ac.apron) {   // 카페·셰프 앞치마: 가슴에서 허벅지까지 + 목끈·허리끈
+    const c = ac.apron, top = lerp(y.armpit, y.bust, .5), bot = lerp(y.crotch, y.knee, .45), tw = Math.min(w.rib * .62, 13 * k), bw = w.hip * .9;
+    o += `<path d="M${f1(60 - tw)},${f1(top)} L${f1(60 + tw)},${f1(top)} L${f1(60 + tw + 1)},${f1(y.waist)} L${f1(60 + bw)},${f1(bot)} Q60,${f1(bot + 2 * k)} ${f1(60 - bw)},${f1(bot)} L${f1(60 - tw - 1)},${f1(y.waist)} Z" fill="${c}" stroke="${shade(c, .65)}" stroke-width=".6"/>` +
+      `<path d="M${f1(60 - tw + 1)},${f1(top)} L${f1(60 - nh + 1)},${f1(ny + 1)} M${f1(60 + tw - 1)},${f1(top)} L${f1(60 + nh - 1)},${f1(ny + 1)} M${f1(60 - T.straight - 3)},${f1(y.waist)} L${f1(60 + T.straight + 3)},${f1(y.waist)}" stroke="${shade(c, .8)}" stroke-width="${sw(1.6)}" stroke-linecap="round"/>` +
+      `<path d="M${f1(60 - bw * .55)},${f1(lerp(y.waist, bot, .45))} l${sw(10)},0 l0,${sw(7)} l${sw(-10)},0 Z" fill="none" stroke="${shade(c, .65)}" stroke-width="${sw(.8)}"/>`;
+  }
+  if (ac.badge) {   // 사원증: 목줄 V + 카드
+    const cy = lerp(y.bust, y.underbust, .9);
+    o += `<path d="M${f1(60 - nh + .5)},${f1(ny + .5)} L${f1(60 - 1.2 * k)},${f1(cy - 5 * k)} M${f1(60 + nh - .5)},${f1(ny + .5)} L${f1(60 + 1.2 * k)},${f1(cy - 5 * k)}" stroke="#2b5fa8" stroke-width="${sw(1.2)}"/><rect x="${f1(60 - 4 * k)}" y="${f1(cy - 5 * k)}" width="${sw(8)}" height="${sw(10)}" rx="${sw(1)}" fill="#f7f6f3" stroke="#9aa2ad" stroke-width="${sw(.6)}"/><rect x="${f1(60 - 2.6 * k)}" y="${f1(cy - 3.6 * k)}" width="${sw(5.2)}" height="${sw(3.6)}" fill="#a9c6dc"/>`;
+  }
+  if (ac.scarf) {   // 목도리: 목을 감싸고 한쪽 끝이 가슴 앞으로
+    const c = ac.scarf, top2 = ny - 4 * k;
+    o += `<path d="M${f1(60 - nh - 4 * k)},${f1(top2)} Q60,${f1(top2 + 3 * k)} ${f1(60 + nh + 4 * k)},${f1(top2)} L${f1(60 + nh + 5 * k)},${f1(ny + 5 * k)} Q60,${f1(ny + 9 * k)} ${f1(60 - nh - 5 * k)},${f1(ny + 5 * k)} Z" fill="${c}" stroke="${shade(c, .65)}" stroke-width=".6"/>` +
+      `<path d="M${f1(60 + 2 * k)},${f1(ny + 5 * k)} L${f1(60 + 9 * k)},${f1(ny + 6 * k)} L${f1(60 + 8 * k)},${f1(y.underbust)} L${f1(60 + 2.4 * k)},${f1(y.underbust - k)} Z" fill="${shade(c, .92)}" stroke="${shade(c, .65)}" stroke-width=".6"/>` +
+      `<path d="M${f1(60 + 3 * k)},${f1(y.underbust - k)} l0,${sw(3)} M${f1(60 + 5.4 * k)},${f1(y.underbust - .6 * k)} l0,${sw(3)} M${f1(60 + 7.6 * k)},${f1(y.underbust - .2 * k)} l0,${sw(3)}" stroke="${shade(c, .7)}" stroke-width="${sw(1)}"/>`;
+  }
+  if (ac.bag === 'cross') { const bx = 60 + w.hip * .5, by = y.hip - 1; o += `<path d="M${f1(60 - w.sh + A.arm.uw * .9)},${f1(y.sh + 1)} L${f1(bx + 2 * k)},${f1(by)}" stroke="#3a2f28" stroke-width="${sw(1.6)}"/><rect x="${f1(bx - 5 * k)}" y="${f1(by)}" width="${sw(12)}" height="${sw(9)}" rx="${sw(1.6)}" fill="#6b4a36" stroke="#3a2f28" stroke-width="${sw(.7)}"/><path d="M${f1(bx - 5 * k)},${f1(by + 3 * k)} l${sw(12)},0" stroke="#3a2f28" stroke-width="${sw(.7)}"/>`; }
+  if (ac.bag === 'shoulder') o += `<path d="M${f1(60 + w.sh - A.arm.uw * .9)},${f1(y.sh + 1)} L${f1(60 + w.sh - A.arm.uw * .6)},${f1(y.waist - 2)}" stroke="#2a211d" stroke-width="${sw(1.4)}"/>`;
+  if (ac.bag === 'backpack') o += [-1, 1].map(s => `<path d="M${f1(60 + s * (w.sh - A.arm.uw * 1.1))},${f1(y.sh - .5)} Q${f1(60 + s * (w.sh - A.arm.uw * .9))},${f1(y.armpit)} ${f1(60 + s * (w.armpit + 1))},${f1(y.bust + 2)}" fill="none" stroke="#2f3440" stroke-width="${sw(3)}" stroke-linecap="round"/>`).join('');
+  return o;
+}
 // 팔 (1-2): 어깨 관절에서 앵커 5개(어깨 1 / 상완 중간 .95·근육형 1.05 / 팔꿈치 .75 / 전완 .85 / 손목 .55)를 지나는 굵기가 변하는 팔
 //   팔꿈치는 허리 높이, 손목은 골반 높이, 손끝은 허벅지 중간. 팔꿈치에서 바깥으로 살짝 꺾임(남 2.5°, 여 4°) — 완전 직선 없음
 //   기본 자세는 몸통 뒤에 그려서 가슴·허리 윤곽이 가려지지 않게. 위쪽 끝은 몸통(삼각근 윤곽) 아래로 숨음
 //   default 차렷 / hip 한 손 허리 / cross 팔짱 / clasp 두 손을 앞에 모음 / pocket 주머니(한 손 또는 두 손)
 function armsFull(A, top, pose, skin, T, lowHip, ring) {   // ring: 왼손(화면 오른쪽, s=1) 약지에 결혼 반지
-  const { y, w } = A, { uw, mw, ew, fw, ww, hand } = A.arm, k = A.hs, c = T.color, shortSl = T.sleeve ? T.sleeve === 'short' : top === 0, bareArm = T.sleeve === 'none', ln = shade(c, .6);
-  const jx = w.sh - uw / 2, jy = y.sh + uw * .5, dv = A.delt || 0;
+  const k = A.hs, c = T.color, shortSl = T.sleeve ? T.sleeve === 'short' : top === 0, bareArm = T.sleeve === 'none', ln = shade(c, .6);
+  // 소매 여유분: 옷이 두꺼울수록(후디·패딩·코트) 소매도 굵음. 반팔·민소매는 살 그대로
+  const se = shortSl || bareArm ? 0 : T.sleeveE || 0, { y, w } = A, { hand } = A.arm;
+  const uw = A.arm.uw + se, mw = A.arm.mw + se, ew = A.arm.ew + se * .8, fw = A.arm.fw + se * .8, ww = A.arm.ww + se * .6;
+  const dv = A.delt || 0, jx = w.sh - A.arm.uw / 2 + se * .36, jy = y.sh + A.arm.uw * .5;
   const rotOf = (E, W) => Math.atan2(-(W[0] - E[0]), W[1] - E[1]) * 180 / Math.PI;
   const along = (P0, P1, d) => { const l = Math.hypot(P1[0] - P0[0], P1[1] - P0[1]) || 1; return [P0[0] + (P1[0] - P0[0]) * d / l, P0[1] + (P1[1] - P0[1]) * d / l]; };
   const cuffAt = T.cuff ?? .86;   // 소매 끝 (전완의 비율, 오버핏은 손등까지)
   const cuff = (E, W, wd) => {
-    const x = lerp(E[0], W[0], Math.min(cuffAt, 1)), yy = lerp(E[1], W[1], Math.min(cuffAt, 1)), l = Math.hypot(W[0] - E[0], W[1] - E[1]) || 1, nx = -(W[1] - E[1]) / l * wd * .55, ny = (W[0] - E[0]) / l * wd * .55;
+    const x = lerp(E[0], W[0], Math.min(cuffAt, .97)), yy = lerp(E[1], W[1], Math.min(cuffAt, .97)), l = Math.hypot(W[0] - E[0], W[1] - E[1]) || 1, nx = -(W[1] - E[1]) / l * wd * .36, ny = (W[0] - E[0]) / l * wd * .36;
     return `<path d="M${P(x - nx, yy - ny)} L${P(x + nx, yy + ny)}" stroke="${ln}" stroke-width="${f1(1.4 * k)}" opacity=".55"/>`;
   };
   // 팔 한 줄기: 반팔이면 소매 아래는 살, 민소매면 전부 살. sleeveTo: 반팔 소매 끝(상완 비율)
@@ -1361,7 +1549,7 @@ function armsFull(A, top, pose, skin, T, lowHip, ring) {   // ring: 왼손(화�
     const sc = T.sleeveFill || T.fill || (dim ? shade(c, .9) : c), sk = dim ? shade(skin, .94) : skin;
     if (!shortSl && !bareArm) return `<path d="${taperD(pts, false)}" fill="${sc}" stroke="${ln}" stroke-width=".5"/>`;
     let o = `<path d="${taperD(pts, false)}" fill="${sk}" stroke="${shade(skin, .72)}" stroke-width=".5"/>`;
-    if (shortSl && sleeveTo) { const p = pts[0], q = pts[1], m = [lerp(p[0], q[0], sleeveTo), lerp(p[1], q[1], sleeveTo)]; o += `<path d="${taperD([[p[0], p[1], p[2] + 1.4 * k], [m[0], m[1], q[2] + 1.6 * k]], false)}" fill="${sc}" stroke="${ln}" stroke-width=".5"/>`; }
+    if (shortSl && sleeveTo) { const p = pts[0], q = pts[1], m = [lerp(p[0], q[0], sleeveTo * (T.puff ? .8 : 1)), lerp(p[1], q[1], sleeveTo * (T.puff ? .8 : 1))], pf = T.puff ? 3.2 * k : 0; o += `<path d="${taperD([[p[0], p[1], p[2] + 1.4 * k + pf], [lerp(p[0], m[0], .5), lerp(p[1], m[1], .5), q[2] + 1.6 * k + pf * 1.4], [m[0], m[1], q[2] + 1.6 * k + pf * .3]], false)}" fill="${sc}" stroke="${ln}" stroke-width=".5"/>`; }
     return o;
   };
   // 마른 체형은 손목뼈가 살짝 보임, 주름 (팔꿈치 안쪽, 옷 색 -15%)
@@ -1373,7 +1561,9 @@ function armsFull(A, top, pose, skin, T, lowHip, ring) {   // ring: 왼손(화�
     let o = seg(pts, dim, .62);
     if (!shortSl && !bareArm) o += cuff(E, W, ww * 1.6) + elbowFold(E, s);
     o += `<path d="M${P(E[0] - s * ew * .25, E[1] + 2 * k)} Q${P(F[0] - s * fw * .35, F[1])} ${P(W[0] - s * ww * .3, W[1] - 2 * k)}" fill="none" stroke="${shade(shortSl || bareArm ? skin : c, .72)}" stroke-width="${f1(k)}" opacity=".3"/>`;   // 팔 안쪽 그림자
-    const hd = handAt(W[0], W[1], s, skin, rot, hand, ring && s === 1) + knob(W, s);
+    let hd = handAt(W[0], W[1], s, skin, rot, hand, ring && s === 1) + knob(W, s);
+    if (T.watch && s === 1 && cuffAt <= 1) { const l = Math.hypot(W[0] - F[0], W[1] - F[1]) || 1, nx = -(W[1] - F[1]) / l * ww * .62, ny = (W[0] - F[0]) / l * ww * .62, wx = lerp(F[0], W[0], .82), wy = lerp(F[1], W[1], .82); hd += `<path d="M${P(wx - nx, wy - ny)} L${P(wx + nx, wy + ny)}" stroke="#3a2f28" stroke-width="${f1(1.8 * k)}"/><circle cx="${f1(wx)}" cy="${f1(wy)}" r="${f1(1.1 * k)}" fill="#d8dde3" stroke="#3a2f28" stroke-width="${f1(.4 * k)}"/>`; }   // 시계 (왼손목)
+    if (T.umbrella && s === -1 && rot !== 42) { const ux = W[0] - 1.2 * k, uy = W[1] + hand * .55; hd += `<path d="M${f1(ux)},${f1(uy)} q${f1(-3 * k)},0 ${f1(-3 * k)},${f1(3 * k)}" fill="none" stroke="#3a2f28" stroke-width="${f1(1.2 * k)}" stroke-linecap="round"/><path d="M${f1(ux)},${f1(uy)} L${f1(ux - 2.2 * k)},${f1(uy + 8 * k)} L${f1(ux - .4)},${FLOOR - 2} L${f1(ux + .4)},${FLOOR - 2} L${f1(ux + 2.2 * k)},${f1(uy + 8 * k)} Z" fill="#2e3a56" stroke="#1d2436" stroke-width=".5"/>`; }   // 우산 (비 오는 날)
     return cuffAt > 1 ? hd + o : o + hd;   // 오버핏 소매는 손등을 덮음
   };
   // 차렷: 팔꿈치는 허리 높이에서 몸 바깥, 손목은 골반 높이에서 골반 바깥 — 팔꿈치에서 바깥으로 꺾임
@@ -1616,7 +1806,7 @@ function renderPreIntimate(a, size, st) {
   const x0 = 60 - W / 2, y0 = bottom - H, u = W / 120;
   let o = `<svg class="av av-full" width="${w}" height="${h}" viewBox="${f1(x0)} ${f1(y0)} ${f1(W)} ${f1(H)}" aria-hidden="true">`;
   o += `<rect class="av-bg" x="${f1(x0 + .5 * u)}" y="${f1(y0 + .5 * u)}" width="${f1(W - u)}" height="${f1(H - u)}" rx="${f1(10 * u)}" style="stroke-width:${f1(1.5 * u)}"/>`;
-  const hp = hairPieces(a, X, age, hc, { sy: F.sy, chest: F.chest });
+  const hp = hairPieces(a, X, age, hc, { sy: F.sy, chest: F.chest }, { noHat: true });
   o += hp.back;
   const nh = F.nh, neckBot = F.sy + 4;
   o += `<path d="M${f1(60 - nh)},94 L${f1(60 + nh)},94 L${f1(60 + nh)},${f1(neckBot)} L${f1(60 - nh)},${f1(neckBot)} Z" fill="${skinD}"/>`;
@@ -1832,7 +2022,9 @@ function headSVG(a, X, age, st, g) {
 const hairColor = (a, age) => HAIR[age <= 18 && (DYED.has(a.hc) || a.hc === GRAY) ? (a.hcN ?? (a.hc % 2 ? 2 : 1)) : a.hc] || HAIR[0];
 // 눈썹·수염용: 흰머리가 섞인 색
 const browColor = (a, age) => { const hc = hairColor(a, age), gl = grayLevel(a, age); return gl > 0 ? mixC(hc, '#d2cdc6', Math.pow(gl, 1.4) * .6) : hc; };
-const topOf = (a, age) => age >= 13 && age <= 18 ? 4 : age <= 12 ? ({ 1: 0, 3: 2, 7: 2 }[a.top] ?? a.top) : a.top;   // 10대는 교복, 어린이는 셔츠·니트·재킷 대신 티·후디
+// 지금 입은 한 벌 (js/outfit.js): st.outfit > st.ctx(계절·장소·시간·사람 정보)로 고름 > 생김새의 대표 한 벌
+const outfitOf = (a, age, st, X) => st.outfit || (window.Outfit ? Outfit.pick(a, age, st.ctx, X) : null) || { inner: { k: 'tee', c: TOP_COLORS[a.tc || 0] }, bottom: { k: 'jeans', c: '#4a5f86', cut: 'straight' }, shoes: { k: 'sneaker', c: '#eceae6' }, acc: {} };
+const hatCtx = (st, OF) => OF && OF.acc && OF.acc.hat ? Object.assign({}, st.ctx, { hat: OF.acc.hat }) : st.ctx;
 // SVG 문자열 안의 절대 좌표를 W(x, y)로 옮김 (path d의 대문자 명령, cx·cy, x·y). 상대 명령(소문자)은 변위라 그대로 둠
 function warpSVG(svg, W) {
   const wp = d => {
@@ -1878,18 +2070,18 @@ function stanceOf(A, ws) {
 // 옷 입은 전신: 0 0 120 280, 바닥선 272. 머리는 머리 좌표 그대로 그려서 나이별 머리 높이에 맞게 줄임
 function renderFull(a, size, st) {
   UID++;
-  const X = extras(a), age = st.age ?? 25, skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86), hc = hairColor(a, age), top = topOf(a, age);
+  const X = extras(a), age = st.age ?? 25, skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86), hc = hairColor(a, age), OF = outfitOf(a, age, st, X);
   const A = anchorsOf(a, age, typeof st.full === 'object' ? st.full : null), { y, w } = A, hs = A.hs;
   const toHead = v => (v - A.hty) / hs, HG = s => `<g transform="translate(${f1(A.htx)},${f1(A.hty)}) scale(${hs.toFixed(4)})">${s}</g>`;
-  const hp = hairPieces(a, X, age, hc, { sy: toHead(y.sh), chest: toHead(y.bust) }, st.ctx);
-  const bt = bottomOf(a, X, age, A);
+  const hp = hairPieces(a, X, age, hc, { sy: toHead(y.sh), chest: toHead(y.bust) }, hatCtx(st, OF));
+  const skirtish = !!(OF.dress || (OF.bottom && SKIRTS[OF.bottom.k]));
   // 자세: st.pose('default'|'hip'|'cross'|'clasp'|'pocket'|'contra'…) 또는 성격. 어린이는 차렷. 주머니는 바지·후디일 때만
   const pz = typeof st.pose === 'string' && st.pose !== 'default' ? (st.pose === 'contra' ? ['contra', 'default'] : st.pose.startsWith('contra-') ? ['contra', st.pose.slice(7)] : ['stand', st.pose]) : st.pose === 'default' ? ['stand', 'default'] : POSE[st.personality] || ['stand', 'default'];
   let [stance, pose] = age <= 12 ? ['stand', 'default'] : pz;
-  if (pose === 'pocket' && bt.k === 'skirt' && top !== 2) pose = 'cross';
+  if (pose === 'pocket' && skirtish && !(OF.inner && OF.inner.k === 'hoodie')) pose = 'cross';
   if (pose === 'pocket' && hash(String(a.fs || a.hair)) % 3 === 0) pose = 'pocket1';
   const ST = stance === 'contra' ? stanceOf(A, pose === 'hip' ? 1 : hash(String(a.fs || a.face)) % 2 ? 1 : -1) : null;
-  const low = lowerFull(a, X, age, A, skinD, bt, ST), T = topFull(a, top, A, skinD, bt, X), AR = armsFull(A, top, pose, skinD, T, low.hipEdge, !!st.ring && age >= 19);
+  const low = lowerFull(a, X, age, A, skinD, OF, ST), T = topFull(a, OF, A, skinD, X), AR = armsFull(A, null, pose, skinD, T, low.hipEdge, !!st.ring && age >= 19);
   const neckBot = y.neck + 4 * hs, LW = s => ST ? warpSVG(s, ST.W) : s, UP = s => ST ? `<g transform="${ST.up}">${s}</g>` : s;
   let o = `<svg class="av av-full" width="${Math.round(size)}" height="${Math.round(size * 7 / 3)}" viewBox="0 0 120 280" aria-hidden="true">`;
   o += `<rect class="av-bg" x=".5" y=".5" width="119" height="279" rx="10" style="stroke-width:1.5"/>`;
@@ -1912,11 +2104,11 @@ function render(a, size = 48, state = 25) {
   if (st.mask) a = Object.assign({}, a, { top: 0, tc: 5, glasses: 0 });   // 검사용 (test.html 가림 테스트): 같은 회색 옷, 안경 없음, 머리 없음
   const X = extras(a);
   const af = adult && st.after ? st.after : null, du = adult && !af && st.during ? st.during : null, tier = af ? tierOf(af.sat ?? 50) : -1;
-  const skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86), hc = hairColor(a, age), top = topOf(a, age);
+  const skin = SKIN[a.skin] || SKIN[1], skinD = shade(skin, .86), hc = hairColor(a, age), OF = af || du ? null : outfitOf(a, age, st, X);
   const fig = adult ? (af || du || st).fig : null;
   const A = anchorsOf(a, age, fig && typeof fig === 'object' ? fig : null), hs = A.hs, toHead = v => (v - A.hty) / hs;
   const BG = s => `<g transform="scale(${(1 / hs).toFixed(4)}) translate(${f1(-A.htx)},${f1(-A.hty)})">${s}</g>`;
-  const hp = st.mask ? { back: '', front: '', shadow: '' } : hairPieces(a, X, age, hc, { sy: toHead(A.y.sh), chest: toHead(A.y.bust) }, st.ctx);
+  const hp = st.mask ? { back: '', front: '', shadow: '' } : hairPieces(a, X, age, hc, { sy: toHead(A.y.sh), chest: toHead(A.y.bust) }, af || du ? { noHat: true } : hatCtx(st, OF));
   const nh = A.w.nh / hs, neckBot = toHead(A.y.neck + 4 * hs);
   const neck = c => `<path d="M${f1(60 - nh)},94 L${f1(60 + nh)},94 L${f1(60 + nh)},${f1(neckBot)} L${f1(60 - nh)},${f1(neckBot)} Z" fill="${c}"/>`;
   let o = `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/>`;
@@ -1929,7 +2121,7 @@ function render(a, size = 48, state = 25) {
     cut = by + 2;
     o += neck(skin) + bareBody(a, A, skin, { by, marks: af ? tier : 0, lipstick: af && af.lipstick, hickey: af && af.hickey, clutch: shy });
   } else {
-    const bt = bottomOf(a, X, age, A), T = topFull(a, top, A, skinD, bt, X), AR = armsFull(A, top, 'default', skinD, T, A.w.hip + 2);
+    const T = topFull(a, OF, A, skinD, X), AR = armsFull(A, null, 'default', skinD, T, A.w.hip + 2);
     o += BG(AR.back) + neck(skinD) + BG(T.svg + AR.front);
   }
   o += headSVG(a, X, age, st, { skin, hc: browColor(a, age), hp, nh, neckBot, af, tier, du, cut, chin2: A.chubbyM });

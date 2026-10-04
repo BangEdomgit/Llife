@@ -84,6 +84,13 @@ GAME_DATA.events = [
       { label: '안 든다', text: '방과 후엔 집에 가는 게 좋았다.' },
     ] },
   // 수능 전날 → 수능 (고3 학교 턴 csat)
+  // 외박한 다음 날 어제 옷 그대로 (HAIR_CLOTHES_BODY 3-7)
+  { id: 'sameClothes', type: 'trigger', text: s => s.vars.dutyKind === 'work' ? '"어? 어제 그 옷 아니에요?" 옆자리 동료가 의미심장하게 웃었다.' : '"너 어제랑 옷 똑같은데?" 동기가 눈썹을 치켜올렸다.',
+    choices: [
+      { label: '"집에 못 들어갔어." 웃어넘긴다', effect: { happy: 1, charm: [0, 1] }, text: '"오~" 소리가 몇 번 오갔다. 점심시간 내내 그 얘기였다.' },
+      { label: '"똑같은 옷이 두 벌이야." 둘러댄다', effect: { happy: -1 }, text: '아무도 안 믿는 눈치였다.' },
+      { label: '못 들은 척한다', effect: { happy: -1, style: -2 }, text: '하루 종일 괜히 옷깃만 만지작거렸다.' },
+    ] },
   { id: 'csatEve', type: 'trigger', text: s => s.age >= 19 ? '두 번째 수능 전날. 작년 이맘때가 떠오른다.' : '수능 전날. 내일이다.',
     choices: [
       { label: '마지막으로 정리한다', do: (s, a) => { s.vars.csatCond = a.rand(-3, 6); a.takeCSAT(); }, text: '오답 노트를 한 번 더 넘겼다. 새벽 한 시에 불을 껐다.' },
