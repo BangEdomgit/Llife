@@ -119,13 +119,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .here-head{display:flex;align-items:center;gap:8px;font-size:13.5px}
 .here-head button{margin-left:auto;padding:5px 10px;font-size:12.5px;white-space:nowrap;flex:none}
 .here-head > span{min-width:0}
-.here{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scroll-snap-type:x proximity;overscroll-behavior-x:contain}
-.here .empty{margin:0;font-size:12.5px;color:var(--text-dim)}
-.hp{flex:0 0 108px;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;padding:7px 6px;font-size:12.5px;line-height:1.3;scroll-snap-align:start}
-.hp .hw{display:flex;flex-direction:column;width:100%}
-.hp .hw b,.hp .hw .dim{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hp .hw .dim{font-size:11px}
-.hp .hd{width:100%;font-size:11px;color:var(--text-dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.here .empty{margin:0;font-size:12.5px;color:var(--text-dim);grid-column:1/-1}
 .hp.used{opacity:.62}
 .log .place{color:var(--text-dim)}
 .drunk{font-size:11.5px;color:var(--accent)}
@@ -343,3 +337,20 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .il{display:grid;grid-template-columns:22px 1fr;gap:6px;margin:0;font-size:14px;line-height:1.5}
 .ii{text-align:center}
 .intro-last{text-align:center;margin:8px 0 2px;font-weight:700;color:var(--accent)}
+/* NPC 출현: 여기 있는 사람들 — 작은 초상화 + 이름(나이)·마커 + 하고 있는 일, 넓으면 두 줄 */
+.here{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:5px}
+.hp{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:8px;text-align:left;padding:5px 8px;font-size:12.5px;line-height:1.3}
+.hp .av{width:32px;height:43px}
+.hp .hw{display:flex;flex-direction:column;min-width:0}
+.hp .hw b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hp .hw b .dim{font-weight:400}
+.hp .hr{font-size:11px;color:var(--accent)}
+.hp .hd{font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hp.grp{border-style:dashed}
+.mk{font-size:12px;letter-spacing:-1px}
+.acq-t{width:100%;text-align:left;padding:7px 10px;font-size:12.5px;margin-top:8px}
+.acq-t .dim{font-size:11.5px}
+.prow.faded{opacity:.6}
+.qs-left.sandbox{color:var(--accent);font-weight:700}
+.qs-left.sandbox small{display:block;font-weight:400;color:var(--minus);font-size:11.5px}
+.qs input[type=number]{font:inherit;color:var(--text);background:var(--btn-bg);border:1px solid var(--panel-border);border-radius:3px;padding:7px 9px;font-size:14px;width:100%;max-width:220px}

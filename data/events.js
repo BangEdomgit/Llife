@@ -1176,7 +1176,7 @@ GAME_DATA.events = [
     when: (s, a) => a.find(p => p.married && p.secret && p.heart >= 80 && p.trust >= 65).length > 0,
     onStart: (s, a) => a.focus(a.find(p => p.married && p.secret && p.heart >= 80 && p.trust >= 65)[0]),
     text: (s, a) => a.main() && a.main() !== a.focused() ? '{fp|이} 말했다. "이혼했어. 이제 너만 정리하면 돼."' : '{fp|이} 말했다. "이혼했어. 이제 숨지 않아도 돼."',   // 문장은 do 다음에 정해짐
-    do: (s, a) => { const p = a.focused(); p.married = false; p.taken = false; if (!a.main()) { p.secret = false; p.partner = true; } },
+    do: (s, a) => { const p = a.focused(); p.married = false; p.divorced = true; p.divorcedKnown = true; p.taken = false; if (!a.main()) { p.secret = false; p.partner = true; } },
     memory: true, effect: { happy: 8 } },
   { id: 'marriedReturn', type: 'fixed', age: [20, 50], once: false, cooldown: 3,
     when: (s, a) => a.find(p => p.married && (p.secret || p.fwb || p.fling) && p.heart < 40).length > 0,

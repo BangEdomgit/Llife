@@ -3,7 +3,14 @@
 window.GAME_DATA = window.GAME_DATA || {};
 
 GAME_DATA.quick = {
-  points: 300,   // 능력치 6개에 나눠 줌 (각 0~100). 0~100 → 게임 등급 수치로 바꿈 (js/game.js qsStat)
+  points: 300,   // 능력치 6개에 나눠 줌 (각 0~100). 0~100 → 게임 등급 수치로 바꿈 (js/game.js qsStat) — 난이도마다 다름 (diffs)
+  // 난이도 (포인트 배분 전에 고름). 샌드박스: 제한 없음 — 능력치 0~100 마음대로, 몸 수치 극단값, 시작 돈·연인 스탯 직접, 저장에 sandbox 표시
+  diffs: [
+    { id: 'hard', label: '하드', points: 240, desc: '평균 40. 약점이 뚜렷하다.' },
+    { id: 'normal', label: '보통', points: 300, desc: '평균 50. 기본.' },
+    { id: 'easy', label: '이지', points: 360, desc: '평균 60. 여유 있다.' },
+    { id: 'sandbox', label: '샌드박스', points: null, desc: '제한 없음. 능력치는 마음대로(전부 100도), 몸 수치는 극단값까지, 시작 돈과 연인 스탯도 직접 정한다.' },
+  ],
   stats: ['smart', 'fit', 'face', 'charm', 'art', 'craft'],
   statDesc: { smart: '학업, 판단', fit: '건강, 운동, 몸', face: '타고난 얼굴', charm: '말솜씨, 분위기', art: '예술, 감정 읽기', craft: '기술, 만들기' },
   presets: [
@@ -13,6 +20,7 @@ GAME_DATA.quick = {
     { id: 'looks',   label: '미남미녀', v: [40, 50, 90, 70, 30, 20] },
     { id: 'artist',  label: '예술가',   v: [50, 30, 40, 50, 90, 40] },
     { id: 'allround', label: '만능',    v: [55, 55, 50, 50, 50, 40] },
+    { id: 'allmax', label: '올맥스',    v: [100, 100, 100, 100, 100, 100], sandbox: true },   // 샌드박스 전용
   ],
   // 학력 — 대학은 data/school.js의 해당 등급 대학 중에서 고르고 학과까지. 이미 1학년을 마친 2학년으로 시작 (1학년 학점이 잡혀 있음)
   edu: [
@@ -31,6 +39,8 @@ GAME_DATA.quick = {
   builds: [{ id: 'slim', label: '마른' }, { id: 'avg', label: '보통' }, { id: 'fit', label: '탄탄한' }, { id: 'chubby', label: '통통한' }],
   cups: ['AA', 'A', 'B', 'C', 'D', 'E', 'F'],
   range: { height: { m: [155, 190], f: [148, 175] }, waist: [55, 80], hip: [80, 105], shoulder: [38, 50], penis: [8, 20], style: [0, 50] },
+  rangeSandbox: { height: { m: [140, 200], f: [135, 195] }, waist: [45, 100], hip: [70, 120], shoulder: [34, 56], penis: [5, 25], style: [0, 50], money: [0, 99999] },
+  loverStats: [['close', '친밀'], ['trust', '신뢰'], ['heart', '설렘'], ['compat', '궁합'], ['libido', '나를 향한 성욕']],   // 샌드박스에서 직접 정하는 연인 스탯
   // 성격 고를 때 보이는 효과 미리보기
   persEffect: { bold: '플러팅 +, 조심성 -', shy: '신뢰 +, 적극성 -', playful: '매력 +, 진지함 -', cool: '독립성 +, 친밀 -',
     warm: '관계 +, 자기 관리 -', sharp: '판단 +, 호감 -', sunny: '행복 +, 심각함 -', sensitive: '감성 +, 안정감 -' },

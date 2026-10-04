@@ -703,7 +703,9 @@ const mitt = (x, y, s, skin, rot) => `<g transform="translate(${f1(x)},${f1(y)})
 const handIn = skin => `<path d="M-2.6,-1.5 C-3.4,1.6 -4.9,3.8 -4.8,7.8 C-4.7,11.2 -2.8,13.7 0,13.8 C2.8,13.9 4.9,11.6 4.9,7.8 C4.9,4 3.4,1.4 2.8,-1.5 Z" fill="${skin}" stroke="${shade(skin, .72)}" stroke-width=".55"/>
   <path d="M-3.3,3 C-6.8,4.4 -7,8.6 -4.6,9.9 C-3.8,8.5 -3.5,6.1 -2.9,4 Z" fill="${shade(skin, .9)}" stroke="${shade(skin, .72)}" stroke-width=".5"/>
   <path d="M-1.3,9.6 L-1.1,12.4 M1.5,9.6 L1.7,12.2" stroke="${shade(skin, .7)}" stroke-width=".55" stroke-linecap="round" opacity=".55"/>`;
-const handAt = (x, y, s, skin, rot, len) => { const q = len / 15.3; return `<g transform="translate(${f1(x)},${f1(y)}) rotate(${f1(rot)}) scale(${(s * q * .8).toFixed(3)},${q.toFixed(3)})">${handIn(skin)}</g>`; };
+// ring: 결혼 반지 — 약지 아래쪽 마디에 작은 금색 고리
+const RING = '<circle cx="1.6" cy="10.3" r="1.2" fill="none" stroke="#d8b45a" stroke-width="1"/><circle cx="1.1" cy="9.8" r=".35" fill="#fff6d8"/>';
+const handAt = (x, y, s, skin, rot, len, ring) => { const q = len / 15.3; return `<g transform="translate(${f1(x)},${f1(y)}) rotate(${f1(rot)}) scale(${(s * q * .8).toFixed(3)},${q.toFixed(3)})">${handIn(skin)}${ring ? RING : ''}</g>`; };
 // 팔 한 마디 (윤곽선 + 색)
 const limb = (x1, y1, cx, cy, x2, y2, w, c) => `<path d="M${P(x1, y1)} Q${P(cx, cy)} ${P(x2, y2)}" fill="none" stroke="${shade(c, .74)}" stroke-width="${f1(w + 1.6)}" stroke-linecap="round"/><path d="M${P(x1, y1)} Q${P(cx, cy)} ${P(x2, y2)}" fill="none" stroke="${c}" stroke-width="${f1(w)}" stroke-linecap="round"/>`;
 
@@ -1034,7 +1036,7 @@ function topFull(a, top, A, skin, bt, X) {
 
 // 팔: 어깨 끝에서 시작해 골반보다 바깥으로 떨어짐. 기본 자세는 몸통 뒤에 그려서 가슴·허리 윤곽이 가려지지 않게
 //   default 차렷 / hip 한 손 허리(팔꿈치는 허리 높이에서 바깥, 팔과 허리 사이 빈 삼각형) / cross 팔짱(밑가슴 +2px, 가슴에 밀려 바깥으로)
-function armsFull(A, top, pose, skin, T, lowHip) {
+function armsFull(A, top, pose, skin, T, lowHip, ring) {   // ring: 왼손(화면 오른쪽, s=1) 약지에 결혼 반지
   const { y, w } = A, { uw, fw, ww, hand } = A.arm, k = A.hs, c = T.color, shortSl = top === 0, ln = shade(c, .6);
   const jx = w.sh - uw / 2, jy = y.sh + uw * .45, capR = uw / 2 + (A.adult && !A.f ? (A.fitM ? 2.5 : 1.2) : 0);   // 남자는 삼각근 볼륨
   const rotOf = (E, W) => Math.atan2(-(W[0] - E[0]), W[1] - E[1]) * 180 / Math.PI;
@@ -1056,7 +1058,7 @@ function armsFull(A, top, pose, skin, T, lowHip) {
     let o = seg(pts, dim, .2);
     if (!shortSl) o += cuff(E, W, ww * 1.5);
     o += `<path d="M${P(E[0] - s * fw * .25, E[1] + 2 * k)} Q${P((E[0] + W[0]) / 2 - s * fw * .35, (E[1] + W[1]) / 2)} ${P(W[0] - s * ww * .3, W[1] - 2 * k)}" fill="none" stroke="${shade(shortSl ? skin : c, .72)}" stroke-width="${f1(k)}" opacity=".35"/>`;   // 팔 안쪽 그림자
-    return o + handAt(W[0], W[1], s, skin, rot, hand);
+    return o + handAt(W[0], W[1], s, skin, rot, hand, ring && s === 1);
   };
   const tB = clamp((y.bust - jy) / (y.waist - jy), .2, 1);
   const xe = Math.max(jx + 1, T.gw(y.waist) + uw / 2 + 2.5, jx + (T.bustEdge + 1.5 - uw / 2 - jx) / tB);
@@ -1074,7 +1076,7 @@ function armsFull(A, top, pose, skin, T, lowHip) {
     const fore = (s, E, W) => seg([[E[0], E[1], (uw + fw) / 2], [lerp(E[0], W[0], .5), lerp(E[1], W[1], .5) + fw * .15, fw * .95], [W[0], W[1], ww * 1.25]], false, 0) + (shortSl ? '' : cuff(E, W, ww * 1.7));
     const ER = [60 + ex, yc], EL = [60 - ex, yc + fw * .55];
     return { back: up(-1) + up(1),
-      front: fore(1, ER, [60 - ex + uw * .9, yc - fw * .2]) + fore(-1, EL, [60 + ex - uw * 1.1, yc + fw * .15]) + handAt(60 + ex - uw * .75, yc + fw * .1, 1, skin, -160, hand * .72) };
+      front: fore(1, ER, [60 - ex + uw * .9, yc - fw * .2]) + fore(-1, EL, [60 + ex - uw * 1.1, yc + fw * .15]) + handAt(60 + ex - uw * .75, yc + fw * .1, 1, skin, -160, hand * .72, ring) };
   }
   return { back: def(-1, true) + def(1, true), front: '' };
 }
@@ -1463,7 +1465,7 @@ function renderFull(a, size, st) {
   const toHead = v => (v - A.hty) / hs, HG = s => `<g transform="translate(${f1(A.htx)},${f1(A.hty)}) scale(${hs.toFixed(4)})">${s}</g>`;
   const hp = hairPieces(a, X, age, hc, { sy: toHead(y.sh), chest: toHead(y.bust) });
   const bt = bottomOf(a, X, age, A), pose = age <= 12 ? 'default' : st.pose || POSE[st.personality] || 'default';
-  const low = lowerFull(a, X, age, A, skinD, bt), T = topFull(a, top, A, skinD, bt, X), AR = armsFull(A, top, pose, skinD, T, low.hipEdge);
+  const low = lowerFull(a, X, age, A, skinD, bt), T = topFull(a, top, A, skinD, bt, X), AR = armsFull(A, top, pose, skinD, T, low.hipEdge, !!st.ring && age >= 19);
   const neckBot = y.neck + 4 * hs;
   let o = `<svg class="av av-full" width="${Math.round(size)}" height="${Math.round(size * 7 / 3)}" viewBox="0 0 120 280" aria-hidden="true">`;
   o += `<rect class="av-bg" x=".5" y=".5" width="119" height="279" rx="10" style="stroke-width:1.5"/>`;
