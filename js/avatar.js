@@ -148,6 +148,27 @@ function halfEye(a, X, x, y, s, nLash, dx, dy, gap) {
     <path d="M${P(...e.i)} Q${P(...midU)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width="2.3" stroke-linecap="round"/>
     <path d="M${P(...e.i)} Q${P(...e.l)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width=".8" opacity=".3"/>${nLash ? lashes(e, s, nLash) : ''}`;
 }
+// 하트 눈: 반쯤 풀린 눈 안에 분홍 하트 홍채 (big이 아니면 홍채 위에 작은 하트 하이라이트만)
+const HEART_P = 'M0,5 C-7,0 -6,-6 -2.5,-6 C-1,-6 0,-5 0,-4 C0,-5 1,-6 2.5,-6 C6,-6 7,0 0,5 Z';
+function loveEye(a, X, x, y, s, nLash, gap, big) {
+  const e = eyeShape(a.eyes, x, y, s), id = `av${UID}lv${s > 0 ? 'r' : 'l'}`;
+  const midU = [(e.i[0] + e.o[0]) / 2, Math.min(e.i[1], e.o[1]) + gap];
+  const shape = `M${P(...e.i)} Q${P(...midU)} ${P(...e.o)} Q${P(...e.l)} ${P(...e.i)} Z`, gx = x - .4, gy = y + (big ? .6 : -.2);
+  const iris = big ? `<path d="${HEART_P}" transform="translate(${f1(gx)},${f1(gy)}) scale(.62)" fill="#ff4f86"/><path d="${HEART_P}" transform="translate(${f1(gx)},${f1(gy + .4)}) scale(.3)" fill="#c2185b" opacity=".6"/>`
+    : `<ellipse cx="${f1(gx)}" cy="${f1(gy)}" rx="${e.ir[0]}" ry="${e.ir[1]}" fill="${IRIS[X.iris]}"/><ellipse cx="${f1(gx)}" cy="${f1(gy + .3)}" rx="${f1(e.ir[0] * .5)}" ry="${f1(e.ir[1] * .5)}" fill="${PUPIL}"/><path d="${HEART_P}" transform="translate(${f1(gx + 1.2)},${f1(gy - 1.2)}) scale(.2)" fill="#ffc2d6"/>`;
+  return `<clipPath id="${id}"><path d="${shape}"/></clipPath><path d="${shape}" fill="${WHITE}"/><g clip-path="url(#${id})">${iris}<circle cx="${f1(gx - 1.6)}" cy="${f1(gy - 1.8)}" r=".9" fill="#fff"/></g>
+    <path d="M${P(...e.i)} Q${P(...midU)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width="2.3" stroke-linecap="round"/>
+    <path d="M${P(...e.i)} Q${P(...e.l)} ${P(...e.o)}" fill="none" stroke="${LINE}" stroke-width=".8" opacity=".3"/>${nLash ? lashes(e, s, nLash) : ''}`;
+}
+// 즐거운 벌린 입 (입꼬리 올라감, 윗니·혀): k 0~2 클수록 크게
+const JOY = (k, lip, female) => {
+  const w = 5.4 + k * .7, y0 = 87.2 - k * .3, y1 = 91.6 + k * 1.8;
+  return `<path d="M${f1(60 - w)},${f1(y0)} Q60,${f1(y0 + 2)} ${f1(60 + w)},${f1(y0)} Q${f1(60 + w * .55)},${f1(y1)} 60,${f1(y1)} Q${f1(60 - w * .55)},${f1(y1)} ${f1(60 - w)},${f1(y0)} Z" fill="${MOUTH_IN}" stroke="${female ? lip.c : LINE}" stroke-width="1.3" stroke-linejoin="round"/>` +
+    `<path d="M${f1(60 - w * .62)},${f1(y0 + 1.1)} Q60,${f1(y0 + 2.6)} ${f1(60 + w * .62)},${f1(y0 + 1.1)} L${f1(60 + w * .5)},${f1(y0 + 2.2)} Q60,${f1(y0 + 3.4)} ${f1(60 - w * .5)},${f1(y0 + 2.2)} Z" fill="#fbf7f2"/>` +
+    `<ellipse cx="60" cy="${f1(y1 - 1.5 - k * .3)}" rx="${f1(w * .48)}" ry="${f1(1.5 + k * .5)}" fill="#e27886"/>`;
+};
+const MINI_HEARTS = `<path d="${HEART_P}" transform="translate(95,42) rotate(16) scale(.7)" fill="#ff6f94"/><path d="${HEART_P}" transform="translate(24,52) rotate(-14) scale(.52)" fill="#ff8fab"/>`;
+const SPARKLE = (x, y, k) => `<path d="M${x},${y - 3 * k} Q${x + .5 * k},${y - .5 * k} ${x + 3 * k},${y} Q${x + .5 * k},${y + .5 * k} ${x},${y + 3 * k} Q${x - .5 * k},${y + .5 * k} ${x - 3 * k},${y} Q${x - .5 * k},${y - .5 * k} ${x},${y - 3 * k} Z" fill="#fff" opacity=".9"/>`;
 // 질끈 감은 눈 (> <): 꼭짓점이 코 쪽
 const SQUEEZE = (x, y, s) => `<path d="M${f1(x + 4.6 * s)},${y - 2.8} Q${f1(x - .5 * s)},${y - .6} ${f1(x - 3.8 * s)},${y + .4} Q${f1(x - .5 * s)},${y + 1.4} ${f1(x + 4.6 * s)},${y + 3.2}" fill="none" stroke="${LINE}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
 const SWEAT = (x, y, k = 1) => `<g transform="translate(${x},${y}) scale(${k})"><path d="M0,0 Q-2.6,3.8 -2.4,5.6 Q0,7.6 2.4,5.6 Q2.6,3.8 0,0 Z" fill="#d6f0ff" stroke="#86bfdc" stroke-width=".7"/><ellipse cx="-.9" cy="4.6" rx=".6" ry="1" fill="#fff"/></g>`;
@@ -168,6 +189,7 @@ function brow(type, x, y, s, expr) {
   if (expr === 'angry') { inY += 2.8; midY += .8; }
   else if (expr === 'surprised') { inY -= 2.6; midY -= 3; outY -= 2.2; }
   else if (expr === 'sad') { inY -= 2.2; outY += 1.8; }
+  else if (expr === 'soft') { inY -= 1.4; midY -= 1; outY += .4; }   // 기분 좋게 풀린
   const ix = x - 6 * s, ox = x + 6.4 * s;
   return type === 2 ? `M${P(ix, inY)} L${P(mx, midY)} L${P(ox, outY)}` : `M${P(ix, inY)} Q${P(mx, midY)} ${P(ox, outY)}`;
 }
@@ -1064,7 +1086,7 @@ function headSVG(a, X, age, st, g) {
   o += `<path d="${FACES[age <= 6 ? 0 : a.face] || FACES[0]}" fill="${skin}"/>`;
   if (g.chin2) o += `<path d="M48,100.5 Q60,108.5 72,100.5" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.6" stroke-linecap="round" opacity=".4"/>`;   // 이중턱
   // 볼 홍조 (모두 옅게, 어린이·볼 빨간 사람은 더), 주근깨, 주름
-  const blush = f1(Math.min(.85, du ? { pleasure: [.35, .5, .62, .75][lv], bliss: .58, content: .42, bored: .1, disappointed: .14 }[mood] + (du.personality === 'shy' ? .1 : 0)
+  const blush = f1(Math.min(.85, du ? { pleasure: [.42, .56, .68, .8][lv], bliss: .62, content: .45, bored: .1, disappointed: .14 }[mood] + (du.personality === 'shy' ? .1 : 0)
     : af ? [.1, .1, .25, .42, .55][tier] + (af.personality === 'shy' && tier >= 2 ? .15 : 0) : kid ? .3 : a.blush ? .24 : .1) * 100) / 100;
   o += `<ellipse cx="44" cy="84" rx="${kid ? 6.5 : 5.5}" ry="3.3" fill="#e8857a" opacity="${blush}"/><ellipse cx="76" cy="84" rx="${kid ? 6.5 : 5.5}" ry="3.3" fill="#e8857a" opacity="${blush}"/>`;
   if (st.aroused && adult) o += arousalFX(st.aroused);
@@ -1076,12 +1098,12 @@ function headSVG(a, X, age, st, g) {
   o += ex.map((x, i) => {
     const s = i ? 1 : -1;
     if (du) {
-      if (mood === 'bliss') return HAPPY(x, ey);
-      if (mood === 'content' || (mood === 'pleasure' && lv === 1)) return SLEEPY(x, ey, s, nLash);
+      if (mood === 'bliss' || (mood === 'pleasure' && lv === 1)) return HAPPY(x, ey);   // 행복하게 감은 눈
+      if (mood === 'content') return SLEEPY(x, ey, s, nLash);
       if (mood === 'bored') return halfEye(a, X, x, ey, s, nLash, 2.6, .9, -2.2);
       if (mood === 'disappointed') return halfEye(a, X, x, ey, s, nLash, -1.4, 2, -1.8);
-      if (lv >= 2) return SQUEEZE(x, ey, s) + (lv >= 3 ? `<path d="M${f1(x + 5 * s)},${ey + 3} q${f1(.8 * s)},3 0,5" fill="none" stroke="#9fd4f0" stroke-width="1.3" stroke-linecap="round" opacity=".8"/>` : '');
-      return halfEye(a, X, x, ey, s, nLash, -.8, 1.2, -2.8);
+      if (lv >= 2) return loveEye(a, X, x, ey, s, nLash, lv >= 3 ? -4 : -2.4, lv >= 3);   // 풀린 눈 → 하트 눈
+      return halfEye(a, X, x, ey, s, nLash, -.6, .6, -3.2);
     }
     if (af && tier >= 3 && af.personality === 'playful' && i === 1) return HAPPY(x, ey);
     if (af && tier === 4) return HAPPY(x, ey);
@@ -1092,7 +1114,7 @@ function headSVG(a, X, age, st, g) {
     return kid ? `<g transform="translate(${x},${ey}) scale(1.1) translate(${-x},${-ey})">${e}</g>` : e;
   }).join('');
   // 눈썹 (다음 날 아침 만족감이 낮으면 처짐)
-  const expr = st.expr || (du ? (mood === 'disappointed' || (mood === 'pleasure' && lv >= 2) ? 'sad' : null) : af && tier <= 1 ? 'sad' : null);
+  const expr = st.expr || (du ? (mood === 'disappointed' ? 'sad' : (mood === 'pleasure' && lv >= 1) || mood === 'bliss' ? 'soft' : null) : af && tier <= 1 ? 'sad' : null);
   const btype = (af && tier >= 3) || mood === 'bliss' || mood === 'content' ? 1 : mood === 'bored' ? 0 : a.brows;
   o += `<path d="${ex.map((x, i) => brow(btype, x, ey - 10, i ? 1 : -1, expr)).join(' ')}" fill="none" stroke="${shade(hc, .72)}" stroke-width="${a.thick ? 3.6 : a.g === 'm' ? 2.8 : 2.2}" stroke-linecap="round" stroke-linejoin="round"/>`;
   // 코: 작게 꺾인 선 + 코 아래 그림자
@@ -1100,7 +1122,7 @@ function headSVG(a, X, age, st, g) {
   o += `<ellipse cx="60.6" cy="84.6" rx="3" ry="1" fill="${shade(skin, .62)}" opacity=".16"/>`;
   // 입 (어른 여자는 립 색, 여자아이는 연분홍, 남자는 자연스러운 입술색)
   const lip = { c: female && age >= 18 ? LIPS[X.lip] : female ? '#e39aa0' : NATURAL_LIP[a.skin] || NATURAL_LIP[1], teeth: X.teeth };
-  o += du ? ({ bliss: mouthSVG(1, lip, female), content: mouthSVG(0, lip, female), bored: mouthSVG(2, lip, female), disappointed: POUT(lip) }[mood] || (lv ? AH(lv - 1, lip, female) : mouthSVG(3, lip, female)))
+  o += du ? ({ bliss: JOY(0, lip, female), content: mouthSVG(1, lip, female), bored: mouthSVG(2, lip, female), disappointed: POUT(lip) }[mood] || (lv ? JOY(lv - 1, lip, female) : mouthSVG(1, lip, female)))
     : af ? (tier === 0 ? FROWN : tier === 1 ? mouthSVG(2, lip, female) : tier >= 3 && af.personality !== 'cool' ? mouthSVG(1, lip, female) : mouthSVG(0, lip, female))
     : aro >= 71 ? mouthSVG(1, lip, female) : aro >= 51 ? mouthSVG(3, lip, female) : mouthSVG(a.mouth, lip, female);
   // 립스틱 자국은 bareBody에서 목·쇄골에 표시
@@ -1115,8 +1137,10 @@ function headSVG(a, X, age, st, g) {
   if (af && tier >= 2) o += messyHair(hc, [0, 0, 1, 3, 5][tier]);
   if (du) {
     o += messyHair(hc, { pleasure: lv + 1, bliss: 5, content: 3, bored: 0, disappointed: 1 }[mood]);
-    if ((mood === 'pleasure' && lv >= 2) || mood === 'bliss') o += BLUSH_LINES;
-    if (mood === 'pleasure' && lv >= 1) o += [[80, 50], [38, 54], [84, 62]].slice(0, lv).map(([x, y]) => SWEAT(x, y)).join('');
+    if ((mood === 'pleasure' && lv >= 1) || mood === 'bliss') o += BLUSH_LINES;
+    if (mood === 'pleasure' && lv >= 2) o += [[80, 50], [38, 54]].slice(0, lv - 1).map(([x, y]) => SWEAT(x, y)).join('');
+    if ((mood === 'pleasure' && lv >= 2) || mood === 'bliss') o += MINI_HEARTS;
+    if (mood === 'bliss') o += SPARKLE(30, 40, 1.1) + SPARKLE(92, 64, .8);
     if (mood === 'disappointed') o += SWEAT(88, 44, 1.7);
   }
   // 안경
