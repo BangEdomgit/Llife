@@ -6,7 +6,7 @@
 <title>Llife</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=Nanum+Gothic+Coding:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 
 <!-- 순서 중요: 데이터 → 배경·아바타 → 엔진 → 화면 -->
@@ -23,6 +23,7 @@
 <script defer src="data/places.js"></script>
 <script defer src="data/encounter.js"></script>
 <script defer src="js/weather.js"></script>
+<script defer src="js/scenes.js"></script>
 <script defer src="js/face.js"></script>
 <script defer src="js/outfit.js"></script>
 <script defer src="js/avatar.js"></script>
@@ -32,6 +33,7 @@
 </head>
 <body>
 <canvas id="sky" aria-hidden="true"></canvas>
+<div id="backdrop" aria-hidden="true"></div>
 
 <main class="app" id="app">
   <header class="hud panel">

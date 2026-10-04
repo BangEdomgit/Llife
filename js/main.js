@@ -15,12 +15,14 @@ let modalMode = null, modalArg = null, lastFocus = null, endingFor = null, perso
 let fullView = null;   // 초상화를 눌러 전신으로 펼친 사람 id ('me' = 나)
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const bar = v => { const n = Math.round(v / 10); return '■'.repeat(n) + '□'.repeat(10 - n); };
-const mini = v => { const n = Math.round(v / 20); return '■'.repeat(n) + '□'.repeat(5 - n); };
+// 게이지: 둥근 막대 (색은 감싼 요소의 color — .bar 노랑, .bar.low 빨강)
+const meter = (pct, cls = '') => `<span class="meter${cls}" role="img" aria-label="${Math.round(pct)}%"><i style="width:${Math.max(0, Math.min(100, pct)).toFixed(0)}%"></i></span>`;
+const bar = v => meter(v);
+const mini = v => meter(v, ' sm');
 const wxIcon = k => (WX[k] && WX[k].icon) || '';
 const genderKo = g => g === 'm' ? '남' : '여';
 const isMoney = k => k === 'money';
-const pbar = p => { const n = Math.round(p * 5); return '▰'.repeat(n) + '▱'.repeat(5 - n); };
+const pbar = p => meter(p * 100, ' sm');
 // 아바타 크기: 관계 목록 32×42 / 장소 48×64 / 상세·이벤트 60×80
 const av = (p, size) => window.Avatar ? Avatar.render(G.look(p), size, { age: G.npcAge(p), libido: G.canSex(p) ? p.libido || 0 : 0, fig: G.figure(p), ctx: G.outfitCtx(p) }) : '';   // 화면 속 사람은 늘 나를 대하고 있음 → 나를 향한 성욕(p.libido)만큼 표정이 달라짐 (어른 이성만). 체형 수치 → 전신과 같은 어깨·가슴
 // 누르면 전신으로 펼쳐지는 초상화 (20살부터 키·허리·골반 수치가 실루엣에 반영)
@@ -58,7 +60,7 @@ function renderLog(S) {
     let el;
     if (e.t === 'year') {
       el = document.createElement('div'); el.className = 'year';
-      el.textContent = `── ${e.age}살 ` + '─'.repeat(80);
+      el.textContent = `${e.age}살`;
     } else if (e.t === 'season') {
       el = document.createElement('div'); el.className = 'season';
       el.textContent = `${e.icon} ${e.season} ${wxIcon(e.wx)}`;
@@ -77,10 +79,10 @@ function renderLog(S) {
 function apDots(ti) {
   if (ti.phase === 'adult') {
     let out = '';
-    for (let i = 0; i < ti.day + ti.lateMax; i++) { if (i === ti.day) out += ' '; out += `<b class="${i >= ti.day ? 'late' : ''}${i < ti.used ? ' u' : ''}">${i < ti.used ? '●' : '○'}</b>`; }
+    for (let i = 0; i < ti.day + ti.lateMax; i++) { if (i === ti.day) out += '<i></i>'; out += `<b class="${i >= ti.day ? 'late' : ''}${i < ti.used ? ' u' : ''}">${i < ti.used ? '●' : '○'}</b>`; }   // 칸 = 둥근 막대 (글자는 숨김), 새벽 칸 앞에 틈
     return out;
   }
-  if (ti.apMax) return Array.from({ length: ti.apMax }, (_, i) => i < ti.apMax - ti.ap ? '●' : '○').join('');
+  if (ti.apMax) return Array.from({ length: ti.apMax }, (_, i) => i < ti.apMax - ti.ap ? '<b class="u">●</b>' : '<b>○</b>').join('');
   return '';
 }
 function timeText(ti) {
@@ -95,7 +97,7 @@ function render(S) {
   $('#gender').textContent = genderKo(S.gender);
   $('#role').textContent = G.roleText();
   const tr = G.trait();
-  $('#trait').textContent = `[${tr.label}]`;
+  $('#trait').textContent = tr.label;
   $('#trait').title = tr.desc;
   const money = $('#money');
   money.textContent = G.fmtMoney(S.money);
@@ -136,6 +138,7 @@ function render(S) {
   const sky = S.sky ?? S.time;
   if (bg.t !== sky) { WeatherBG.setTime(sky, bg.t === null); bg.t = sky; }
 
+  sceneBG(S, ti);
   maybeScene(S);
   // 모달 (이벤트 → 성적표·합격 → 원서)
   if (S.intro) openIntro();
@@ -152,6 +155,29 @@ function render(S) {
   else if (modalMode === 'me') openMe();
   else if (modalMode === 'study' || modalMode === 'shop') closeModal();
   else if (modalMode === 'dateDress') openPerson(modalArg);   // 데이트 옷을 고르고 나면 그 사람 창으로
+}
+
+/* ---------- 장소 배경 (js/scenes.js) ---------- */
+// 장소에 가면 그 장소 그림, 장소 밖이면 지금 구역(집 근처 → 집, 수업 끝난 학교 쪽 → 강의실, 직장 → 사무실, 번화가 → 거리)
+//   대학은 '대학'에 가면 캠퍼스, 수업 시간(평일 9~17시 학교 쪽)엔 강의실. 중·고등학생은 학기 중 교실, 방학엔 집
+const PLACE_SCENE = { home: 'home', playground: 'playground', park: 'park', school: 'classroom', academy: 'academy', campus: 'campus', office: 'office', cafe: 'cafe', library: 'library', gym: 'gym',
+  pcbang: 'pcbang', mall: 'street', hospital: 'hospital', center: 'center', station: 'station', bar: 'bar', motel: 'motel', church: 'church', conveni: 'conveni', concert: 'concert', market: 'market' };
+const SEASON_EN = { 봄: 'spring', 여름: 'summer', 가을: 'fall', 겨울: 'winter' };
+function sceneBG(S, ti) {
+  if (!window.SceneBG) return;
+  const h = ti.clock ? +ti.clock.split(':')[0] : [8, 13, 18][S.time] ?? 13;
+  const tod = h < 6 || h >= 20 ? 'night' : h < 10 ? 'morning' : h < 17 ? 'day' : 'evening';
+  const pl = G.place();
+  let id = null;
+  if (S.jail) id = null;
+  else if (pl) id = PLACE_SCENE[pl.id] || null;
+  else if (ti.phase === 'story') id = 'home';
+  else if (ti.phase === 'ms' || ti.phase === 'hs') id = S.tkind === 'vac' ? 'home' : 'classroom';
+  else if (ti.phase === 'adult') {
+    const z = S.zone || 'home';
+    id = z === 'home' ? 'home' : z === 'school' ? (S.flags.student && !ti.weekend && h >= 9 && h < 17 ? 'lecture' : 'campus') : z === 'work' ? 'office' : z === 'downtown' ? 'street' : null;
+  }
+  SceneBG.set({ id, tod, season: SEASON_EN[ti.season && ti.season.id] || 'spring', wet: /rain|storm|snow|sleet/.test(S.weather || '') });
 }
 
 /* ---------- 하단: 장소 고르기 → 거기 있는 사람 + 할 수 있는 것 ---------- */
@@ -1115,6 +1141,7 @@ $('#sky').addEventListener('click', () => { if (app.classList.contains('off')) t
 
 /* ---------- 시작 ---------- */
 WeatherBG.init($('#sky'));
+if (window.SceneBG) SceneBG.init($('#backdrop'));
 WeatherBG.setWeather(WX.partly.p, true);
 G.subscribe(render);
 if (!G.init()) openCreate(false);
