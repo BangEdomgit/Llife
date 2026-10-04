@@ -7,7 +7,7 @@ const C = D.config;
 const SEASONS = C.seasons;
 const SAVE_KEY = 'llife-save-v5';
 const OLD_KEYS = ['llife-save-v4', 'llife-save-v3'];
-const COND = ['happy', 'health', 'libido'];   // 상태: 0~100 (성욕은 20살부터)
+const COND = ['happy', 'health', 'libido'];   // 상태: 0~100. 성욕은 대상마다 따로(S.lust) — stats.libido는 그중 가장 높은 값(화면·조건용)
 const ABIL = D.abilities;                     // 능력: 상한 없음, 등급
 const STATS = COND.concat(ABIL);
 const PSTATS = ['close', 'trust', 'heart', 'grudge'];
@@ -303,19 +303,59 @@ function canSex(p) {
   if (S.age < C.sexMinAge || npcAge(p) < C.sexMinAge) return false;
   return lover(p) || canRomance(p);
 }
-// 행동 1회마다 성욕이 오름 (20대 3~4 / 30대 2~3 / 40대 1~2, 건강 50 이하면 절반). 60 넘으면 행복이 조금씩 깎임 (30 아래로는 안 깎음)
+/* ── 성욕은 늘 대상이 있음 ──
+   내 성욕: S.lust[사람 id] (그 사람을 향한 것) / NPC 성욕: p.libido (나를 향한 것)
+   S.stats.libido는 내 성욕 중 가장 높은 값(S.lustTop이 그 대상) — 화면과 '성욕 몇 이상' 조건용 */
+const lustOf = p => (p && S.lust && S.lust[p.id]) || 0;
+function addLust(p, v) {
+  if (!p || !v || !canSex(p)) return 0;
+  const b = lustOf(p);
+  S.lust[p.id] = clamp(b + Math.round(v), 0, 100);
+  return S.lust[p.id] - b;
+}
+function lustTop() {
+  let best = null, v = 0;
+  for (const id in S.lust) { const p = person(id); if (p && canSex(p) && S.lust[id] > v) { v = S.lust[id]; best = p; } }
+  return { p: best, v };
+}
+function syncLibido() { const t = lustTop(); S.stats.libido = t.v; S.lustTop = t.p ? t.p.id : null; }
+// 성욕 변화: 오를 땐 대상(없으면 지금 가장 높은 대상)에게만, 내릴 땐(해소) 대상이 없으면 모두에게
+function libidoDelta(v, p) {
+  v = val(v);
+  if (!v) return [];
+  if (!p || !canSex(p)) {
+    if (v < 0) { for (const id in S.lust) S.lust[id] = clamp(S.lust[id] + v, 0, 100); syncLibido(); return [['libido', v]]; }
+    p = lustTop().p;
+    if (!p) return [];
+  }
+  const d = addLust(p, v);
+  syncLibido();
+  return d ? [[`성욕→${pname(p)}`, d]] : [];
+}
+// 이 사람이 나에게 얼마나 끌리는지와 반대로, 내가 이 사람에게 끌리는 정도 (처음 성욕을 정할 때): 생김새·몸·꾸밈 + 설렘
+const attraction = p => clamp((p.face ?? 2) * 3 + bodyIdx(p) * 2 + (p.style ?? 2) + Math.round((p.heart || 0) / 8), 0, 40);
+// 시간이 흐르면 성욕이 오름 — 이미 마음에 둔 대상들에게, 설렘이 클수록 많이 (20대 3 / 30대 2 / 40대 1 기준, 건강 50 이하면 절반)
+// 가장 높은 대상이 60을 넘으면 행복이 조금씩 깎임 (30 아래로는 안 깎음)
 function libidoTick() {
   if (S.age < C.sexMinAge) return;
-  let v = S.age < 30 ? rand(3, 4) : S.age < 40 ? rand(2, 3) : rand(1, 2);
-  if (S.stats.health <= 50) v = Math.max(1, Math.round(v / 2));
-  S.stats.libido = clamp(S.stats.libido + v, 0, 100);
+  let r = S.age < 30 ? 3 : S.age < 40 ? 2 : 1;
+  if (S.stats.health <= 50) r /= 2;
+  for (const id in S.lust) {
+    const p = person(id);
+    if (!p || !canSex(p)) continue;
+    const w = clamp(.25 + (p.heart || 0) / 100 * .75 + (lover(p) || p.fwb ? .2 : 0), .25, 1.2);
+    S.lust[id] = clamp(S.lust[id] + Math.round(r * w * rand(60, 140) / 100), 0, 100);
+  }
+  syncLibido();
   if (S.stats.libido >= 60 && S.stats.happy > 30) S.stats.happy--;
 }
-// 같이 있으면 서로 자극됨: 상대 성욕은 내 몸 등급만큼, 내 성욕은 상대 몸 등급만큼 빨리 오름
+// 같이 있으면 서로 자극됨: 상대 성욕(나를 향한)은 내 몸 등급만큼, 내 성욕(그 사람을 향한)은 상대 몸 등급만큼 빨리 오름
 function nearby(p) {
   if (!canSex(p)) return;
   p.libido = clamp((p.libido || 0) + Math.round(rand(1, 3) * (1 + gIdx(S.stats.fit) * .08 + (figPref(p) ? .05 : 0)) * (S.gender === 'm' && pGrade(S.penis) >= 5 && p.nights ? 1.3 : 1)), 0, 100);
-  S.stats.libido = clamp(S.stats.libido + Math.round(rand(0, 2) * (1 + bodyIdx(p) * .08)), 0, 100);
+  if (S.lust[p.id] == null) S.lust[p.id] = clamp(rand(0, 8) + attraction(p), 0, 60);   // 처음 마음에 들어옴
+  addLust(p, Math.round(rand(0, 2) * (1 + bodyIdx(p) * .08)));
+  syncLibido();
 }
 // 꼬심 — 외모(생김새·몸·꾸밈) + 인간(매력·감성) + 관계(설렘·친밀) + 보정. 상황마다 가중치가 다름
 const g100 = v => Math.min(100, (gIdx(v) + gradeInfo(v).pct) * 100 / 6);
@@ -354,8 +394,8 @@ function allure(p, sit) {
   if (p.hobby === S.hobby) m += rand(5, 8);
   if (p.value === S.value) m += rand(5, 8); else if (valueClash(p)) m -= rand(5, 8);
   if (S.place === 'bar') m += rand(10, 15); else if (S.place === 'station') m += rand(8, 10);
-  if (S.age >= C.sexMinAge && st.libido >= 60) m += st.libido / 8;
-  if ((p.libido || 0) >= 60 && npcAge(p) >= C.sexMinAge) m += p.libido / 10;
+  if (S.age >= C.sexMinAge && lustOf(p) >= 60) m += lustOf(p) / 8;   // 이 사람을 향한 내 성욕
+  if ((p.libido || 0) >= 60 && npcAge(p) >= C.sexMinAge) m += p.libido / 10;   // 나를 향한 상대 성욕
   if (p.married) m -= rand(15, 20);
   if (S.rumorType === 'bad' && (S.rumor || 0) >= 30 && sit !== 'close' && sit !== 'bed') m -= rand(10, 20);   // 나쁜 소문 — 새 사람이 경계함
   m += [0, 3, rand(10, 12), 5][d];
@@ -477,10 +517,14 @@ function sexScene(p, o) {
   else if (pg === 2) sat = Math.min(sat, 92);
   else if (pg >= 5) { sat = Math.max(sat, rand(25, 35)); if (pg === 6 && herBuild === 'slim') sat = clamp(sat - rand(10, 15), 0, 100); }
   const tier = satTier(sat);
-  S.stats.libido = clamp(S.stats.libido - rand(70, 90), 0, 100);
+  // 해소: 이 사람을 향한 성욕은 크게, 다른 대상들은 조금 (몸이 채워져서)
+  if (S.lust[p.id] == null) S.lust[p.id] = 0;
+  addLust(p, -rand(70, 90));
+  for (const id in S.lust) if (id !== p.id) S.lust[id] = clamp(S.lust[id] - rand(10, 20), 0, 100);
   p.libido = clamp((p.libido || 0) - rand(70, 90), 0, 100);
   // 대물·흉기는 보는 것만으로 상대 성욕 +10~15 (그래서 더 자주 먼저 원함)
-  if (pg >= 5) { if (S.gender === 'm') p.libido = clamp(p.libido + rand(10, 15), 0, 100); else S.stats.libido = clamp(S.stats.libido + rand(10, 15), 0, 100); }
+  if (pg >= 5) { if (S.gender === 'm') p.libido = clamp(p.libido + rand(10, 15), 0, 100); else addLust(p, rand(10, 15)); }
+  syncLibido();
   S.sexSkill = (S.sexSkill || 0) + Math.max(1, Math.round(rand(6, 10) * GR[gIdx(S.sexSkill || 0)][2]));
   p.compat = clamp(p.compat + rand(5, 10), 0, 100);
   night(p, !!o.fling);
@@ -581,6 +625,7 @@ function applyEffect(eff) {
   const tr = trait(), out = [];
   for (const k of Object.keys(eff)) {
     if (k === 'rel') { out.push(...applyRel(eff.rel)); continue; }
+    if (k === 'libido') { out.push(...libidoDelta(eff[k], person(S.vars.fp))); continue; }
     let v = val(eff[k]);
     if (!v) continue;
     if (k === 'money') { S.money += v; out.push(['money', v]); continue; }
@@ -636,7 +681,7 @@ function applyOutcome(o, target, resumed) {
   if (sx) { pd = scaleBySat(pd, sx); deltas.push(['sat', sx.sat]); }
   if (pd && tp) deltas.push(...applyP(tp, pd, o.mult));
   if (o.fight && tp && lover(tp)) tp.fought = turnNo();   // 싸움 — 몇 턴 동안 거절이 잦고, 화해할 기회가 생김
-  if (o.libido) S.stats.libido = clamp(S.stats.libido + val(o.libido), 0, 100);
+  if (o.libido) deltas.push(...libidoDelta(o.libido, tp));
   if (o.drunk) drinkUp(val(o.drunk));
   if (o.sober) soberUp(true);
   addKarma(o.karma);
@@ -780,7 +825,7 @@ function currentEvent() {
   if (!ev) { S.pending.shift(); return currentEvent(); }
   Object.assign(S.vars, p.tv);
   const wp = p.who && person(p.who);
-  const who = wp ? { look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp), fig: figure(wp) } : null;
+  const who = wp ? { look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp), fig: figure(wp), libido: canSex(wp) ? wp.libido || 0 : 0 } : null;   // 나를 향한 성욕 → 표정
   return { text: p.text, who, choices: choicesOf(ev).map(c => fill(resolve(c.label))) };
 }
 function choose(i) {
@@ -1123,7 +1168,9 @@ function yearly() {
   // 어른 NPC 직업 붙이기, 나이에 안 맞게 된 단골 장소 바꾸기, 성욕 (20살부터, 나이 들수록 천천히)
   for (const p of alive()) {
     const na = npcAge(p);
-    if (na >= C.sexMinAge && p.kind !== 'family' && p.kind !== 'child') p.libido = clamp((p.libido || 0) + Math.round(rand(10, 25) * (na < 30 ? 1.2 : na < 40 ? 1 : .7)), 0, 100);
+    // 나를 향한 성욕: 나에게 끌리는 만큼(설렘, 내 몸이 취향, 함께 보낸 밤) 해마다 쌓임
+    if (canSex(p)) p.libido = clamp((p.libido || 0) + Math.round(rand(6, 14) * (na < 30 ? 1.2 : na < 40 ? 1 : .7) * (.4 + p.heart / 80 + (figPref(p) || prefMatch(p) ? .2 : 0) + (p.nights ? .3 : 0))), 0, 100);
+    else if (!lover(p)) p.libido = 0;
     if (!p.npcJob && npcAge(p) >= 23 && p.kind !== 'family') p.npcJob = pick(D.npcJobs);
     if (p.hangout && !ageFits(PLACES[p.hangout], npcAge(p))) p.hangout = pickHangout(p.hobby, npcAge(p));
   }
@@ -1134,6 +1181,9 @@ function yearly() {
   if (S.flags.onPill) S.money -= rand(36, 60);   // 피임약값 (한 달 3~5만원)
   if (S.money < 0 && a >= 20) log('통장 잔고가 마이너스다.', { deltas: applyEffect({ happy: -4 }) });
   if (!jailed()) rumorYear();
+  // 내 성욕: 떠난 사람·더는 안 되는 사람은 지우고, 사귀는 사이가 아니면 한 해에 10%씩 식음
+  for (const id in S.lust) { const p = person(id); if (!p || !canSex(p)) delete S.lust[id]; else if (!lover(p) && !p.fwb) S.lust[id] = Math.round(S.lust[id] * .9); }
+  syncLibido();
 
   // 수감
   if (jailed()) {
@@ -1158,6 +1208,7 @@ function yearly() {
 
 function after() {
   for (const p of alive()) if (p.married && !p.marriedKnown && p.close >= 40) { p.marriedKnown = true; log(`알고 보니 ${josa(pname(p), '은')} 결혼한 사람이었다.`, { t: 'info' }); }
+  if (S.lust) syncLibido();
   if (!S.ended) {
     if (S.stats.health <= 0) { S.ended = 'death'; S.pending = []; }
     else if (S.age >= C.endAge && !S.pending.length) S.ended = 'fifty';
@@ -1221,9 +1272,8 @@ function doAction(id, subj) {
   if (a.id === 'exercise' || a.id === 'play') S.vars.exN = (S.vars.exN || 0) + 1;
   asList(a.set).forEach(f => { S.flags[f] = true; });
   asList(a.unset).forEach(f => { delete S.flags[f]; });
-  if (a.libido) S.stats.libido = clamp(S.stats.libido + val(a.libido), 0, 100);
   if (a.drunk) drinkUp(a.drunk);
-  const deltas = applyEffect(a.effect);
+  const deltas = libidoDelta(a.libido, null).concat(applyEffect(a.effect));
   const c = costOf(a);
   if (c) deltas.push(...applyEffect({ money: -c }));
   if (a.subjAll && inSchool()) SUBJ.forEach(k => { const g = subjGain(k, val(a.subjAll)); deltas.push([D.subjects.find(x => x.id === k).label, g]); });
@@ -1595,7 +1645,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, onPill, fertile, refusal, turn: () => turnNo(), allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, refusal, turn: () => turnNo(), lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,
@@ -1623,7 +1673,7 @@ function newLife(opt = {}) {
     stats: { happy: rand(60, 80), health: rand(65, 90), libido: 0, smart: rand(5, 20), fit: rand(5, 20), face: gradeValue(pickKey(tr.face || D.faceStart)), style: rand(0, 10), charm: rand(5, 20), art: rand(5, 20), craft: rand(5, 20) },
     school: { subj: { kor: 0, math: 0, eng: 0, sci: 0 }, naesin: [], mock: null, sat: null, tier: null, major: null, start: null, years: null, gpa: 0, gpaN: 0, studyYear: 0, degree: null },
     karma: 0, heat: 0, record: 0, crimes: 0, jail: 0, rank: 0, perf: 0, preg: null,
-    sexSkill: 0, penis: gender === 'm' ? rollPenis() : null, drunk: 0, scene: null,
+    sexSkill: 0, penis: gender === 'm' ? rollPenis() : null, drunk: 0, scene: null, lust: {}, lustTop: null,
     flags: {}, vars: {}, done: {}, last: {},
     people: [], job: null, salary: 0, log: [], memories: [], pending: [], ended: null,
     weather: 'sunny', time: 0,
@@ -1674,6 +1724,16 @@ function patch(s) {
     if (x.gender === 'm' && x.penis == null) x.penis = cmFromSize(x.size);
     delete x.size;
   }
+  // 대상 없는 성욕 하나 → 대상별 성욕: 예전 값은 애인(없으면 설렘이 가장 큰 사람)에게, 함께 밤을 보낸 사람들은 조금씩
+  if (!s.lust) {
+    const prev = S; S = s;
+    s.lust = {};
+    const cands = s.people.filter(p => !p.gone && canSex(p)).sort((a, b) => (lover(b) - lover(a)) || b.heart - a.heart);
+    if (cands[0] && (s.stats.libido || 0) > 0) s.lust[cands[0].id] = s.stats.libido;
+    for (const p of cands.slice(1)) if (p.nights || p.heart >= 40) s.lust[p.id] = clamp(Math.round((s.stats.libido || 0) * .5) + attraction(p), 0, 100);
+    syncLibido();
+    S = prev;
+  }
   return s;
 }
 // v4 → v5 (외모 3층, 체형). 비어 있는 값만 채움
@@ -1716,6 +1776,8 @@ window.Game = {
   places: placeList, goPlace, leavePlace, here: hereList, talkTo, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
   intimacy: p => canSex(p) && (p.nights || lover(p)) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
+  // 이 사람을 향한 내 성욕 (내 마음이라 늘 보임) / 지금 가장 높은 대상
+  myLust: p => canSex(p) ? lustOf(p) : null, lustTarget: () => { const t = lustTop(); return t.p ? { name: pname(t.p), v: t.v, id: t.p.id } : null; },
   people: () => alive(), person, interactions, interact, canSex, clearScene: () => { if (S.scene) { S.scene = null; save(); } }, look: lookOf, myLook: () => S.look, figure, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,
   crimes: () => D.crimes.filter(c => S.age >= c.minAge && meets(c.req)), canCrime, crimeOdds, commitCrime,
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,

@@ -363,6 +363,16 @@ function glassesSVG(type, glc) {
   return o + glare;
 }
 const FROWN = `<path d="M54,90 Q60,86 66,90" fill="none" stroke="${LINE}" stroke-width="2" stroke-linecap="round"/>`;
+// 살짝 벌어진 입술 (나를 향한 성욕이 높을 때): k 0~1 클수록 조금 더 벌어짐. 여자는 립 색 + 아랫입술 윤기
+const PARTED = (k, lip, female) => {
+  const g = 1.2 + k * 1.1, lc = female ? lip.c : shade(lip.c, .92);
+  return `<ellipse cx="60" cy="${f1(88.9 + g * .25)}" rx="${f1(3.2 + k * .5)}" ry="${f1(g * .55)}" fill="${MOUTH_IN}"/>` +
+    `<path d="M54.6,88.2 Q57.3,86.4 60,87.6 Q62.7,86.4 65.4,88.2 Q60,${f1(88.6)} 54.6,88.2 Z" fill="${lc}"${female ? '' : ' opacity=".7"'}/>` +
+    `<path d="M54.6,88.2 Q57.3,86.4 60,87.6 Q62.7,86.4 65.4,88.2" fill="none" stroke="${LINE}" stroke-width="1.2" stroke-linecap="round" opacity=".75"/>` +
+    `<path d="M53.6,87.2 q.9,.3 1.2,1.2 M66.4,87.2 q-.9,.3 -1.2,1.2" fill="none" stroke="${LINE}" stroke-width=".9" stroke-linecap="round" opacity=".6"/>` +   // 입꼬리가 살짝 올라감
+    `<path d="M56.2,${f1(89.4 + g * .5)} Q60,${f1(92.6 + g * .45)} 63.8,${f1(89.4 + g * .5)} Q60,${f1(90.4 + g * .55)} 56.2,${f1(89.4 + g * .5)} Z" fill="${lc}"${female ? '' : ' opacity=".6"'}/>` +
+    (female ? `<ellipse cx="58.6" cy="${f1(90.9 + g * .55)}" rx="1.5" ry=".5" fill="#fff" opacity=".45"/>` : '');
+};
 
 /* ---------- 머리 ---------- */
 // 윗머리(돔) + 앞머리(이마를 덮는 모양, 따로) + 옆머리(얼굴 옆으로 내려옴) + 뒷머리(얼굴 뒤) + 묶음
@@ -1354,8 +1364,10 @@ function headSVG(a, X, age, st, g) {
   if (adult && X.ear) o += earringSVG(female ? X.ear : 1, X.metal, -1) + earringSVG(female ? X.ear : 1, X.metal, 1);
   if (g.chin2) o += `<path d="M48,100.5 Q60,108.5 72,100.5" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.6" stroke-linecap="round" opacity=".4"/>`;   // 이중턱
   // 볼 홍조 (모두 옅게, 어린이·볼 빨간 사람은 더), 주근깨, 주름
-  const lib = adult && !du && !af ? st.libido || 0 : 0;   // 성욕 60+ 옅은 홍조, 80+ 더 붉고 눈에 윤기
-  const blush = f1(Math.min(.95, (lib >= 80 ? .25 : lib >= 60 ? .15 : 0) + (pk && pk.blush ? pk.blush : du ? { pleasure: [.42, .56, .68, .8][lv], bliss: .62, content: .45, bored: .1, disappointed: .14 }[mood] + (du.personality === 'shy' ? .1 : 0)
+  // 나를 향한 성욕 (st.libido: 이 사람이 지금 대하는 사람 = 나에게 느끼는 것, 어른 이성만). 대상마다 달라서 같은 사람도 누구를 대하느냐에 따라 표정이 다름
+  //   30+ 나를 똑바로 봄·눈썹이 풀림 / 50+ 눈에 반짝임·다문 미소·홍조 선 / 70+ 나른하게 내리깐 눈·살짝 벌어진 입술 / 85+ 풀린 눈에 분홍 하트 반사광·더 붉음·땀 한 방울
+  const lib = adult && !du && !af ? st.libido || 0 : 0, lt = lib >= 85 ? 4 : lib >= 70 ? 3 : lib >= 50 ? 2 : lib >= 30 ? 1 : 0;
+  const blush = f1(Math.min(.95, [0, .08, .18, .3, .42][lt] + (pk && pk.blush ? pk.blush : du ? { pleasure: [.42, .56, .68, .8][lv], bliss: .62, content: .45, bored: .1, disappointed: .14 }[mood] + (du.personality === 'shy' ? .1 : 0)
     : af ? [.1, .1, .25, .42, .55][tier] + (af.personality === 'shy' && tier >= 2 ? .15 : 0) : kid ? .3 : a.blush ? .24 : .1)) * 100) / 100;
   o += `<ellipse cx="44" cy="84" rx="${kid ? 6.5 : 5.5}" ry="3.3" fill="#e8857a" opacity="${blush}"/><ellipse cx="76" cy="84" rx="${kid ? 6.5 : 5.5}" ry="3.3" fill="#e8857a" opacity="${blush}"/>`;
   if (st.aroused && adult) o += arousalFX(st.aroused);
@@ -1388,12 +1400,14 @@ function headSVG(a, X, age, st, g) {
     if (af && tier === 3) return SLEEPY(x, ey, s, nLash);
     if (aro >= 86) return SLEEPY(x, ey, s, nLash);
     if (aro >= 71) return halfEye(a, X, x, ey, s, nLash, -2.5, 1.5, 1.2);
-    const e = openEye(a, X, x, ey, s, nLash, { aegyo: X.aegyo && age >= 13, skinLn: shade(skin, .74), wing: female && adult && X.liner });
+    if (lt >= 4) return loveEye(a, X, x, ey, s, nLash, -3, false);
+    if (lt >= 3) return halfEye(a, X, x, ey, s, nLash, 0, .4, -3.3);
+    const e = openEye(a, lt ? Object.assign({}, X, { gaze: 0 }) : X, x, ey, s, nLash, { aegyo: X.aegyo && age >= 13, skinLn: shade(skin, .74), wing: female && adult && X.liner });
     return kid ? `<g transform="translate(${x},${ey}) scale(1.1) translate(${-x},${-ey})">${e}</g>` : e;
   }).join('');
-  if (lib >= 80) o += ex.map(x => `<circle cx="${x + 2.2}" cy="${ey - 1.6}" r=".9" fill="#fff" opacity=".85"/><circle cx="${x - 1.4}" cy="${ey + 1.6}" r=".5" fill="#fff" opacity=".7"/>`).join('');
+  if (lt === 2 || lt === 3) o += ex.map(x => `<circle cx="${x + 2.2}" cy="${ey - 1.2}" r=".9" fill="#fff" opacity=".85"/><circle cx="${x - 1.4}" cy="${ey + 1.6}" r=".5" fill="#fff" opacity=".7"/>`).join('');
   // 눈썹 (다음 날 아침 만족감이 낮으면 처짐)
-  const expr = st.expr || (pk && 'brow' in pk ? pk.brow : du ? (mood === 'disappointed' ? 'sad' : (mood === 'pleasure' && lv >= 1) || mood === 'bliss' ? 'soft' : null) : af && tier <= 1 ? 'sad' : null);
+  const expr = st.expr || (pk && 'brow' in pk ? pk.brow : du ? (mood === 'disappointed' ? 'sad' : (mood === 'pleasure' && lv >= 1) || mood === 'bliss' ? 'soft' : null) : af && tier <= 1 ? 'sad' : lt === 1 || lt === 2 ? 'soft' : null);
   const btype = (af && tier >= 3) || mood === 'bliss' || mood === 'content' ? 1 : mood === 'bored' ? 0 : a.brows;
   const bw = (a.thick ? 3.8 : a.g === 'm' ? 3.1 : 2.5) * (kid ? .9 : 1);
   o += `<path d="${ex.map((x, i) => browFill(btype, x, ey - 10, i ? 1 : -1, expr, bw)).join(' ')}" fill="${shade(hc, .72)}"/>`;
@@ -1404,7 +1418,8 @@ function headSVG(a, X, age, st, g) {
   o += pk ? { joy2: JOY(2, lip, female), joy1: JOY(1, lip, female), o: mouthSVG(3, lip, female), tongue: JOY(1, lip, female) + TONGUE, smile: mouthSVG(1, lip, female), smirk: SMIRK(lip), tremble: TREMBLE(lip, female) }[pk.mouth]
     : du ? ({ bliss: JOY(0, lip, female), content: mouthSVG(1, lip, female), bored: mouthSVG(2, lip, female), disappointed: POUT(lip) }[mood] || (lv ? JOY(lv - 1, lip, female) : mouthSVG(1, lip, female)))
     : af ? (tier === 0 ? FROWN : tier === 1 ? mouthSVG(2, lip, female) : tier >= 3 && af.personality !== 'cool' ? mouthSVG(1, lip, female) : mouthSVG(0, lip, female))
-    : aro >= 71 ? mouthSVG(1, lip, female) : aro >= 51 ? mouthSVG(3, lip, female) : mouthSVG(a.mouth, lip, female);
+    : aro >= 71 ? mouthSVG(1, lip, female) : aro >= 51 ? mouthSVG(3, lip, female)
+    : lt >= 3 ? PARTED(lt - 3, lip, female) : lt === 2 && a.mouth !== 1 ? mouthSVG(4, lip, female) : mouthSVG(a.mouth, lip, female);
   if (!female && adult) o += beardSVG(X.beard, hc, `${fid}c`);
   // 립스틱 자국은 bareBody에서 목·쇄골에 표시
   if (af && tier >= 4 && female) {
@@ -1412,10 +1427,12 @@ function headSVG(a, X, age, st, g) {
     o += `<path d="M78,74 Q82,78 84,82" fill="none" stroke="#555" stroke-width="1.2" opacity=".25" stroke-linecap="round"/>`;
   }
   if (a.dimples) o += `<path d="M50,87 q-1.5,2 0,3.5 M70,87 q1.5,2 0,3.5" fill="none" stroke="${shade(skin, .72)}" stroke-width="1.1" stroke-linecap="round"/>`;
+  if (lt >= 2) o += `<g opacity="${lt >= 3 ? .8 : .45}">${BLUSH_LINES}</g>`;
   // 앞머리·옆머리
   // 이불을 덮었으면 앞머리·옆머리 끝은 이불 속으로
   o += g.cut ? `<clipPath id="av${UID}cut"><rect width="120" height="${g.cut}"/></clipPath><g clip-path="url(#av${UID}cut)">${hp.front}</g>` : hp.front;
   if (af && tier >= 2) o += messyHair(hc, [0, 0, 1, 3, 5][tier]);
+  if (lt >= 4) o += SWEAT(83, 52, .7);
   if (af) o += [[82, 52], [37, 57], [70, 118]].slice(0, Math.min(3, Math.floor((af.sat ?? 50) / 30))).map(([x, y]) => SWEAT(x, y, .85)).join('');
   if (af && female && tier >= 3) o += `<path d="M64.5,88.6 q3.6,1.2 6.8,-.6${tier >= 4 ? ' M55.4,89.4 q-3.4,1.8 -6.4,.8 M61,92.6 q2,2.6 1,4.8' : ''}" fill="none" stroke="${lip.c}" stroke-width="${tier >= 4 ? 2.2 : 1.8}" stroke-linecap="round" opacity="${tier >= 4 ? .45 : .32}"/>`;   // 립스틱 번짐
   if (du) {

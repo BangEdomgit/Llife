@@ -966,9 +966,13 @@ GAME_DATA.events = [
         text: '어색했지만 끝까지 이야기했다. 서로 몰랐던 게 많았다.' },
       { label: '모른 척한다', p: { heart: [-6, -3] }, text: '침대 양 끝에 누워 잠들었다.' },
     ] },
-  { id: 'libidoRestless', type: 'random', age: [20, 49], once: false, cooldown: 2, when: s => s.stats.libido >= 80,
-    text: '밤마다 잠이 안 온다. 괜히 휴대폰 연락처만 위아래로 넘겼다.',
+  // 성욕은 늘 대상이 있음 — 가장 높은 대상(a.lustTop)이 80을 넘으면 그 사람 생각에 잠이 안 옴
+  { id: 'libidoRestless', type: 'random', age: [20, 49], once: false, cooldown: 2, when: (s, a) => s.stats.libido >= 80 && !!a.lustTop(),
+    onStart: (s, a) => a.focus(a.lustTop()),
+    text: '밤마다 {fp} 생각에 잠이 안 온다. 괜히 휴대폰 연락처만 위아래로 넘겼다.',
     choices: [
+      { label: '{fp}에게 연락한다', p: { heart: [3, 6] }, libido: [4, 8], risk: (s, a) => a.focused() && !lover(a.focused()) ? .1 : 0,
+        text: (s, a) => lover(a.focused()) || a.focused().fwb ? '"자?" 1이 사라지자마자 전화가 걸려왔다.' : '"자?" 한 글자를 보냈다. 한참 뒤에 1이 사라졌다.' },
       { label: '전 연인에게 연락한다', if: (s, a) => a.find(p => p.ex && a.canSex(p) && p.grudge < 40).length > 0, risk: .15,
         do: (s, a) => a.focus(a.find(p => p.ex && a.canSex(p) && p.grudge < 40)[0]), p: { heart: [4, 8] }, text: '"자?" 한 글자를 보냈다. 1이 금방 사라졌다.' },
       { label: '편한 사람을 부른다', if: (s, a) => a.find(p => (p.fwb || p.fling) && a.canSex(p)).length > 0,
@@ -976,8 +980,9 @@ GAME_DATA.events = [
         text: (s, a) => '"지금 와." 답장은 한 글자였다. ' + nightLine(a, 'fling') },
       { label: '찬물로 샤워한다', libido: [-25, -15], effect: { health: 1 }, text: '이가 딱딱 부딪혔다. 조금 나아졌다.' },
     ] },
-  { id: 'libidoDistract', type: 'random', on: ['work', 'study', 'office'], age: [20, 49], once: false, cooldown: 2, when: s => s.stats.libido >= 70,
-    text: '도무지 집중이 안 된다. 같은 문장을 다섯 번째 읽고 있다.', effect: { happy: -1 }, do: (s, a) => a.perf(-3) },
+  { id: 'libidoDistract', type: 'random', on: ['work', 'study', 'office'], age: [20, 49], once: false, cooldown: 2, when: (s, a) => s.stats.libido >= 70 && !!a.lustTop(),
+    onStart: (s, a) => a.focus(a.lustTop()),
+    text: '도무지 집중이 안 된다. {fp|이} 자꾸 떠올라 같은 문장을 다섯 번째 읽고 있다.', effect: { happy: -1 }, do: (s, a) => a.perf(-3) },
 
   /* ═════ 섹파 (감정은 깊지 않고, 서로 성욕이 차면 만나는 사이) ═════ */
   { id: 'fwbOffer', type: 'fixed', age: [20, 49], once: false, cooldown: 2, weight: 1.5,
@@ -991,8 +996,8 @@ GAME_DATA.events = [
       { label: '그건 싫어', do: (s, a) => { const p = a.focused(); p.fling = false; }, p: { heart: [-10, -5], close: [-3, -1] }, text: '{fp|이} 알겠다며 웃었다. 그 뒤로 조금 어색해졌다.' },
     ] },
   { id: 'fwbCall', type: 'random', age: [20, 49], once: false, cooldown: 1, weight: 1.5,
-    when: (s, a) => a.find(p => p.fwb && a.canSex(p) && (s.stats.libido >= 60 || (p.libido || 0) >= 60)).length > 0,
-    onStart: (s, a) => a.focus(a.find(p => p.fwb && a.canSex(p) && (s.stats.libido >= 60 || (p.libido || 0) >= 60))[0]),
+    when: (s, a) => a.find(p => p.fwb && a.canSex(p) && (a.lust(p) >= 60 || (p.libido || 0) >= 60)).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => p.fwb && a.canSex(p) && (a.lust(p) >= 60 || (p.libido || 0) >= 60))[0]),
     text: '{fp}에게서 문자가 왔다. "오늘 시간 돼?"',
     choices: [
       { label: '간다', intimate: true, fling: true, p: { close: [2, 4] }, effect: { happy: [2, 4] }, risk: .15, pregnant: .04,

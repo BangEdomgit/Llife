@@ -60,6 +60,7 @@ body{height:100%;margin:0;background:var(--page-bg);color:var(--text);font-famil
 
 /* 상태 + 능력 등급 */
 .conds{display:grid;grid-template-columns:auto 1fr auto auto 1fr auto;gap:2px 8px;padding-top:8px;font-size:13px;align-items:center}
+.conds .lt{margin-left:3px;font-size:11px;color:#f2a7c3;white-space:nowrap}
 .abils{display:grid;grid-template-columns:repeat(4,1fr);gap:3px 8px;padding-top:6px;font-size:12.5px}
 .ab{display:flex;align-items:baseline;gap:5px;white-space:nowrap;overflow:hidden}
 .ab .g{font-weight:700;min-width:1.6em}

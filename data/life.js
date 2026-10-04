@@ -289,7 +289,7 @@ GAME_DATA.actions = [
   { id: 'rest',      label: '쉬기',   icon: '🛋', minAge: 0,  effect: { health: [1, 2], happy: [1, 3] },
     text: s => s.age < 4 ? ['낮잠을 푹 잤다.', '엄마 품에서 잠들었다.', '모빌을 보다가 잠들었다.']
       : ['이불 속에서 뒹굴었다.', '아무것도 안 하고 하루를 보냈다.', '낮잠을 자고 일어나니 저녁이었다.'] },
-  { id: 'selfRelief', label: '자위',  icon: '🚿', minAge: 20, if: s => s.stats.libido >= 30, libido: [-50, -40], effect: { happy: [-1, 1] },
+  { id: 'selfRelief', label: '자위',  icon: '🚿', minAge: 20, if: s => s.stats.libido >= 30, libido: [-50, -40], effect: { happy: [-1, 1] },   // 대상이 있는 성욕만 있으므로, 가장 높은 대상이 30 이상일 때. 모든 대상이 내려감
     text: ['샤워를 오래 했다.', '혼자만의 시간을 보냈다.', '좀 나아졌다.'] },
   { id: 'play',      label: '놀기',   icon: '🪁', minAge: 4,  effect: { happy: [3, 5], fit: [1, 3], charm: [0, 1] },
     text: ['해가 질 때까지 뛰어놀았다.', '무릎이 까지도록 놀았다.', '모래 범벅이 돼서 집에 갔다.'] },
