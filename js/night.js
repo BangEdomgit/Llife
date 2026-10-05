@@ -13,6 +13,12 @@
 // 재생 배속 (×1 / ×2 / ×4 / ×8) — 화면에서 고름, 이 기기에 기억
 let RATE = 1;
 try { RATE = +localStorage.getItem('llife.ntRate') || 1; } catch (e) { /* 저장 못 하는 환경 */ }
+// 디테일 모드 (테스트용, 기본 꺼짐): 그날 밤 카드의 🔬 버튼·그날 밤 테스트 창·주소 ?detail 로 켬, 이 기기에 기억
+//   이불 장면(효과음 글자·땀·열기·숨결·시트 주름·발끝·김 서린 창·바닥 옷), 초상화(홍조·땀·젖은 머리·숨결·자국),
+//   내레이션 자막·추가 말풍선·테스트 수치. 문장과 그림은 지금처럼 암시까지만
+let DETAIL = false;
+try { DETAIL = /[?&#]detail/.test(location.href) || localStorage.getItem('llife.ntDetail') === '1'; } catch (e) { /* 저장 못 하는 환경 */ }
+let FORCE_POSE = null, LAST = null;   // 테스트 창의 체위 고정 / 마지막 밤 기록 (아침 카드의 '어젯밤 기록')
 const HEART = 'M0,5 C-7,0 -6,-6 -2.5,-6 C-1,-6 0,-5 0,-4 C0,-5 1,-6 2.5,-6 C6,-6 7,0 0,5 Z';
 const CX = Array.from({ length: 44 }, (_, i) => 68 + 216 * i / 43);   // 이불 윗선 점들의 x
 const FOLDS = [[112, -4, .8], [146, 3, 1], [176, -3, .7], [212, 4, 1], [250, -2, .8]];
@@ -130,8 +136,10 @@ function room(kind) {
   <g id="ntH"><path d="${HEART}" fill="url(#ntHeart)"/><ellipse cx="-2.8" cy="-3.2" rx="1.7" ry="1" fill="#fff" opacity=".7" transform="rotate(-35 -2.8 -3.2)"/></g>
 </defs><g class="nt-cam">
   ${BACK[kind]}
+  <g class="nt-fog"></g>
   <g class="nt-bed">
     ${BED[kind]}
+    <g class="nt-wr"></g>
     <path class="nt-q" fill="url(#ntQuilt)"/>
     <g class="nt-sil" clip-path="url(#ntQC)" filter="url(#ntBlur)"><path class="nt-sf" fill="#3b1b4a" opacity="${(q.sil * .9).toFixed(2)}"/><path class="nt-sm" fill="#1c0f2c" opacity="${(q.sil * 1.05).toFixed(2)}"/></g><path class="nt-st" fill="none" stroke="${q.st}" stroke-width=".9" stroke-dasharray="2.2 2.6" opacity="${q.stO}"/>
     <g fill="none" stroke-linecap="round">${FOLDS.map(([, , o]) => `<path class="nt-f" stroke="${q.fd}" stroke-width="2.2" opacity="${.26 * o}"/><path class="nt-f" stroke="${q.fl}" stroke-width="1.1" opacity="${.18 * o}"/>`).join('')}</g>
@@ -140,7 +148,7 @@ function room(kind) {
   </g>
   <ellipse class="nt-warm" cx="182" cy="116" rx="122" ry="54" fill="url(#ntWarm)" opacity="0"/>
   ${kind === 'home' ? '<path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>' : kind === 'park' ? '' : kind === 'motel' ? '<path class="nt-neon" d="M110,92 L180,92 L250,170 L120,170 Z" fill="url(#ntPinkBeam)"/>' : '<path d="M198,128 L304,128 L230,170 L120,170 Z" fill="url(#ntBeam)"/>'}
-  <g class="nt-hearts"></g><g class="nt-fx"></g>
+  <g class="nt-hearts"></g><g class="nt-fx"></g><g class="nt-dx"></g>
 </g></svg>`;
 }
 
@@ -184,7 +192,9 @@ function standing(male) {
     <path d="M${-hip + 2},-68 L-9,-36 L-7,0 H-1 L0,-36 L3,-68 Z"/><path d="M2,-68 L4,-36 L7,0 H13 L11,-36 L${hip - 1},-68 Z"/></g>`;
 }
 const arm = () => `<path d="M-3,-3 Q3,12 2,30 L6,30 Q9,12 4,-3 Z"/><circle cx="4" cy="31" r="3"/>`;
-function foreplay(colors) {
+// 디테일 모드 자막: 카드 아래에 한 줄씩 차례로 (step초 간격)
+const capLines = (list, step) => list && list.length ? `<p class="sc-cap">${list.map((c, i) => `<span${i === list.length - 1 ? ' class="last"' : ''} style="animation-delay:${(i * step).toFixed(2)}s;animation-duration:${i === list.length - 1 ? .5 : step}s">${c}</span>`).join('')}</p>` : '';
+function foreplay(colors, cap) {
   const cloth = (c, cls) => `<g class="fp-cloth ${cls}"><path d="M-9,-6 L-4,-9 Q0,-6 4,-9 L9,-6 L12,0 L7,2 L6,10 H-6 L-7,2 L-12,0 Z" fill="${c}"/></g>`;
   return `<div class="sc-fore"><svg viewBox="0 0 320 190" aria-hidden="true">
   <defs><radialGradient id="fpLight" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="#3a3f66"/><stop offset="1" stop-color="#0b0d18"/></radialGradient></defs>
@@ -195,9 +205,9 @@ function foreplay(colors) {
     <g class="fp-b"><g transform="translate(171,172) scale(-1,1)">${standing(false)}<g transform="translate(4,-120)"><g class="fp-arm-b">${arm()}</g></g></g></g>
   </g>
   <g transform="translate(146,96)">${cloth(colors[0], 'c1')}</g><g transform="translate(174,94)">${cloth(colors[1], 'c2')}</g>
-  <rect class="fp-dark" width="320" height="190" fill="#000"/></svg></div>`;
+  <rect class="fp-dark" width="320" height="190" fill="#000"/></svg>${capLines(cap, .72)}</div>`;
 }
-function alley(meMale, themMale) {
+function alley(meMale, themMale, cap) {
   const bricks = Array.from({ length: 15 }, (_, r) => { const y = 14 + r * 11, o = r % 2 ? 9 : 0; return `M0,${y} H${118 - r * 1.5}` + Array.from({ length: 7 }, (_, c) => ` M${o + c * 18},${y} V${y + 11}`).join(''); }).join(' ');
   return `<div class="sc-alley"><svg viewBox="0 0 320 190" aria-hidden="true">
   <defs><linearGradient id="alSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a0c2a"/><stop offset="1" stop-color="#3b1440"/></linearGradient>
@@ -221,10 +231,11 @@ function alley(meMale, themMale) {
     <g class="al-b"><g transform="translate(140,172) scale(-1,1)">${standing(meMale)}<g transform="translate(4,-122)"><g class="al-arm-b">${arm()}</g></g></g></g>
   </g>
   <g class="al-heart" transform="translate(126,22)"><path d="${HEART}" fill="#ff6f94" transform="scale(1.6)"/></g>
-  </svg></div>`;
+  </svg>${capLines(cap, .9)}</div>`;
 }
 // 교과서식 자궁·난관·난소 단면. 정자는 자궁경부에서 올라오다 대부분 멈추고, 임신이면 하나가 왼쪽 난관 끝 난자에 닿아 빛남
-function uterus(preg) {
+//   info(디테일 모드): { pregP: 이번 밤 임신 확률 0~1 (모르면 없음), contra } → 단계별 정자 수와 확률을 숫자로
+function uterus(preg, info) {
   const way = (k, side, j) => { const tx = 160 + side * 34, ox = 160 + side * 92; return `M${160 + j},176 C${160 + j * 2},150 ${150 + side * 8 + j},122 ${tx},96 C${tx + side * 22},${76 + k % 3 * 2} ${ox - side * 30},58 ${ox},66`; };
   const sperm = Array.from({ length: 14 }, (_, k) => {
     const side = k % 2 ? 1 : -1, win = preg && k === 2, stop = win ? 1 : [.25, .38, .5, .62, .72, .82][k % 6], dur = 2.6 + (k % 5) * .2, d = (k * .09).toFixed(2), path = way(k, side, (k % 5 - 2) * 3);
@@ -242,7 +253,7 @@ function uterus(preg) {
   <path d="M134,98 Q160,90 186,98 Q182,136 166,152 H154 Q138,136 134,98 Z" fill="#1b1220" opacity=".55"/>
   <ellipse cx="62" cy="70" rx="13" ry="9" fill="#f1c0b4" stroke="#d98a7e" stroke-width="2"/><ellipse cx="258" cy="70" rx="13" ry="9" fill="#f1c0b4" stroke="#d98a7e" stroke-width="2"/>
   <circle class="egg${preg ? ' win' : ''}" cx="68" cy="66" r="5.5" fill="url(#eggG)"/>
-  ${sperm}</svg><p class="sc-later" style="animation-delay:3s">${preg ? '…하나가 닿았다.' : ''}</p></div>`;
+  ${sperm}</svg><p class="sc-later" style="animation-delay:3s">${preg ? '…하나가 닿았다.' : ''}</p>${info ? `<p class="sc-nums">정자 약 <b>2~3억</b> → 자궁경부를 지나는 건 약 <b>1%</b> → 자궁을 지나 난관까지 <b>수천</b> → 난자 곁까지 <b>수백</b> → 난자는 <b>1개</b><br>이번 밤 임신 확률 <b>${info.pregP != null ? (info.pregP * 100).toFixed(info.pregP < .1 ? 1 : 0) + '%' : '—'}</b>${info.contra ? ` · ${info.contra}` : ''} · 결과: <b>${preg ? '임신' : '아님'}</b></p>` : ''}</div>`;
 }
 
 /* ---------- 더미 ---------- */
@@ -475,7 +486,7 @@ const POSE_W = { shy: { missionary: 4, prone: 1, doggy: 1, cowgirl: .5, lotus: 2
 const POSE_W0 = { missionary: 2, doggy: 1.5, cowgirl: 1.5, prone: 1, lotus: 1.2, legsUp: 1, reverse: 1, seated: 1 };
 // 체위 고르기 (not: 방금 한 체위는 빼고). 주소에 ?pose=doggy 처럼 고정 가능
 function pickPose(personality, not) {
-  const forced = (location.search.match(/[?&]pose=(\w+)/) || [])[1];
+  const forced = FORCE_POSE || (location.search.match(/[?&]pose=(\w+)/) || [])[1];
   if (forced && POSES[forced]) return forced;
   const w = POSE_W[personality] || POSE_W0, ks = Object.keys(w).filter(k => k !== not);
   let r = Math.random() * ks.reduce((a, k) => a + w[k], 0);
@@ -674,10 +685,125 @@ function run(stage, job, done) {
   const pickOf = a => a && a.length ? a[Math.floor(Math.random() * a.length)] : '';
   function say(txt, cls, dur = 1.5) {
     if (!sayEl || !txt) return;
-    sayEl.textContent = txt; sayEl.className = 'nt-say on' + (cls ? ' ' + cls : '');
+    sayEl.textContent = txt.includes('{') ? fillT(txt) : txt; sayEl.className = 'nt-say on' + (cls ? ' ' + cls : '');
     sayUntil = t + dur; lastSay = t;
   }
   const hearts = [];
+  // ---------- 디테일 모드 (테스트용) ----------
+  //   이불 장면: 효과음 글자, 이불 위로 튀는 땀, 열기 아지랑이, 숨결, 시트 주름, 발끝 오므림, 더 크게 흔들리는 침대, 김 서린 창(대절정에 손자국), 바닥에 흩어진 옷·콘돔 포장
+  //   초상화: 홍조 번짐·땀·젖은 머리·숨결·자국(avatar.js가 그려 두고 여기서 세기 조절) / 내레이션 자막 / 테스트 수치
+  const kind = stage.dataset.kind, WIN = { home: [214, 24, 76, 68], hotel: [196, 12, 110, 116], sea: [196, 12, 110, 116], motel: [110, 22, 70, 70] }[kind];
+  const HEADB = { home: [45, 98], hotel: [40, 98], sea: [40, 98], motel: [40, 94] }[kind], KNOCK = { missionary: 1, legsUp: 1, doggy: 1, prone: 1 };
+  const fogG = q('.nt-fog'), wrG = q('.nt-wr'), dxG = q('.nt-dx'), narEl = stage.querySelector('.nt-nar'), hudEl = stage.querySelector('.nt-hud');
+  const meS = G && G.state ? G.state() : null, lipMe = !!meS && meS.gender === 'f';
+  const NARR = ((window.GAME_DATA || {}).nightNarr) || null, gradeTxt = G && G.sexGrades ? G.sexGrades[gi] : '';
+  let dxOn = null, dxBuilt = false, fogV = 0, handK = 0, handOn = false, lastSfx = -9, lastSweat = 0, lastNar = -9, narUntil = 0, brPh = 0, brS = 0, mkN = 0, lastMk = -9, gripK = 0, dampV = 0, lastFr = 0, hudAt = -9, narAfter = false;
+  let fogEl = null, handEl = null, steamEls = [], wrEl = null, sfxG = null, swG = null, puffG = null, dx = null;
+  const sfxs = [], sweats = [], puffs = [];
+  const stats = { poses: [poseName], ouch: 0, gasp: 0, maxPl: 0 };
+  // 아침 카드의 '어젯밤 기록' — 종료로 넘겨도 그때까지의 값
+  LAST = () => ({ poses: stats.poses, ouch: stats.ouch, gasp: stats.gasp, maxPl: Math.round(stats.maxPl * 100), marks: mkN, lip: lipMe, counts: Object.assign({}, counts), dur: plan.fl.dur, early: !!plan.fl.early, pow: plan.fl.pow, grade: gradeTxt, cm, sat: sc.sat, contra: sc.contra, detail: DETAIL });
+  const nameOf = () => (G && G.pname ? G.pname(p) : '');
+  const fillT = txt => String(txt).replace(/\{p\|(.)\}/g, (_, j) => (G && G.josa ? G.josa(nameOf(), j) : nameOf() + j)).replace(/\{p\}/g, nameOf()).replace(/\{me\}/g, meS && meS.name ? meS.name.slice(-2) : '너');
+  function buildDetail() {
+    dxBuilt = true;
+    const hc = Avatar.topColor(G.look(p)), mc = Avatar.topColor(G.myLook()), pers = p.personality || 'warm';
+    const uc = p.gender === 'f' ? (pers === 'bold' ? '#2a2a2a' : pers === 'shy' ? '#e8dff0' : pers === 'sensitive' ? '#f5e0e4' : '#d4c8b8') : '#3a4a5a';
+    if (WIN) {   // 김 서린 창: 시간이 갈수록 뿌옇게, 대절정에 손자국 (닦인 자리로 밤하늘이 보이고 물방울이 흘러내림)
+      const [wx, wy, ww, wh] = WIN, sky = SKY[kind][1];
+      const hand = `<ellipse cx="0" cy="4" rx="6.2" ry="6.8"/>` + [[-5.6, -3, -22, 1.9, 6.5], [-2.3, -6.5, -7, 1.8, 8], [1.3, -7, 4, 1.8, 8.4], [4.6, -5.6, 15, 1.7, 7.2], [7.4, 1.5, 58, 1.8, 5.6]]
+        .map(([x, yy, r, w, l]) => `<rect x="${-w}" y="${-l}" width="${2 * w}" height="${l + 2}" rx="${w}" transform="translate(${x},${yy}) rotate(${r})"/>`).join('');
+      fogG.innerHTML = `<rect x="${wx}" y="${wy}" width="${ww}" height="${wh}" fill="#e3ebff" opacity="0"/>` +
+        `<g opacity="0" fill="${sky}" transform="translate(${f(wx + ww * .56)},${f(wy + wh * .5)}) rotate(-8) scale(1.15)">${hand}<path d="M-3,10 v6 M1,10.6 v8 M4.4,9.6 v5 M-6.4,6 v7" stroke="${sky}" stroke-width="1.2" stroke-linecap="round"/></g>`;
+      fogEl = fogG.firstChild; handEl = fogG.lastChild;
+    }
+    const top = (x, yy, c, r, k) => `<g transform="translate(${x},${yy}) rotate(${r}) scale(${k})"><path d="M18,36 C10,28 18,14 36,16 C46,8 70,12 74,22 C86,20 96,30 88,36 C68,42 38,42 18,36 Z" fill="${c}"/><path d="M30,28 Q44,22 56,30 M58,22 Q68,26 76,32" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.8"/></g>`;
+    const under = p.gender === 'f' ? `<g transform="translate(138,178) rotate(-10) scale(.62)"><path d="M0,8 Q8,-4 16,8 Q24,-4 32,8 L30,14 Q24,4 16,14 Q8,4 2,14 Z" fill="${uc}" opacity=".9"/><path d="M0,8 Q8,-4 16,8 Q24,-4 32,8" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.2"/><path d="M32,9 q8,3 14,1" fill="none" stroke="${uc}" stroke-width="1.4"/></g>`
+      : `<g transform="translate(140,175) rotate(8) scale(.48)"><path d="M0,0 L30,0 L32,22 L18,22 L16,8 L14,22 L0,22 Z" fill="${uc}" opacity=".9"/></g>`;
+    const socks = `<path d="M186,183 h6 v-5 h3 v8 h-9 Z" fill="#e9e4dc" opacity=".8" transform="rotate(-14 190 182)"/><path d="M198,186 h7 v-4 h3 v7 h-10 Z" fill="#d9d2c6" opacity=".75" transform="rotate(20 203 184)"/>`;
+    const condom = sc.contra === 'condom' || sc.contra === 'both', wp = kind === 'home' || kind === 'motel' ? [25, 127.4] : [284, 181];
+    const wrap = condom ? `<g transform="translate(${wp[0]},${wp[1]}) rotate(-14)"><path d="M0,0 h6.4 l-.6,.8 .6,.8 -.6,.8 .6,.8 -.6,.8 .6,.8 -.6,.8 .6,.6 H0 Z" fill="#c9ced8" stroke="#8e95a4" stroke-width=".4"/><circle cx="3" cy="3.2" r="1.9" fill="none" stroke="#e98fb6" stroke-width=".6"/><path d="M6.6,-.4 l1.4,-1.2 .4,1.6 Z" fill="#c9ced8"/></g>` : '';
+    dxG.innerHTML = (kind === 'park' ? '' : top(68, 168, hc, -8, .42) + top(226, 166, mc, 12, .44) + under + socks) + wrap +
+      `<g class="nt-steam">${[0, 1, 2].map(() => '<path fill="none" stroke="#ffd6e6" stroke-width="1.3" stroke-linecap="round"/>').join('')}</g><g></g><g></g><g></g>`;
+    steamEls = [...dxG.querySelectorAll('.nt-steam path')]; [swG, puffG, sfxG] = [...dxG.children].slice(-3);
+    wrG.innerHTML = '<path fill="none" stroke="#8f8676" stroke-width=".9" stroke-linecap="round" opacity="0"/>'; wrEl = wrG.firstChild;
+  }
+  // 효과음 글자: 침대 다리 삐걱, 헤드보드 쿵, 풀숲 바스락, 절정 부르르, 체위 바꿀 때 털썩
+  function sfxAt(txt, x, yy, k = 1) {
+    if (!sfxG) return;
+    const el = document.createElementNS(NS, 'text');
+    el.textContent = txt; el.setAttribute('class', 'nt-sfx'); el.setAttribute('text-anchor', 'middle');
+    sfxG.appendChild(el);
+    sfxs.push({ el, t0: t, x, y: yy, k, rot: (Math.random() - .5) * 22, life: .8 });
+    lastSfx = t;
+  }
+  function sweatAt(cnt) {
+    for (let j = 0; j < cnt; j++) {
+      const el = document.createElementNS(NS, 'path');
+      el.setAttribute('d', 'M0,-2.2 Q-1.5,.2 -1.3,1.1 Q0,2.2 1.3,1.1 Q1.5,.2 0,-2.2 Z'); el.setAttribute('fill', '#e3f5ff'); el.setAttribute('stroke', '#8cc5e6'); el.setAttribute('stroke-width', '.4');
+      swG.appendChild(el);
+      const x = actHip()[0] - 26 + Math.random() * 52, s2 = Math.random() < .5 ? -1 : 1;
+      sweats.push({ el, t0: t, x, y: at(y, x) - 2, vx: s2 * (8 + Math.random() * 22), vy: -(38 + Math.random() * 34), life: .7 + Math.random() * .35 });
+    }
+  }
+  function puffAt(x, yy) {
+    const el = document.createElementNS(NS, 'ellipse');
+    el.setAttribute('fill', '#fff'); puffG.appendChild(el);
+    puffs.push({ el, t0: t, x, y: yy, life: 1 });
+  }
+  function narrate() {
+    if (!NARR || !narEl) return;
+    const band = tier <= 1 ? 'low' : tier === 2 || ar < .6 ? 'mid' : 'high';
+    let pool;
+    if (t >= end) pool = NARR.after[good ? 'good' : 'bad'];
+    else if (t < peakUntil) pool = NARR.climax[peakKind] || NARR.climax.minor;
+    else if (t < 5) pool = NARR.start[good ? 'good' : 'bad'];
+    else if (Math.random() < .4 && NARR.pose[poseName]) pool = NARR.pose[poseName][band === 'low' ? 0 : 1];
+    else pool = NARR.band[band];
+    const txt = pickOf(pool);
+    if (!txt) return;
+    narEl.textContent = fillT(txt); narEl.classList.add('on'); narUntil = t + 4.4; lastNar = t;
+  }
+  function detailDraw() {
+    if (!dxBuilt) return;
+    if (fogEl) { fogEl.setAttribute('opacity', fogV.toFixed(3)); handEl.setAttribute('opacity', (handK * .9 * Math.min(1, fogV / .15)).toFixed(3)); }
+    // 열기 아지랑이 (달아오를수록 짙게, 이불 위로 흔들리며 올라감)
+    const so = good ? Math.max(0, Math.min(.5, (heat - .3) * .9)) : 0, hx = actHip()[0];
+    steamEls.forEach((el, j) => {
+      const x0 = hx - 22 + j * 22, y0 = at(y, Math.max(CX[0], Math.min(CX[n - 1], x0))) - 5, w = Math.sin(t * 2.1 + j * 2), w2 = Math.sin(t * 1.7 + j);
+      el.setAttribute('d', `M${f(x0)},${f(y0)} C${f(x0 + 4 * w)},${f(y0 - 8)} ${f(x0 - 4 * w2)},${f(y0 - 15)} ${f(x0 + 3 * w)},${f(y0 - 24)}`);
+      el.setAttribute('opacity', (so * (.6 + .4 * Math.sin(t * 1.3 + j))).toFixed(3));
+    });
+    // 시트를 움켜쥔 손 주름 (이불 밖으로 보이는 곳에서만)
+    const hh = P[her].hand, gx = hh[0], gy = Math.max(MY - 8, Math.min(MY + 6, hh[1]));
+    wrEl.setAttribute('d', [200, 232, 264, 296, 328].map((dg, j) => { const a = dg * Math.PI / 180, r0 = 2.5, r1 = 7 + (j % 2) * 3; return `M${f(gx + r0 * Math.cos(a))},${f(gy + r0 * Math.sin(a) * .5)} Q${f(gx + (r0 + r1) * .5 * Math.cos(a + .25))},${f(gy + (r0 + r1) * .5 * Math.sin(a + .25) * .5)} ${f(gx + r1 * Math.cos(a))},${f(gy + r1 * Math.sin(a) * .5)}`; }).join(''));
+    wrEl.setAttribute('opacity', (gripK * .85).toFixed(3));
+    for (let i = sfxs.length - 1; i >= 0; i--) {
+      const s2 = sfxs[i], k = (t - s2.t0) / s2.life;
+      if (k >= 1) { s2.el.remove(); sfxs.splice(i, 1); continue; }
+      const sc2 = s2.k * (k < .15 ? .6 + 3.6 * k : k < .3 ? 1.14 - (k - .15) : 1);
+      s2.el.setAttribute('transform', `translate(${f(s2.x)},${f(s2.y - 6 * k)}) rotate(${f(s2.rot)}) scale(${sc2.toFixed(3)})`);
+      s2.el.setAttribute('opacity', (k > .6 ? (1 - k) / .4 : 1).toFixed(2));
+    }
+    for (let i = sweats.length - 1; i >= 0; i--) {
+      const d = sweats[i], a = t - d.t0, k = a / d.life;
+      if (k >= 1) { d.el.remove(); sweats.splice(i, 1); continue; }
+      const vy = d.vy + 170 * a;
+      d.el.setAttribute('transform', `translate(${f(d.x + d.vx * a)},${f(d.y + d.vy * a + 85 * a * a)}) rotate(${f(Math.atan2(vy, d.vx) * 57.3 + 90)})`);
+      d.el.setAttribute('opacity', (k > .6 ? (1 - k) / .4 : 1).toFixed(2));
+    }
+    for (let i = puffs.length - 1; i >= 0; i--) {
+      const d = puffs[i], k = (t - d.t0) / d.life;
+      if (k >= 1) { d.el.remove(); puffs.splice(i, 1); continue; }
+      d.el.setAttribute('cx', f(d.x + 6 * k)); d.el.setAttribute('cy', f(d.y - 7 * k)); d.el.setAttribute('rx', f(2.2 + 5 * k)); d.el.setAttribute('ry', f(1.5 + 3 * k));
+      d.el.setAttribute('opacity', ((1 - k) * .32).toFixed(3));
+    }
+  }
+  function detailVis(on) {
+    for (const g of [fogG, wrG, dxG]) if (g) g.style.display = on ? '' : 'none';
+    if (narEl) narEl.hidden = !on;
+    if (hudEl) hudEl.hidden = !on;
+  }
   // 받는 쪽 더미의 반응 (섹스 기술 등급 × 달아오른 정도). mine: 상대가 움직이는 쪽(기승위 등)이면 마중 대신 골반을 더 굴림
   function herMotion(J, mine, dir) {
     const R = REACT[Math.max(0, Math.min(8, gi))], e = (good ? .35 + .65 * ar : .3) * (t < end ? 1 : Math.max(0, 1 - (t - end) / SLUMP));
@@ -694,7 +820,11 @@ function run(stage, job, done) {
   }
   function poseNow() {
     pi = Math.min(pi, plan.poses.length - 1);
-    while (pi < plan.poses.length - 1 && t >= plan.poses[pi + 1].at) { pi++; poseName = plan.poses[pi].name; stage.dataset.pose = poseName; showPose(); if (face) face.dataset.view = (VIEW[poseName] || VIEW.missionary).v; }
+    while (pi < plan.poses.length - 1 && t >= plan.poses[pi + 1].at) {
+      pi++; poseName = plan.poses[pi].name; stage.dataset.pose = poseName; showPose(); if (face) face.dataset.view = (VIEW[poseName] || VIEW.missionary).v;
+      stats.poses.push(poseName);
+      if (DETAIL && P) sfxAt('털썩', actHip()[0], at(y, actHip()[0]) - 12, 1.05);
+    }
     const cur = POSES[poseName](ms, M, F), at0 = plan.poses[pi].at;
     return pi && t - at0 < 1.1 ? blendPose(POSES[plan.poses[pi - 1].name](ms, M, F), cur, ease((t - at0) / 1.1)) : cur;
   }
@@ -764,6 +894,13 @@ function run(stage, job, done) {
   function climax(s) {
     const ty = s.her, big = ty === 'major', mid = ty === 'mid', amp = .65 + .045 * gi;   // 등급이 높을수록 반응이 큼
     if (SY) say(pickOf(SY.climax[ty]), 'peak', big ? 2.2 : 1.5);
+    if (face) { face.classList.remove('flash'); void face.offsetWidth; face.classList.add('flash'); }   // 절정 순간에만 번쩍 (헉·움찔로 표정이 바뀔 때마다 번쩍이지 않게)
+    if (DETAIL) {
+      const hx = P[her].hip[0];
+      sfxAt(big ? '부르르르…' : mid ? '부르르' : '움찔', hx, at(y, Math.max(CX[0], Math.min(CX[n - 1], hx))) - 16, big ? 1.3 : mid ? 1.1 : .9);
+      if (big) handOn = true;
+      if (t - lastNar > 1.2) lastNar = -9;   // 절정 내레이션을 바로
+    }
     ar = Math.max(.35, ar * (big ? .7 : .85));   // 절정 뒤엔 잠깐 가라앉았다 다시
     react = { t0: t, hold: s.t0 + s.T + (big ? .9 : mid ? .4 : 0), k: (big ? 1 : mid ? .62 : .3) * amp };
     peakUntil = Math.max(peakUntil, s.t0 + s.T + (big ? 1.6 : mid ? 1.1 : .5));
@@ -789,9 +926,21 @@ function run(stage, job, done) {
     if (!s.her) {
       const fr = force / lim, sizeK = fr > 1 ? .45 : fr > .8 ? 1.3 : fr > .45 ? 1 : .55;
       ar = Math.min(1, ar + .04 * (.35 + gi * .13) * sizeK * (good ? 1 : .35) * (s.kind === 'n' ? 1 : 1.6));
-      if (fr > 1) { figVY -= 45 * str; jolt -= .5; if (t - lastPop > .5) pop('!', 'ow'); if (SY && t - lastSay > 1.2 && Math.random() < .6) say(pickOf(SY.ouch), 'ow', 1.1); }
-      else if (good && fr > .8 && (s.kind !== 'n' || Math.random() < .1 + gi * .03)) { gaspAt = t; jolt += .4; if (t - lastPop > .6) pop(ar > .5 ? '♡' : '!?', 'gasp'); if (SY && t - lastSay > 1 && Math.random() < .5) say(pickOf(SY.gasp), 'gasp', .9); }
+      lastFr = fr;
+      if (fr > 1) { stats.ouch++; figVY -= 45 * str; jolt -= .5; if (t - lastPop > .5) pop('!', 'ow'); if (SY && t - lastSay > 1.2 && Math.random() < .6) say(pickOf(SY.ouch), 'ow', 1.1); }
+      else if (good && fr > .8 && (s.kind !== 'n' || Math.random() < .1 + gi * .03)) { stats.gasp++; gaspAt = t; jolt += .4; if (t - lastPop > .6) pop(ar > .5 ? '♡' : '!?', 'gasp'); if (SY && t - lastSay > 1 && Math.random() < .5) say(pickOf(SY.gasp), 'gasp', .9); }
+      // 디테일: 내가 남긴 자국이 하나씩 (목 → 쇄골 → 가슴 위 → 어깨 손자국은 아주 달아올랐을 때)
+      if (DETAIL && good && s.kind !== 'n' && ar > .45 && t - lastMk > 3 && mkN < (ar > .8 ? 7 : 6) && Math.random() < .5) { mkN++; lastMk = t; pop('💋', 'love'); }
     }
+    if (DETAIL && t - lastSfx > (s.kind === 'n' ? .5 : .2)) {   // 효과음 글자
+      const hard = s.kind !== 'n';
+      if (park) { if (hard || Math.random() < .2 + heat * .3) sfxAt('바스락', 90 + Math.random() * 160, 146 + Math.random() * 10, .85); }
+      else {
+        if (hard || Math.random() < .16 + heat * .38) sfxAt(Math.random() < .6 ? '삐걱' : '끼익', Math.random() < .5 ? 60 : 276, 162, .85);
+        if (HEADB && KNOCK[poseName] && (hard || (heat > .6 && Math.random() < .22))) sfxAt('쿵', HEADB[0] + Math.random() * 4, HEADB[1], hard ? 1.3 : 1);
+      }
+    }
+    if (DETAIL && good && s.kind !== 'n' && heat > .4 && swG) sweatAt(2);
     jyV += (s.kind === 'n' ? 7 : 22) * str; jxV -= (s.kind === 'n' ? 2.5 : 9) * str;
     const pu = PUSH[poseName] || [0, -1], mine = P.act === her;   // 초상화 인물: 받는 쪽이면 크게 밀리고, 움직이는 쪽이면 내려앉으며 쿵
     figVX += pu[0] * (mine ? 18 : 120) * str; figVY += (mine ? 70 : pu[1] * 120) * str;
@@ -829,6 +978,10 @@ function run(stage, job, done) {
       if (env <= 0 && t > react.hold) react = null;
       else headReact(P.f, react.k * env, BURY[poseName], react.k * env * 1.3 * Math.sin(a * 92), react.k * env * .9 * Math.cos(a * 117));
     }
+    if (DETAIL && !settle) {   // 발끝이 오므라듦 (절정·아주 달아올랐을 때)
+      const J = P[her], c = react ? Math.min(1, react.k * 1.6) : Math.max(0, (ar - .8) * 3) * (.5 + .5 * Math.sin(t * 2.3));
+      if (c > 0 && J.toe && J.ankle) J.toe = lerp(J.toe, add(J.ankle, sub(J.toe, J.ankle), .55), c * .8);
+    }
     capsM = caps(M, P.m); capsF = caps(F, P.f);
     if (!settle) {
       // 초상화 인물: 움직이는 쪽이면 d(빼는 정도)를 따라 오르내림(좌위는 작은 원, 역기승위·뒤로 앉기는 살짝 앞뒤), 받는 쪽이면 제자리로 돌아오는 용수철. 끝나면 숨 고르기
@@ -856,7 +1009,20 @@ function run(stage, job, done) {
       // 말풍선: 달아오를수록 자주. 소리 65% / 말 35% (만족감 단계별, tier 3 이상이면 가끔 성격별 말)
       if (SY && t < end && t > 1.2 && t - lastSay > (good ? 3.4 - ar * 1.7 : 4.6) && t >= peakUntil) {
         if (Math.random() < .65) say(pickOf(SY.moan[!good ? 'bad' : ar < .3 ? 'low' : ar < .65 ? 'mid' : 'high']), 'moan', 1.2);
-        else say(tier >= 3 && SY.pers[p.personality] && Math.random() < .3 ? SY.pers[p.personality] : pickOf(SY.line[tier]), '', 1.8);
+        else say(tier >= 3 && SY.pers[p.personality] && Math.random() < .3 ? SY.pers[p.personality] : pickOf(DETAIL && SY.more ? SY.line[tier].concat(SY.more[tier] || []) : SY.line[tier]), '', 1.8);   // 디테일: 이름 부르기 등이 섞임
+      }
+      stats.maxPl = Math.max(stats.maxPl, pv);
+      if (DETAIL) {
+        // 숨: 달아오를수록 빠르게 (절정·끝난 뒤엔 더 가쁘게). 내쉴 때 이불 장면 머리맡에 숨결
+        brPh += DT * 6.283 * (.35 + ar * .9 + (t < peakUntil ? .5 : 0) + (t > end && t < end + 3 ? .4 : 0));
+        const bs = Math.sin(brPh);
+        if (brS > 0 && bs <= 0 && (ar > .3 || t > end) && puffG) { const hd2 = P[her].head; puffAt(hd2[0] + 4, hd2[1] - 6); }
+        brS = bs;
+        fogV = Math.min(.42, fogV + DT * (good ? .0022 + heat * .006 : .0006));
+        handK += ((handOn ? 1 : 0) - handK) * Math.min(1, DT * 2.5);
+        gripK += (((t < end && good) ? Math.max(0, Math.min(1, (ar - .55) * 2.4), t < peakUntil ? 1 : 0) : 0) - gripK) * Math.min(1, DT * 4);
+        if (good && t < end && heat > .5 && swG && t - lastSweat > 1 - heat * .6) { lastSweat = t; sweatAt(1); }
+        if (t > .8 && (t - lastNar > 5.4 || (t >= end && !narAfter && t > end + .9))) { if (t >= end) narAfter = true; if (t < end || narAfter) narrate(); }
       }
     }
     for (const b of blobs) {
@@ -898,6 +1064,7 @@ function run(stage, job, done) {
       if (good) heart(actHip()[0], at(y, actHip()[0]) - 14, { big: true, s: 1.4 + .3 * tier, life: 1.8, dy: -24 });
       else letdown();
       if (SY) say(pickOf(SY.end[good ? 'good' : 'bad']), good ? 'peak' : '', 2.4);
+      if (DETAIL) sfxAt(good ? '털썩' : '…', actHip()[0], at(y, actHip()[0]) - 14, 1.1);
     }
   }
   // 상대 표정 (관계 중 초상화)
@@ -917,6 +1084,8 @@ function run(stage, job, done) {
   }).join('');
   const hemY = x => 150 - 17 * Math.exp(-(((x - 66) / 22) ** 2)) + .9 * Math.sin(x * .13 + .6) + FOLDS.reduce((s, [c, lean]) => s + 1.6 * Math.exp(-(((x - c - lean) / 6) ** 2)), 0) + at(hemL, x);
   function draw() {
+    if (dxOn !== DETAIL) { dxOn = DETAIL; if (DETAIL && !dxBuilt) buildDetail(); detailVis(DETAIL); faceKey = ''; }   // 디테일 켜고 끔 (초상화도 다시 그림)
+    if (DETAIL) detailDraw();
     const top = CX.map((x, i) => [x, y[i]]), hem = Array.from({ length: 9 }, (_, i) => { const x = 284 - 216 * i / 8; return [x, hemY(x)]; });
     const l = top[0], r = top[n - 1], hr = hem[0], hl = hem[8];
     // 공원 덤불은 윗선을 잎 뭉치처럼 오돌토돌하게 (두 점마다 위로 볼록한 호)
@@ -945,11 +1114,18 @@ function run(stage, job, done) {
     const ago = t - shakeAt, sk = ago < .6 ? 1.5 * shakeK * Math.exp(-ago * 10) : 0;
     const cx = sk * Math.sin(ago * 95), cy = sk * .6 * Math.sin(ago * 120 + 1);
     cam.setAttribute('transform', sk > .02 ? `translate(${f(cx)},${f(cy)})` : '');
-    bed.setAttribute('transform', `translate(${jx.toFixed(2)},${jy.toFixed(2)})`);
+    const bk = DETAIL ? 1.8 : 1;   // 디테일: 침대가 더 크게 흔들림
+    bed.setAttribute('transform', `translate(${(jx * bk).toFixed(2)},${(jy * bk).toFixed(2)})`);
     warm.setAttribute('opacity', Math.min(1, Math.max(heat * .9, flashK)).toFixed(3));
     // 쾌락 게이지·말풍선
     if (plBar) { const v = Math.round(pv * 100); if (v !== pvShown) { pvShown = v; plBar.style.width = v + '%'; plNum.textContent = v; plEl.classList.toggle('hot', v >= 80); } }
     if (sayEl && t > sayUntil && sayEl.classList.contains('on')) sayEl.classList.remove('on');
+    if (narEl && t > narUntil && narEl.classList.contains('on')) narEl.classList.remove('on');
+    if (DETAIL && hudEl && t - hudAt > .2) {   // 테스트 수치
+      hudAt = t;
+      const b = S[si], bpm = b && b.kind === 'n' && b.T ? Math.round(60 / b.T) : 0;
+      hudEl.textContent = `${gradeTxt} · ${cm}cm 궁합 ${Math.round(lastFr * 100)}% · ${bpm ? bpm + 'bpm' : b ? b.kind : ''} · 달아오름 ${Math.round(ar * 100)} · 만족 ${sc.sat ?? '?'} · 자국 ${mkN}`;
+    }
     // 시계 (화면 1초 = 6초)
     if (clockEl) { const gs = Math.floor(Math.min(t, end) * SPEED), txt = `⏱ ${Math.floor(gs / 60)}:${String(gs % 60).padStart(2, '0')}${warpTo > t ? ' ⏩' : ''}`; if (txt !== clockTxt) { clockTxt = txt; clockEl.textContent = txt; } }
     for (let i = hearts.length - 1; i >= 0; i--) {
@@ -966,14 +1142,28 @@ function run(stage, job, done) {
       if (key !== faceKey) {
         faceKey = key; face.dataset.key = key;
         const du = key === 'major' ? { lv: 3, major: true, tongue: gi >= 7 } : key[0] === 'p' && key.length === 2 ? { lv: +key[1] } : { mood: key };   // 대절정: SS 이상이면 혀까지
-        face.innerHTML = Avatar.render(G.look(p), 110, { age: G.npcAge(p), during: Object.assign(du, { personality: p.personality, fig: sc.fig }) });
+        face.innerHTML = Avatar.render(G.look(p), 110, { age: G.npcAge(p), during: Object.assign(du, { personality: p.personality, fig: sc.fig, detail: DETAIL ? { lip: lipMe } : null }) });
         figEl = face.querySelector('.av-fig'); headEls = [...face.querySelectorAll('.av-head, .av-hb')]; bustEl = face.querySelector('.av-bust');
         if (bustEl) { bustK = +bustEl.dataset.k || 1; bustCy = +bustEl.dataset.cy || 0; }
+        const all = c => [...face.querySelectorAll(c)];
+        dx = DETAIL ? { flush: all('.av-flush'), swt: all('.av-swt'), damp: all('.av-damp'), breath: all('.av-breath'), mk: all('.av-mk'), mkShown: -1 } : null;
       }
       face.classList.toggle('peak', t < peakUntil || (key === 'p3' && good));   // 절정: 초상화가 확 바뀌며 분홍빛으로 반짝
       face.classList.toggle('big', key === 'major');
       // 칸은 고정, 안의 인물이 움직임: 몸(이불째) → 머리(살짝 늦게, 절정엔 젖혀짐) → 가슴(출렁)
-      if (figEl) figEl.setAttribute('transform', `translate(${f(vw.x + figX)},${f(vw.y + figY)}) translate(60 104) rotate(${f(vw.r)}) scale(${vw.k.toFixed(3)}) translate(-60 -104)`);
+      const brY = DETAIL ? Math.sin(brPh) * (.5 + ar * 1.2) : 0;   // 디테일: 가쁜 숨에 어깨가 오르내림
+      if (figEl) figEl.setAttribute('transform', `translate(${f(vw.x + figX)},${f(vw.y + figY + brY)}) translate(60 104) rotate(${f(vw.r)}) scale(${vw.k.toFixed(3)}) translate(-60 -104)`);
+      if (dx) {   // 디테일: 홍조·땀·젖은 머리·숨결·자국
+        const fl = Math.min(1, (good ? ar * 1.05 : ar * .4) + (t < peakUntil ? .25 : 0) + (t >= end ? satV * .45 : 0));
+        const sw = Math.min(1, Math.min(1, t / Math.max(20, end * .6)) * (good ? .85 : .35) + (t < peakUntil ? .25 : 0));
+        dampV = Math.max(dampV, Math.min(1, (ar - .4) * 1.8 + (t >= end && good ? .5 : 0)));
+        const brO = ar > .2 || t > end ? Math.max(0, -Math.sin(brPh)) ** 2 * (.25 + ar * .75) : 0;
+        for (const el of dx.flush) el.setAttribute('opacity', fl.toFixed(2));
+        for (const el of dx.swt) el.setAttribute('opacity', sw.toFixed(2));
+        for (const el of dx.damp) el.setAttribute('opacity', dampV.toFixed(2));
+        for (const el of dx.breath) el.setAttribute('opacity', brO.toFixed(2));
+        if (dx.mkShown !== mkN) { dx.mkShown = mkN; dx.mk.forEach(el => el.setAttribute('opacity', +el.dataset.i < mkN ? 1 : 0)); }
+      }
       const tilt = hdR * (P && P.act === her ? 7 : -9) + (2 + ar * 5) * Math.sin(t * 1.3) * .3 - jolt * 8;   // 달아오를수록 고개가 더 움직이고, 헉·움찔엔 젖혀졌다 숙여짐
       for (const el of headEls) el.setAttribute('transform', `translate(0,${f(hd)}) rotate(${f(tilt)} 60 104)`);
       if (bustEl) { const ly = bY * bustK, sy = 1 - bY * .03; bustEl.setAttribute('transform', `translate(0,${ly.toFixed(2)}) translate(60 ${bustCy}) scale(${(1 + bY * .012).toFixed(4)} ${sy.toFixed(4)}) translate(-60 ${-bustCy})`); }
@@ -1062,7 +1252,9 @@ function run(stage, job, done) {
 }
 
 window.Night = {
-  html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div><div class="nt-pops"></div><div class="nt-say"></div><div class="nt-pl" title="쾌락"><span>💗 쾌락</span><em><i></i></em><b>0</b></div>${SYM}</div>`,
+  html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div><div class="nt-pops"></div><div class="nt-say"></div><div class="nt-pl" title="쾌락"><span>💗 쾌락</span><em><i></i></em><b>0</b></div>${SYM}<div class="nt-nar"></div><div class="nt-hud"></div></div>`,
+  detail: () => DETAIL, setDetail: on => { DETAIL = !!on; try { localStorage.setItem('llife.ntDetail', DETAIL ? '1' : '0'); } catch (e) { /* 무시 */ } return DETAIL; },
+  forcePose: name => { FORCE_POSE = name && POSES[name] ? name : null; }, lastStats: () => (LAST ? LAST() : null), resetStats: () => { LAST = null; },
   rate: () => RATE, setRate: r => { RATE = [1, 2, 4, 8].includes(+r) ? +r : 1; try { localStorage.setItem('llife.ntRate', RATE); } catch (e) { /* 무시 */ } return RATE; },
   foreplay, uterus, alley,
   run, stop: () => { cancelAnimationFrame(raf); ender = skipper = null; }, finish: () => !!ender && ender(), skip: () => !!skipper && skipper(),

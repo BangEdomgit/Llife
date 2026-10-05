@@ -1679,7 +1679,7 @@ const tierOf = v => v >= 90 ? 4 : v >= 70 ? 3 : v >= 50 ? 2 : v >= 30 ? 1 : 0;
 // 맨몸 상반신 (전신 앵커, 전신 px 좌표): 팔(몸통 뒤) → 몸통 → 쇄골·겨드랑이 경계 → 가슴
 //   여자: 가슴 자리(꼭짓점 ±bx, 반지름 r)에만 윤곽선 + 입체 그림자 / 남자: 가슴 근육
 const BUST_MARK = '<!--bust-->';
-function bareTorso(a, A, skin, id) {
+function bareTorso(a, A, skin, id, dx) {
   const { y, w } = A, k = A.hs, { uw } = A.arm, female = a.g === 'f', sk = v => shade(skin, v), ny = y.neck;
   const ln = (d, c, wd, op) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${f1(wd * k)}" stroke-linecap="round" opacity="${op}"/>`;
   const jx = w.sh - uw / 2, jy = y.sh + uw * .45, capR = uw / 2 + (A.adult && !female ? (A.fitM ? 2.5 : 1.2) : 0);
@@ -1720,6 +1720,12 @@ function bareTorso(a, A, skin, id) {
     }).join('');
     o += `<ellipse cx="60" cy="${f1(cy - r * .08)}" rx="${f1(1.6 * k + Math.max(0, gap) * .7)}" ry="${f1(r * .7)}" fill="url(#${gid}v)"/>` +   // 가슴골
       ln(`M${f1(60 - gap * .4)},${f1(cy - r * .6)} Q60,${f1(cy - r * .2)} ${f1(60 + gap * .4)},${f1(cy - r * .6)}`, sk(.62), .8, gap > 2 * k ? 0 : .25);
+    if (dx) {   // 디테일(테스트): 가슴 윗면 땀 윤기·방울, 가슴골로 흐르는 한 방울 (js/night.js가 세기 조절)
+      o += `<g class="av-swt" opacity="0">` + [-1, 1].map(s => `<ellipse cx="${f1(60 + s * (bx - r * .28))}" cy="${f1(cy - r * .62)}" rx="${f1(r * .16)}" ry="${f1(r * .055)}" transform="rotate(${s * -18} ${f1(60 + s * (bx - r * .28))} ${f1(cy - r * .62)})" fill="#fff" opacity=".7"/>` +
+        `<ellipse cx="${f1(60 + s * (bx + r * .3))}" cy="${f1(cy - r * .2)}" rx="${f1(r * .06)}" ry="${f1(r * .04)}" fill="#fff" opacity=".8"/>`).join('') +
+        `<path d="M60,${f1(cy - r * .78)} q-.9,1.6 -.7,2.5 q.7,.9 1.4,0 q.2,-.9 -.7,-2.5 Z" transform="translate(0 0) scale(1)" fill="#e9f6ff" stroke="${sk(.7)}" stroke-width=".35" opacity=".9"/>` +
+        ln(`M60,${f1(cy - r * .74)} L60,${f1(cy - r * .2)}`, '#fff', .5, .35) + '</g>';
+    }
     o = o.replace(BUST_MARK, `<g class="av-bust" data-cy="${f1(cy)}" data-r="${f1(r)}" data-k="${k.toFixed(4)}">`) + '</g>';   // 가슴 (함께 밤을 보내는 중엔 js/night.js가 출렁이게 함)
   } else if (A.adult) {
     // 가슴 근육 아랫선 + 아래 그림자 + 가운데 오목한 선
@@ -1727,6 +1733,16 @@ function bareTorso(a, A, skin, id) {
     o += ln([-1, 1].map(s => `M${f1(60 + s * w.rib * .88)},${f1(y.armpit + 2 * k)} Q${f1(60 + s * w.rib * .5)},${f1(y.bust + 4.5 * k)} ${f1(60 + s * 1.2 * k)},${f1(y.bust + 1.6 * k)}`).join(' '), sk(.68), 1.3, .4);
     o += bustVolume(id + 'b', px, py, pr, sk(.55), A.fitM ? .26 : .18, false, k);
     o += ln(`M60,${f1(ny + 8 * k)} L60,${f1(y.bust + 2 * k)}`, sk(.66), 1.3, .18);
+  }
+  if (dx && A.adult) {
+    // 디테일(테스트): 달아오를수록 목 아래·가슴 위로 번지는 홍조, 쇄골·어깨·가슴 위 땀 윤기 (js/night.js가 opacity를 바꿈)
+    const fy = lerp(ny, y.bust, .46);
+    o += `<defs><radialGradient id="${id}fl" cx=".5" cy=".42" r=".5"><stop offset="0" stop-color="#ff5f7e" stop-opacity=".32"/><stop offset=".6" stop-color="#ff6f8a" stop-opacity=".16"/><stop offset="1" stop-color="#ff6f8a" stop-opacity="0"/></radialGradient></defs>` +
+      `<ellipse class="av-flush" cx="60" cy="${f1(fy)}" rx="${f1(w.sh * .92)}" ry="${f1((y.bust - ny) * .82)}" fill="url(#${id}fl)" opacity="0"/>`;
+    const gl = (x, yy, rx, rot, op = .7) => `<ellipse cx="${f1(x)}" cy="${f1(yy)}" rx="${f1(rx)}" ry="${f1(rx * .32)}" transform="rotate(${rot} ${f1(x)} ${f1(yy)})" fill="#fff" opacity="${op}"/>`;
+    const drop = (x, yy, kk) => `<path d="M${f1(x)},${f1(yy)} q${f1(-1.1 * kk)},${f1(1.9 * kk)} ${f1(-.9 * kk)},${f1(2.9 * kk)} q${f1(.9 * kk)},${f1(1.1 * kk)} ${f1(1.8 * kk)},0 q${f1(.2 * kk)},${f1(-1 * kk)} ${f1(-.9 * kk)},${f1(-2.9 * kk)} Z" fill="#e9f6ff" stroke="${sk(.7)}" stroke-width="${f1(.35 * k)}" opacity=".9"/>`;
+    o += `<g class="av-swt" opacity="0">` + [-1, 1].map(s => gl(60 + s * cl * .55, cy0 + 3.2 * k, 2.6 * k, s * 10) + gl(60 + s * (w.tip - 3 * k), y.sh + 3 * k, 3 * k, s * -30, .55) + gl(60 + s * (w.armpit - 4 * k), y.armpit + 1.5 * k, 2 * k, s * 70, .45)).join('') +
+      drop(60 + cl * .35, cy0 + 5 * k, 1.1 * k) + drop(60 - (w.tip - 6 * k), y.sh + 6 * k, 1 * k) + (female ? '' : drop(60 + 4 * k, y.bust - 4 * k, 1.1 * k)) + '</g>';
   }
   return o + '</g>';
 }
@@ -1736,7 +1752,7 @@ function bareBody(a, A, skin, o) {
   const id = `av${UID}`, hs = A.hs, hw = A.w.sh / hs - 3, L = f1(60 - hw), R = f1(60 + hw), nh = A.w.nh / hs, nl = 60 - nh, nr = 60 + nh, by = o.by;
   const ln = (d, c, w, op) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`;
   const sk = k => shade(skin, k), notch = (A.y.neck - A.hty) / hs + 5;
-  let s = `<g transform="scale(${(1 / hs).toFixed(4)}) translate(${f1(-A.htx)},${f1(-A.hty)})">${bareTorso(a, A, skin, id)}</g>`;
+  let s = `<g transform="scale(${(1 / hs).toFixed(4)}) translate(${f1(-A.htx)},${f1(-A.hty)})">${bareTorso(a, A, skin, id, o.dx)}</g>`;
   s += `<defs><linearGradient id="${id}q" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dcbde6"/><stop offset=".5" stop-color="#b48bc6"/><stop offset="1" stop-color="#8c66a3"/></linearGradient></defs>`;
   s += ln(`M${f1(nl + 1.5)},101 Q${f1(nl + 3)},${f1(notch - 6)} 58.4,${f1(notch)} M${f1(nr - 1.5)},101 Q${f1(nr - 3)},${f1(notch - 6)} 61.6,${f1(notch)}`, sk(.72), 1, .22);   // 목 근육
   // 자국: 목·쇄골의 립스틱, 어깨의 손톱 자국
@@ -1747,6 +1763,7 @@ function bareBody(a, A, skin, o) {
   const hickey = (x, y) => `<ellipse cx="${x}" cy="${y}" rx="3.3" ry="2.5" fill="#9c3a55" opacity=".24"/><ellipse cx="${x}" cy="${y}" rx="2" ry="1.5" fill="#b0425f" opacity=".3"/>`;
   if (o.hickey && o.marks >= 3) s += [[54, 108], [66, 112], [57, 116], [f1(+R - 16), 126]].slice(0, o.marks >= 4 ? 4 : 2).map(([x, y]) => hickey(x, y)).join('');
   if (o.hickey && o.marks >= 4) s += [-1, 1].map(k => [0, 1, 2, 3, 4].map(i => `<ellipse cx="${f1(+L + 12 + i * 1.8)}" cy="${f1(128 + k * (2.2 - Math.abs(i - 2) * .45))}" rx=".7" ry=".5" fill="#c86a70" opacity=".45"/>`).join('')).join('');
+  if (o.dx) s += detailBody(o.dx, { id, L, R, nh, notch });
   if (o.noQuilt) return s;
   // 이불(밤과 같은 라벤더 이불): 살 위 그림자 → 이불 → 접힌 단 → 주름 → 윗선 하이라이트
   const top = `M0,${by + 5} C18,${by - 3} 38,${by + 3} 60,${by} C80,${by - 3} 102,${by + 4} 120,${by - 1}`;
@@ -1764,6 +1781,25 @@ function bareBody(a, A, skin, o) {
       [-4.3, -1.45, 1.45, 4.3].map((d, k) => `<ellipse cx="${f1(x + d)}" cy="${f1(by + 1.8 - (k % 3 ? 0 : .7))}" rx="1.5" ry="2.9" fill="${skin}" stroke="${sk(.72)}" stroke-width=".6"/>`).join('') +
       ln(`M${x - 5},${by - 1.6} Q${x},${by - 3} ${x + 5},${by - 1.6}`, sk(.74), .7, .5)).join('');
   }
+  return s;
+}
+// 디테일(테스트) — 목의 홍조, 내가 남긴 자국(목 → 쇄골 → 가슴 위 → 어깨 손톱자국, 차례로 드러남). 머리 좌표
+//   dx: { lip(내가 여자 → 립스틱 입술 자국, 아니면 키스 자국), shown(아침: 이만큼 자국을 보여 줌) }
+//   js/night.js가 .av-flush / .av-mk[data-i] 를 켜고 끔
+const MARK_AT = [[54, 108, -8], [66, 112, 12], [57, 117, 4], [47, 126, 14], [0, 128, -18], [66, 138, 8], [0, 0, 0]];
+function detailBody(dx, g) {
+  const { id, L, R, nh, notch } = g;
+  let s = `<defs><radialGradient id="${id}nf" cx=".5" cy=".55" r=".55"><stop offset="0" stop-color="#ff5f7e" stop-opacity=".3"/><stop offset="1" stop-color="#ff6f8a" stop-opacity="0"/></radialGradient>` +
+    `<clipPath id="${id}nk"><rect x="${f1(60 - nh)}" y="94" width="${f1(nh * 2)}" height="${f1(notch - 94 + 4)}"/></clipPath></defs>` +
+    `<g clip-path="url(#${id}nk)"><ellipse class="av-flush" cx="60" cy="${f1(notch - 6)}" rx="${f1(nh * 1.3)}" ry="12" fill="url(#${id}nf)" opacity="0"/></g>`;
+  const kiss = (x, y, r) => `<path d="M${x - 4},${y} q2,-2.5 4,0 q2,-2.5 4,0 q-2,3.5 -4,3.5 q-2,0 -4,-3.5 Z" fill="#c43c4f" opacity=".6" transform="rotate(${r} ${x} ${y})"/><path d="M${x - 3.4},${y + .4} H${x + 3.4}" stroke="#8e2333" stroke-width=".5" opacity=".5" transform="rotate(${r} ${x} ${y})"/>`;
+  const hickey = (x, y) => `<ellipse cx="${x}" cy="${y}" rx="2.8" ry="2.1" fill="#9c3a55" opacity=".2"/><ellipse cx="${x}" cy="${y}" rx="1.6" ry="1.2" fill="#b0425f" opacity=".26"/>`;
+  const fingers = x => [0, 1, 2, 3].map(i => `<path d="M${f1(x + i * 2.4)},${f1(129 + i * .5)} q.6,3.2 .2,6" fill="none" stroke="#d0606e" stroke-width="1.3" stroke-linecap="round" opacity=".42"/>`).join('');
+  const shown = dx.shown || 0;
+  s += MARK_AT.map(([x, y, r], i) => {
+    const X = i === 4 ? +R - 14 : x, art = i === 6 ? fingers(+L + 7) : dx.lip ? kiss(X, y, r) : hickey(X, y);
+    return `<g class="av-mk" data-i="${i}" opacity="${i < shown ? 1 : 0}">${art}</g>`;
+  }).join('');
   return s;
 }
 // 흐트러진 머리: 뿌리는 굵고 끝은 가는 삐친 가닥들
@@ -2083,6 +2119,16 @@ function headSVG(a, X, age, st, g) {
     if (pk && pk.sweat) o += SWEAT(84, 54, .75) + (pk.sweat > 1 ? SWEAT(35, 60, .6) : '');
     if (mood === 'bliss') o += SPARKLE(30, 40, 1.1) + SPARKLE(92, 64, .8);
     if (mood === 'disappointed') o += SWEAT(88, 44, 1.7);
+    if (du.detail) {
+      // 디테일(테스트): 얼굴 전체로 번지는 홍조, 이마·관자놀이 땀, 이마·볼에 달라붙은 젖은 머리 가닥, 입가 숨결 (js/night.js가 opacity를 바꿈)
+      o += `<defs><radialGradient id="${fid}fl" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ff5f7e" stop-opacity=".26"/><stop offset=".7" stop-color="#ff6f8a" stop-opacity=".12"/><stop offset="1" stop-color="#ff6f8a" stop-opacity="0"/></radialGradient>` +
+        `<radialGradient id="${fid}br" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>` +
+        `<g clip-path="url(#${fid}c)"><ellipse class="av-flush" cx="60" cy="80" rx="30" ry="17" fill="url(#${fid}fl)" opacity="0"/></g>`;
+      o += `<g class="av-swt" opacity="0">${SWEAT(43, 55, .6)}${SWEAT(78, 58, .55)}${SWEAT(36, 74, .5)}<ellipse cx="56" cy="51" rx="3.2" ry=".9" fill="#fff" opacity=".55"/><ellipse cx="66" cy="53" rx="2" ry=".6" fill="#fff" opacity=".45"/>${G(L && L.noseT, '<ellipse cx="60.6" cy="82.2" rx="1" ry=".55" fill="#fff" opacity=".7"/>')}</g>`;
+      const strand = (pts, w) => { const [[bx, by], [cx, cy], [tx, ty]] = pts, dx = tx - bx, dy = ty - by, l = Math.hypot(dx, dy), px = -dy / l * w, py = dx / l * w; return `<path d="M${P(bx + px, by + py)} Q${P(cx + px * .5, cy + py * .5)} ${P(tx, ty)} Q${P(cx - px * .5, cy - py * .5)} ${P(bx - px, by - py)} Z" fill="${hc}"/>`; };
+      o += `<g class="av-damp" opacity="0">${strand([[53, 44], [49, 56], [52, 67]], 1.1)}${strand([[57, 45], [58, 55], [55, 62]], .8)}${strand([[38, 60], [37, 74], [44, 88]], 1)}${strand([[82, 58], [84, 70], [77, 83]], .9)}</g>`;
+      o += G(L && L.mouthT, `<g class="av-breath" opacity="0"><ellipse cx="70" cy="93.5" rx="2.6" ry="1.8" fill="url(#${fid}br)" opacity=".7"/><ellipse cx="75.5" cy="91.5" rx="3.4" ry="2.3" fill="url(#${fid}br)" opacity=".5"/><ellipse cx="81.5" cy="89" rx="4.2" ry="2.8" fill="url(#${fid}br)" opacity=".32"/></g>`);
+    }
   }
   // 안경 (눈 간격·크기를 따라감)
   o += G(L && a.glasses && L.glassT, glassesSVG(a.glasses, X.glc));
@@ -2202,7 +2248,7 @@ function renderPortrait(a, size, st, crop) {
     const shy = (af || du).personality === 'shy', apex = toHead(A.y.bust);
     const by = Math.round(a.g === 'f' ? apex - (af ? [7, 6, 5, 4, 3][tier] : 4) - (shy ? 2 : 0) : apex + (af ? [-4, -3, -2, -1, 0][tier] : -1) - (shy ? 2 : 0));
     cut = du ? 0 : by + 2;   // 함께 밤을 보내는 중엔 이불 없이 (다음 날 아침엔 이불)
-    o += neck(skin) + bareBody(a, A, skin, { by, marks: af ? tier : 0, lipstick: af && af.lipstick, hickey: af && af.hickey, clutch: shy && !du, noQuilt: !!du });
+    o += neck(skin) + bareBody(a, A, skin, { by, marks: af ? tier : 0, lipstick: af && af.lipstick, hickey: af && af.hickey, clutch: shy && !du, noQuilt: !!du, dx: (af || du).detail || null });
   } else {
     const T = topFull(a, OF, A, skinD, X), AR = armsFull(A, null, 'default', skinD, T, A.w.hip + 2);
     o += BG(AR.back) + neck(skinD) + BG(T.svg + AR.front);

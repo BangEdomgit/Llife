@@ -362,6 +362,7 @@ function conceive(p, chance) {
   const mom = S.gender === 'f' ? S.age : npcAge(p);
   let c = chance * (mom >= 45 ? 0 : mom >= 40 ? .25 : mom >= 35 ? .5 : mom >= 30 ? .8 : 1);
   if (alive().filter(x => x.kind === 'child').length >= 3) c *= .3;
+  if (S.scene && S.scene.kind === 'night' && S.scene.pid === p.id) S.scene.pregP = c;   // 디테일 모드 자궁 그림에 숫자로 보여 줌
   if (Math.random() >= c) return false;
   S.preg = { pid: p.id, due: null, mode: null };
   return true;
@@ -609,6 +610,30 @@ function nightFlow(sat, cm) {
     minor: n((pow - 30) / 40), mid: sat < 50 ? 0 : n((pow - 50) / 50), major: sat < 50 ? 0 : n((pow - 75) / 45) };
   if (early) f.minor = f.mid = f.major = 0;
   return f;
+}
+// 그날 밤 테스트 창 (js/main.js): 저장 데이터는 그대로 두고 상대와 장면만 만듦 — 상대는 사람 목록에 넣지 않고, 섹스 기술·크기는 잠깐 바꿨다 되돌림
+//   o: { gender, age, personality, chest, build, grade(0 F ~ 8 SSS), cm, sat(null이면 계산), spot, contra, preg }. 둘 다 20살 이상일 때만
+function testNight(o) {
+  if (S.age < C.sexMinAge) return null;
+  const g = o.gender === 'm' ? 'm' : 'f';
+  const p = makePerson({ gender: g, ageDiff: clamp(Math.round(o.age || 25), C.sexMinAge, 70) - S.age, personality: o.personality || undefined, kind: 'friend', married: false, taken: false });
+  p.id = 'test'; p.close = p.trust = 70; p.heart = 80; p.compat = 60; p.libido = 80;
+  const look = lookOf(p);
+  if (look && look.body) { if (o.chest) look.body.chest = o.chest; if (o.build) look.body.build = o.build; }
+  const keep = { sk: S.sexSkill, pe: S.penis }, cmv = clamp(Math.round(o.cm || 15), 6, 26), contra = D.contra.methods[o.contra] ? o.contra : 'none';
+  if (S.gender === 'm') S.penis = cmv; else p.penis = cmv;
+  S.sexSkill = SG[clamp(o.grade ?? 4, 0, SG.length - 1)][1] + 5;
+  try {
+    const herBuild = S.gender === 'm' ? (look.body || {}).build : myBuild(), pg = pGrade(cmv);
+    let sat = o.sat != null && o.sat !== '' ? clamp(+o.sat, 0, SSS() ? 130 : 100) : satisfaction(p, 0, D.contra.methods[contra].sat || 0);
+    if (o.sat == null || o.sat === '') { if (pg === 1) sat = Math.min(sat, 85); else if (pg === 2) sat = Math.min(sat, 92); else if (pg >= 5) sat = Math.max(sat, 30); }
+    const flow = nightFlow(sat, cmv);
+    if (o.sat == null || o.sat === '') sat = clamp(sat + flow.major * 2 + flow.mid, 0, SSS() ? 130 : 100);
+    const mom = S.gender === 'f' ? S.age : npcAge(p), ageK = mom >= 45 ? 0 : mom >= 40 ? .25 : mom >= 35 ? .5 : mom >= 30 ? .8 : 1;
+    const sc = { kind: 'night', pid: p.id, sat, first: false, fling: true, contra, spot: o.spot || 'home', direct: !o.fore, personality: p.personality, fig: figure(p), cm: cmv, build: herBuild, flow,
+      preg: !!o.preg && contra !== 'both', pregP: .25 * D.contra.methods[contra].preg * ageK, test: true, text: '(테스트) ' + flowLine(flow), n: -1 };
+    return { sc, p };
+  } finally { S.sexSkill = keep.sk; S.penis = keep.pe; }
 }
 const flowLine = f => f.early ? `${f.dur}분 만에 끝나 버렸다.` : `${f.dur}분 동안.` + (f.minor + f.mid + f.major ? ` 상대가 ${[['소절정', f.minor], ['중절정', f.mid], ['대절정', f.major]].filter(x => x[1]).map(([l, v]) => `${l} ${v}번`).join(' · ')}.` : ' 상대는 끝까지 가지 못했다.');
 function sexScene(p, o) {
@@ -3166,6 +3191,6 @@ window.Game = {
   creation: { traits: D.traits, personalities: D.personalities, wealth: D.wealth, hobbies: D.hobbies, values: D.values, dreams: D.dreams, siblings: D.siblings },
   LABEL, config: C, seasons: SEASONS,
   // 개발·테스트용 (브라우저 콘솔이나 헤드리스 검사에서 이벤트를 직접 터뜨려볼 때)
-  dev: { flow: (sat, cm) => nightFlow(sat, cm), fire: id => { fire(EVENTS[id]); after(); }, eligible: id => eligible(EVENTS[id]), meet: spec => addPerson(spec), rumorYear, api },
+  testNight, dev: { flow: (sat, cm) => nightFlow(sat, cm), fire: id => { fire(EVENTS[id]); after(); }, eligible: id => eligible(EVENTS[id]), meet: spec => addPerson(spec), rumorYear, api },
 };
 })();

@@ -295,39 +295,46 @@ function sceneCard(html) {
 const CONTRA_LABEL = { none: '피임 안 함', condom: '콘돔', pill: '피임약', both: '콘돔 + 피임약' };
 // 다음 날 아침 카드: 만족감에 따라 표정·머리가 달라진 초상화(80×107) + 아침 한 줄 + 바닥의 옷
 function morningCard(sc, p) {
-  const S = G.state(), look = { age: G.npcAge(p), after: { sat: sc.sat, personality: p.personality, lipstick: S.gender === 'f' && p.gender === 'm', hickey: S.gender === 'm' && p.gender === 'f', fig: sc.fig } };
+  const S = G.state(), dt = window.Night && Night.detail(), rec = dt ? Night.lastStats() : null;
+  const look = { age: G.npcAge(p), after: { sat: sc.sat, personality: p.personality, lipstick: S.gender === 'f' && p.gender === 'm', hickey: S.gender === 'm' && p.gender === 'f', fig: sc.fig, detail: rec && rec.marks ? { shown: rec.marks, lip: rec.lip } : null } };
+  // 디테일 모드(테스트): 만족감 단계별 아침 한 줄 + 어젯밤 기록(길이·체위·절정·최고 쾌락·움찔·헉·자국·종합 점수)
+  const tierN = [30, 50, 70, 90].filter(v => (sc.sat ?? 50) >= v).length, MN = window.GAME_DATA.morningNarr;
+  const narr = dt && MN ? MN[tierN][Math.floor(Math.random() * MN[tierN].length)].replace(/\{p\|(.)\}/g, (_, j) => G.josa(G.pname(p), j)).replace(/\{p\}/g, G.pname(p)) : '';
+  const recHTML = rec ? `<div class="sc-rec">📝 <b>어젯밤 기록</b> (디테일)<br>${rec.early ? `${rec.dur}분 만에 끝남` : `${rec.dur}분`} · 섹스 기술 ${rec.grade} · ${rec.cm}cm · 종합 ${rec.pow ?? '?'}<br>체위: ${rec.poses.filter((k, i, a) => !i || a[i - 1] !== k).map(k => Night.poseLabel[k] || k).join(' → ')}<br>` +
+    `절정: 소 ${rec.counts.minor} · 중 ${rec.counts.mid} · 대 ${rec.counts.major} · 최고 쾌락 ${rec.maxPl}<br>헉 ${rec.gasp}번 · 움찔 ${rec.ouch}번 · 남은 자국 ${rec.marks}개</div>` : '';
   return `<p class="sc-t">다음 날 아침</p><div class="sc-port">${Avatar.render(G.look(p), 80, look)}</div>
-    <p>${esc(sc.text || '')}</p><p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
+    <p>${esc(sc.text || '')}</p>${narr ? `<p class="sc-narr">${esc(narr)}</p>` : ''}<p class="dim sc-sat">만족감 ${sc.sat}${sc.contra ? ` · ${CONTRA_LABEL[sc.contra]}` : ''}</p>${recHTML}${floorClothes(p)}<button type="button" data-sc-next>계속</button>`;
 }
 // 그날 밤 장면은 night.js (Night.html / Night.run)
 let nightJob = null;
-function playScene(sc) {
-  const p = G.person(sc.pid);
+function playScene(sc, testP) {
+  const p = testP || G.person(sc.pid);   // testP: 그날 밤 테스트 창의 상대 (사람 목록에 없음)
   if (!p || !window.Avatar) { G.clearScene(); return; }
   sceneEl.hidden = false;
   clearTimeout(sceneTimer);
   if (sc.kind !== 'night') {
     sceneQueue = [];
     // 골목: 벽에 기댄 상대가 깃을 잡아끌고 입맞춤 (night.js) — 키스까지만
-    const art = sc.kind === 'alley' && window.Night ? Night.alley(G.state().gender === 'm', p.gender === 'm') : SIL[sc.kind] || '';
+    const art = sc.kind === 'alley' && window.Night ? Night.alley(G.state().gender === 'm', p.gender === 'm', Night.detail() ? window.GAME_DATA.alleyCap : null) : SIL[sc.kind] || '';
     sceneCard(`<div class="sc-card">${art}<p>${esc(sc.text || '')}</p><button type="button" data-sc-next>계속</button></div>`);
     return;
   }
-  const morningQ = [`<div class="sc-card sc-morning">${morningCard(sc, p)}</div>`];
+  const morningQ = [() => `<div class="sc-card sc-morning">${morningCard(sc, p)}</div>`];   // 보여 줄 때 그림 (디테일 모드의 어젯밤 기록)
   const pregQ = sc.preg ? [`<div class="sc-card">${CONCEIVE}<p class="sc-later">몇 주 뒤, ${esc(G.josa(G.pname(p), '이'))} 할 말이 있다고 했다.</p><button type="button" data-sc-next>계속</button></div>`] : [];
   nightJob = { sc, p };
+  if (window.Night) Night.resetStats();   // 어젯밤 기록은 이번 그날 밤을 본 경우에만 (동작 줄이기면 없음)
   // 서서 다가감 → 그날 밤 → (콘돔 없이면) 자궁 그림 → 다음 날 아침 → (임신이면) 몇 주 뒤
   const S = G.state(), inside = sc.contra === 'none' || sc.contra === 'pill';
   const tops = [Avatar.topColor(S.gender === 'm' ? G.myLook() : G.look(p)), Avatar.topColor(S.gender === 'm' ? G.look(p) : G.myLook())];
-  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`]).concat([`<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}<div class="nt-bar"><span class="nt-clock">⏱ 0:00</span><span class="nt-pose"></span><span class="nt-cnt"></span></div><div class="nt-btns"><span class="nt-rate" role="group" aria-label="배속">${[1, 2, 4, 8].map(r => `<button type="button" data-nt-rate="${r}"${Night.rate() === r ? ' class="on"' : ''}>×${r}</button>`).join('')}</span><button type="button" class="nt-skip" data-nt-skip>⏩ 건너뛰기</button><button type="button" class="nt-end" data-nt-end>종료</button></div></div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
-    .concat(inside ? [`<div class="sc-card sc-ut">${Night.uterus(!!sc.preg)}</div>`] : []);
+  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [() => `<div class="sc-card sc-fp">${Night.foreplay(tops, Night.detail() ? window.GAME_DATA.foreCap : null)}</div>`]).concat([() => `<div class="sc-night"><p class="sc-t">그날 밤${sc.test ? ' <small class="dim">(테스트)</small>' : ''}</p>${Night.html(sc.spot)}<div class="nt-bar"><span class="nt-clock">⏱ 0:00</span><span class="nt-pose"></span><span class="nt-cnt"></span></div><div class="nt-btns"><span class="nt-rate" role="group" aria-label="배속">${[1, 2, 4, 8].map(r => `<button type="button" data-nt-rate="${r}"${Night.rate() === r ? ' class="on"' : ''}>×${r}</button>`).join('')}</span><button type="button" class="nt-dbtn${Night.detail() ? ' on' : ''}" data-nt-detail title="디테일 모드 (테스트용)">🔬 디테일</button><button type="button" class="nt-skip" data-nt-skip>⏩ 건너뛰기</button><button type="button" class="nt-end" data-nt-end>종료</button></div></div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
+    .concat(inside ? [() => `<div class="sc-card sc-ut">${Night.uterus(!!sc.preg, Night.detail() ? { pregP: sc.pregP, contra: CONTRA_LABEL[sc.contra] } : null)}</div>`] : []);
   sceneQueue = nightQ.concat(morningQ, pregQ);
   nextScene();
 }
 function nextScene() {
   clearTimeout(sceneTimer); if (window.Night) Night.stop();
   if (sceneQueue.length) {
-    const html = sceneQueue.shift();
+    const next = sceneQueue.shift(), html = typeof next === 'function' ? next() : next;
     sceneCard(html);
     const night = sceneBox.querySelector('.nt-stage');
     if (night) Night.run(night, nightJob, () => { sceneTimer = setTimeout(nextScene, 500); });
@@ -336,6 +343,7 @@ function nextScene() {
     return;
   }
   sceneEl.hidden = true; sceneBox.innerHTML = '';
+  if (window.Night) Night.forcePose(null);   // 테스트 창의 체위 고정은 한 번만
   G.clearScene();
 }
 function maybeScene(S) {
@@ -348,6 +356,8 @@ sceneEl.addEventListener('click', e => {
   if (e.target.closest('[data-sc-next]')) { nextScene(); return; }
   // 그날 밤은 종료 버튼을 누를 때까지 계속 (누르면 마무리, 마무리 중에 또 누르면 바로 넘김)
   if (e.target.closest('[data-nt-skip]')) { if (window.Night) Night.skip(); return; }   // 다음 일(절정·체위 바꾸기·마무리) 직전까지 빨리 감기
+  const db = e.target.closest('[data-nt-detail]');   // 🔬 디테일 모드 (테스트용) 켜고 끔 — 지금 장면에 바로 적용
+  if (db) { db.classList.toggle('on', Night.setDetail(!Night.detail())); return; }
   const rb = e.target.closest('[data-nt-rate]');   // 배속 ×1 / ×2 / ×4 / ×8
   if (rb) { const r = Night.setRate(+rb.dataset.ntRate); rb.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.ntRate === r)); return; }
   const end = e.target.closest('[data-nt-end]');
@@ -1052,7 +1062,41 @@ function openSlots() {
         : `<button type="button" data-sl="${x.n}">불러오기</button><button type="button" data-sv="${x.n}">덮어쓰기</button><button type="button" data-sdel="${x.n}">지우기</button>`);
     return `<div class="row"><div>${x.n}번 칸 · ${info}</div><div class="slot-btns">${btns}</div></div>`;
   }).join('');
-  showModal('slots', '💾 저장 칸', `${rows}<p class="hint">지금 칸에는 행동·턴·하루가 끝날 때마다 자동으로 저장돼. 다른 칸에 저장하면 그 칸으로 옮겨가서 이어서 저장돼.</p>`);
+  const S = G.state(), ntOk = S && !S.ended && S.age >= 20;
+  showModal('slots', '💾 저장 칸', `${rows}<p class="hint">지금 칸에는 행동·턴·하루가 끝날 때마다 자동으로 저장돼. 다른 칸에 저장하면 그 칸으로 옮겨가서 이어서 저장돼.</p>` +
+    (ntOk ? '<div class="choices"><button type="button" data-ntest>🧪 그날 밤 테스트 (디테일 모드)</button></div>' : ''));
+}
+/* 그날 밤 테스트 창: 저장 데이터를 건드리지 않고 원하는 조건으로 그날 밤 연출 전체(다가감 → 그날 밤 → 자궁 그림 → 아침)를 재생. 디테일 모드 확인용 */
+let ntDraft = null;
+function openNightTest() {
+  const S = G.state();
+  if (!S || S.age < 20) { showModal('ntest', '🧪 그날 밤 테스트', '<p>20살 이상인 인생에서만 열 수 있어.</p>'); return; }
+  const d = ntDraft || (ntDraft = { gender: S.gender === 'm' ? 'f' : 'm', age: 25, personality: 'playful', chest: 'avg', build: 'avg', grade: 5, cm: 15, sat: '', pose: '', spot: 'home', contra: 'none', preg: false, fore: true, detail: true });
+  const sel = (k, opts) => `<select data-nt="${k}">${opts.map(([v, l]) => `<option value="${v}"${String(d[k]) === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  const num = (k, lo, hi, ph = '') => `<input type="number" data-nt="${k}" min="${lo}" max="${hi}" value="${d[k] ?? ''}" placeholder="${ph}">`;
+  const chk = (k, l) => `<label class="nt-chk"><input type="checkbox" data-nt="${k}"${d[k] ? ' checked' : ''}> ${l}</label>`;
+  const row = (l, x) => `<label class="nt-row"><span>${l}</span>${x}</label>`;
+  const D = window.GAME_DATA;
+  showModal('ntest', '🧪 그날 밤 테스트', `<p class="hint">저장 데이터는 그대로 두고 상대·조건만 정해서 그날 밤 연출 전체를 다시 봐. 상대는 사람 목록에 들어가지 않아.</p>
+    <div class="nt-form">
+      ${row('상대 성별', sel('gender', [['f', '여자'], ['m', '남자']]))}${row('상대 나이', num('age', 20, 70))}
+      ${row('성격', sel('personality', D.personalities.map(x => [x.id, x.label])))}${row('가슴', sel('chest', [['small', '작은 편'], ['avg', '보통'], ['large', '큰 편']]))}
+      ${row('체형', sel('build', [['slim', '마름'], ['avg', '보통'], ['fit', '탄탄'], ['chubby', '통통']]))}${row('섹스 기술', sel('grade', G.sexGrades.map((g, i) => [i, g])))}
+      ${row('크기 cm', num('cm', 6, 26))}${row('만족감', num('sat', 0, 130, '자동'))}
+      ${row('체위', sel('pose', [['', '자동 (성격대로)']].concat(Object.entries(Night.poseLabel))))}${row('장소', sel('spot', [['home', '집'], ['hotel', '호텔'], ['travel', '여행지'], ['park', '공원'], ['motel', '모텔']]))}
+      ${row('피임', sel('contra', Object.entries(CONTRA_LABEL)))}
+    </div>
+    <div class="nt-chks">${chk('detail', '🔬 디테일 모드')}${chk('fore', '다가가는 카드부터')}${chk('preg', '임신 연출')}</div>
+    <div class="choices"><button type="button" data-ntgo>▶ 재생</button></div>`);
+}
+function runNightTest() {
+  const v = k => { const el = mBody.querySelector(`[data-nt="${k}"]`); return !el ? null : el.type === 'checkbox' ? el.checked : el.value; };
+  ntDraft = { gender: v('gender'), age: +v('age') || 25, personality: v('personality'), chest: v('chest'), build: v('build'), grade: +v('grade'), cm: +v('cm') || 15, sat: v('sat'), pose: v('pose'), spot: v('spot'), contra: v('contra'), preg: v('preg'), fore: v('fore'), detail: v('detail') };
+  const r = G.testNight(ntDraft);
+  if (!r) return;
+  closeModal();
+  Night.setDetail(ntDraft.detail); Night.forcePose(ntDraft.pose || null);
+  playScene(r.sc, r.p);
 }
 function confirmRestart() {
   showModal('confirm', '↻ 새 인생', `<p>지금 인생을 접고 처음부터 다시 시작할까?</p>
@@ -1101,6 +1145,8 @@ mBody.addEventListener('click', e => {
   if (!b || b.disabled) return;
   const d = b.dataset;
   if (modalMode === 'create') { createClick(b); return; }
+  if ('ntest' in d) { openNightTest(); return; }   // 💾 저장 칸 → 🧪 그날 밤 테스트
+  if (modalMode === 'ntest') { if ('ntgo' in d) runNightTest(); return; }
   if (modalMode === 'quick') { quickClick(b); return; }
   if ('intro' in d) { G.ackIntro(); return; }
   if ('rok' in d) { G.ackReport(); return; }
