@@ -73,6 +73,13 @@ function fmtUSD(v) {
   if (a >= 1e4) return `${sign}${(a / 1e4).toFixed(a >= 1e5 ? 0 : 1).replace(/\.0$/, '')}만 달러`;
   return `${sign}${a.toLocaleString('en-US')}달러`;
 }
+// 평균 등급 글: 서울 '3.2등급' / 뉴욕 'GPA 3.18'(학교 시험·내신) · '1310점'(SAT·모의 SAT) — data/region.js grade
+function gradeTxt(g, kind) {
+  const C = (REG[REGION] || {}).grade;
+  if (!C) return `${(+g).toFixed(1)}등급`;
+  return kind === 'sat' ? `${C.sat(+g)}점` : `GPA ${C.gpa(+g)}`;
+}
+const gradeLetter = g => { const C = (REG[REGION] || {}).grade; return C ? C.letter(g) : `${g}등급`; };
 function applyRegion(id) {
   for (let i = ORIG.length - 1; i >= 0; i--) { const [o, k, v, had] = ORIG[i]; if (had) o[k] = v; else delete o[k]; }
   ORIG.length = 0;
@@ -82,7 +89,7 @@ function applyRegion(id) {
   const P = R.patch || {};
   const byId = (list, map) => { if (list && map) for (const x of list) if (map[x.id]) for (const k in map[x.id]) setD(x, k, map[x.id][k]); };
   byId(D.places, P.places); byId(D.jobs, P.jobs); byId(D.hobbies, P.hobbies); byId(D.dreams, P.dreams);
-  byId(D.subjects, P.subjects); byId(D.tracks, P.tracks); byId(D.wealth, P.wealth);
+  byId(D.subjects, P.subjects); byId(D.tracks, P.tracks); byId(D.wealth, P.wealth); byId(D.actions, P.actions); byId(D.events, P.events);
   if (R.features) setD(D, 'features', R.features);
   if (R.dogNames) setD(D, 'dogNames', R.dogNames);
   if (R.universities) setD(D, 'universities', R.universities);
@@ -132,6 +139,7 @@ function compileLoc() {
       .replace(/(\d[\d,]*)\s?천\s?원/g, (m, a) => won(num(a) / 10))
       .replace(/(\d[\d,]*)\s?원(?![가-힣])/g, (m, a) => won(num(a) / 10000));
     if (re) u = u.replace(re, (m, k, part) => map[k] + fixPart(part, map[k]));
+    for (const [re2, fn] of R.post || []) u = u.replace(re2, fn);
     // '원'(받침 있음) 뒤에 붙어 있던 조사 → '달러'(받침 없음)에 맞게
     if (/달러/.test(u)) u = u.replace(/달러(이랑|으로|을|은|과|이(?=[\s.,!?)"'…]|$))/g, (m, part) => '달러' + fixPart(part, '달러'));
     return u;
@@ -593,13 +601,14 @@ function allure(p, sit) {
   if (sit === 'bed' && SSS()) m += p.hooked ? 40 : 10;   // 섹스 기술 SSS: 한 번 같이 잔 사람은 빠져나오지 못함 (애인·남편이 있어도)   // 가벼운 관계(하룻밤·집으로 데려가기·즐기자는 제안)는 외모·매력이 크게 먹힘
   if (S.rumorType === 'bad' && (S.rumor || 0) >= 30 && sit !== 'close' && sit !== 'bed') m -= rand(10, 20);   // 나쁜 소문 — 새 사람이 경계함
   m += [0, 3, rand(10, 12), 5][d];
+  m -= NORM('flirtNeed') || 0;   // 뉴욕: 다가가는 데 덜 망설임
   return looks + human + rel + m;
 }
 const charmed = (p, sit, need) => allure(p, sit) + rand(-15, 15) + DLGB >= need;   // DLGB: 대화 이벤트에서 고른 말이 잘 맞으면 + (dlgChoose)
 // 그저 즐기는 관계: 외모(생김새·몸·꾸밈)와 매력이 높을수록 훨씬 쉬움 — 0(F·F) ~ 40(S·S)
 function casualBonus() {
   const st = S.stats, looks = g100(st.face) * .6 + g100(st.fit) * .2 + g100(st.style) * .2;
-  return Math.round((looks + g100(st.charm)) / 2 * .4);
+  return Math.round((looks + g100(st.charm)) / 2 * .4 * (NORM('casualK') || 1));   // 뉴욕: 가벼운 만남이 더 자연스러움
 }
 // 설렘이 없어도 나를 향한 성욕이 차면 하룻밤까지 갈 수 있음 (외모·매력이 높을수록 문턱이 낮음: 성욕 60 → 40)
 const casualReady = p => !!p && canSex(p) && !lover(p) && p.close >= 20 && (p.libido || 0) >= 60 - casualBonus() / 2;
@@ -650,7 +659,7 @@ function rumorYear() {
     return;
   }
   const f = ps.reduce((t, p) => t + (p.fwb || lover(p) ? .3 : 1) * ((p.bestSat || 0) >= 70 ? .5 : 1) * (p.flaunt ? 1 : .4) * (p.grudge < 20 ? .3 : 1), 0) / ps.length;
-  const chance = ps.length * .05 * f * (S.caughtN ? 1 : .5);
+  const chance = ps.length * .05 * f * (S.caughtN ? 1 : .5) * (NORM('rumorK') ?? 1);   // 뉴욕: 누구와 자든 덜 수군거림
   if (Math.random() >= chance) return;
   const avgSat = ps.reduce((t, p) => t + (p.bestSat || 0), 0) / ps.length;
   const type = !S.caughtN && !ps.some(p => p.grudge >= 40) && sIdx(S.sexSkill) >= 5 && avgSat >= 75 ? 'skill' : 'bad';
@@ -795,7 +804,7 @@ function guiltCheck(p, sx, ctx) {
   const G = D.guiltLines, c = Object.assign({ p: pname(p) }, ctx);
   // 상대의 죄책감
   if (npcIllicit(p)) {
-    const pt = personality(p), base = pt.guilt ?? 40, g = SSS() ? 0 : Math.round(guiltOf(p.personality, sx.sat) * (p.fwb && !p.married ? .6 : 1));   // SSS: 죄책감을 못 느낌   // 즐기기만 하기로 한 사이면 죄책감이 덜함
+    const pt = personality(p), base = pt.guilt ?? 40, g = SSS() ? 0 : Math.round(guiltOf(p.personality, sx.sat) * (p.fwb && !p.married ? .6 : 1) * (NORM('guiltK') ?? 1));   // SSS: 죄책감을 못 느낌   // 즐기기만 하기로 한 사이면 죄책감이 덜함
     p.guiltN = (p.guiltN || 0) + 1;
     let line = null, end = false;
     if (g >= 86) { end = true; line = G.breakNow; }
@@ -1069,6 +1078,7 @@ function seasonOk(ev, sid) {
   return true;
 }
 function eligible(ev) {
+  if (ev.region && ev.region !== REGION) return false;   // 그 나라에만 있는 이벤트 (data/region.js)
   if (ev.once !== false && S.done[ev.id]) return false;
   if (ev.cooldown && S.last[ev.id] != null && S.age - S.last[ev.id] < ev.cooldown) return false;
   if (ev.at != null && S.age !== ev.at) return false;
@@ -1545,9 +1555,9 @@ function examTurn(k) {
   const r = sitExam(`${g > 3 ? '재수' : `${g}학년`} ${sem}학기 ${TURN_LABEL[k]}`, 10);
   r.school = ph === 'ms' ? '중학교' : '고등학교';
   S.school.exams.push({ title: r.title, avg: r.avg, age: S.age, ms: ph === 'ms' });
-  if (ph === 'hs' && g <= 3) { S.school.naesin.push(r.avg); r.note = `내신 평균: ${naesinAvg().toFixed(1)}등급`; }
+  if (ph === 'hs' && g <= 3) { S.school.naesin.push(r.avg); r.note = `${REGION === 'kr' ? '내신 평균: ' : '누적 '}${gradeTxt(naesinAvg())}`; }
   S.school.prep = {}; S.school.bonus = {};
-  log(`${r.school} ${r.title} — 평균 ${r.avg.toFixed(1)}등급.`, { t: 'info', deltas: applyEffect({ happy: r.avg <= 3 ? 3 : r.avg >= 7 ? -3 : 0 }) });
+  log(`${r.school} ${r.title} — 평균 ${gradeTxt(r.avg)}.`, { t: 'info', deltas: applyEffect({ happy: r.avg <= 3 ? 3 : r.avg >= 7 ? -3 : 0 }) });
   S.report = r;
 }
 // 모의고사 (고2 11월, 고3 3·6·9월): 운이 더 크고(±15) 백분위로. 이대로면 어디까지 가능한지
@@ -1556,8 +1566,8 @@ function mockTurn() {
   r.mock = true; r.rows.forEach(x => { x.pct = clamp(x.score + rand(-3, 3), 1, 99); });
   S.school.mocks.push(r.avg); S.school.mock = { avg: r.avg };
   const pred = mockAvg(), u = bestReach(pred);
-  r.note = `모의고사 평균 ${pred.toFixed(1)}등급 · ` + (u ? `이대로 가면 ${u.name} 가능` : '이러다 큰일이다');
-  log(`${r.title} — 평균 ${r.avg.toFixed(1)}등급. ${u ? `이대로 가면 ${u.short}도 노려볼 만하다.` : '이러다 큰일이다. 등골이 서늘했다.'}`, { t: 'info' });
+  r.note = `모의고사 평균 ${gradeTxt(pred, 'sat')} · ` + (u ? `이대로 가면 ${u.name} 가능` : '이러다 큰일이다');
+  log(`${r.title} — 평균 ${gradeTxt(r.avg, 'sat')}. ${u ? `이대로 가면 ${u.short}도 노려볼 만하다.` : '이러다 큰일이다. 등골이 서늘했다.'}`, { t: 'info' });
   S.report = r;
 }
 // 이 등급(정시 가군 기준 ±.5)으로 갈 수 있는 가장 높은 대학
@@ -1571,8 +1581,8 @@ function takeCSAT() {
   sc.sat = { avg: r.avg, rows: r.rows.map(x => ({ id: x.id, grade: x.grade, score: x.score })) };
   const exp = m ?? n ?? r.avg;
   r.note = r.avg <= exp - .5 ? '믿기지 않았다. 손이 떨렸다.' : r.avg <= exp + .5 ? '예상대로다.' : '눈물이 났다.';
-  S.vars.satText = `수능 평균 ${r.avg.toFixed(1)}등급. ${r.note}`;
-  log(`수능이 끝났다. 한 달 뒤, 성적표가 나왔다. 평균 ${r.avg.toFixed(1)}등급. ${r.note}`, { memory: true });
+  S.vars.satText = `수능 평균 ${gradeTxt(r.avg, 'sat')}. ${r.note}`;
+  log(`수능이 끝났다. 한 달 뒤, 성적표가 나왔다. 평균 ${gradeTxt(r.avg, 'sat')}. ${r.note}`, { memory: true });
   S.report = r;
 }
 /* ── 원서: 수시(고3 1학기, 6개까지 — 내신) / 정시 가·나·다(수능). 합격 확률은 내 등급과 기준 등급의 차이로 ── */
@@ -2780,9 +2790,9 @@ function myProfile() {
 
 /* ═════════ 데이터에서 쓰는 도구 ═════════ */
 const api = {
-  rand, pick, josa, money: fmtMoney, dateDress,
+  rand, pick, josa, money: fmtMoney, dateDress, college: () => D.universities.find(u => u.tier === 5) || D.universities[D.universities.length - 1],   // 그 나라의 전문대(커뮤니티 칼리지)
   givenName: g => pick(g === 'm' ? D.namesM : g === 'f' ? D.namesF : D.namesM.concat(D.namesF)),
-  region: () => REGION, regions: REG, loc, previewRegion: id => applyRegion(id), syncRegion: () => applyRegion(S ? S.region : 'kr'), norm: NORM,
+  region: () => REGION, regions: REG, loc, previewRegion: id => applyRegion(id), syncRegion: () => applyRegion(S ? S.region : 'kr'), norm: NORM, gradeTxt, gradeLetter,
   myGiven: () => !S ? '' : REGION === 'kr' ? (S.name.length >= 3 ? S.name.slice(1) : S.name) : S.name.split(' ')[0],
   meet: spec => addPerson(spec),
   person, npcAge, canRomance, heartOk, jailed, gradeMin, gradeOf, pGrade,
@@ -2850,6 +2860,7 @@ function newLife(opt = {}) {
   const name = (opt.name || '').trim().slice(0, REGION === 'kr' ? 6 : 12) || nameFor(gender, opt.eth, true);
   const sib = D.siblings.find(x => x.id === opt.sibling) || (Math.random() < .35 ? D.siblings[0] : pick(D.siblings.slice(1)));
   S = blankState(opt, gender, tr, name, sib);
+  if (REGION !== 'kr') S.flags.exempt = true;   // 뉴욕: 병역 없음
   if (tr.start) for (const k in tr.start) S.stats[k] = COND.includes(k) ? clamp(S.stats[k] + tr.start[k], 0, 100) : S.stats[k] + tr.start[k];
   S.look = window.Avatar ? Avatar.make(`${S.id}:me`, gender, { eth: S.eth }) : null;
   fitMyFace();
@@ -2915,7 +2926,7 @@ function quickLook(q) {
   if (!window.Avatar) return null;
   const g = q.gender === 'f' ? 'f' : 'm', a = Avatar.make(`${q.seed || 'qs'}:me`, g, { eth: q.eth || (REGION === 'kr' ? null : S && S.eth) });
   a.xseed = String(q.seed || 'qs');
-  for (const k of ['hair', 'hc', 'skin', 'eyes']) if (q[k] != null && q[k] !== '') a[k] = +q[k];
+  for (const k of ['hair', 'hc', 'skin', 'eyes', 'iris']) if (q[k] != null && q[k] !== '') a[k] = +q[k];
   // 직접 고른 얼굴형·눈썹·속눈썹·눈썹 진하기 (안 고르면 얼굴 유전자대로) — 생김새 등급을 맞출 때도 그대로 남음
   const has = k => q[k] != null && q[k] !== '', go = {};
   if (has('shape')) go.shape = +q.shape;
@@ -2984,7 +2995,8 @@ function newLife20(q = {}) {
   const mr = Q.money[S.wealth] || [50, 100];
   S.money = rand(mr[0], mr[1]);
   if (q.home === 'own') S.flags.ownPlace = true;
-  if (gender === 'm') { const ar = edu.id === 'retake' && q.army === 'now' ? 'next' : q.army; if (ar === 'exempt') S.flags.exempt = true; else S.vars.enlistAt = ar === 'now' ? 20 : 21; }
+  if (REGION !== 'kr') S.flags.exempt = true;   // 뉴욕: 병역 없음
+  else if (gender === 'm') { const ar = edu.id === 'retake' && q.army === 'now' ? 'next' : q.army; if (ar === 'exempt') S.flags.exempt = true; else S.vars.enlistAt = ar === 'now' ? 20 : 21; }
 
   // 학교: 고교 내신·수능은 능력치로 역산 (대학을 골랐으면 그 대학 합격선 쪽으로), 1학년 학점
   const sc = S.school, lines = [];
@@ -3031,7 +3043,7 @@ function newLife20(q = {}) {
   }
   sc.naesin = Array.from({ length: 6 }, () => clamp(r1(nae + rand(-4, 4) / 10), 1, 9));
   if (sat != null) { sc.sat = { avg: sat, rows: [] }; sc.mocks = [0, 1, 2].map(() => clamp(r1(sat + rand(-6, 6) / 10), 1, 9)); }
-  if (gender === 'm') lines[0][1] += S.flags.exempt ? ' 병역은 면제받았다.' : S.vars.enlistAt === 20 ? ' 올봄 입대를 앞두고 있다.' : ' 내년 봄에 입대한다.';
+  if (gender === 'm' && REGION === 'kr') lines[0][1] += S.flags.exempt ? ' 병역은 면제받았다.' : S.vars.enlistAt === 20 ? ' 올봄 입대를 앞두고 있다.' : ' 내년 봄에 입대한다.';
 
   // 가족: 부모(함께·이혼·여읨), 형제는 이미 자란 채로
   const mom = addPerson({ kind: 'family', role: '엄마', gender: 'f', ageDiff: rand(26, 34), close: rand(55, 85), trust: rand(55, 80), taken: true, wealth: S.wealth });
@@ -3257,7 +3269,7 @@ function deleteSlot(n) { if (n === slot) return; try { localStorage.removeItem(s
 
 window.Game = {
   // 나라 (data/region.js)
-  region: () => REGION, regions: REG, loc, previewRegion: id => applyRegion(id), syncRegion: () => applyRegion(S ? S.region : 'kr'), norm: NORM,
+  region: () => REGION, regions: REG, loc, previewRegion: id => applyRegion(id), syncRegion: () => applyRegion(S ? S.region : 'kr'), norm: NORM, gradeTxt, gradeLetter,
   myGiven: () => !S ? '' : REGION === 'kr' ? (S.name.length >= 3 ? S.name.slice(1) : S.name) : S.name.split(' ')[0],
   init, subscribe: f => subs.push(f), state: () => S,
   slots: slotList, useSlot, saveTo, deleteSlot, slot: () => slot,
@@ -3287,7 +3299,7 @@ window.Game = {
   roleText, karmaLabel, trait, job, mainPartner, season, fmtMoney, josa,
   gradeInfo, sexInfo: () => sexInfo(S.sexSkill), sexGrades: SG.map(g => g[0]), abilities: ABIL, conds: COND, subjects: D.subjects, naesinAvg, mockAvg, univLabel, majorLabel, studyInfo, subjectsNow: () => subjectsNow().map(SUB),
   // 학교 화면: 성적표 확인, 원서 (대학·학과 목록, 합격 확률, 내기)
-  ackReport: () => { S.report = null; after(); }, universities: D.universities, departments: D.departments, tracks: D.tracks, tierLabel: t => D.tierLabel[t], admitP, submitApply, gradeLabel: () => gradeLabel(),
+  ackReport: () => { S.report = null; after(); }, get universities() { return D.universities; }, departments: D.departments, tracks: D.tracks, tierLabel: t => D.tierLabel[t], admitP, submitApply, gradeLabel: () => gradeLabel(),
   creation: { traits: D.traits, personalities: D.personalities, wealth: D.wealth, hobbies: D.hobbies, values: D.values, dreams: D.dreams, siblings: D.siblings },
   LABEL, config: C, seasons: SEASONS,
   // 개발·테스트용 (브라우저 콘솔이나 헤드리스 검사에서 이벤트를 직접 터뜨려볼 때)

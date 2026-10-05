@@ -172,6 +172,7 @@ function extras(a) {
   X.pinC = n(TOP_COLORS.length);                               // 머리띠 색
   const E = a.eth && ETH[a.eth];
   if (E) { X.iris = wPick(r, E.iris); X.lid = E.lid[n(E.lid.length)]; }   // 배경별 눈동자색·쌍꺼풀 (점수와 무관)
+  if (a.iris != null) X.iris = a.iris;   // 20세 시작에서 직접 고른 눈동자색
   return X;
 }
 
@@ -2391,7 +2392,7 @@ const topColor = a => TOP_COLORS[(a && a.tc) || 0];
    최상위권: 방패 + 금색 테두리 + 월계수 / 상위권: 방패 + 금색 테두리 / 중·하위권: 이중 원 / 전문대: 둥근 네모 */
 function univLogo(u, size = 40) {
   if (!u) return '';
-  const c = u.color, dark = shade(c, .68), ch = u.name[0], shield = u.tier <= 2;
+  const c = u.color, dark = shade(c, .68), ch = u.mark || u.name[0], shield = u.tier <= 2;
   let shape;
   if (shield) {
     shape = `<path d="M50,5 L89,17 L85,57 C81,78 67,90 50,96 C33,90 19,78 15,57 L11,17 Z" fill="${c}" stroke="${dark}" stroke-width="3"/>` +
@@ -2405,7 +2406,7 @@ function univLogo(u, size = 40) {
     `<path d="M22,30 A36,36 0 0 1 78,30" fill="none" stroke="#fff" stroke-width="5" opacity=".12"/>`;
   else shape = `<rect x="7" y="7" width="86" height="86" rx="20" fill="${c}" stroke="${dark}" stroke-width="3"/><rect x="16" y="16" width="68" height="68" rx="13" fill="none" stroke="#fff" stroke-width="2" opacity=".6"/>`;
   return `<svg class="ulogo" width="${Math.round(size)}" height="${Math.round(size)}" viewBox="0 0 100 100" aria-hidden="true">${shape}` +
-    `<text x="50" y="${shield ? 61 : 64}" text-anchor="middle" font-size="${shield ? 38 : 42}" font-weight="700" fill="#fff" font-family="'Nanum Gothic Coding', sans-serif" style="paint-order:stroke" stroke="${dark}" stroke-width="2">${ch}</text></svg>`;
+    `<text x="50" y="${shield ? 61 : 64}" text-anchor="middle" font-size="${(shield ? 38 : 42) * (ch.length > 1 ? .62 : 1)}" font-weight="700" fill="#fff" font-family="'Nanum Gothic Coding', sans-serif" style="paint-order:stroke" stroke="${dark}" stroke-width="2">${ch}</text></svg>`;
 }
 
 // 고를 수 있는 파츠 이름 (20세 시작 외모 단계)

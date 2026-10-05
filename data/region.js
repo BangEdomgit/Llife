@@ -120,15 +120,71 @@ GAME_DATA.regions = {
         fashion: { act: ['소호에서 쇼핑을 했다.', '서로 옷을 골라줬다.'] },
       },
       dreams: { creator: { label: '인플루언서' }, singer: { label: '브로드웨이 스타' }, civil: { label: '공무원' }, rich: { label: '백만장자' } },
-      subjects: { korean: { label: '영어' }, english: { label: '스페인어' }, history: { label: '미국사' }, society: { label: '사회' }, arts: { label: '예체능' }, cs: { label: '컴퓨터 과학' } },
-      tracks: { liberal: { label: '인문 (AP 인문)', text: '영어·사회·윤리 AP 수업을 듣기로 했다.' }, science: { label: '과학 (AP 과학)', text: 'AP 미적분·물리·화학의 세계로.' },
+      subjects: { history: { label: '미국사' }, society: { label: '사회' }, arts: { label: '예체능' }, cs: { label: '컴퓨터 과학' } },
+      tracks: { liberal: { label: '인문 (AP 인문)', text: 'AP 영문학·사회·윤리 수업을 듣기로 했다.' }, science: { label: '과학 (AP 과학)', text: 'AP 미적분·물리·화학의 세계로.' },
         life: { label: '과학 (생명·의예)', text: 'AP 생물과 화학, 언젠가 사람을 살리는 일을 하고 싶었다.' }, tech: { label: '과학 (컴퓨터)', text: 'AP 컴퓨터 과학과 물리. 화면 속 세상을 만들고 싶었다.' },
         arts: { label: '예체능', text: '포트폴리오를 만들기로 했다. 남들과 다른 길이었다.' } },
+      actions: { drink: { minAge: 21 } },
+      // 동거: 결혼 전에 같이 사는 게 자연스러움 (더 이르게, 문턱이 낮게)
+      events: {
+        holiday: { text: (s) => s.seasonIdx >= 3 || (s.date && s.date.m === 12) ? '크리스마스다. 록펠러 센터 트리 앞이 사람으로 꽉 찼다.' : '추수감사절이다.',
+          choices: [
+            { label: '본가에 간다', effect: { money: -30, rel: { family: 4 } },
+              text: (s, a) => s.flags.married ? (a.find(p => p.kind === 'child').length ? '"애들 많이 컸네." 엄마가 아이들 볼을 쓰다듬었다. 칠면조는 또 말라 있었다.' : '"손주는 언제 보여 줄 거니?" 질문이 세 번 나왔다.')
+                : '"요즘 만나는 사람은 있고?" 질문이 세 번 나왔다. 펌킨 파이는 맛있었다.' },
+            { label: '프렌즈기빙을 연다', effect: { happy: 4, rel: { family: -2 } }, text: '친구들이 각자 요리를 하나씩 들고 왔다. 칠면조 대신 피자였지만 다들 웃었다.' },
+            { label: '여행을 떠난다', if: s => s.money >= 300, effect: { money: -300, happy: 6, rel: { family: -2 } }, text: 'JFK 공항이 사람으로 꽉 차 있었다. 다들 같은 생각이었다.' },
+          ] },
+        cohabit: { age: [21, 45], when: (s, a) => { const m = a.main(); return !!m && m.partner && !m.livesWith && m.heart >= 55 && m.trust >= 40; } } },
       wealth: { normal: { desc: '평범한 집이다. 퀸스의 아파트에 산다.' }, rich: { desc: '어퍼 이스트 사이드. 부족한 게 없다. 기대도 크다.' }, poor: { desc: '월세가 밀릴 때가 있다. 일찍 철이 든다.' } },
     },
+    // 대학 — 전부 가상 (뉴욕 느낌). mark: 로고 글자. cut은 한국과 같은 기준(등급)으로 계산하고 화면에는 GPA·SAT로 보여 줌
+    universities: [
+      { id: 'NY1', name: '모닝사이드대학교', short: '모닝사이드대', mark: 'M', tier: 1, icon: '🔷', color: '#2b5c9e', motto: '빛 속에서 빛을 본다',
+        cut: { 수시: 1.5, 정시가: 1.3, 정시나: 1.4, 정시다: 1.5 }, departments: ['korean_lit', 'law', 'business', 'economics', 'political', 'psychology', 'physics', 'chemistry', 'cs', 'medicine'] },
+      { id: 'NY2', name: '허드슨대학교', short: '허드슨대', mark: 'H', tier: 1, icon: '🟣', color: '#57068c', motto: '강을 거슬러 오른다',
+        cut: { 수시: 1.6, 정시가: 1.4, 정시나: 1.5, 정시다: 1.6 }, departments: ['korean_lit', 'law', 'business', 'media', 'psychology', 'biology', 'cs', 'engineering'] },
+      { id: 'NY3', name: '이타카힐대학교', short: '이타카힐대', mark: 'I', tier: 1, icon: '🔴', color: '#b31b1b', motto: '누구든 무엇이든 배운다',
+        cut: { 수시: 1.7, 정시가: 1.5, 정시나: 1.6, 정시다: 1.7 }, departments: ['business', 'engineering', 'architecture', 'biology', 'cs', 'culinary'] },
+      { id: 'NY4', name: '그리니치대학교', short: '그리니치대', mark: 'G', tier: 2, icon: '🟪', color: '#6a2c91', motto: '도시가 곧 캠퍼스',
+        cut: { 수시: 2.0, 정시가: 1.8, 정시나: 1.9, 정시다: 2.0 }, departments: ['business', 'economics', 'media', 'cs', 'psychology', 'philosophy', 'arts'] },
+      { id: 'NY5', name: '로즈힐대학교', short: '로즈힐대', mark: 'R', tier: 2, icon: '🟥', color: '#860038', motto: '지혜와 배움',
+        cut: { 수시: 2.2, 정시가: 2.0, 정시나: 2.1, 정시다: 2.2 }, departments: ['business', 'law', 'political', 'education', 'theology', 'nursing'] },
+      { id: 'NY6', name: '링컨예술대학교', short: '링컨예대', mark: 'L', tier: 2, icon: '🎭', color: '#c8102e', motto: '무대 위에서 배운다',
+        cut: { 수시: 2.3, 정시가: 2.1, 정시나: 2.2, 정시다: 2.3 }, departments: ['music', 'arts', 'media', 'design'] },
+      { id: 'NY7', name: '맨해튼시티칼리지', short: '시티칼리지', mark: 'C', tier: 3, icon: '🟦', color: '#5f259f', motto: '모두에게 열린 문',
+        cut: { 수시: 3.0, 정시가: 2.7, 정시나: 2.8, 정시다: 3.0 }, departments: ['business', 'engineering', 'cs', 'architecture', 'psychology'] },
+      { id: 'NY8', name: '퀸스칼리지', short: '퀸스칼리지', mark: 'Q', tier: 3, icon: '🔴', color: '#e31837', motto: '배움으로 세운다',
+        cut: { 수시: 3.2, 정시가: 3.0, 정시나: 3.1, 정시다: 3.2 }, departments: ['business', 'education', 'nursing', 'music', 'korean_lit'] },
+      { id: 'NY9', name: '브루클린공과대학교', short: '브루클린공대', mark: 'B', tier: 3, icon: '⚙️', color: '#003d7c', motto: '다리를 놓는 사람들',
+        cut: { 수시: 3.5, 정시가: 3.2, 정시나: 3.3, 정시다: 3.5 }, departments: ['engineering', 'cs', 'design', 'architecture'] },
+      { id: 'NY10', name: '브롱크스대학교', short: '브롱크스대', mark: 'X', tier: 4, icon: '🟢', color: '#00843d', motto: '함께 오른다',
+        cut: { 수시: 4.5, 정시가: 4.0, 정시나: 4.2, 정시다: 4.5 }, departments: ['business', 'engineering', 'social', 'education'] },
+      { id: 'NY11', name: '스태튼아일랜드대학교', short: '스태튼대', mark: 'S', tier: 4, icon: '⚓', color: '#6d2077', motto: '바다 건너 배움',
+        cut: { 수시: 5.5, 정시가: 5.0, 정시나: 5.2, 정시다: 5.5 }, departments: ['nursing', 'social', 'education', 'arts'] },
+      { id: 'NYC1', name: '로어맨해튼 커뮤니티 칼리지', short: '커뮤니티 칼리지', mark: 'LM', tier: 5, icon: '🟧', color: '#e87722', motto: '배워서 바로 쓴다',
+        cut: { 수시: 6.0, 정시가: 5.5, 정시나: 5.8, 정시다: 6.0 }, departments: ['nursing', 'design', 'culinary', 'beauty'] },
+    ],
+    departments: { korean_lit: { name: '영문학과' }, law: { name: '법학과(프리로)' }, political: { name: '정치학과' }, theology: { name: '종교학과' }, biology: { name: '생물학과' },
+      cs: { name: '컴퓨터과학과' }, medicine: { name: '의예과(프리메드)' }, social: { name: '사회복지학과' } },
+    // 화면 글 다듬기 (사전 다음에): 한국식 등급 → GPA(4.0)·SAT(1600), 대학 학점(4.5 만점) → 4.0 만점
+    // 등급(1~9) → GPA(4.0~1.0) / SAT(1560~640) / 과목 학점(A+~F). js/game.js gradeTxt, js/main.js 성적표
+    grade: {
+      gpa: g => Math.max(0, 4 - (g - 1) * .375).toFixed(2),
+      sat: g => Math.round((1560 - (g - 1) * 115) / 10) * 10,
+      letter: g => ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'F'][Math.min(9, Math.max(1, Math.round(g))) - 1],
+    },
+    post: [
+      [/(GPA[^\d\n]{0,10}?)(\d(?:\.\d+)?)\s?등급/g, (m, a, g) => a + GAME_DATA.regions.ny.grade.gpa(+g)],
+      [/((?:모의 )?SAT[^\d\n]{0,10}?)(\d(?:\.\d+)?)\s?등급/g, (m, a, g) => a + GAME_DATA.regions.ny.grade.sat(+g) + '점'],
+      [/학점 (\d\.\d{1,2})/g, (m, v) => 'GPA ' + Math.min(4, +v * 4 / 4.5).toFixed(2)],
+      [/([가나다])군/g, (m, g) => ({ 가: '1지망', 나: '2지망', 다: '3지망' })[g]],
+    ],
+    // 그 밖의 덮어쓰기: 나이별 기혼 비율이 낮음 (결혼이 늦고, 결혼 없이 오래 사귀는 커플이 많음)
+    apply: (D, set) => { if (D.encounter) set(D.encounter, 'married', [[24, .02], [29, .13], [34, .33], [39, .5], [999, .58]]); },
     // 화면 글의 한국 낱말 → 뉴욕식 (긴 것부터 맞춤, 앞뒤가 다른 낱말에 붙어 있으면 바꾸지 않음, 조사는 자동)
     dict: [
-      ['수능날', 'SAT 시험일'], ['수능', 'SAT'], ['모의고사', '모의 SAT'], ['내신', 'GPA'], ['수시', '얼리 지원'], ['정시', '정규 지원'],
+      ['대학수학능력시험', 'SAT'], ['수능날', 'SAT 시험일'], ['수능', 'SAT'], ['모의고사', '모의 SAT'], ['내신', 'GPA'], ['수시', '얼리 지원'], ['정시', '정규 지원'],
       ['재수생', '갭이어 학생'], ['재수', '갭이어'], ['고3', '12학년'], ['고2', '11학년'], ['고1', '10학년'], ['중3', '9학년'], ['중2', '8학년'], ['중1', '7학년'],
       ['학원', '과외'], ['야자', '방과 후 자습'], ['매점', '자판기'], ['실내화', '운동화'], ['교복', '등교 옷'], ['급식', '카페테리아 점심'],
       ['운동회', '필드 데이'], ['반장', '학급 회장'], ['수학여행', '현장 학습 여행'], ['학생식당', '다이닝 홀'], ['학식', '다이닝 홀 밥'],
@@ -139,7 +195,81 @@ GAME_DATA.regions = {
       ['한강', '허드슨강'], ['서울역', '펜실베이니아역'], ['서울', '뉴욕'], ['홍대', '브루클린'], ['강남', '맨해튼'], ['KTX', '암트랙'], ['부산', '보스턴'], ['제주도', '마이애미'], ['제주', '마이애미'],
       ['터미널', '그랜드 센트럴'], ['카카오톡', '문자'], ['카톡', '문자'], ['명절', '연휴'], ['설날', '새해'], ['추석', '추수감사절'], ['세뱃돈', '새해 용돈'], ['세배', '새해 인사'],
       ['회식', '해피아워'], ['배드민턴', '농구'], ['딱지', '포켓몬 카드'], ['자영업자', '가게 사장'], ['간병인', '홈케어 도우미'], ['헬스장', '짐'],
-      ['한국사', '미국사'], ['국어국문', '영문학'], ['술집', '바'], ['번화가', '타임스스퀘어'], ['복지관', '커뮤니티 센터'],
+      ['한국사', '미국사'], ['국어국문', '영문학'], ['국어', '영어'], ['영어', '스페인어'], ['과방', '학과 라운지'], ['받아쓰기', '스펠링 테스트'], ['문방구', '잡화점'], ['개나리', '수선화'], ['단칸방', '원룸 아파트'], ['스승의 날', '교사 감사 주간'], ['송편', '펌킨 파이'], ['김치찌개', '칠리'], ['김치', '피클'], ['분식집', '피자 가게'], ['국밥집', '다이너'], ['분식', '패스트푸드'], ['짜장면', '중국 음식'], ['가군', '1지망'], ['나군', '2지망'], ['다군', '3지망'], ['술집', '바'], ['번화가', '타임스스퀘어'], ['복지관', '커뮤니티 센터'],
+      // 장소 그림 속 간판·게시물
+      ['자 습', 'STUDY HALL'], ['급훈', 'RULES'], ['합격', 'SAT'], ['입학을 환영합니다', 'WELCOME, FRESHMEN'], ['술 한 잔', 'HAPPY HOUR'], ['우리 동네 소식', 'COMMUNITY BOARD'], ['PC 방', 'GAME CAFE'], ['24 시간', 'OPEN 24/7'],
     ],
   },
 };
+
+// 뉴욕에만 있는 이벤트 (region: 'ny') — 명절·도시 일상·학교. 한국판 이벤트 목록 끝에 붙고, 뉴욕 인생에서만 나옴
+(function () {
+  const N = 'ny';
+  GAME_DATA.events.push(
+    { id: 'ny_halloweenKid', region: N, type: 'fixed', age: [4, 12], season: ['가을'], once: false, cooldown: 2,
+      text: '핼러윈 밤. 동네 현관마다 호박등이 켜졌다.',
+      choices: [
+        { label: '슈퍼히어로 옷을 입는다', lean: 'bold', effect: { happy: 5 }, text: '"Trick or treat!" 베갯잇이 사탕으로 터질 것 같았다.' },
+        { label: '유령 옷(이불)을 쓴다', lean: 'playful', effect: { happy: 4, art: 1 }, text: '눈구멍 두 개 뚫은 이불을 뒤집어썼다. 다들 웃었다.' },
+        { label: '집에서 사탕을 나눠 준다', lean: 'warm', effect: { happy: 3, charm: 1 }, text: '문 앞에서 사탕 바구니를 들었다. 꼬마 마녀가 고맙다며 꾸벅 인사했다.' },
+      ] },
+    { id: 'ny_halloweenParty', region: N, type: 'fixed', age: [16, 45], season: ['가을'], once: false, cooldown: 2,
+      text: '핼러윈 코스튬 파티 초대장이 왔다. 그리니치 빌리지에선 퍼레이드도 한다.',
+      choices: [
+        { label: '공들인 코스튬으로 간다', check: { stat: 'art', diff: 50, dice: true },
+          success: { text: '코스튬 콘테스트 1등. 모르는 사람들이 사진을 찍자고 줄을 섰다.', effect: { happy: 6, charm: 2 } },
+          fail: { text: '아무도 내가 뭘 입은 건지 몰랐다. 세 번 설명했다.', effect: { happy: 2 } } },
+        { label: '퍼레이드를 구경한다', effect: { happy: 4, art: 1 }, text: '6번가가 해골과 마녀와 거대한 인형으로 가득 찼다.' },
+        { label: '집에서 공포 영화를 본다', effect: { happy: 2 }, text: '불을 끄고 공포 영화를 봤다. 초인종이 울릴 때마다 놀랐다.' },
+      ] },
+    { id: 'ny_july4', region: N, type: 'fixed', age: [5, 50], season: ['여름'], once: false, cooldown: 3,
+      text: '7월 4일 독립기념일. 이스트강 위로 불꽃놀이를 한다.',
+      choices: [
+        { label: '강가 자리를 일찍 맡는다', effect: { happy: 5, health: -1 }, text: '돗자리 위에서 네 시간을 기다렸다. 첫 불꽃이 터지자 다 같이 환호했다.' },
+        { label: '루프톱에서 본다', if: s => s.age >= 21, effect: { happy: 6, money: -10 }, text: '루프톱 바에서 맥주를 들고 봤다. 도시 전체가 반짝였다.' },
+        { label: '바비큐 파티에 간다', effect: { happy: 4, charm: 1 }, text: '친구네 뒷마당에서 핫도그를 구웠다. 불꽃은 나무 사이로 조금 보였다.' },
+      ] },
+    { id: 'ny_newyear', region: N, type: 'fixed', age: [14, 50], season: ['겨울'], once: false, cooldown: 3,
+      text: '12월 31일. 타임스스퀘어에서 볼 드롭을 한다.',
+      choices: [
+        { label: '타임스스퀘어에 간다', effect: { happy: 5, health: -2 }, text: '추위 속에서 여덟 시간을 버텼다. "Ten, nine…" 색종이가 눈처럼 쏟아졌다.', memory: true },
+        { label: '친구 집 파티에 간다', effect: { happy: 4 }, text: 'TV로 볼 드롭을 보며 다 같이 카운트다운을 외쳤다.' },
+        { label: '연인과 자정 키스를 한다', if: (s, a) => !!a.main(), effect: { happy: 6 }, text: '자정에 맞춰 입을 맞췄다. 창밖에서 폭죽 소리가 났다.', memory: true },
+      ] },
+    { id: 'ny_prom', region: N, type: 'fixed', age: [17, 18], season: ['봄'], text: '졸업 무도회, 프롬이 다가온다. 누구랑 갈지가 반 전체의 화제다.',
+      choices: [
+        { label: '마음에 둔 사람에게 신청한다', check: { stat: 'charm', diff: 55, dice: true },
+          success: { text: '꽃 한 송이를 내밀자 웃으며 받아 줬다. 그날 밤 춤을 세 곡이나 췄다.', effect: { happy: 8, charm: 2 }, memory: true },
+          fail: { text: '"미안, 벌써 다른 사람이랑 가기로 했어." 결국 친구들이랑 갔다.', effect: { happy: 1 } } },
+        { label: '친구들끼리 간다', effect: { happy: 5 }, text: '리무진을 나눠 타고 갔다. 사진 부스 앞에서 한참 놀았다.', memory: true },
+        { label: '안 간다', effect: { smart: 1 }, text: '그날 밤 집에서 넷플릭스를 봤다. 인스타그램은 일부러 안 열었다.' },
+      ] },
+    { id: 'ny_springBreak', region: N, type: 'fixed', age: [19, 22], season: ['봄'], req: { flags: ['student'] }, once: false, cooldown: 1,
+      text: '봄방학. 다들 마이애미에 간다고 들떠 있다.',
+      choices: [
+        { label: '마이애미로 간다', if: s => s.money >= 60, effect: { money: -60, happy: 7, health: -2 }, text: '해변, 파티, 선크림 자국. 일주일이 하루 같았다.', memory: true },
+        { label: '집에서 쉰다', effect: { happy: 2, health: 2 }, text: '텅 빈 기숙사에서 실컷 잤다.' },
+        { label: '인턴십 지원서를 쓴다', effect: { smart: 2, happy: -1 }, text: '자기소개서를 열 번 고쳤다. 사진 속 친구들은 바다에 있었다.' },
+      ] },
+    { id: 'ny_subway', region: N, type: 'random', age: [13, 50], once: false, cooldown: 2,
+      text: '퇴근길 지하철. 객차 안에서 갑자기 누가 음악을 틀고 브레이크댄스를 춘다.',
+      choices: [
+        { label: '1달러를 넣는다', effect: { money: -1, happy: 2 }, text: '"Showtime!" 봉을 잡고 공중제비를 돌았다. 다들 박수를 쳤다.' },
+        { label: '이어폰을 꽂는다', effect: {}, text: '뉴요커답게 못 본 척했다.' },
+      ] },
+    { id: 'ny_marathon', region: N, type: 'fixed', age: [20, 50], season: ['가을'], once: false, cooldown: 3,
+      text: '뉴욕 마라톤 날. 다섯 개 자치구를 지나는 42킬로미터.',
+      choices: [
+        { label: '직접 뛴다', check: { stat: 'fit', diff: 65, dice: true },
+          success: { text: '센트럴 파크 결승선을 통과했다. 모르는 사람들이 내 이름을 외쳐 줬다.', effect: { happy: 8, fit: 3, health: -3 }, memory: true },
+          fail: { text: '퀸스보로 다리에서 다리에 쥐가 났다. 그래도 걸어서 끝까지 갔다.', effect: { happy: 3, health: -4 } } },
+        { label: '길가에서 응원한다', effect: { happy: 3, charm: 1 }, text: '"You got this!" 피켓을 들고 소리를 질렀다.' },
+      ] },
+    { id: 'ny_bodegaCat', region: N, type: 'random', age: [6, 50], once: false, cooldown: 3,
+      text: '보데가 카운터 위의 고양이가 내 손에 머리를 비볐다.',
+      choices: [
+        { label: '쓰다듬는다', effect: { happy: 3 }, text: '사장님이 "걔 이름은 치즈야"라고 했다. 샌드위치를 하나 더 샀다.' },
+        { label: '사진을 찍는다', effect: { happy: 2, art: 1 }, text: '보데가 고양이 계정에 올렸더니 좋아요가 꽤 달렸다.' },
+      ] },
+  );
+})();

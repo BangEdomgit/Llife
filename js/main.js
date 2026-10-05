@@ -134,6 +134,7 @@ function render(S) {
   } else { flow.hidden = true; flow.innerHTML = ''; }
 
   // 배경: 지금 날씨와 시간대 (어른은 시계를 따라 하늘이 바뀜)
+  WeatherBG.setCity(G.region() === 'ny' ? 'ny' : 'kr');   // 뉴욕이면 마천루·물탱크 실루엣
   if (bg.w !== S.weather) { WeatherBG.setWeather(WX[S.weather].p, bg.w === null); bg.w = S.weather; }
   const sky = S.sky ?? S.time;
   if (bg.t !== sky) { WeatherBG.setTime(sky, bg.t === null); bg.t = sky; }
@@ -426,10 +427,11 @@ function openReport() {
     return;
   }
   const extra = r.csat ? '<th>🎲</th>' : r.mock ? '<th>백분위</th>' : '';
-  const rows = r.rows.map(x => `<tr><td>${esc(x.label)}</td><td>${x.score}</td><td><b class="gr gr${x.grade}">${x.grade}등급</b></td>${r.csat ? `<td class="dim">${x.roll > 0 ? '+' : ''}${x.roll}</td>` : r.mock ? `<td class="dim">${x.pct}</td>` : ''}</tr>`).join('');
+  const kr = G.region() === 'kr', gk = r.csat || r.mock ? 'sat' : 'gpa';   // 뉴욕: 과목은 학점(A+~F), 평균은 GPA·SAT 점수
+  const rows = r.rows.map(x => `<tr><td>${esc(x.label)}</td><td>${x.score}</td><td><b class="gr gr${x.grade}">${kr ? x.grade + '등급' : G.gradeLetter(x.grade)}</b></td>${r.csat ? `<td class="dim">${x.roll > 0 ? '+' : ''}${x.roll}</td>` : r.mock ? `<td class="dim">${x.pct}</td>` : ''}</tr>`).join('');
   showModal('report', r.csat ? '📜 수능 성적표' : '📋 성적표', `<p class="rc-t">${esc(r.school ? r.school + ' ' : '')}${esc(r.title)}</p>
-    <table class="rc"><thead><tr><th>과목</th><th>점수</th><th>등급</th>${extra}</tr></thead><tbody>${rows}</tbody></table>
-    <p class="rc-avg">평균 <b>${r.avg.toFixed(1)}등급</b></p>${r.note ? `<p class="dim rc-note">${esc(r.note)}</p>` : ''}
+    <table class="rc"><thead><tr><th>과목</th><th>점수</th><th>${kr ? '등급' : '학점'}</th>${extra}</tr></thead><tbody>${rows}</tbody></table>
+    <p class="rc-avg">${kr || gk !== 'sat' ? '평균' : '환산 점수'} <b>${G.gradeTxt(r.avg, gk)}</b></p>${r.note ? `<p class="dim rc-note">${esc(r.note)}</p>` : ''}
     <div class="choices"><button type="button" data-rok>확인</button></div>`, false, r.title);
 }
 /* 원서 접수: 수시(6장, 내신 — 교과/종합) / 정시(가·나·다, 수능) */
@@ -449,12 +451,13 @@ function openApply() {
       ${susi ? `<select data-f="type"><option${r.type === '교과' ? ' selected' : ''}>교과</option><option${r.type === '종합' ? ' selected' : ''}>종합</option></select>` : ''}
       <span class="ap-p${p == null ? '' : p >= .7 ? ' ok' : p >= .35 ? ' mid' : ' low'}">${p == null ? '' : `예상 합격률 ${Math.round(p * 100)}%`}</span></div>`;
   }).join('');
-  const n = G.naesinAvg(), sat = S.school.sat;
+  const n = G.naesinAvg(), sat = S.school.sat, kr = G.region() === 'kr';
   showModal('apply', susi ? '📝 수시 원서 접수' : '📝 정시 원서 접수', `
-    <p class="dim">${sat ? `내 수능 평균: <b>${sat.avg.toFixed(1)}등급</b><br>` : ''}내 내신 평균: <b>${n != null ? n.toFixed(1) + '등급' : '없음'}</b>${susi ? ` · 비교과 ${Math.round(S.school.extra || 0)}점` : ''}</p>
+    <p class="dim">${sat ? `${kr ? '내 수능 평균' : '내 SAT'}: <b>${G.gradeTxt(sat.avg, 'sat')}</b><br>` : ''}${kr ? '내 내신 평균' : '내 GPA'}: <b>${n == null ? '없음' : kr ? G.gradeTxt(n) : G.gradeTxt(n).replace('GPA ', '')}</b>${susi ? ` · 비교과 ${Math.round(S.school.extra || 0)}점` : ''}</p>
     <div class="ap">${rows}</div>
     ${susi && applyDraft.rows.length < 6 ? '<button type="button" class="ap-add" data-apadd>＋ 한 장 더</button>' : ''}
-    <p class="hint">${susi ? '교과는 내신만, 종합은 내신 + 비교과(동아리·봉사·독서) + 자소서. 6장까지. 의학과는 기준이 1등급 더 높다.' : '가·나·다군에 한 장씩. 수능 평균 등급으로 본다. 의학과는 기준이 1등급 더 높다.'}</p>
+    <p class="hint">${kr ? (susi ? '교과는 내신만, 종합은 내신 + 비교과(동아리·봉사·독서) + 자소서. 6장까지. 의학과는 기준이 1등급 더 높다.' : '가·나·다군에 한 장씩. 수능 평균 등급으로 본다. 의학과는 기준이 1등급 더 높다.')
+      : susi ? '교과는 GPA만, 종합은 GPA + 비교과(동아리·봉사·독서) + 에세이. 6장까지. 의예과는 기준이 더 높다.' : '1·2·3지망에 한 장씩. SAT 점수로 본다. 의예과는 기준이 더 높다.'}</p>
     <div class="choices"><button type="button" data-apgo>접수하기</button>${susi ? '<button type="button" data-apskip>수시는 안 넣는다</button>' : ''}</div>`, false, 'apply');
 }
 mBody.addEventListener('change', e => {
@@ -695,11 +698,12 @@ function openMe() {
     const lines = [];
     const tr = sc.track && G.tracks.find(t => t.id === sc.track);
     if (tr) lines.push(`계열 ${tr.label} — ${G.subjectsNow().map(x => x.label).join('·')}`);
-    const last = sc.exams.slice(-4).map(e => `${e.title} ${e.avg.toFixed(1)}`).join(' · ');
-    if (last) lines.push(`최근 시험 (평균 등급): ${last}`);
-    if (G.naesinAvg() != null) lines.push(`내신 평균 ${G.naesinAvg().toFixed(1)}등급`);
-    if (G.mockAvg() != null) lines.push(`모의고사 평균 ${G.mockAvg().toFixed(1)}등급 (${sc.mocks.length}회)`);
-    if (sc.sat) lines.push(`수능 평균 ${sc.sat.avg.toFixed(1)}등급${sc.sat.rows && sc.sat.rows.length ? ` (${sc.sat.rows.map(x => (G.subjects.find(y => y.id === x.id) || {}).label + ' ' + x.grade).join(', ')})` : ''}`);
+    const kr = G.region() === 'kr';   // 뉴욕: GPA·SAT 점수·과목 학점
+    const last = sc.exams.slice(-4).map(e => `${e.title} ${kr ? e.avg.toFixed(1) : G.gradeTxt(e.avg).replace('GPA ', '')}`).join(' · ');
+    if (last) lines.push(`최근 시험 (${kr ? '평균 등급' : 'GPA'}): ${last}`);
+    if (G.naesinAvg() != null) lines.push(`${kr ? '내신 평균 ' : '누적 '}${G.gradeTxt(G.naesinAvg())}`);
+    if (G.mockAvg() != null) lines.push(`모의고사 평균 ${G.gradeTxt(G.mockAvg(), 'sat')} (${sc.mocks.length}회)`);
+    if (sc.sat) lines.push(`수능 평균 ${G.gradeTxt(sc.sat.avg, 'sat')}${sc.sat.rows && sc.sat.rows.length ? ` (${sc.sat.rows.map(x => (G.subjects.find(y => y.id === x.id) || {}).label + ' ' + (kr ? x.grade : G.gradeLetter(x.grade))).join(', ')})` : ''}`);
     if (sc.extra) lines.push(`비교과 ${Math.round(sc.extra)}점 (동아리·봉사·독서)`);
     const uni = G.univLabel() ? `<div class="me-uni">${logo(sc.univ, 34)}<span>${esc(G.univLabel())} ${esc(G.majorLabel() || '')}${sc.gpaN ? `<br><span class="dim">학점 ${sc.gpa.toFixed(2)}${sc.degree ? ' · 졸업' : ''}</span>` : ''}</span></div>` : '';
     school = `<p class="sec-t">학교</p>${subj ? `<div class="subj">${subj}</div><p class="hint">예상 점수 (능력치 + 이번 시험을 위해 쌓은 공부·수업)</p>` : ''}${lines.map(l => `<p class="dim" style="font-size:13px">${esc(l)}</p>`).join('')}${uni}`;
@@ -788,7 +792,7 @@ function qFace(q, P) {
 }
 /* ── 20세 시작: 배경 → 능력치 → 외모·신체 → 성격·취향 → 관계 → 확인 (뒤로 가기 가능, 오른쪽에 전신 미리보기) ── */
 const QSTEPS = ['배경', '능력치', '외모·신체', '성격·취향', '관계', '확인'];
-const QNUM = ['hair', 'hc', 'skin', 'eyes', 'shape', 'brow', 'lashLv', 'browLv', 'friends', 'ly'], QBOOL = ['exp', 'lsex'];
+const QNUM = ['hair', 'hc', 'skin', 'iris', 'eyes', 'shape', 'brow', 'lashLv', 'browLv', 'friends', 'ly'], QBOOL = ['exp', 'lsex'];
 const QD = () => G.quick.data();
 // 처음 들어올 때(또는 성별을 바꿨을 때) 기본값: 첫 화면에서 뽑힌 성격·집안·취미·꿈·형제를 이어받음
 function quickSync() {
@@ -871,7 +875,7 @@ function quickStep(n) {
       more = qFld('하는 일', `<div class="chips">${G.quick.jobs().map(j => qChip('job', j.id, `${esc(j.label)} <small>${esc(G.fmtMoney(j.salary))}</small>`, j.id === q.job)).join('')}</div>`, '연봉 (만원). 고졸로 바로 시작할 수 있는 일.');
     }
     const mr = Q.money[q.wealth] || [0, 0], w = C.wealth.find(x => x.id === q.wealth) || {};
-    const army = q.gender === 'm' ? qFld('병역', qChips('army', Q.army.filter(a => q.edu !== 'retake' || a.id !== 'now'), q.army === 'now' && q.edu === 'retake' ? 'next' : q.army), '입대하면 2년 동안 훈련이 하루 8칸을 쓴다.') : '';
+    const army = q.gender === 'm' && G.region() === 'kr' ? qFld('병역', qChips('army', Q.army.filter(a => q.edu !== 'retake' || a.id !== 'now'), q.army === 'now' && q.edu === 'retake' ? 'next' : q.army), '입대하면 2년 동안 훈련이 하루 8칸을 쓴다.') : '';
     return qFld('학력', qChips('edu', Q.edu, q.edu), esc(e.desc)) + more
       + qFld('집안', qChips('wealth', C.wealth, q.wealth), `${esc(w.desc || '')} 시작 돈 ${mr[0] === mr[1] ? G.fmtMoney(mr[0]) + (q.wealth === 'poor' ? ' (대학생이면 학자금 대출)' : '') : `${G.fmtMoney(mr[0])}~${G.fmtMoney(mr[1])}`}`)
       + (qSandbox(q) ? qFld('시작 돈 <small class="dim">샌드박스 · 만원, 비우면 집안대로</small>', `<input type="number" id="qsMoney" min="0" max="${Q.rangeSandbox.money[1]}" step="10" inputmode="numeric" value="${q.money ?? ''}" placeholder="예: 5000">`) : '')
@@ -902,7 +906,7 @@ function quickStep(n) {
     return `<div class="qs-rs">${qRange('height', R.height[g][0], R.height[g][1], q.height, '키')}</div>`
       + qFld('체형', qChips('build', Q.builds, q.build)) + body
       + qFld('머리 스타일', `<div class="chips">${P.hair[g].map((l, i) => qChip('hair', i, esc(l), i === q.hair)).join('')}</div>`)
-      + qFld('머리색', sw('hc', P.hc)) + qFld('피부', sw('skin', P.skin))
+      + qFld('머리색', sw('hc', P.hc)) + qFld('피부', sw('skin', P.skin)) + (P.iris ? qFld('눈동자', sw('iris', P.iris)) : '')
       + qFace(q, P)
       + `<div class="chips"><button type="button" data-qreface>🎲 얼굴 다시 뽑기</button></div>`;
   }
@@ -932,7 +936,7 @@ function quickStep(n) {
     ['이름', `${draft.name.trim() || '(랜덤)'} · ${genderKo(q.gender)} · ${draft.month}월생`],
     ['난이도', `${L(Q.diffs, q.diff)}${qSandbox(q) && q.money != null && q.money !== '' ? ` · 시작 돈 ${G.fmtMoney(+q.money)}` : ''}`],
     ['학력', e.tiers && u ? `${e.label} — ${u.name} ${d ? d.name : ''}` : q.edu === 'work' ? `${e.label} — ${(G.quick.jobs().find(j => j.id === q.job) || {}).label || ''}` : e.label],
-    ['집안', `${L(C.wealth, q.wealth)} · ${L(Q.home, q.home)}${q.gender === 'm' ? ` · ${L(Q.army, q.edu === 'retake' && q.army === 'now' ? 'next' : q.army)}` : ''}`],
+    ['집안', `${L(C.wealth, q.wealth)} · ${L(Q.home, q.home)}${q.gender === 'm' && G.region() === 'kr' ? ` · ${L(Q.army, q.edu === 'retake' && q.army === 'now' ? 'next' : q.army)}` : ''}`],
     ['능력치', Q.stats.map(k => `${G.LABEL[k]} ${G.quick.grade(q.st[k])}`).join(' · ') + ` · 꾸밈 ${G.quick.grade(q.style)}`],
     ['소질', L(C.traits, q.trait) + (qSandbox(q) ? ((q.sexg || 'F') !== 'F' ? ` · 섹스 기술 ${q.sexg}` : '') : q.exp ? ' · 경험 있음' : '')],
     ['몸', `${f.height}cm · ${L(Q.builds, q.build)} · ${q.gender === 'f' ? `${f.under}${f.cup} · ${f.bust}-${f.waist}-${f.hip}` : `어깨 ${f.shoulder}cm · ${q.penis}cm`}`],
@@ -1227,8 +1231,15 @@ WeatherBG.init($('#sky'));
 if (window.SceneBG) SceneBG.init($('#backdrop'));
 WeatherBG.setWeather(WX.partly.p, true);
 // 뉴욕 인생: 화면에 나오는 모든 글의 한국 낱말·원화 금액을 뉴욕식으로 (data/region.js dict, 조사 자동 — js/game.js loc)
-//   그리는 쪽은 그대로 두고, 화면에 붙는 글 조각마다 바꿈 (한 번 바꾼 글은 다시 바뀌지 않음)
-function locText(n) { const t = n.nodeValue; if (t && /[가-힣\d]/.test(t)) { const u = G.loc(t); if (u !== t) n.nodeValue = u; } }
+//   그리는 쪽은 그대로 두고, 화면에 붙는 글 조각마다 바꿈 (한 번 바꾼 글은 다시 바뀌지 않음: 국어 → 영어 → 스페인어처럼 이어서 바뀌지 않게)
+const LOCD = new WeakMap();   // 글 조각 → 바꾼 결과
+function locText(n) {
+  const t = n.nodeValue;
+  if (!t || LOCD.get(n) === t || !/[가-힣\d]/.test(t)) return;
+  const u = G.loc(t);
+  LOCD.set(n, u);
+  if (u !== t) n.nodeValue = u;
+}
 function locTree(root) {
   if (G.region() === 'kr' || !root) return;
   if (root.nodeType === 3) { locText(root); return; }

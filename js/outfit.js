@@ -218,9 +218,11 @@ function special(id, g, age, r, season) {
 // 예전 생김새의 top·tc → 대표 한 벌 (테스트 시트·ctx 없는 호출). 0 티 / 1 셔츠 / 2 후디 / 3 니트 / 4 교복 / 5 터틀넥 / 6 가디건 / 7 재킷 / 8 줄무늬
 const OLD_TOP = ['tee', 'shirt', 'hoodie', 'knit', 'uniform', 'turtle', 'tee', 'shirt', 'stripe'];
 const OLD_COLORS = ['#4f6d8f', '#9a4f5f', '#5f8f6a', '#d0a443', '#ece7dd', '#3b3e48', '#8a6fb0', '#d9784a', '#6aa3c8', '#7a8a5a'];
+// 교복이 없는 나라(뉴욕): 중·고등학생도 사복
+const noUniform = () => !!(window.Game && Game.region && Game.region() !== 'kr');
 function signature(a, age, X) {
   const g = a.g === 'f' ? 'f' : 'm', c = OLD_COLORS[a.tc || 0] || OLD_COLORS[0], kid = age <= 12, teen = age >= 13 && age <= 18;
-  if (teen) return special('uniform', g, age, rng('u' + (a.fs || a.tc)), 'spring');
+  if (teen && !noUniform()) return special('uniform', g, age, rng('u' + (a.fs || a.tc)), 'spring');
   let ik = OLD_TOP[a.top] || 'tee';
   if (kid && ['shirt', 'knit', 'uniform', 'turtle'].includes(ik)) ik = ik === 'shirt' ? 'tee' : 'sweat';
   const o = { inner: { k: ik, c: ik === 'stripe' ? (c === '#ece7dd' ? '#3b4a6b' : c) : ik === 'shirt' && a.top === 7 ? N.white : c }, acc: {}, tags: [] };
@@ -280,7 +282,7 @@ function pick(a, age, ctx, X) {
   // 1) 강제 복장: 근무 중 → 출근복 / 학교(18살 이하) → 교복 / 집(밤) → 잠옷 / 바다 → 수영복
   if (ctx.event === 'beach' && age >= 4) return special('swim', g, age, r, season);
   if (ctx.home && (ctx.hour >= 22 || ctx.hour < 7)) return special('pajama', g, age, rng('pj' + (a.fs || a.tc)), season);
-  if (age >= 13 && age <= 18 && ctx.school) return special(ctx.gymDay ? 'gym' : 'uniform', g, age, rng('un' + (a.fs || a.tc)), season);
+  if (age >= 13 && age <= 18 && ctx.school && (ctx.gymDay || !noUniform())) return special(ctx.gymDay ? 'gym' : 'uniform', g, age, rng('un' + (a.fs || a.tc)), season);
   if (ctx.army) return special('army', g, age, r, season);
   const W = wardrobe(a, age, who);
   if (ctx.working && W.work) { const o = W.work[season === 'summer' ? 1 : 0]; return season === 'winter' && !o.outer && !['fire', 'army'].includes(o.uni) ? Object.assign({}, o, { outer: { k: 'longcoat', c: N.charcoal } }) : o; }

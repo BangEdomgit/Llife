@@ -110,7 +110,7 @@ GAME_DATA.events = [
     choices: [
       { label: '재수한다', if: s => s.age === 18, set: 'retake', text: '1년을 더 투자하기로 했다. 길고 외로운 시간이 시작됐다.', effect: { happy: -6 } },
       { label: '취업한다', set: 'noCollege', unset: 'retake', text: '학교가 전부는 아니다. 내 길을 가기로 했다.', effect: { happy: 1 } },
-      { label: '전문대라도 간다', do: (s, a) => { const u = a.univ('COL1'); a.admit('COL1', a.pick(u.departments)); }, text: '갈 수 있는 곳에 갔다. 여기서 다시 시작이다.' },
+      { label: '전문대라도 간다', do: (s, a) => { const u = a.college(); a.admit(u.id, a.pick(u.departments)); }, text: '갈 수 있는 곳에 갔다. 여기서 다시 시작이다.' },
     ] },
   { id: 'dreamSpeech', type: 'must', at: 10, text: '장래희망 발표 시간. "{dreamSpeech}"', memory: true },
   { id: 'enlist', type: 'must', age: [20, 21], season: ['봄'], req: { gender: 'm', noFlags: ['inJail', 'exempt'] }, when: s => s.age === (s.vars.enlistAt || 20),   // 20세 시작에선 내년으로 미루거나 면제
