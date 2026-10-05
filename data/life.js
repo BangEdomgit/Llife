@@ -27,11 +27,14 @@ GAME_DATA.config = {
 // 외모는 3층 — 생김새(face): 타고남, 성형으로만 오름 / 몸(body): 체력 등급 그대로 / 꾸밈(style): 돈과 시간, 매년 떨어짐
 GAME_DATA.abilities = ['smart', 'fit', 'face', 'style', 'charm', 'art', 'craft'];
 GAME_DATA.statLabel = { happy: '행복', health: '건강', libido: '성욕', smart: '지능', fit: '체력', face: '생김새', style: '꾸밈', charm: '매력', art: '감성', craft: '손재주', money: '돈' };
-// [등급, 시작값, 이 등급에서 오르는 속도]
+// [등급, 시작값, 이 등급에서 오르는 속도] — 능력치는 상한 300(abilCap), 화면에는 ×10/3 해서 1000 만점으로 보임
+//   화면 기준: F 0 · E 100 · D 200 · C 300 · B 400 · A 550 · S 750 · SS 900 · 최대 1000
 GAME_DATA.grades = [
-  ['F', 0, 1], ['E', 25, 1], ['D', 50, 1], ['C', 80, .85],
-  ['B', 120, .7], ['A', 170, .55], ['S', 230, .4], ['SS', 300, .3],
+  ['F', 0, 1], ['E', 30, 1], ['D', 60, 1], ['C', 90, .85],
+  ['B', 120, .7], ['A', 165, .55], ['S', 225, .4], ['SS', 270, .3],
 ];
+GAME_DATA.abilCap = 300;          // 능력치 상한 (안쪽 값) — 화면 1000
+GAME_DATA.abilShow = 10 / 3;      // 화면에 보이는 값 = 안쪽 값 × 10/3
 // 섹스 기술은 SSS까지 (같은 문턱 + SSS 380). SSS: 애인 있는 사람·유부녀도 빠져들고 죄책감을 못 느낌, 만족감이 100을 넘을 수 있음
 GAME_DATA.sexGrades = GAME_DATA.grades.concat([['SSS', 380, .25]]);
 

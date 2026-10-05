@@ -12,7 +12,10 @@ const OLD_KEYS = ['llife-save-v4', 'llife-save-v3'];
 let slot = 1;
 try { slot = Math.max(1, Math.min(SLOTS_N, Math.round(+localStorage.getItem(SLOT_KEY)) || 1)); } catch (e) { /* 저장 불가 */ }   // clamp는 아래에 있어서 여기선 못 씀
 const COND = ['happy', 'health', 'libido'];   // 상태: 0~100. 성욕은 대상마다 따로(S.lust) — stats.libido는 그중 가장 높은 값(화면·조건용)
-const ABIL = D.abilities;                     // 능력: 상한 없음, 등급
+const ABIL = D.abilities;                     // 능력: 등급, 상한 ABIL_CAP (화면에는 ×10/3 → 1000 만점)
+const ABIL_CAP = D.abilCap || 300, ABIL_SHOW = D.abilShow || 10 / 3;
+const abilShow = v => Math.min(1000, Math.round((v || 0) * ABIL_SHOW));   // 화면용 능력치 (0~1000)
+function capAbil() { if (S && S.stats) for (const k of ABIL) if (S.stats[k] > ABIL_CAP) S.stats[k] = ABIL_CAP; }
 const STATS = COND.concat(ABIL);
 const PSTATS = ['close', 'trust', 'heart', 'grudge'];
 const LABEL = Object.assign({}, D.statLabel, { close: '친밀', trust: '신뢰', heart: '설렘', grudge: '원한', sat: '만족감' });
@@ -156,7 +159,7 @@ function gIdx(v) { let i = 0; while (i + 1 < GR.length && v >= GR[i + 1][1]) i++
 const gradeOf = v => GR[gIdx(v)][0];
 const gradeMin = letter => (GR.find(g => g[0] === letter) || GR[0])[1];
 function gradeInfo(v) {
-  const i = gIdx(v), lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : lo + 100;
+  const i = gIdx(v), lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : ABIL_CAP;
   return { letter: GR[i][0], idx: i, pct: Math.min(1, (v - lo) / (hi - lo)), value: v };
 }
 const LETTERS = GR.map(g => g[0]);
@@ -173,13 +176,13 @@ const SSS = () => sIdx(S.sexSkill) >= 8;
 const pickKey = obj => weighted(Object.keys(obj), k => obj[k]);
 // 등급 글자 → 그 등급 안의 아무 값
 function gradeValue(letter) {
-  const i = Math.max(0, LETTERS.indexOf(letter)), lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : lo + 60;
+  const i = Math.max(0, LETTERS.indexOf(letter)), lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : ABIL_CAP + 1;
   return rand(lo, hi - 1);
 }
 // 한 등급 위/아래로 (등급 안에서의 위치는 유지). cap: 최고 등급 번호
 function gradeStep(v, dir, cap = LETTERS.length - 1) {
   const g = gradeInfo(v), i = clamp(g.idx + dir, 0, cap);
-  const lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : lo + 60;
+  const lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : ABIL_CAP + 1;
   return Math.round(lo + g.pct * (hi - lo - 1));
 }
 
@@ -374,16 +377,21 @@ function faceStat(inf) {
   const i = Math.max(0, LETTERS.indexOf(inf.grade)), lo = GR[i][1], hi = GR[i + 1] ? GR[i + 1][1] : lo + 40;
   return Math.round(lo + inf.pos * (hi - lo - 1));
 }
+// 얼굴 그림 등급은 S까지 (SS 생김새도 S 얼굴 중 가장 위로)
+const faceLetter = v => { const L = gradeOf(v); return L === 'SS' ? 'S' : L; };
 function fitMyFace() {
   if (!S.look || !window.Avatar || !Avatar.fitGrade) return;
-  const inf = Avatar.fitGrade(S.look, gradeOf(S.stats.face));
+  const inf = Avatar.fitGrade(S.look, faceLetter(S.stats.face));
   if (inf && inf.grade === gradeOf(S.stats.face)) S.stats.face = faceStat(inf);   // 같은 등급 안에서 숫자만 얼굴 점수 위치로 (이후 나이·성형 재계산과 이어지게)
   S.look.gfit = FACE_V;
 }
 function syncFace() {
   if (!S.look || !window.Avatar || !Avatar.faceInfo) return null;
   const inf = Avatar.faceInfo(S.look, S.age);
-  if (inf) S.stats.face = clamp(faceStat(inf) + (S.look.fadj || 0), 0, gradeMin('SS') - 1);   // fadj: 성형 최소 보정 (다시 계산해도 남게)
+  if (inf) {   // fadj: 성형 최소 보정 (다시 계산해도 남게)
+    const ss = gradeMin('SS'), v = clamp(faceStat(inf) + (S.look.fadj || 0), 0, ss - 1);
+    S.stats.face = S.stats.face >= ss && inf.grade === 'S' ? S.stats.face : v;   // SS 생김새(샌드박스로 높게)는 얼굴 그림이 S로 남아 있는 동안 그대로 — 나이 들어 A로 내려가면 그때 같이
+  }
   return inf;
 }
 let MF = { k: null, v: null };   // 내 얼굴 정보는 꼬심 계산마다 쓰여서 얼굴·나이가 같으면 다시 안 셈
@@ -899,7 +907,7 @@ function applyEffect(eff, gk) {
       S.stats[k] = clamp(b + v, 0, 100);
     } else {
       if (v > 0) v = Math.max(1, Math.round(v * GR[gIdx(b)][2]));   // 등급이 높을수록 덜 오름
-      S.stats[k] = Math.max(0, b + v);
+      S.stats[k] = clamp(b + v, 0, ABIL_CAP);   // 상한 (화면 1000)
     }
     if (S.stats[k] !== b) out.push([k, S.stats[k] - b]);
   }
@@ -2071,6 +2079,7 @@ function yearly() {
 }
 
 function after() {
+  capAbil();   // 능력치 상한 (예전 저장의 큰 값도 여기서 맞춤)
   for (const p of alive()) {
     if (p.married && !p.marriedKnown && (p.close >= 25 || (p.mateId && S.here.some(h => h.key === p.mateId)))) { p.marriedKnown = true; log(`알고 보니 ${josa(pname(p), '은')} 결혼한 사람이었다.`, { t: 'info' }); }
     if (p.divorced && !p.divorcedKnown && Math.max(p.close, p.trust) >= 40) p.divorcedKnown = true;
@@ -2411,20 +2420,33 @@ const campusPos = id => (D.map && D.map.campus && D.map.campus.pos[id]) || null;
 const onCampus = id => !!(PLACES[id] && PLACES[id].campus);
 const standAt = () => S.place || S.at || 'home';
 // 이동 비용: 학교 다닐 땐 어디든 50. 어른은 지도 거리 — 바로 옆 1, 가까우면 2, 멀면 3~10 (1 ≈ 11분)
-function travelRoute(pl) {
+// mode: 고른 교통수단 (지도에서 핀을 누르면 고르는 창) — 없으면 정해 둔 것(S.ride) 또는 자동
+function travelRoute(pl, mode) {
   if (phase() !== 'adult') return null;
   const from = standAt();
   if (from === pl.id) return null;
   if (onCampus(from) && onCampus(pl.id)) return { mode: 'walk', ap: 1, money: 0, min: 11 };   // 캠퍼스 안은 걸어서 금방
   const a = mapPos(from), b = mapPos(pl.id);
   if (!a || !b) return { mode: 'walk', ap: 3, money: 0, min: 33 };
-  const r = pickRoute(routeOptions(a, b, pl.id), S.ride || 'auto');
+  const r = pickRoute(routeOptions(a, b, pl.id), mode || S.ride || 'auto');
   return Object.assign({}, r, { ap: clamp(r.ap, 1, 10) + (onCampus(pl.id) && pl.id !== 'campus' ? 1 : 0) });
 }
-function travelCost(pl) {
+function travelCost(pl, mode) {
   if (phase() !== 'adult') return TEEN_PT;
-  const r = travelRoute(pl);
+  const r = travelRoute(pl, mode);
   return r ? r.ap : 0;
+}
+// 가는 방법 고르기 창 (지도): 수단마다 행동력·시간·요금, 못 쓰는 까닭, 추천(자동이 고르는 것)
+function routeChoices(id) {
+  const pl = PLACES[id];
+  if (!pl || phase() !== 'adult') return null;
+  const from = standAt();
+  if (from === id || (onCampus(from) && onCampus(id))) return null;
+  const a = mapPos(from), b = mapPos(id);
+  if (!a || !b) return null;
+  const extra = onCampus(id) && id !== 'campus' ? 1 : 0, opts = routeOptions(a, b, id), best = pickRoute(opts, 'auto');
+  const list = opts.map(o => { const ap = clamp(o.ap, 1, 10) + extra; return { mode: o.mode, ic: RIDE_IC[o.mode], label: o.nbus ? '심야 N버스' : o.mode === 'bike' ? rideCfg().bikeName || '자전거' : RIDE_LB[o.mode], ap, min: ap * 11, money: o.money, moneyT: o.money ? fmtPrice(o.money) : '무료', via: o.from && o.to ? `${o.from}역 → ${o.to}역` : '', why: o.why || (S.ap < ap ? `행동력 ⚡${ap} 필요` : ''), best: o === best }; });
+  return { id, label: kidPlaceName(id) || pl.label, icon: pl.icon, from: mapPos(from), to: b, list, why: closedWhy(pl) || (dutyPending() ? '먼저 출근·수업부터' : ''), car: rideInfo() };
 }
 const ageFits = (pl, age) => !!pl && age >= (pl.minAge || 0) && (pl.maxAge == null || age <= pl.maxAge);
 function pickHangout(hobby, age) {
@@ -2641,9 +2663,9 @@ function enterPlace(pl, bring, night = S.time === 2) {
 // 동행 — 잠자리 제안·가볍게 즐기기를 받아준 사람이 오늘 하루 같이 다님 (모텔·집으로). 하루가 끝나거나 그날 밤을 보내면 헤어짐
 const companion = () => { const p = S.companion && person(S.companion); return p && canSex(p) ? p : null; };
 function setCompanion(p) { S.companion = p ? p.id : null; }
-function goPlace(id) {
+function goPlace(id, mode) {
   const pl = PLACES[id];
-  const cost = pl ? travelCost(pl) : 0, rt = pl ? travelRoute(pl) : null;
+  const cost = pl ? travelCost(pl, mode) : 0, rt = pl ? travelRoute(pl, mode) : null;
   if (!pl || S.place === id || busy() || S.ap < cost || S.ap <= 0 || dutyPending() || !placeOpen(pl)) return;
   const night = S.time === 2;   // 사람은 도착한 때(행동 쓰기 전) 기준으로 채움
   if (S.drunk && ZONE[pl.id] !== ZONE[S.place]) soberUp();
@@ -3977,15 +3999,15 @@ function newLife(opt = {}) {
    0~19살을 건너뛰고, 직접 정한 능력치(300포인트)·몸·배경·관계로 스무 살 3월 1일(학년도 시작)부터 어른 하루를 삶 (재수면 고3 턴 한 번 더)
    지나온 시간(내신·수능·1학년 학점, 가족·친구·연인, 어린 시절 추억)은 고른 값에서 거꾸로 만들어 넣음 (data/quick.js) */
 const QD = () => D.quick;
-// 0~100 포인트 → 게임 능력치: 0~20 F / 21~40 E~D / 41~60 C / 61~80 B~A / 81~100 S (등급 시작값 data/life.js grades)
-const QS_CONV = [[0, 0], [20, 24], [21, 25], [40, 79], [41, 80], [60, 119], [61, 120], [80, 229], [81, 230], [100, 299]];
+// 0~100 포인트 → 게임 능력치: 0~20 F / 21~40 E~D / 41~60 C / 61~80 B~A / 81~100 S~SS (등급 시작값 data/life.js grades, 100이면 상한 = 화면 1000)
+const QS_CONV = [[0, 0], [20, 29], [21, 30], [40, 89], [41, 90], [60, 119], [61, 120], [80, 224], [81, 225], [100, 300]];
 function qsStat(v) {
   v = clamp(Math.round(+v || 0), 0, 100);
   for (let i = 1; i < QS_CONV.length; i++) {
     const [x0, y0] = QS_CONV[i - 1], [x1, y1] = QS_CONV[i];
     if (v <= x1) return x1 === x0 ? y1 : Math.round(y0 + (y1 - y0) * (v - x0) / (x1 - x0));
   }
-  return 299;
+  return 300;
 }
 // 직접 정한 몸 수치 → figure() 모양 (밑가슴은 허리에서, 남자 가슴둘레는 어깨에서)
 function customFig(g, build, c) {
@@ -4022,7 +4044,7 @@ function quickLook(q) {
   a.body = { height: h < R[0] ? 'short' : h > R[1] ? 'tall' : 'avg', build: QD().builds.some(b => b.id === q.build) ? q.build : 'avg' };
   if (g === 'f') { const ci = QD().cups.indexOf(q.cup); a.body.chest = ci <= 1 ? 'small' : ci >= 4 ? 'large' : 'avg'; }
   else a.body.shoulder = +q.shoulder < 41 ? 'narrow' : +q.shoulder > 46 ? 'wide' : 'avg';
-  if (q.st && q.st.face != null && Avatar.fitGrade) Avatar.fitGrade(a, gradeOf(+q.st.face));   // 미리보기도 고른 생김새 등급의 얼굴
+  if (q.st && q.st.face != null && Avatar.fitGrade) Avatar.fitGrade(a, faceLetter(qsStat(+q.st.face)));   // 미리보기·랜덤 얼굴도 고른 생김새 등급으로 (포인트 → 능력치로 바꿔서 — 샌드박스로 높게 깔면 높은 얼굴만)
   return a;
 }
 const QS_TRACK = { cs: 'tech', medicine: 'life', nursing: 'life', biology: 'life', physics: 'science', chemistry: 'science', engineering: 'science', architecture: 'science', arts: 'arts', music: 'arts', design: 'arts', culinary: 'arts', beauty: 'arts' };
@@ -4050,7 +4072,7 @@ function newLife20(q = {}) {
   const sum = pts.reduce((a, b) => a + b, 0);
   if (!sandbox && sum > diff.points) { const k = diff.points / sum; for (let i = 0; i < pts.length; i++) pts[i] = Math.floor(pts[i] * k); }
   Q.stats.forEach((k, i) => { S.stats[k] = qsStat(pts[i]); });
-  S.stats.style = qsStat(clamp(+q.style || 0, 0, 50));
+  S.stats.style = qsStat(clamp(+q.style || 0, 0, (q.diff === 'sandbox' ? QD().rangeSandbox : QD().range).style[1]));   // 샌드박스는 꾸밈도 100까지
   S.stats.happy = 60; S.stats.health = 80; S.stats.libido = 0;
   if (tr.start) for (const k in tr.start) S.stats[k] = COND.includes(k) ? clamp(S.stats[k] + tr.start[k], 0, 100) : S.stats[k] + tr.start[k];
   if (tr.face) S.stats.face = Math.max(S.stats.face, gradeValue(pickKey(tr.face)));
@@ -4301,6 +4323,7 @@ function patch(s) {
 function upgrade(s) {
   S = s;
   s.v = 5;
+  if (s.stats) for (const k of ABIL) if (s.stats[k] > ABIL_CAP) s.stats[k] = ABIL_CAP;   // 능력치 상한 (화면 1000)
   if (s.stats.face == null) { s.stats.face = s.stats.looks ?? gradeValue(pickKey(D.faceStart)); delete s.stats.looks; }
   if (s.stats.style == null) s.stats.style = 20;
   if (!s.closet) s.closet = [];   // 옷장 (산 옷)
@@ -4379,7 +4402,7 @@ window.Game = {
     jobs: () => D.quick.jobs.map(job), tierUnis: tiers => D.universities.filter(u => tiers.includes(u.tier)),
   },
   // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
-  actPreview, lastAct: () => LAST_ACT, ride: { info: rideInfo, set: setRide, buyCar, sellCar, options: id => { const pl = PLACES[id], a = mapPos(standAt()), b = pl && mapPos(id); return a && b ? routeOptions(a, b, id) : []; } }, mapInfo: () => ({ home: D.map ? homePos() : null, dong: D.map ? homeDong() : '', at: D.map ? mapPos(standAt()) : null }), phase, timeInfo, storyNext, nextTurn, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
+  actPreview, lastAct: () => LAST_ACT, ride: { info: rideInfo, set: setRide, buyCar, sellCar, choices: routeChoices, options: id => { const pl = PLACES[id], a = mapPos(standAt()), b = pl && mapPos(id); return a && b ? routeOptions(a, b, id) : []; } }, mapInfo: () => ({ home: D.map ? homePos() : null, dong: D.map ? homeDong() : '', at: D.map ? mapPos(standAt()) : null }), phase, timeInfo, storyNext, nextTurn, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
   actionList, canDo, costOf, apOf, doAction, needsSubject, shopToday, outfitCtx: (p, evId) => outfitCtx(p || null, evId), dateOutfits, setDateOutfit: ix => { S.vars.dateOutfit = ix; },
   places: placeList, onCampus: () => onCampus(standAt()) && !!S.flags.student, teenPt: TEEN_PT, goPlace, leavePlace, hasNumber, askNumber, askStranger, mateWord, numberOdds, homeNow: () => homeNow(),
   // 📱 부동산 앱 (data/realty.js)
@@ -4399,7 +4422,7 @@ window.Game = {
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,
   jobsite: { list: () => postings().map(postingView), apply: applyPosting, resume, polish: polishResume, apps: jobApps, accept: acceptOffer, decline: declineOffer, app: () => (JS() || {}).app || '구인', applyPt: APPLY_PT, polishPt: POLISH_PT, cats: () => D.jobCats || {} },
   roleText, karmaLabel, trait, job, mainPartner, season, fmtMoney, josa,
-  gradeInfo, sexInfo: () => sexInfo(S.sexSkill), sexGrades: SG.map(g => g[0]), abilities: ABIL, conds: COND, subjects: D.subjects, naesinAvg, mockAvg, univLabel, majorLabel, studyInfo, subjectsNow: () => subjectsNow().map(SUB),
+  gradeInfo, abilShow, abilMax: 1000, sexInfo: () => sexInfo(S.sexSkill), sexGrades: SG.map(g => g[0]), abilities: ABIL, conds: COND, subjects: D.subjects, naesinAvg, mockAvg, univLabel, majorLabel, studyInfo, subjectsNow: () => subjectsNow().map(SUB),
   // 학교 화면: 성적표 확인, 원서 (대학·학과 목록, 합격 확률, 내기)
   ackReport: () => { S.report = null; after(); }, get universities() { return D.universities; }, departments: D.departments, tracks: D.tracks, tierLabel: t => D.tierLabel[t], admitP, submitApply, gradeLabel: () => gradeLabel(),
   creation: { traits: D.traits, personalities: D.personalities, wealth: D.wealth, hobbies: D.hobbies, values: D.values, dreams: D.dreams, siblings: D.siblings },

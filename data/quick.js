@@ -39,7 +39,7 @@ GAME_DATA.quick = {
   builds: [{ id: 'slim', label: '마른' }, { id: 'avg', label: '보통' }, { id: 'fit', label: '탄탄한' }, { id: 'chubby', label: '통통한' }],
   cups: ['AA', 'A', 'B', 'C', 'D', 'E', 'F'],
   range: { height: { m: [155, 190], f: [148, 175] }, waist: [55, 80], hip: [80, 105], shoulder: [38, 50], penis: [8, 20], style: [0, 50] },
-  rangeSandbox: { height: { m: [140, 200], f: [135, 195] }, waist: [45, 100], hip: [70, 120], shoulder: [34, 56], penis: [5, 25], style: [0, 50], money: [0, 99999] },
+  rangeSandbox: { height: { m: [140, 200], f: [135, 195] }, waist: [45, 100], hip: [70, 120], shoulder: [34, 56], penis: [5, 25], style: [0, 100], money: [0, 99999] },
   loverStats: [['close', '친밀'], ['trust', '신뢰'], ['heart', '설렘'], ['compat', '궁합'], ['libido', '나를 향한 성욕']],   // 샌드박스에서 직접 정하는 연인 스탯
   // 성격 고를 때 보이는 효과 미리보기
   persEffect: { bold: '플러팅 +, 조심성 -', shy: '신뢰 +, 적극성 -', playful: '매력 +, 진지함 -', cool: '독립성 +, 친밀 -',

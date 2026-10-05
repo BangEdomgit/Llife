@@ -35,7 +35,7 @@ function deltaHTML(d) {
   if (!d || !d.length) return '';
   const parts = d.map(([k, v]) => {
     if (k === 'sat') return `${esc(G.LABEL.sat)} <b class="sat">${v}</b>`;
-    const shown = isMoney(k) ? G.fmtMoney(Math.abs(v)) : Math.abs(v);
+    const shown = isMoney(k) ? G.fmtMoney(Math.abs(v)) : G.abilities.includes(k) ? Math.max(1, G.abilShow(Math.abs(v))) : Math.abs(v);   // 능력치는 1000 만점 기준으로
     return `${esc(G.LABEL[k] || k)} <span class="${v > 0 ? 'p' : 'm'}">${v > 0 ? '+' : '-'}${shown}</span>`;
   });
   return `<span class="delta">(${parts.join(', ')})</span>`;
@@ -203,23 +203,14 @@ function mapHTML(list, mode) {
   const map = `<div class="cmap${night ? ' night' : ''}${cp ? ' campus' : ''}">${window.CityMap ? (cp ? CityMap.campusSvg(univ) : CityMap.svg(G.region())) : ''}${pins}</div>`;
   if (cp) return map;
   if (G.region() === 'kr') {   // 서울: 휠·두 손가락으로 확대/축소, 끌어서 이동, ＋/－ (지도 폭 = 720 × 배율)
-    return `${rideBar()}<div class="cmap-wrap"><div class="cmap-view kr${mapScale < .75 ? ' zs' : ''}">${map.replace('<div class="cmap', `<div style="width:${Math.round(720 * mapScale)}px" class="cmap`)}</div>
+    return `<div class="cmap-wrap"><div class="cmap-view kr${mapScale < .75 ? ' zs' : ''}">${map.replace('<div class="cmap', `<div style="width:${Math.round(720 * mapScale)}px" class="cmap`)}</div>
       <div class="cm-zbtn" role="group" aria-label="지도 확대·축소"><button type="button" data-mapz="in" aria-label="확대">＋</button><button type="button" data-mapz="out" aria-label="축소">－</button><button type="button" data-mapz="fit" aria-label="전체 보기">⤢</button></div></div>
       <p class="cm-legend"><span><i class="k me"></i>내 위치</span><span><i class="k go"></i>갈 수 있는 곳</span><span><i class="k kinder">유</i>유치원</span><span><i class="k elem">초</i>초등</span><span><i class="k mid">중</i>중</span><span><i class="k high">고</i>고</span><span>🚇 역</span><button type="button" class="cm-zoom" data-mapcenter>📍 내 위치</button></p>
-      <p class="hint cm-hint">마우스 휠·두 손가락으로 확대/축소, 끌어서 이동</p>`;
+      <p class="hint cm-hint">마우스 휠·두 손가락으로 확대/축소, 끌어서 이동 · 갈 곳을 누르면 교통수단을 고른다</p>`;
   }
-  return `${rideBar()}<div class="cmap-view ${mapZoom}">${map}</div>
-    <p class="cm-legend"><span><i class="k kinder">유</i>유치원</span><span><i class="k elem">초</i>초등</span><span><i class="k mid">중</i>중학교</span><span><i class="k high">고</i>고등학교</span><span>🚇 지하철역</span><button type="button" class="cm-zoom" data-mapzoom>${mapZoom === 'big' ? '🗺️ 한눈에' : '🔍 크게'}</button><button type="button" class="cm-zoom" data-mapcenter>📍 내 위치</button></p>`;
-}
-// 교통 칩: 자동·걷기·자전거·버스·지하철·(내 차)·택시 + 차 사기/팔기 + 막차 안내
-function rideBar() {
-  const S = G.state();
-  if (G.phase() !== 'adult' || !G.ride) return '';
-  const R = G.ride.info();
-  const chips = R.modes.map(m => `<button type="button" data-ride="${m.id}" aria-pressed="${R.pref === m.id}">${m.ic} ${esc(m.label)}</button>`).join('');
-  const car = R.car ? `<button type="button" class="ride-car" data-sellcar>🚗 내 차 · 월 ${G.fmtMoney(R.carMonth)} <small>팔기</small></button>`
-    : R.canCar ? `<button type="button" class="ride-car" data-buycar${S.money < R.carPrice ? ' disabled' : ''}>🚗 중고차 사기 <small>${G.fmtMoney(R.carPrice)}</small></button>` : '';
-  return `<div class="ride-bar" role="group" aria-label="이동 수단">${chips}${car}</div>${R.late ? `<p class="hint ride-late">🌙 ${G.region() === 'kr' ? '지하철 막차가 끊겼다 — 심야 N버스·택시·걷기' : '심야 — 지하철은 24시간이지만 배차가 길다'}</p>` : ''}`;
+  return `<div class="cmap-wrap"><div class="cmap-view ${mapZoom}">${map}</div></div>
+    <p class="cm-legend"><span><i class="k me"></i>내 위치</span><span><i class="k go"></i>갈 수 있는 곳</span><span><i class="k kinder">유</i>유치원</span><span><i class="k elem">초</i>초등</span><span><i class="k mid">중</i>중학교</span><span><i class="k high">고</i>고등학교</span><span>🚇 지하철역</span><button type="button" class="cm-zoom" data-mapzoom>${mapZoom === 'big' ? '🗺️ 한눈에' : '🔍 크게'}</button><button type="button" class="cm-zoom" data-mapcenter>📍 내 위치</button></p>
+    <p class="hint cm-hint">갈 곳을 누르면 교통수단을 고른다</p>`;
 }
 // 지도 가운데 맞추기 (지금 있는 곳 → 없으면 집)
 function centerMap(force) {
@@ -285,6 +276,54 @@ document.addEventListener('click', e => {
   const z = b.dataset.mapz;
   setMapScale(v, z === 'in' ? mapScale * 1.4 : z === 'out' ? mapScale / 1.4 : 0);
 }, true);
+// 🚇 가는 방법 고르기: 핀을 누르면 지도 아래쪽에 창 — 수단마다 ⚡·시간·요금 (못 쓰는 건 까닭), ⭐ 추천. 고르면 내 아이콘이 그곳까지 이동
+function openRoute(id, pinEl) {
+  const R = G.ride && G.ride.choices(id), wrap = pinEl && pinEl.closest('.cmap-wrap');
+  if (!R || !wrap) return false;
+  closeRoute();
+  const S = G.state(), rows = R.list.map(o => `<button type="button" class="rt-opt${o.best ? ' best' : ''}" data-route="${o.mode}" data-to="${id}"${o.why || R.why ? ' disabled' : ''}>
+      <span class="ro-ic">${o.ic}</span><span class="ro-t"><b>${esc(o.label)}${o.best ? ' <small>⭐ 추천</small>' : ''}</b><small>${o.why ? esc(o.why) : `${o.min}분${o.via ? ` · ${esc(o.via)}` : ''}`}</small></span>
+      <span class="ro-c"><b>⚡${o.ap}</b><small>${esc(o.moneyT)}</small></span></button>`).join('');
+  const car = R.car.car ? `<button type="button" class="ro-car" data-sellcar data-to="${id}">🚗 내 차 팔기 <small>월 유지비 ${G.fmtMoney(R.car.carMonth)}</small></button>`
+    : R.car.canCar ? `<button type="button" class="ro-car" data-buycar data-to="${id}"${S.money < R.car.carPrice ? ' disabled' : ''}>🚗 중고차 사기 <small>${G.fmtMoney(R.car.carPrice)}</small></button>` : '';
+  wrap.insertAdjacentHTML('beforeend', `<div class="route-sheet" role="dialog" aria-label="${esc(R.label)} 가는 방법">
+    <div class="rs-hd"><b>${R.icon} ${esc(R.label)}</b><span class="dim">가는 방법</span><button type="button" class="rs-x" data-routeclose aria-label="닫기">✕</button></div>
+    ${R.why ? `<p class="hint">${esc(R.why)}</p>` : ''}<div class="rs-list">${rows}</div>${car}</div>`);
+  const first = wrap.querySelector('.route-sheet .rt-opt.best:not(:disabled)') || wrap.querySelector('.route-sheet .rt-opt:not(:disabled)');
+  if (first) first.focus({ preventScroll: true });
+  return true;
+}
+function closeRoute() { document.querySelectorAll('.route-sheet').forEach(x => x.remove()); }
+// 이동 애니메이션: 내 위치(파란 아이콘)가 교통수단 아이콘을 달고 목적지 핀까지 (지도도 따라감)
+let traveling = false;
+function travelTo(wrap, id, mode, ic) {
+  const v = wrap.querySelector('.cmap-view'), m = v && v.querySelector('.cmap'), from = m && (m.querySelector('.pin.here, .pin.at') || m.querySelector('.pin.home')), to = m && m.querySelector(`.pin[data-pl="${id}"]`);
+  const go = () => { traveling = false; G.goPlace(id, mode); if (modalMode === 'map' && G.state().place === id) { mapMode = null; closeModal(); } };
+  if (!m || !from || !to || calm || window.__fastTravel) { go(); return; }
+  traveling = true;
+  const t = document.createElement('div');
+  t.className = 'traveler';
+  t.innerHTML = `<span class="tv-me">${(from.querySelector('.pi') || {}).textContent || '🧍'}</span><span class="tv-ride">${ic}</span>`;
+  t.style.left = from.style.left; t.style.top = from.style.top;
+  m.appendChild(t);
+  from.classList.add('leaving');
+  const W = m.offsetWidth, H = m.offsetHeight, tx = parseFloat(to.style.left) / 100 * W, ty = parseFloat(to.style.top) / 100 * H;
+  const dist = Math.hypot(tx - parseFloat(from.style.left) / 100 * W, ty - parseFloat(from.style.top) / 100 * H), dur = Math.round(Math.min(1400, Math.max(650, dist * 1.6)));
+  t.style.transitionDuration = dur + 'ms';
+  if (v.scrollTo) v.scrollTo({ left: Math.max(0, tx - v.clientWidth / 2), top: Math.max(0, ty - v.clientHeight / 2), behavior: 'smooth' });
+  requestAnimationFrame(() => requestAnimationFrame(() => { t.style.left = to.style.left; t.style.top = to.style.top; }));
+  setTimeout(go, dur + 120);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-route], [data-routeclose]');
+  if (!b) { if (e.target.closest && e.target.closest('.cmap-view') && !e.target.closest('.pin')) closeRoute(); return; }   // 지도 빈 곳을 누르면 닫힘
+  e.stopPropagation();
+  if ('routeclose' in b.dataset) { closeRoute(); return; }
+  if (b.disabled || traveling) return;
+  const wrap = b.closest('.cmap-wrap'), id = b.dataset.to, mode = b.dataset.route, ic = (b.querySelector('.ro-ic') || {}).textContent || '';
+  closeRoute();
+  travelTo(wrap, id, mode, ic);
+}, true);
 // 지도 모드 고르기: 캠퍼스 안에 있으면 캠퍼스 지도부터 (버튼으로 바꿈)
 const mapModeNow = () => mapMode && (mapMode !== 'campus' || campusOK()) ? mapMode : G.onCampus() ? 'campus' : 'city';
 const mapToggle = mode => campusOK() ? `<button type="button" class="map-tog" data-mapmode="${mode === 'campus' ? 'city' : 'campus'}">${mode === 'campus' ? '🏙️ 시내 지도' : '🎓 캠퍼스 지도'}</button>` : '';
@@ -297,7 +336,7 @@ const hhMix = hh => { const t = Object.values(hh).reduce((a, b) => a + b, 0) || 
 function openMap(keep) {
   const ti = G.timeInfo(), S = G.state(), mode = mapModeNow();
   const old = keep === true && modalMode === 'map' && mBody.querySelector('.cmap-view'), sx = old ? old.scrollLeft : 0, sy = old ? old.scrollTop : 0;
-  showModal('map', mode === 'campus' ? '🎓 캠퍼스 지도' : '🗺️ 지도', `${mapToggle(mode)}${mapHTML(G.places(), mode)}<p class="hint">${ti.phase === 'adult' ? `가고 싶은 곳을 누르면 바로 이동한다. ⚡ = 이동에 드는 행동력 (1 ≈ 11분), 옆은 교통수단·요금. 남은 행동력 ⚡${S.ap} · ⏰ ${ti.clock}` : `어디든 ⚡${G.teenPt}. 남은 행동력 ⚡${S.ap}`}</p>`);
+  showModal('map', mode === 'campus' ? '🎓 캠퍼스 지도' : '🗺️ 지도', `${mapToggle(mode)}${mapHTML(G.places(), mode)}<p class="hint">${ti.phase === 'adult' ? `⚡ = 이동에 드는 행동력 (1 ≈ 11분), 옆은 교통수단·요금. 남은 행동력 ⚡${S.ap} · ⏰ ${ti.clock}` : `어디든 ⚡${G.teenPt}. 남은 행동력 ⚡${S.ap}`}</p>`);
   const v = mBody.querySelector('.cmap-view');
   if (old && v) { v.scrollLeft = sx; v.scrollTop = sy; }
   else requestAnimationFrame(() => centerMap(true));
@@ -310,8 +349,15 @@ function strangerLabel(p, grp) {
 }
 // 여기 있는 사람 한 줄 (목록): 아바타 · 이름(아는 사람) 또는 '낯선 여자 (~25)' · 배지 · 하고 있는 일 · 관계
 //   배지: 💍 기혼(반지가 보이면 바로) · 💑 부부 / 👫 커플 (짝과 같이 있음) · 👥 일행 · 👋 이쪽을 봄 · 📱 번호 있음
+// 외모 배지 (어른만): 생김새 등급(F~S, 사람들 사이 백분위) → 못생김 15% · 평범 이하 25% · 평범 25% · 훈훈함/호감형 20% · 잘생김/예쁨 10% · 미남/미녀 4% · 연예인급 1%
+const LOOK_BADGE = [['못생김'], ['평범 이하'], ['평범'], ['훈훈함', '호감형'], ['잘생김', '예쁨'], ['미남', '미녀'], ['✨연예인급']];
+function lookBadge(p) {
+  if (G.npcAge(p) < 19 || p.face == null) return '';
+  const i = Math.max(0, Math.min(6, p.face)), w = LOOK_BADGE[i];
+  return `<span class="bd lk lk${i + 1}">${w[p.gender === 'f' && w[1] ? 1 : 0]}</span>`;
+}
 function hereBadges(h) {
-  const p = h.p, b = [], mk = h.stranger ? '' : G.marker(p);
+  const p = h.p, b = [lookBadge(p)].filter(Boolean), mk = h.stranger ? '' : G.marker(p);
   if (mk) b.push(`<span class="bd wed" title="${mk === '💍' ? '기혼' : '반지 — 기혼 추정'}">${mk}${mk === '💍' ? ' 기혼' : ''}</span>`);
   else if (h.ring) b.push('<span class="bd wed" title="왼손에 결혼 반지">💍 반지</span>');
   if (h.couple) b.push(`<span class="bd cp">${h.wed ? '💑 부부' : '👫 커플'}</span>`);
@@ -964,8 +1010,11 @@ function rollAct() {
 // 지도 조작 (#where·지도 창 공통): 교통수단·차·크게/한눈에·내 위치
 function mapCtl(d) {
   if (d.ride) { G.ride.set(d.ride); return true; }   // 상태가 바뀌면 render가 지도(화면·창)를 제자리에서 다시 그림
-  if ('buycar' in d) { G.ride.buyCar(); return true; }
-  if ('sellcar' in d) { if (confirm('차를 팔까? 산 값의 60%를 받는다.')) G.ride.sellCar(); return true; }
+  if ('buycar' in d || 'sellcar' in d) {   // 교통수단 고르기 창에서 사고팔면 지도가 다시 그려지니 그 창을 다시 띄움
+    if ('buycar' in d) G.ride.buyCar(); else if (confirm('차를 팔까? 산 값의 60%를 받는다.')) G.ride.sellCar();
+    if (d.to) setTimeout(() => { const pin = document.querySelector(`${modalMode === 'map' ? '#mBody' : '#where'} .cmap .pin[data-pl="${d.to}"]`); if (pin) openRoute(d.to, pin); }, 0);
+    return true;
+  }
   if ('mapzoom' in d) { mapZoom = mapZoom === 'big' ? 'fit' : 'big'; try { localStorage.setItem('llife-mapzoom', mapZoom); } catch (e) {} mapCenterKey = null; if (modalMode === 'map') openMap(); else render(G.state()); requestAnimationFrame(() => centerMap(true)); return true; }
   if ('mapcenter' in d) { centerMap(true); return true; }
   return false;
@@ -1002,10 +1051,10 @@ function openDateDress(pid) {
 function openMe() {
   const S = G.state();
   const prof = G.myProfile().map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
-  const ab = G.abilities.map(k => { const g = G.gradeInfo(S.stats[k]);
-    return `<span>${G.LABEL[k]}</span><span class="bar">${bar(g.pct * 100)}</span><span class="num"><b class="g-${g.letter}">${g.letter}</b> ${S.stats[k]}</span>`; }).join('');
+  const ab = G.abilities.map(k => { const g = G.gradeInfo(S.stats[k]), v = G.abilShow(S.stats[k]);   // 1000 만점
+    return `<span>${G.LABEL[k]}</span><span class="bar">${bar(v / 10)}</span><span class="num"><b class="g-${g.letter}">${g.letter}</b> ${v}<small class="dim">/1000</small></span>`; }).join('');
   const cond = G.conds.filter(k => k !== 'libido' || S.age >= G.config.sexMinAge).map(k => `<span>${CD_ICON[k]} ${G.LABEL[k]}</span><span class="bar">${bar(S.stats[k])}</span><span class="num">${S.stats[k]}</span>`).join('');
-  const sx = S.age >= G.config.sexMinAge ? (g => `<span>섹스 기술</span><span class="bar">${bar(g.pct * 100)}</span><span class="num"><b class="g-${g.letter}">${g.letter}</b> ${g.value}</span>`)(G.sexInfo()) : '';
+  const sx = S.age >= G.config.sexMinAge ? (g => `<span>섹스 기술</span><span class="bar">${bar(g.pct * 100)}</span><span class="num"><b class="g-${g.letter}">${g.letter}</b> <small class="dim">F~SSS</small></span>`)(G.sexInfo()) : '';
   const rec = G.myRecords().map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
   let school = '';
   const sc = S.school;
@@ -1160,8 +1209,8 @@ const qFig = q => G.quick.fig(q.gender, q.build, q);
 function qLabel(k) {
   const q = draft.q, Qk = G.quick, gl = v => { const L = Qk.grade(v); return `<b class="g g-${L}">${L}</b>`; };
   if (k === 'left') return String(qLeft(q));
-  if (q.st && k in q.st) return `${q.st[k]} ${gl(q.st[k])}`;
-  if (k === 'style') return `${q.style} ${gl(q.style)}`;
+  if (q.st && k in q.st) return `${q.st[k]} <small class="dim">→ ${G.abilShow(Qk.stat(q.st[k]))}</small> ${gl(q.st[k])}`;   // 포인트 → 능력치(1000 만점)
+  if (k === 'style') return `${q.style} <small class="dim">→ ${G.abilShow(Qk.stat(q.style))}</small> ${gl(q.style)}`;
   if (k === 'height') return `${q.height}cm (${Qk.heightLabel(q.gender, q.height)})`;
   if (k === 'waist') return `${q.waist}cm`;
   if (k === 'hip') return `${q.hip}cm (${Qk.hipLabel(q.hip)})`;
@@ -1211,8 +1260,8 @@ function quickStep(n) {
     return qFld('난이도', qChips('diff', Q.diffs, q.diff), esc(dv.desc)) + head + `
       <div class="chips">${Q.presets.filter(p => !p.sandbox || qSandbox(q)).map(p => `<button type="button" data-qpre="${p.id}">${esc(p.label)}</button>`).join('')}<button type="button" data-qpre="random">🎲 랜덤</button></div>
       <div class="qs-rs">${rows}</div>
-      <p class="hint">0~20 F · 21~40 E~D · 41~60 C · 61~80 B~A · 81~100 S.${qSandbox(q) ? ' 샌드박스는 포인트 제한이 없다.' : ' 남은 포인트가 0이면 더 올릴 수 없다.'}</p>
-      <div class="qs-rs">${qRange('style', 0, 50, q.style, '꾸밈 <small class="dim">옷·머리 상태</small>')}</div>
+      <p class="hint">0~20 F · 21~40 E~D · 41~60 C · 61~80 B~A · 81~100 S~SS. 화살표 옆 숫자는 게임 속 능력치 (1000 만점, 100이면 1000).${qSandbox(q) ? ' 샌드박스는 포인트 제한이 없다.' : ' 남은 포인트가 0이면 더 올릴 수 없다.'}</p>
+      <div class="qs-rs">${qRange('style', 0, qRanges(q).style[1], q.style, '꾸밈 <small class="dim">옷·머리 상태</small>')}</div>
       ${qFld('소질 <small class="dim">앞으로 잘 오르는 것</small>', qChips('trait', C.traits, q.trait), esc(tr.desc || ''))}
       ${qSandbox(q) ? qFld('섹스 기술 <small class="dim">샌드박스</small>', `<div class="chips">${G.sexGrades.map(l => qChip('sexg', l, l, (q.sexg || 'F') === l)).join('')}</div>`, (q.sexg || 'F') === 'F' ? '경험 없이 시작한다.' : q.sexg === 'SSS' ? 'SSS — 애인이 있든 결혼했든 한 번 자면 빠져들고 죄책감을 못 느낀다. 만족감이 100을 넘을 수 있다.' : `${q.sexg} 등급으로 시작한다. 높을수록 그날 밤이 길고 상대가 더 많이 절정한다.`)
         : qFld('경험', `<div class="chips">${qChip('exp', 0, '없음', !q.exp)}${qChip('exp', 1, '있음', q.exp)}</div>`, q.exp ? '섹스 기술이 조금 있는 채로 시작한다.' : '아직 경험 없이 시작한다.')}`;
@@ -1364,7 +1413,7 @@ function openEnding() {
   const close = G.people().filter(p => p.kind === 'family' || p.kind === 'child' || p.spouse || p.partner || p.close >= 60)
     .map(p => `${G.pname(p)}(${G.relLabel(p)})`).join(', ') || '없음';
   const stats = G.conds.filter(k => k !== 'libido' || S.age >= G.config.sexMinAge).map(k => `<span>${G.LABEL[k]}</span><span class="bar">${bar(S.stats[k])}</span><span class="num">${S.stats[k]}</span>`).join('')
-    + G.abilities.map(k => { const g = G.gradeInfo(S.stats[k]); return `<span>${G.LABEL[k]}</span><span class="bar">${bar(g.pct * 100)}</span><span class="num"><b class="g-${g.letter}">${g.letter}</b></span>`; }).join('');
+    + G.abilities.map(k => { const g = G.gradeInfo(S.stats[k]); return `<span>${G.LABEL[k]}</span><span class="bar">${bar(G.abilShow(S.stats[k]) / 10)}</span><span class="num"><b class="g-${g.letter}">${g.letter}</b> ${G.abilShow(S.stats[k])}</span>`; }).join('');
   const album = S.memories.map(m => `<p><span class="dim">${m.age}살 ${m.season || ''} ${wxIcon(m.wx)}</span> ${esc(m.text)}</p>`).join('');
 
   showModal('ending', death ? '— 끝 —' : '🎂 50번째 생일', `
@@ -1827,7 +1876,7 @@ $('#where').addEventListener('click', e => {
   if (!b || b.disabled) return;
   const d = b.dataset;
   if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) (a.id === 'shop' ? openShop() : a.id === 'houseHunt' ? openPhone('realty') : openStudy()); else if ((G.actPreview(d.a) || {}).dice) openAct(d.a); else G.doAction(d.a); }
-  else if (d.pl) { mapMode = null; G.goPlace(d.pl); }
+  else if (d.pl) { mapMode = null; if (!(b.classList.contains('pin') && openRoute(d.pl, b))) G.goPlace(d.pl); }
   else if ('leave' in d) G.leavePlace();
   else if ('map' in d) openMap();
   else if (d.mapmode) { mapMode = d.mapmode; render(G.state()); }
@@ -1875,7 +1924,7 @@ mBody.addEventListener('click', e => {
   if ('ntest' in d) { openNightTest(); return; }   // 💾 저장 칸 → 🧪 그날 밤 테스트
   if (modalMode === 'ntest') { if ('ntgo' in d) runNightTest(); return; }
   if (modalMode === 'quick') { quickClick(b); return; }
-  if (modalMode === 'map') { if (d.mapmode) { mapMode = d.mapmode; openMap(); } else if (mapCtl(d)) {} else if (d.pl) { G.goPlace(d.pl); mapMode = null; if (modalMode === 'map') closeModal(); } return; }   // 지도: 핀을 누르면 이동
+  if (modalMode === 'map') { if (d.mapmode) { mapMode = d.mapmode; openMap(); } else if (mapCtl(d)) {} else if (d.pl) { const pinB = e.target.closest('.pin'); if (pinB && openRoute(d.pl, pinB)) return; G.goPlace(d.pl); mapMode = null; if (modalMode === 'map') closeModal(); } return; }   // 지도: 핀을 누르면 이동
   if (inPhone && phoneClick(b, d)) return;   // 📱 폰 (홈 화면·앱)
   if (modalMode === 'food') {   // 🍽 먹기·사기·집밥
     if (d.ftab) openFood(d.ftab);

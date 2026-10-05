@@ -595,7 +595,7 @@ GAME_DATA.events = [
         text: '{new|이} 고맙다며 다음 공연 날짜를 알려줬다.' },
       { label: '박수만 치고 간다', text: '노래가 귀에 오래 남았다.', effect: { art: [0, 1] } },
     ] },
-  { id: 'mallScout', type: 'random', on: ['mall', 'shop', 'style'], age: [15, 30], when: s => s.stats.face >= 120 && s.stats.style >= 50, text: '길에서 누가 명함을 내밀었다. 모델 일을 해볼 생각이 없냐고 한다.',
+  { id: 'mallScout', type: 'random', on: ['mall', 'shop', 'style'], age: [15, 30], when: s => s.stats.face >= 120 && s.stats.style >= 60, text: '길에서 누가 명함을 내밀었다. 모델 일을 해볼 생각이 없냐고 한다.',
     choices: [
       { label: '해본다', chance: .45,
         success: { text: '광고 사진 한 장에 내 얼굴이 실렸다. 버스 정류장에서 나를 마주쳤다.', memory: true, effect: { money: [100, 400], charm: [2, 4], happy: 6 } },
@@ -1421,7 +1421,7 @@ GAME_DATA.events = [
         success: { text: '오히려 신뢰를 얻었다.', do: (s, a) => a.perf(10) },
         fail: { text: '클라이언트가 떨어져 나갔다.', do: (s, a) => a.perf(-10) } },
     ] },
-  { id: 'designAward', type: 'fixed', weight: 2, when: s => s.job === 'designer' && s.stats.art >= 170, text: '내 디자인이 상을 받았다.', memory: true, effect: { happy: 8 } },
+  { id: 'designAward', type: 'fixed', weight: 2, when: s => s.job === 'designer' && s.stats.art >= 165, text: '내 디자인이 상을 받았다.', memory: true, effect: { happy: 8 } },
   { id: 'teacherCounsel', type: 'fixed', weight: 2.5, once: false, cooldown: 3, when: JOB('teacher'), text: '반 아이 하나가 고민이 있다며 남았다.',
     choices: [
       { label: '끝까지 들어준다', text: '해가 질 때까지 이야기했다. 아이가 웃으며 돌아갔다.', karma: 5, effect: { happy: 3 } },
