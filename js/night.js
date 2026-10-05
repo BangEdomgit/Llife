@@ -681,6 +681,13 @@ function run(stage, job, done) {
   let pv = 0, pvShown = -1;
   // 말풍선: 소리(신음)와 말 — 만족감 단계·달아오른 정도·성격마다 (data/social.js nightSay)
   const SAYD = ((window.GAME_DATA || {}).nightSay) || null, SY = SAYD && (her === 'm' ? SAYD.m : SAYD), sayEl = stage.querySelector('.nt-say');
+  // 사이: 사귀는 사이·배우자·몰래 만나는 사이만 사랑 말(love), 그 밖(원나잇·섹파·썸)은 가볍게(casual) — 억지 러브 없음
+  const loverP = !!(p.partner || p.spouse || p.secret), LOVE_RE = SAYD && SAYD.loveRe;
+  const linePool = () => {
+    const L = [...(SY.line[tier] || []), ...((SY.real || [])[tier] || []), ...(((loverP ? SY.love : SY.casual) || [])[tier] || [])];
+    if (DETAIL && SY.more) L.push(...(SY.more[tier] || []).filter(x => loverP || !LOVE_RE || !LOVE_RE.test(x)));   // 디테일: 이름 부르기 등
+    return L;
+  };
   let lastSay = -9, sayUntil = 0;
   const pickOf = a => a && a.length ? a[Math.floor(Math.random() * a.length)] : '';
   function say(txt, cls, dur = 1.5) {
@@ -1006,10 +1013,10 @@ function run(stage, job, done) {
       for (const k of ['r', 'k', 'x', 'y']) vw[k] += (tv[k] - vw[k]) * e;
       const pt = t >= end ? satV : t < peakUntil ? (peakKind === 'major' ? 1 : peakKind === 'mid' ? .96 : .9) : Math.min(satCap, ar);
       pv += (pt - pv) * Math.min(1, DT * 3);
-      // 말풍선: 달아오를수록 자주. 소리 65% / 말 35% (만족감 단계별, tier 3 이상이면 가끔 성격별 말)
+      // 말풍선: 달아오를수록 자주. 소리 절반 / 짧은 말 절반 (만족감 단계별 · 실제로 튀어나오는 말 · 사이별, tier 3 이상이면 가끔 성격별 말)
       if (SY && t < end && t > 1.2 && t - lastSay > (good ? 3.4 - ar * 1.7 : 4.6) && t >= peakUntil) {
-        if (Math.random() < .65) say(pickOf(SY.moan[!good ? 'bad' : ar < .3 ? 'low' : ar < .65 ? 'mid' : 'high']), 'moan', 1.2);
-        else say(tier >= 3 && SY.pers[p.personality] && Math.random() < .3 ? SY.pers[p.personality] : pickOf(DETAIL && SY.more ? SY.line[tier].concat(SY.more[tier] || []) : SY.line[tier]), '', 1.8);   // 디테일: 이름 부르기 등이 섞임
+        if (Math.random() < .48) say(pickOf(SY.moan[!good ? 'bad' : ar < .3 ? 'low' : ar < .65 ? 'mid' : 'high']), 'moan', 1.2);
+        else say(tier >= 3 && SY.pers[p.personality] && Math.random() < .25 ? SY.pers[p.personality] : pickOf(linePool()), '', 1.8);
       }
       stats.maxPl = Math.max(stats.maxPl, pv);
       if (DETAIL) {
@@ -1063,7 +1070,7 @@ function run(stage, job, done) {
       finale = true;
       if (good) heart(actHip()[0], at(y, actHip()[0]) - 14, { big: true, s: 1.4 + .3 * tier, life: 1.8, dy: -24 });
       else letdown();
-      if (SY) say(pickOf(SY.end[good ? 'good' : 'bad']), good ? 'peak' : '', 2.4);
+      if (SY) say(pickOf(SY.end[good ? 'good' : 'bad'].concat(good ? SY.end[loverP ? 'love' : 'casual'] || [] : [])), good ? 'peak' : '', 2.4);
       if (DETAIL) sfxAt(good ? '털썩' : '…', actHip()[0], at(y, actHip()[0]) - 14, 1.1);
     }
   }

@@ -787,6 +787,7 @@ function sexScene(p, o) {
   const prevBest = p.bestSat || 0;
   p.lastSat = sat; p.bestSat = Math.max(prevBest, sat);
   S.flags.hadSex = true;
+  if (Math.random() < (lover(p) ? .3 : .75)) p.afterTxt = (S.dayN || 0) + rand(1, 3);   // 며칠 뒤 메시지 (afterTexts)
   const fig = figure(p);
   if (S.companion === p.id) S.companion = null;
   S.scene = { kind: 'night', pid: p.id, sat, first: firstWith, fling: !lover(p), contra, spot, direct: !!o.direct, personality: p.personality, fig, cm: pcm, build: herBuild, flow, n: (S.sceneN = (S.sceneN || 0) + 1) };   // cm·build: 그날 밤 ♂♀ 화살 길이·움찔 기준
@@ -982,7 +983,28 @@ function afterSex(p, sx, ctx) {
   if (sx.first && sx.tier <= 1) { log(fill(pick(L.firstLow), c), { t: 'info' }); return; }
   const line = pick(L[sx.tier] || []);
   if (line) log(fill(line, c), { t: sx.tier >= 3 ? 'text' : 'info', memory: sx.legend });
+  afterTalk(p, sx, c);
   pillowTalk(p, sx, c);
+  // 사귀지 않는 사이와 처음 보낸 밤 → 다음 날 아침 (해장·연락처·택시·선 긋기)
+  if (sx.firstWith && !sx.first && !sx.lover && !npcIllicit(p) && !S.pending.length && Math.random() < .5) { S.vars.fp = p.id; trigger('af_morning'); }
+}
+// 끝나고 잠들기 전 한마디 (data/social.js afterTalk) — 사귀는 사이 / 사귀지 않는 사이 / 떳떳하지 못한 사이. 사랑 얘기는 사귀는 사이만
+function afterTalk(p, sx, c) {
+  const A = D.afterTalk;
+  if (!A || Math.random() > .7) return;
+  const set = npcIllicit(p) && !lover(p) ? A.illicit : (sx.lover ? A.love : A.casual)[sx.tier >= 2 ? 'good' : 'bad'];
+  if (set && set.length) log(fill(pick(set), c), { t: 'info' });
+}
+// 1~3일 뒤 메시지 (data/events2.js af_*): 사귀는 사이 → 보고 싶다는 말 / 떳떳하지 못한 사이 → "지워 줘" / 사귀지 않는 사이 → 잘 들어갔냐는 말, 별로였으면 읽씹
+function afterTexts() {
+  if (S.pending.length || phase() !== 'adult' || jailed()) return;
+  const day = S.dayN || 0, p = alive().find(x => x.afterTxt != null && x.afterTxt <= day);
+  if (!p) return;
+  delete p.afterTxt;
+  if (!hasNumber(p) && !lover(p)) return;   // 번호도 모르는 원나잇 상대는 연락이 안 옴
+  const id = lover(p) ? 'af_text_love' : npcIllicit(p) ? 'af_text_illicit' : (p.lastSat || 0) >= 45 && p.heart >= 15 ? 'af_text_casual' : 'af_ghost';
+  if (id === 'af_text_love' && (S.companion === p.id || p.livesWith || p.spouse)) return;   // 같이 사는 사이는 문자 대신 얼굴 보고
+  S.vars.fp = p.id; trigger(id);
 }
 // 필로우 토크: 만족감 50+·친밀 40+면 60%, 만족감 80+면 90% (소심형·예민형 +10%). 같은 사람과는 4턴에 한 번까지
 // 신뢰 +5~10, 친밀 +3~6, 가끔 속마음을 털어놓아 아직 모르던 프로필이 열림
@@ -1341,6 +1363,8 @@ function advanceTurn() {
 function startDay(first) {
   const pen = S.wake || 0;
   S.wake = 0; S.used = pen; S.dayStart = pen; S.ap = DAY_AP + LATE_AP - pen; S.meals = 0; S.worked = false;
+  spoilBag();   // 🎒 가방 속 상한 음식
+  afterTexts();   // 함께 밤을 보낸 사람에게서 온 메시지
   S.place = null; S.here = []; S.zone = 'home'; S.at = 'home'; S.drunk = 0;
   if (!first) S.weather = rollWeather();
   if (isWeekend() && (S.fatigue || 0) > 0) S.fatigue--;
@@ -1368,7 +1392,8 @@ function doDuty(auto) {
   if (!auto && S.sameClothes === (S.dayN || 0) && (d.id === 'work' || d.id === 'class') && Math.random() < .55 && EVENTS.sameClothes) { S.sameClothes = -1; S.vars.dutyKind = d.id; fire(EVENTS.sameClothes); }   // 어제 옷 그대로 출근·등교
   if (d.id === 'work') {
     S.perf = clamp(S.perf + probRound((.12 + gIdx(S.stats.smart) * .02) * tired), 0, 100);
-    if (!auto) log(pick(['출근했다. 하루가 길었다.', '회의, 메일, 회의. 퇴근길 하늘이 벌써 어두웠다.', '일을 마치고 퇴근했다.', '점심시간만 기다리며 오전을 버텼다.']), { t: 'info' });
+    const lunch = workLunch();   // 점심은 회사 근처에서
+    if (!auto) log(`${pick(['출근했다. 하루가 길었다.', '회의, 메일, 회의. 퇴근길 하늘이 벌써 어두웠다.', '일을 마치고 퇴근했다.', '점심시간만 기다리며 오전을 버텼다.'])} 점심은 ${pick(FD().lunchSpots || ['회사 근처 백반집', '구내식당'])}에서 먹었다. (${fmtPrice(lunch)})`, { t: 'info' });
     maybeRandom(['work', 'office', S.job], auto ? .01 : C.randomEventChance * .5);
   } else if (d.id === 'class') {
     S.school.studyYear += .02 * tired;
@@ -1376,7 +1401,7 @@ function doDuty(auto) {
     // 수업이 끝나면 강의실에 남아 있음 (같은 과 사람들) — 캠퍼스 지도로 학생식당·도서관·동아리방…
     if (!auto && PLACES.lecture) { enterPlace(PLACES.lecture); S.at = 'lecture'; }
     maybeRandom(['lecture', 'campus', 'study'], auto ? .01 : C.randomEventChance * .8);
-  } else if (!auto) log('하루 종일 훈련을 받았다.', { t: 'info' });
+  } else { S.meals = Math.max(S.meals || 0, 2); if (!auto) log('하루 종일 훈련을 받았다. 밥은 짬밥.', { t: 'info' }); }
 }
 // 잠자기 — 하루 끝. 밥을 거르면 건강이 깎이고, 새벽까지 깨 있었으면 다음 날 늦게 일어나고 피로가 쌓임
 function endDay(auto) {
@@ -1389,7 +1414,7 @@ function endDay(auto) {
   }
   if (!auto) {
     const m = S.meals || 0;
-    if (m < 2) log(m ? '오늘은 한 끼밖에 못 먹었다.' : '하루 종일 아무것도 안 먹었다.', { t: 'info', deltas: applyEffect({ health: m ? -1 : -2 }) });
+    if (m < 2 && !S.flags.inArmy && !jailed()) log(m >= .5 ? (m >= 1 ? '오늘은 한 끼밖에 못 먹었다.' : '오늘은 군것질로만 버텼다.') : '하루 종일 아무것도 안 먹었다.', { t: 'info', deltas: applyEffect(m >= 1 ? { health: -1 } : { health: -2, happy: -1 }) });
     if (hourOf(S.used) >= 29) { S.wake = Math.round(6 / HPA); S.fatigue = (S.fatigue || 0) + 2; log('해가 뜰 무렵에야 잠들었다.', { t: 'info', deltas: applyEffect({ health: -3 }) }); }
     else if (hourOf(S.used) >= 25.5) { S.wake = Math.round(3 / HPA); S.fatigue = (S.fatigue || 0) + 1; log('새벽 늦게 잠들었다.', { t: 'info', deltas: applyEffect({ health: -1 }) }); }
   }
@@ -1409,8 +1434,8 @@ function endDay(auto) {
 const healthBase = () => clamp(Math.round(86 - Math.max(0, S.age - 30) * .8 + gIdx(S.stats.fit) * 2), 40, 96);
 // 하루를 통째로 넘김 (출근·밥은 자동, 랜덤 이벤트는 하루에 조금)
 function autoDay() {
-  S.meals = 2;
   if (dutyPending()) doDuty(true);
+  autoMeals();   // 끼니는 알아서 (식비만 나감)
   maybeRandom(['day'], C.dayEventChance);
   endDay(true);
 }
@@ -1436,14 +1461,166 @@ function skip(kind) {
   if (phase() !== 'adult') beginPhase();
   after();
 }
-// 밥 먹기 (5) — 하루 두 끼를 안 먹으면 건강이 깎임
-function eat() {
-  if (busy() || phase() !== 'adult' || S.ap <= 0) return;
-  spend(PT.eat);
-  S.meals = (S.meals || 0) + 1;
-  const where = S.place ? PLACES[S.place].label : '집';
-  log(pick(hourOf(S.used) <= 10.5 ? ['토스트 한 장으로 아침을 때웠다.', '아침밥을 든든하게 먹었다.'] : hourOf(S.used) <= 16.5 ? ['점심을 먹었다.', `${where} 근처에서 점심을 먹었다.`, '김치찌개 한 그릇을 비웠다.'] : ['저녁을 먹었다.', '배달 음식을 시켜 먹었다.', '라면을 끓여 먹었다.']), { t: 'info', deltas: applyEffect({ health: 1 }) });
+/* ═════════ 먹을 것 (data/food.js) — 🍽 식당 · 🛵 배달 · 🎒 가방 ═════════
+   끼니(S.meals): 하루 두 끼가 기준 (못 채우면 잠들 때 건강이 깎임). 먹을 때마다 메뉴의 건강·행복(기대값, 확률 반올림)
+   건강은 나이·체력 기준선(healthBase)까지만 오름 — 자극적인 음식은 깎일 수도. 세 끼를 넘기면 더 먹어도 소용없음
+   🎒 S.bag = [{ id, n, day }] — 편의점·시장·카페에서 산 것. keep일이 지나면 상해서 버림. 식재료는 집에서 해 먹기에 씀
+   출근한 날 점심은 회사 근처에서(자동), 넘기는 날은 끼니 평균값만큼 나감(본가·군대·수감 중엔 0) */
+const FD = () => (D.food || {})[REGION] || (D.food || {}).kr;
+const BAG_MAX = 12;
+const fPrice = x => REGION === 'kr' ? (x.won || 0) / 10000 : (x.usd || 0) / ((REG[REGION] || {}).money || 15);
+// 메뉴 값 (내부 단위 → 원·달러 그대로)
+function fmtPrice(v) {
+  if (REGION !== 'kr') { const d = Math.round(v * ((REG[REGION] || {}).money || 15) * 100) / 100; return `${d % 1 ? d.toFixed(2) : d}달러`; }
+  const w = Math.round(v * 100) * 100;
+  if (!w) return '0원';
+  const man = Math.floor(w / 10000), rest = w % 10000;
+  return man ? `${man}만${rest ? ' ' + rest.toLocaleString() : ''}원` : `${rest.toLocaleString()}원`;
+}
+const foodState = () => { if (!S.bag) S.bag = []; if (!S.food) S.food = { key: '', spent: 0, last: 0 }; return S.food; };
+function payFood(v) {
+  const F = foodState(), key = `${S.date.y}-${S.date.m}`;
+  if (F.key !== key) { F.last = F.key ? F.spent : 0; F.key = key; F.spent = 0; }
+  S.money -= v; F.spent += v;
+}
+const atHome = () => S.place === 'home' || (!S.place && (S.zone || 'home') === 'home');
+const parentsHome = () => homeNow().id === 'parents' && !S.flags.married;
+const foodBlock = () => phase() !== 'adult' ? '어른이 되면' : busy() ? '지금은 못 함' : jailed() ? '수감 중' : '';
+const foodTags = f => [f.meal >= 1 ? '든든' : f.meal <= .25 ? '주전부리' : '간단히', ...(f.hp >= .8 ? ['건강식'] : f.hp < 0 ? ['자극적'] : []), ...(f.hy >= 1.5 ? ['행복 ↑↑'] : f.hy >= .9 ? ['행복 ↑'] : [])];
+// 먹기 (모든 먹는 길이 여기로): 끼니 + 건강·행복
+// 문장 속 {f|을} → 음식 이름 + 조사
+const fillF = (t, label) => t.replace(/\{f(?:\|([^}]+))?\}/g, (m, j) => j ? subJ(label, j) : label);
+function eatFood(f) {
+  const before = S.meals || 0;
+  S.meals = before + (f.meal ?? 1);
+  const eff = {};
+  if (before >= 3) return { deltas: [], full: true };   // 배불러서 더 먹어도 소용없음
+  const hp = probRound(Math.abs(f.hp || 0)) * Math.sign(f.hp || 0), hy = probRound(Math.max(0, f.hy || 0)) + (before === 0 && hourOf(S.used || 0) >= 13 && Math.random() < .5 ? 1 : 0);   // 굶다가 먹으면 꿀맛
+  if (hp > 0 && S.stats.health < healthBase() + 2) eff.health = hp; else if (hp < 0) eff.health = hp;
+  if (hy) eff.happy = hy;
+  return { deltas: applyEffect(eff), full: false };
+}
+// 지금 있는 곳에서 먹거나 살 수 있는 것 (장소 메뉴 · 파는 것 · 집)
+function foodView(x, kind, mult = 1) {
+  const price = fPrice(x) * mult, pt = kind === 'buy' ? 0 : x.pt ?? (x.meal >= 1 ? 3 : 2);
+  let why = foodBlock();
+  if (!why && price > 0 && S.money < price) why = '돈이 모자람';
+  if (!why && S.ap < pt) why = `행동력 ⚡${pt} 필요`;
+  return { id: x.id, label: x.label, icon: x.icon, price, priceT: fmtPrice(price), pt, meal: x.meal, tags: x.cook ? ['집에서 해 먹기'] : foodTags(x), keep: x.keep || 0, uses: x.uses || 0, why, ok: !why, with: !!x.with };
+}
+function foodHere() {
+  const F = FD();
+  if (!F || phase() !== 'adult') return null;
+  const id = S.place || (atHome() ? 'home' : null);
+  if (!id) return null;
+  const c = companion() || (S.companion && person(S.companion)) || null;
+  const out = { place: id, title: '', note: '', eat: [], buy: [], home: [], mate: c ? pname(c) : '' };
+  const m = F.menus[id];
+  if (m) { out.title = m.title; out.note = m.note || ''; out.eat = m.menu.map(x => foodView(x, 'menu', c ? 2 : 1)); }
+  out.buy = F.items.filter(x => (x.at || []).includes(id)).map(x => foodView(x, 'buy'));
+  if (id === 'home') {
+    if (parentsHome()) out.home.push(foodView(F.home.parents, 'menu'));
+    const gro = bagCount('groceries');
+    out.home.push(Object.assign(foodView(F.home.cook, 'menu'), gro ? {} : { why: '식재료가 없다 (시장에서)', ok: false }, { left: gro }));
+  }
+  return out.eat.length || out.buy.length || out.home.length ? out : null;
+}
+// 식당·포장마차·카페에서 앉아서 먹기 (같이 온 사람이 있으면 2인분 — 내가 삼)
+function eatMenu(id) {
+  const here = foodHere(), v = here && here.eat.find(x => x.id === id);
+  if (!v || !v.ok) return;
+  const F = FD(), m = F.menus[here.place], x = m.menu.find(y => y.id === id), c = S.companion && person(S.companion);
+  spend(v.pt); payFood(v.price);
+  const r = eatFood(x);
+  if (c) applyP(c, { close: probRound(x.with ? 2 : 1.2), heart: lover(c) || c.heart >= 30 ? probRound(x.with ? 1.5 : .6) : 0 });
+  log(`${x.icon} ${c ? `${josa(pname(c), '와')} ` : ''}${subJ(x.label, '을')} 먹었다. (${fmtPrice(v.price)})${r.full ? ' 배가 불러서 반은 남겼다.' : ''}`, { t: 'info', deltas: r.deltas });
   after();
+}
+// 사서 가방에 넣기 (식재료는 끼니 수만큼)
+function bagCount(id) { return (S.bag || []).filter(b => b.id === id).reduce((t, b) => t + b.n, 0); }
+function bagUsed() { return (S.bag || []).reduce((t, b) => t + ((FD().items.find(x => x.id === b.id) || {}).cook ? 1 : b.n), 0); }
+function buyFood(id) {
+  const here = foodHere(), v = here && here.buy.find(x => x.id === id), x = FD().items.find(y => y.id === id);
+  if (!v || !v.ok || !x) return;
+  foodState();
+  if (bagUsed() >= BAG_MAX && !(x.cook && bagCount(id))) { log(FD().say.full, { t: 'info' }); after(); return; }
+  payFood(v.price);
+  const day = S.dayN || 0, st = S.bag.find(b => b.id === id && b.day === day);
+  if (st) st.n += x.uses || 1; else S.bag.push({ id, n: x.uses || 1, day });
+  log(`🛒 ${subJ(x.label, '을')} 샀다. (${fmtPrice(v.price)}) 가방에 넣었다.`, { t: 'info' });
+  after();
+}
+// 가방 보기: 상한 날까지
+function bagList() {
+  const F = FD(), day = S.dayN || 0;
+  return (S.bag || []).map((b, i) => { const x = F.items.find(y => y.id === b.id) || { label: b.id, icon: '❔' };
+    const left = x.keep ? x.keep - (day - b.day) : null;
+    return { ix: i, id: b.id, label: x.label.replace(' (3끼분)', ''), icon: x.icon, n: b.n, cook: !!x.cook, left, meal: x.meal, tags: x.cook ? ['집에서 해 먹기'] : foodTags(x), pt: x.meal >= 1 ? 3 : 2,
+      why: x.cook ? '집에서 해 먹기로' : foodBlock() || (S.ap < (x.meal >= 1 ? 3 : 2) ? '행동력 부족' : '') }; });
+}
+function eatBag(ix) {
+  const b = (S.bag || [])[ix], F = FD(), x = b && F.items.find(y => y.id === b.id);
+  if (!x || x.cook || foodBlock()) return;
+  const pt = x.meal >= 1 ? 3 : 2;
+  if (S.ap < pt) return;
+  spend(pt);
+  if (--b.n <= 0) S.bag.splice(ix, 1);
+  const r = eatFood(x);
+  log(`${x.icon} ${fillF(pick(F.say.eat), x.label)}${r.full ? ' 배가 불러서 반은 남겼다.' : ''}`, { t: 'info', deltas: r.deltas });
+  after();
+}
+function dropBag(ix) { if (S.bag && S.bag[ix]) { S.bag.splice(ix, 1); save(); emit(); } }
+// 상한 것 버리기 (아침마다)
+function spoilBag() {
+  if (!S.bag || !S.bag.length) return;
+  const F = FD(), day = S.dayN || 0;
+  S.bag = S.bag.filter(b => { const x = F.items.find(y => y.id === b.id); if (!x || !x.keep || day - b.day <= x.keep) return true; log(fillF(F.say.bad, x.label.replace(' (3끼분)', '')), { t: 'info' }); return false; });
+}
+// 집: 본가 집밥 · 해 먹기
+function homeEat(kind) {
+  const here = foodHere(), F = FD(), x = kind === 'parents' ? F.home.parents : F.home.cook;
+  const v = here && here.home.find(y => y.id === x.id);
+  if (!v || !v.ok) return;
+  spend(v.pt);
+  if (kind === 'cook') { const st = S.bag.find(b => b.id === 'groceries'); if (!st) return; if (--st.n <= 0) S.bag.splice(S.bag.indexOf(st), 1); }
+  const r = eatFood(x), extra = kind === 'cook' && Math.random() < .3 ? applyEffect({ craft: 1 }) : [];
+  log(`${x.icon} ${pick(x.say)}`, { t: 'info', deltas: r.deltas.concat(extra) });
+  after();
+}
+// 🛵 배달 (집에 있을 때): 값 + 배달팁(뉴욕은 배달비 + 팁). 기다리는 동안 행동력
+function deliveryInfo() {
+  const F = FD(), Dv = F.delivery, rate = (REG[REGION] || {}).money || 15;
+  const why = foodBlock() || (!atHome() ? '집에 있을 때만' : '');
+  const fee = p => REGION === 'kr' ? Dv.tipWon / 10000 : (Dv.feeUsd / rate) + p * Dv.tipPct;
+  const min = REGION === 'kr' ? Dv.minWon / 10000 : Dv.minUsd / rate;
+  const stores = Dv.stores.map(st => Object.assign({}, st, { menu: st.menu.map((m, i) => { const p = fPrice(m), f = fee(p), tot = p + f;
+    const w = why || (p < min ? `최소주문 ${fmtPrice(min)}` : S.money < tot ? '돈이 모자람' : S.ap < Dv.pt ? `행동력 ⚡${Dv.pt} 필요` : '');
+    return { ix: i, label: m.label, price: p, priceT: fmtPrice(p), fee: f, feeT: fmtPrice(f), total: tot, totalT: fmtPrice(tot), tags: foodTags(m), why: w, ok: !w }; }) }));
+  return { app: Dv.app, why, pt: Dv.pt, tipT: REGION === 'kr' ? `배달팁 ${fmtPrice(Dv.tipWon / 10000)}` : `배달비 ${fmtPrice(Dv.feeUsd / rate)} + 팁 ${Math.round(Dv.tipPct * 100)}%`, minT: fmtPrice(min), stores, home: atHome() };
+}
+function orderFood(storeId, ix) {
+  const info = deliveryInfo(), st = info.stores.find(x => x.id === storeId), m = st && st.menu[ix];
+  if (!m || !m.ok) return;
+  const raw = FD().delivery.stores.find(x => x.id === storeId).menu[ix], c = S.companion && person(S.companion);
+  spend(info.pt); payFood(m.total);
+  const r = eatFood(raw);
+  if (c) applyP(c, { close: probRound(1.2) });
+  log(`🛵 ${st.name}에서 ${subJ(m.label, '을')} 시켰다. ${st.eta.split('~')[1] || st.eta} 만에 문 앞에 왔다.${c ? ` ${josa(pname(c), '와')} 나눠 먹었다.` : ''} (${m.totalT})`, { t: 'info', deltas: r.deltas });
+  after();
+}
+// 넘기는 날 끼니 (출근한 날 점심은 doDuty에서) — 본가·군대·수감 중엔 돈이 안 듦
+function autoMeals() {
+  const F = FD(), need = Math.max(0, 2 - (S.meals || 0));
+  if (need && F && !parentsHome() && !S.flags.inArmy && !jailed()) payFood(fPrice({ won: F.autoWon, usd: F.autoUsd }) * need);
+  S.meals = Math.max(S.meals || 0, 2);
+}
+// 출근한 날 점심 (회사 근처·구내식당)
+function workLunch() {
+  const F = FD();
+  if (!F) return 0;
+  const p = fPrice({ won: F.lunchWon, usd: F.lunchUsd });
+  payFood(p); S.meals = (S.meals || 0) + 1;
+  return p;
 }
 // 한 달마다: 월급·생활비·피임약값
 function monthly() {
@@ -2526,7 +2703,7 @@ const RT = () => (D.realty || {})[REGION] || (D.realty || {}).kr;
 const ZONE_XY = { home: [48, 396], school: [90, 120], downtown: [230, 170], work: [306, 52], out: [240, 360] };
 const VISIT_PT = 8, REG_PT = 2;
 const r100 = v => Math.max(0, Math.round(v / 100) * 100), r500 = v => Math.max(0, Math.round(v / 500) * 500);
-const realtyState = () => { if (!S.realty) S.realty = { fav: [], seen: {}, reg: {}, gone: {} }; return S.realty; };
+const realtyState = () => { if (!S.realty) S.realty = { fav: [], seen: {}, reg: {}, gone: {} }; const R = S.realty; R.recent = R.recent || []; R.asked = R.asked || {}; R.reported = R.reported || {}; return R; };
 // 매물 한 개 (opt.type: 그 종류로, opt.agent: 중개사 추천 — 허위매물 없음)
 function makeListing(R, id, opt = {}) {
   const t = opt.type ? R.types.find(x => x.id === opt.type) || R.types[0] : weighted(R.types, x => x.w);
@@ -2564,7 +2741,61 @@ function makeListing(R, id, opt = {}) {
   L.nofee = REGION !== 'kr' && Math.random() < .3;
   L.instant = Math.random() < .4;
   L.say = pick(R.agent);
+  appInfo(L, R, t, dong);
   return L;
+}
+// 📱 앱 화면용 정보 (직방·다방·네이버 부동산 / StreetEasy·Zillow 참고): 매물 번호·제목·사진 수·확인매물·방·욕실·난방·방향·입주·용도
+//   관리비 포함/별도 · 보안 · 주변 편의 시설(도보 분) · 역 이름 · 중개사무소 · 중개사가 적은 융자금(거짓일 수도) · 단지 정보 · 실거래가
+//   뉴욕: 올라온 지 며칠 · 한 달 무료(넷 이펙티브) · 렌트 안정화 · 가격 변동 · 편의 시설(amenities)
+function appInfo(L, R, t, dong) {
+  const T = R.titles && R.titles[t.id], day = S.dayN || 0, kr = REGION === 'kr';
+  const big = L.area >= 85, mid = L.area >= 50;
+  L.no = String(2e9 + Math.floor(Math.random() * 7e8));
+  L.photos = L.fake ? rand(3, 6) : rand(6, 15);
+  L.verified = !L.fake && (L.agent || Math.random() < .55) ? day - rand(0, 6) : null;   // 확인매물 (중개사가 현장 확인한 날)
+  L.rooms = { goshiwon: 1, oneroom: L.duplex ? 1 : 1, officetel: mid ? 2 : 1, villa: mid ? 3 : 2, apt: big ? 4 : L.area >= 59 ? 3 : 2, house: rand(3, 5) }[t.id] || 1;
+  L.baths = t.id === 'goshiwon' ? (L.win ? 1 : 0) : big || t.id === 'house' ? 2 : 1;
+  L.heat = pick((R.heat || {})[t.id] || ['개별난방']);
+  L.dirT = L.south ? '남향' : pick(['동향', '서향', '남동향', '남서향', '북향']);
+  L.moveIn = L.instant ? '즉시 입주' : `${((S.date ? S.date.m : 3) % 12) + 1}월 ${pick([1, 10, 15, 20, 25])}일 이후 (협의)`;
+  L.use = (R.uses || {})[t.id] || '';
+  L.entr = ['apt', 'officetel'].includes(t.id) ? pick(['계단식', '복도식']) : null;
+  const mi = (R.mgmtInc || {})[t.id] || [[], []];
+  L.mgmtIn = mi[0]; L.mgmtOut = mi[1];
+  L.secu = shuffle((R.secu || []).slice()).slice(0, rand(2, 5));
+  L.near = shuffle((R.near || []).slice()).slice(0, 5).map(n => [n, rand(1, 12)]).sort((a, b) => a[1] - b[1]);
+  L.stName = (R.stations || {})[dong.name] || '';
+  const O = R.office || {};
+  if (O.words) L.office = { name: kr ? `${dong.name.replace(/동$/, '')} ${pick(O.words)}${O.suffix}` : `${pick(O.words)}${O.suffix}`, boss: `${pick(O.surnames)}${kr ? '○○' : ''}`, deals: rand(2, 46), tel: `${O.tel}-${rand(200, 999)}-${rand(1000, 9999)}`, years: rand(2, 25) };
+  // 중개사가 적은 융자금: 근저당이 있어도 '없음'이라 적기도 함 → 등기부로 확인
+  if (kr && (L.deal === '전세' || L.deal === '매매')) L.claim = !L.lien ? '없음' : Math.random() < .45 ? '없음' : L.lien < (L.market || 1) * .3 ? '시세 대비 30% 미만' : '있음 (협의)';
+  // 단지 (아파트·오피스텔) + 실거래가 (최근 거래 4건)
+  if (['apt', 'officetel'].includes(t.id) && R.cx) {
+    const nm = pick(R.cx.names);
+    L.cx = { name: kr ? `${dong.name.replace(/동$/, '')} ${nm}${t.id === 'apt' ? R.cx.suffix : ' 오피스텔'}` : nm, units: t.id === 'apt' ? (kr ? rand(3, 30) * 100 + rand(0, 99) : rand(40, 400)) : rand(120, 600), dongs: t.id === 'apt' && kr ? rand(4, 28) : 1,
+      top: L.floors, built: L.built, park: (rand(t.id === 'apt' ? 9 : 4, t.id === 'apt' ? 16 : 9) / 10).toFixed(1), builder: pick(R.cx.builders) };
+  }
+  if (['apt', 'officetel', 'villa'].includes(t.id) && L.market) {
+    const base = L.deal === '매매' ? L.market : L.deal === '전세' ? L.market * t.jr : null;
+    let ag = rand(0, 1);
+    if (base) L.trades = Array.from({ length: 4 }, (_, i) => ({ ago: i ? (ag += rand(1, 3)) : ag, f: rand(2, L.floors), v: r500(base * (1 - i * .012 + (Math.random() - .5) * .08)) }));
+  }
+  const py = kr ? ((/(\d+)평형/.exec(L.sub) || [])[1] ? `${/(\d+)평형/.exec(L.sub)[1]}평` : `${Math.round(L.area / 3.3058)}평`) : '';
+  // 매물 제목: 집과 안 맞는 말은 빼고 (신축·역세권·남향·풀옵션·주차·복층·세탁기 …)
+  const fits = x => !(/신축/.test(x) && L.age > 5) && !(/역세권|역 \{st\}분|\{st\}분 거리/.test(x) && L.station > 7) && !(/남향|햇살|채광/.test(x) && !L.south) && !(/풀옵션/.test(x) && (L.opts || []).length < 5)
+    && !(/주차/.test(x) && !L.parking) && !(/복층/.test(x) && !L.duplex) && !(/창문 있는/.test(x) && !L.win) && !(/세탁기/.test(x) && !(L.opts || []).some(o => o.includes('세탁'))) && !(/뷰|스카이라인/.test(x) && (L.floor || 0) < 8);
+  const Tf = T && T.filter(fits);
+  L.title = T ? pick(Tf && Tf.length ? Tf : T).replace('{dong}', dong.name).replace('{st}', L.station).replace('{cx}', L.cx ? L.cx.name.replace(/ ?아파트$/, '') : dong.name).replace('{py}', py) : L.sub;
+  if (!kr) {
+    L.dom = L.fake ? rand(1, 4) : rand(1, 45);   // 올라온 지 며칠 (Days on market)
+    L.free = L.deal === '월세' && !L.fake && Math.random() < .22 ? 1 : 0;   // 한 달 무료 → 넷 이펙티브
+    L.stab = L.deal === '월세' && ['oneroom', 'villa'].includes(t.id) && Math.random() < .15;   // 렌트 안정화
+    if (L.deal === '월세' && L.dom > 14 && Math.random() < .5) L.hist = [{ ago: L.dom, t: '등록', v: Math.round(L.rent * 1.05) }, { ago: rand(1, L.dom - 1), t: '가격 인하', v: L.rent }];
+    else L.hist = [{ ago: L.dom, t: '등록', v: L.deal === '매매' ? L.price : L.rent }];
+    L.amen = shuffle((R.amen || []).filter(a => (a !== '도어맨' || ['officetel', 'apt'].includes(t.id)) && (a !== '엘리베이터' || L.elevator))).slice(0, rand(2, 6));
+    L.baths = big ? 2 : 1;
+    const bd = /(\d)베드/.exec(L.sub); L.rooms = bd ? +bd[1] : /스튜디오|방$|셰어/.test(L.sub) ? 0 : L.rooms;   // 침실 수는 이름대로 (스튜디오 0)
+  }
 }
 let LCACHE = null;
 function listings() {
@@ -2578,11 +2809,11 @@ function listings() {
   LCACHE = { key, list };
   return list;
 }
-const listingById = id => listings().find(l => l.id === id) || (realtyState().fav.find(l => l.id === id)) || null;
+const listingById = id => listings().find(l => l.id === id) || realtyState().fav.find(l => l.id === id) || realtyState().recent.find(l => l.id === id) || null;
 // 화면용: 값·면적·층·통근
 const eok = v => v >= 10000 ? `${Math.floor(v / 10000)}억${v % 10000 ? ' ' + (v % 10000).toLocaleString('en-US') : ''}` : v.toLocaleString('en-US');
 function priceLine(L) {
-  if (REGION === 'kr') return L.deal === '월세' ? `월세 ${L.dep.toLocaleString('en-US')}/${L.rent}` : L.deal === '전세' ? `전세 ${eok(L.dep)}` : `매매 ${eok(L.price)}`;
+  if (REGION === 'kr') return L.deal === '월세' ? `월세 ${L.dep >= 10000 ? eok(L.dep).replace(' ', '') : L.dep.toLocaleString('en-US')}/${L.rent}` : L.deal === '전세' ? `전세 ${eok(L.dep)}` : `매매 ${eok(L.price)}`;
   return L.deal === '월세' ? `렌트 ${fmtMoney(L.rent)}/월` : `매매 ${fmtMoney(L.price)}`;
 }
 const areaText = L => REGION === 'kr' ? `전용 ${L.area}㎡ (${Math.round(L.area / 3.3058)}평)` : `${Math.round(L.area * 10.764).toLocaleString('en-US')} sqft (${L.area}㎡)`;
@@ -2606,9 +2837,41 @@ function listingView(L) {
   return Object.assign({}, L, { priceN: L.price || 0, depN: L.dep || 0, price: priceLine(L), areaT: areaText(L), floorT: floorText(L), commute: commuteOf(L), fav: RS.fav.some(x => x.id === L.id), gone: !!RS.gone[L.id],
     seen: !!seen || L.agent, notes: (seen || L.agent) ? L.hidden.map(id => ({ t: flawT(id).t, bad: !!flawT(id).bad })) : null,
     reg: reg ? { lien: L.lien || 0, risk: L.risk || 0 } : null, canReg: REGION === 'kr' && (L.deal === '전세' || L.deal === '매매'),
+    asked: RS.asked[L.id] || null, reported: !!RS.reported[L.id], wasFake: !!RS.gone[L.id] && !!L.fake, verifiedT: L.verified != null ? ago(L.verified) : null,
     fake: undefined, hidden: undefined, market: undefined, lien: undefined, risk: undefined });
 }
 function realtyList() { return listings().map(listingView); }
+// 며칠 전 (확인매물 날짜 · 올라온 날)
+const ago = d => { const n = (S.dayN || 0) - d; return n <= 0 ? '오늘' : n === 1 ? '어제' : `${n}일 전`; };
+// 최근 본 방 (앱의 '최근 본') — 매물은 주마다 바뀌어도 기록은 남음
+function viewListing(id) {
+  const RS = realtyState(), L = listingById(id);
+  if (!L) return;
+  RS.recent = [JSON.parse(JSON.stringify(L))].concat(RS.recent.filter(x => x.id !== id)).slice(0, 15);
+}
+// 📞 중개사에게 문의 (⚡1): 진짜 매물이면 "아직 있어요", 허위매물이면 대개 "방금 나갔어요"(들킴) — 가끔 "오시면 설명드릴게요"
+function askListing(id) {
+  const L = listingById(id), RS = realtyState();
+  if (!L || RS.asked[id] || RS.gone[id] || realtyWhy() || busy() || S.ap < 1) return;
+  spend(1);
+  let a;
+  if (L.fake && Math.random() < .7) { RS.gone[id] = true; a = pick(['"아, 그 방은 방금 나갔어요. 대신 비슷한 거 있는데 보러 오실래요?"', '"그건 계약됐고요, 조금 더 주시면 더 좋은 방 있어요."']); }
+  else if (L.fake) a = '"전화로는 좀 그렇고, 사무실로 오시면 자세히 설명드릴게요."';
+  else a = pick(L.instant ? ['"네, 아직 있어요. 오늘도 보실 수 있어요."', '"비어 있는 방이라 바로 보실 수 있어요."'] : ['"네, 있어요. 세입자분 계셔서 시간 맞춰 보셔야 해요."', '"아직 있어요. 주말에 보러 오세요."']) +
+    (L.mgmtOut && L.mgmtOut.length ? ` 관리비 말고 ${josa(L.mgmtOut.join('·'), '은')} 따로 나와요.` : '');
+  RS.asked[id] = a;
+  log(`📞 ${L.office ? L.office.name : '중개사'}에 전화했다. ${a}`, { t: 'info' });
+  after();
+}
+// 🚨 허위매물 신고 (들킨 허위매물만)
+function reportListing(id) {
+  const L = listingById(id), RS = realtyState();
+  if (!L || !L.fake || !RS.gone[id] || RS.reported[id]) return;
+  RS.reported[id] = true;
+  log('🚨 허위매물로 신고했다. 며칠 뒤 그 광고가 내려갔다는 알림이 왔다.', { t: 'info', deltas: applyEffect({ happy: 1 }) });
+  addKarma(1);
+  after();
+}
 const realtyWhy = () => phase() !== 'adult' ? '스무 살이 되면' : jailed() ? '수감 중' : '';
 // 보러 가기·등기부·계약을 지금 못 하는 까닭 (평일 출근·수업 전, 이벤트 중)
 const realtyActWhy = () => { if (dutyPending()) { const d = dutyOf(); return `평일 — 먼저 ${d.id === 'work' ? '출근' : d.id === 'class' ? '수업' : '훈련'}부터`; } return busy() ? '지금은 못 함' : ''; };
@@ -2727,6 +2990,7 @@ function budget() {
     if (H.loan) out.push([`🏦 대출 이자 (연 ${((H.rate || 0) * 100).toFixed(1)}%)`, -Math.round(H.loan * (H.rate || 0) / 12)]);
   }
   if (S.flags.onPill) out.push(['💊 피임약', -4]);
+  if (S.age >= 19 && S.food && (S.food.last || S.food.spent)) out.push([S.food.last ? '🍚 식비 (지난달)' : '🍚 식비 (이번 달 지금까지)', -Math.round((S.food.last || S.food.spent) * 10) / 10]);
   return { lines: out, net: out.reduce((t, l) => t + l[1], 0), money: S.money, dep: H.dep || 0, loan: H.loan || 0, owned: H.owned ? H.price || 0 : 0 };
 }
 // 기본 집 채우기 (독립·동거·결혼 이벤트, 20세 시작) — 그 종류의 매물 하나로. dep: 이미 낸 보증금으로 칠지
@@ -3220,6 +3484,26 @@ function myProfile() {
     ['가치관', L(D.values, S.value)], ['집안', L(D.wealth, S.wealth)], ['꿈', L(D.dreams, S.dream) + (S.flags.dreamDone ? ' (이룸)' : '')],
     ['형제', L(D.siblings, S.sibling)], ['생일', `${S.month}월`],
   ];
+}
+
+// 내 정보(프로필 원)의 기록 — 숫자로 남는 것들
+function myRecords() {
+  const ps = alive().filter(p => p.kind !== 'child' || p.role), out = [];
+  const num = ps.filter(p => hasNumber(p)).length, fr = ps.filter(p => relLabel(p) === '친구').length;
+  out.push(['💰 돈', fmtMoney(S.money)]);
+  if (S.job) out.push(['💼 직업', `${jobTitle()} · 연봉 ${fmtMoney(S.salary || 0)} · 성과 ${Math.round(S.perf || 0)}`]);
+  out.push(['👥 아는 사람', `${ps.length}명 · 번호 ${num} · 친구 ${fr}`]);
+  const mate = ps.find(p => p.spouse) || ps.find(p => p.partner);
+  const loves = ps.filter(p => p.partner || p.spouse || p.ex || p.secret).length;
+  if (S.age >= 13) out.push(['💕 연애', `${mate ? `${relLabel(mate)} ${pname(mate)} · ` : ''}사귄 사람 ${loves}명`]);
+  if (S.age >= C.sexMinAge && S.flags.hadSex) { const np = ps.filter(p => p.nights); out.push(['🌙 함께 보낸 밤', `${np.length}명 · ${np.reduce((a, p) => a + (p.nights || 0), 0)}번 · 기술 ${sexGrade(S.sexSkill)}`]); }
+  if (S.age >= 19) out.push(['🏠 집', `${homeNow().label || '집'}${S.home && S.home.dong ? ` (${S.home.dong})` : ''} · 이사 ${Math.max(0, (S.home && S.home.n || 0) - 0)}번`]);
+  out.push(['📷 추억', `${(S.memories || []).length}개`]);
+  out.push(['☯ 업보', `${karmaLabel()} (${S.karma || 0})`]);
+  if ((S.rumor || 0) > 0) out.push(['🗣 소문', `${Math.round(S.rumor)}`]);
+  if (S.record || S.caughtN) out.push(['🚨 전과·들킴', `전과 ${S.record || 0}번 · 들킨 일 ${S.caughtN || 0}번`]);
+  if (phase() === 'adult') out.push(['😮‍💨 피로·취기', `피로 ${S.fatigue || 0} · ${DRUNK[S.drunk || 0] || '맨정신'}`]);
+  return out;
 }
 
 /* ═════════ 데이터에서 쓰는 도구 ═════════ */
@@ -3734,12 +4018,14 @@ window.Game = {
     jobs: () => D.quick.jobs.map(job), tierUnis: tiers => D.universities.filter(u => tiers.includes(u.tier)),
   },
   // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
-  phase, timeInfo, storyNext, nextTurn, eat, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
+  phase, timeInfo, storyNext, nextTurn, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
   actionList, canDo, costOf, apOf, doAction, needsSubject, shopToday, outfitCtx: (p, evId) => outfitCtx(p || null, evId), dateOutfits, setDateOutfit: ix => { S.vars.dateOutfit = ix; },
   places: placeList, onCampus: () => onCampus(standAt()) && !!S.flags.student, teenPt: TEEN_PT, goPlace, leavePlace, hasNumber, askNumber, askStranger, mateWord, numberOdds, homeNow: () => homeNow(),
   // 📱 부동산 앱 (data/realty.js)
-  realty: { list: realtyList, get: id => { const L = listingById(id); return L ? listingView(L) : null; }, fav: favListing, favs: () => realtyState().fav.map(listingView), visit: visitListing, registry: checkRegistry, quote, sign: signContract,
+  realty: { list: realtyList, get: id => { const L = listingById(id); return L ? listingView(L) : null; }, fav: favListing, favs: () => realtyState().fav.map(listingView), recent: () => realtyState().recent.map(listingView), view: viewListing, ask: askListing, report: reportListing, visit: visitListing, registry: checkRegistry, quote, sign: signContract,
     toParents, home: homeInfo, why: realtyWhy, actWhy: () => realtyWhy() || realtyActWhy(), app: () => (RT() || {}).app || '방구하기', visitPt: VISIT_PT, regPt: REG_PT, agentToday: () => !!(S.realty && S.realty.agentDay === S.dayN), moves: () => RT().move },
+  // 🍽 먹을 것 (data/food.js): 여기 메뉴·사기·가방·집밥·해 먹기·배달
+  food: { here: foodHere, eat: eatMenu, buy: buyFood, bag: bagList, eatBag, drop: dropBag, home: homeEat, delivery: deliveryInfo, order: orderFood, price: fmtPrice, max: BAG_MAX, used: bagUsed, spent: () => { foodState(); payFood(0); return S.food; } },
   budget, here: hereList, hereNote: () => S.hereNote && S.hereNote.pl === S.place ? S.hereNote : null, talkTo, passBy, browseMore, browseLeft, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
   intimacy: p => canSex(p) && (p.nights || lover(p) || p.teased) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
@@ -3747,7 +4033,7 @@ window.Game = {
   myLust: p => canSex(p) ? lustOf(p) : null, lustTarget: () => { const t = lustTop(); return t.p ? { name: pname(t.p), v: t.v, id: t.p.id } : null; },
   people: () => alive(), person, interactions,
   // NPC 출현: 이름 옆 결혼 마커, 지금 반지가 보이는지, 얼굴만 아는 사람(관계 목록엔 따로), 소원해짐
-  marker, ringVisible, acquaintance: p => !!p.acq, faded: p => faded(p), companion, endCompany: () => { S.companion = null; save(); emit(); }, interact, canSex, clearScene: () => { if (S.scene) { S.scene = null; save(); } }, look: lookOf, myLook: () => S.look, figure, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile,
+  marker, ringVisible, acquaintance: p => !!p.acq, faded: p => faded(p), companion, endCompany: () => { S.companion = null; save(); emit(); }, interact, canSex, clearScene: () => { if (S.scene) { S.scene = null; save(); } }, look: lookOf, myLook: () => S.look, figure, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile, myRecords,
   crimes: () => D.crimes.filter(c => S.age >= c.minAge && meets(c.req)), canCrime, crimeOdds, commitCrime,
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,
   roleText, karmaLabel, trait, job, mainPartner, season, fmtMoney, josa,

@@ -23,7 +23,7 @@ GAME_DATA.encounter = {
     school: [[5, 10], [3, 6]], schoolAfter: [[3, 6], [3, 6]], campus: [[5, 10], [3, 6]], campusAfter: [[3, 6], [4, 7]],
     office: [[4, 8], [1, 3]], officeAfter: [[2, 4], [3, 5]],
     cafe: [[2, 4], [6, 10]], mall: [[0, 2], [14, 20]], bar: [[2, 5], [6, 10]], gym: [[2, 4], [5, 8]], park: [[0, 2], [8, 12]],
-    library: [[1, 3], [6, 9]], market: [[0, 2], [12, 18]], conveni: [[1, 2], [2, 5]], concert: [[0, 1], [16, 22]], church: [[1, 3], [6, 10]],
+    library: [[1, 3], [6, 9]], market: [[0, 2], [12, 18]], conveni: [[1, 2], [2, 5]], diner: [[0, 2], [7, 12]], concert: [[0, 1], [16, 22]], church: [[1, 3], [6, 10]],
     hospital: [[0, 1], [6, 10]], academy: [[3, 6], [3, 5]], station: [[0, 1], [14, 20]], pcbang: [[1, 3], [6, 10]], center: [[0, 2], [5, 8]],
     lecture: [[4, 8], [2, 4]], cafeteria: [[2, 5], [8, 12]], ulib: [[1, 3], [6, 9]], quad: [[1, 3], [8, 14]], union: [[1, 3], [5, 8]],   // 대학 캠퍼스
   },
@@ -41,7 +41,7 @@ GAME_DATA.encounter = {
   // 처음 보는 사람이 혼자인지 일행인지 [인원, 가중치] (4명은 술집에서만)
   groupSize: [[1, 60], [2, 25], [3, 12], [4, 3]],
   // 장소별 기본 유동 인구 (참고값 — 실제 수는 count 표 × 보정)
-  crowdBase: { home: 0, conveni: 2, park: 3, cafe: 4, gym: 3, library: 2, market: 4, school: 8, academy: 2, office: 5, mall: 6, bar: 5, concert: 7, church: 3, hospital: 2, station: 8 },
+  crowdBase: { home: 0, conveni: 2, diner: 4, park: 3, cafe: 4, gym: 3, library: 2, market: 4, school: 8, academy: 2, office: 5, mall: 6, bar: 5, concert: 7, church: 3, hospital: 2, station: 8 },
   // 풀 크기
   pools: { neighbors: [6, 10], classmates: [20, 30], seniors: [8, 12], team: [6, 10], otherDept: [12, 20], merchants: [3, 5] },
   regulars: { cafe: [3, 6], gym: [3, 5], bar: [4, 7], library: [2, 4] },   // 공원은 열린 장소라 단골 무리가 없음 (예전 저장의 공원 단골은 가끔 마주침)
@@ -77,6 +77,7 @@ GAME_DATA.encounter = {
     park: ['산책 중', '벤치에 앉아 있다', '강아지와 놀고 있다', '조깅 중', '잔디에 누워 있다', '사진 찍는 중', '아이와 놀아주고 있다', '자전거 타는 중'],
     school: ['수업을 듣고 있다', '복도에서 친구와 대화 중', '도시락 먹는 중', '과제 하는 중', '졸고 있다', '휴대폰 보는 중', '동아리실에 가는 중', '매점에서 뭔가 사는 중'],
     office: ['업무 중', '회의실로 가는 중', '커피 타는 중', '점심 메뉴 고르는 중', '통화 중', '모니터 보는 중', '프린터 앞에 서 있다', '엘리베이터 기다리는 중'],
+    diner: ['찌개를 먹고 있다', '혼밥 중', '동료들과 점심 중', '메뉴판을 보는 중', '계산하는 중', '반찬을 더 받는 중'],
     conveni: ['삼각김밥 고르는 중', '음료수를 보고 있다', '계산대에 서 있다', '라면 먹는 중', 'ATM 쓰는 중', '우산 사는 중'],
     church: ['기도 중', '성가대 연습 중', '봉사 활동 중', '어르신과 대화 중'],
     concert: ['공연 보는 중', '팸플릿 읽는 중', '사진 찍는 중', '굿즈 사는 중'],
@@ -218,6 +219,13 @@ GAME_DATA.encounter = {
       age: [['peer', 1], [20, 29, 1], [30, 49, 2.5], [50, 64, 3], [65, 85, 3]], female: .62, married: 1.4, couple: .08,
       pers: { warm: 3, shy: 1.2, playful: .7 }, hobby: { music: 1.8, book: 1.4 }, job: { 주부: 2.5, 퇴직자: 2 }, style: .4,
       when: [{ days: [0], age: [['peer', 2], [20, 29, 2], [30, 49, 3], [50, 64, 3], [65, 85, 2.5]], couple: .12, style: .8, note: '일요일 — 차려입고 온 가족들로 가득하다' }],
+    },
+    diner: {
+      note: '밥 먹으러 온 동네 사람들과 직장인', open: .7,
+      age: [['peer', 1], [19, 29, 2.5], [30, 49, 3], [50, 70, 2]], female: .45, married: 1, couple: .1,
+      job: { 회사원: 2, '배달 라이더': 1.5, 자영업자: 1.5 }, style: -.6,
+      when: [{ h: [11, 14], age: [[25, 39, 4], [40, 55, 3]], job: { 회사원: 6 }, note: '점심시간 — 넥타이 맨 직장인들이 줄을 선다' },
+        { h: [18, 21], couple: .2, note: '저녁 — 퇴근길 혼밥과 가족 손님' }],
     },
     conveni: {
       note: '잠깐 들른 동네 사람들', open: .5,

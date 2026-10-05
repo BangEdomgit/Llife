@@ -28,6 +28,7 @@
 <script defer src="data/map.js"></script>
 <script defer src="data/housing.js"></script>
 <script defer src="data/realty.js"></script>
+<script defer src="data/food.js"></script>
 <script defer src="js/weather.js"></script>
 <script defer src="js/scenes.js"></script>
 <script defer src="js/citymap.js"></script>
@@ -44,20 +45,21 @@
 
 <main class="app" id="app">
   <header class="hud panel">
-    <div class="rule" aria-hidden="true">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
     <div class="who">
-      <span id="name"></span><span id="age"></span><span id="gender" class="dim"></span>
+      <!-- 프로필 원: 누르면 내 정보(능력치·상태·기록 수치 전부) -->
+      <button type="button" class="me-av" id="meAv" aria-label="내 정보 — 능력치·기록"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><clipPath id="meAvClip"><circle cx="32" cy="32" r="32"/></clipPath></defs><g clip-path="url(#meAvClip)"><rect width="64" height="64" fill="#dfe2e8"/><circle cx="32" cy="25" r="11.5" fill="#9aa1ac"/><path d="M7 68c0-15 11-25.5 25-25.5S57 53 57 68z" fill="#9aa1ac"/></g></svg></button>
+      <div class="who-t">
+        <div class="who-n"><span id="name"></span><span id="age"></span><span id="gender" class="dim"></span></div>
+        <div class="sub"><span id="role"></span><span id="trait"></span><span id="money"></span></div>
+      </div>
       <span class="tools">
         <button type="button" id="slotsBtn" aria-label="저장 칸">💾</button>
         <button type="button" id="restart" aria-label="새 인생">↻</button>
         <button type="button" id="hide" aria-label="배경만 보기">👁</button>
       </span>
     </div>
-    <div class="sub"><span id="role"></span><span id="trait"></span><span id="money"></span></div>
-    <div class="rule" aria-hidden="true">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+    <!-- 홈 화면엔 행복·건강·성욕만. 능력치·기록은 프로필 원을 눌러서 -->
     <div class="conds" id="conds"></div>
-    <button type="button" class="ab-tog" id="abTog" aria-expanded="false">능력치 <span id="abSum"></span> <b>▾</b></button>
-    <div class="abils" id="abils"></div>
   </header>
 
   <section class="log panel" id="log" aria-label="인생 기록"></section>
@@ -69,11 +71,11 @@
   </section>
 </main>
 
-<!-- 아래 탭바: 📱 폰(연락처·관계망·부동산·구인·은행·지도·앨범) · 🗺️ 지도 · 📋 나 · 🕶 범죄 · 큰 버튼(계속·다음 주·잠자기) -->
+<!-- 아래 탭바: 📱 폰(연락처·관계망·부동산·배달·구인·은행·지도·앨범) · 🗺️ 지도 · 🎒 가방(먹을 것) · 🕶 범죄 · 큰 버튼(계속·다음 주·잠자기) -->
 <nav class="tabbar" id="tabbar" aria-label="메뉴">
   <button type="button" id="phoneBtn"><span class="ti">📱</span><span>폰</span></button>
   <button type="button" id="mapBtn"><span class="ti">🗺️</span><span>지도</span></button>
-  <button type="button" id="meBtn"><span class="ti">📋</span><span>나</span></button>
+  <button type="button" id="bagBtn"><span class="ti">🎒</span><span>가방</span></button>
   <button type="button" id="crimeBtn"><span class="ti">🕶</span><span>범죄</span></button>
   <button type="button" class="age-btn" id="ageUp">▶ 계속</button>
 </nav>

@@ -34,7 +34,7 @@ GAME_DATA.map = {
     // 강가 공원
     park: [118, 306],
     // 우리 동네 (왼쪽 아래)
-    home: [48, 396], block: [112, 416], conveni: [126, 358], playground: [30, 340], realty: [176, 330],
+    home: [48, 396], block: [112, 416], conveni: [126, 358], playground: [30, 340], realty: [176, 330], diner: [74, 316],
     // 옆 동네 (오른쪽 아래)
     market: [172, 404], hospital: [310, 326], center: [222, 346], church: [246, 410],
     // 터미널 (오른쪽 끝)

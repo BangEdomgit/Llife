@@ -421,4 +421,56 @@ E.push(
       { label: '그냥 챙겨 간다', effect: { happy: 2 }, text: '세상은 아직 따뜻하다.' },
     ] },
 );
+
+/* ═════ 함께 밤을 보낸 뒤 (js/game.js afterSex·afterTexts) — 다음 날 아침, 1~3일 뒤 메시지, 읽씹 ═════ */
+const fpP = (s, a) => a.focused();
+E.push(
+  // 사귀지 않는 사이와 처음 보낸 밤 — 다음 날 아침
+  { id: 'af_morning', type: 'trigger', once: false, age: [20, 70],
+    text: s => s.place === 'motel' ? '체크아웃 전화에 눈을 떴다. {fp|이} 이불 속에서 머리를 긁적였다. 둘 다 잠깐 말이 없었다.' : '커튼 사이로 해가 들어왔다. {fp|이} 옆에서 눈을 떴다. 둘 다 잠깐 말이 없었다.',
+    choices: [
+      { label: '해장하러 가자고 한다', effect: { money: -3, happy: 2 }, p: { close: [4, 7], heart: [2, 4] }, text: '국밥집에서 마주 앉았다. 어젯밤 얘기는 안 했는데 이상하게 편했다.' },
+      { label: '"연락해도 돼?" 하고 묻는다', check: { stat: 'charm', diff: 55 },
+        success: { p: { close: [3, 5], heart: [2, 4] }, do: (s, a) => { const p = fpP(s, a); if (p) p.phone = true; }, text: '{fp|이} 내 휴대폰에 번호를 찍어 줬다. 이름 옆에 이모티콘까지.' },
+        fail: { p: { heart: [-3, -1] }, text: '"…그냥 이렇게 끝내는 게 좋지 않을까." {fp|이} 웃으며 신발을 신었다.' } },
+      { label: '택시를 잡아 준다', effect: { money: -2 }, p: { close: [1, 3] }, text: '택시 문을 닫기 전에 {fp|이} 손을 흔들었다. 묘하게 아쉬웠다.' },
+      { label: '"어젯밤 일은 없던 걸로 하자"', p: { heart: [-8, -5], trust: [1, 3] }, do: (s, a) => { const p = fpP(s, a); if (p) p.fling = false; }, text: '{fp|이} 잠깐 나를 보더니 고개를 끄덕였다. "그래, 그게 편하겠다."' },
+    ] },
+  // 1~3일 뒤 메시지 — 사귀지 않는 사이 (만족감이 괜찮았으면)
+  { id: 'af_text_casual', type: 'trigger', once: false, age: [20, 70],
+    text: s => `띵. {fp}에게서 메시지가 왔다. ${s.region === 'ny' ? '"Hey. 잘 들어갔어?"' : '"어제… 잘 들어갔어?"'}`,
+    choices: [
+      { label: '"응. 너는?" 다정하게 답한다', p: { close: [3, 5], heart: [2, 4] }, text: '대화가 새벽까지 이어졌다. 이모티콘이 점점 늘었다.' },
+      { label: '"이번 주에 또 볼래?"', check: { stat: 'charm', diff: 60 },
+        success: { p: { heart: [4, 7] }, do: (s, a) => { const p = fpP(s, a); if (p) p.libido = Math.min(100, (p.libido || 0) + 12); }, text: '"금요일?" 답이 바로 왔다.' },
+        fail: { p: { heart: [-2, -1] }, text: '"…생각해 볼게." 그 뒤로 한참 답이 없었다.' } },
+      { label: '"응ㅋㅋ" 짧게만 답한다', p: { close: [0, 1] }, text: '대화는 거기서 끝났다.' },
+      { label: '읽고 답하지 않는다', karma: -2, p: { heart: [-7, -4], grudge: [2, 4] }, text: '읽고 그냥 뒀다. 다시 연락은 오지 않았다.' },
+    ] },
+  // 별로였던 밤 — 상대가 답을 안 함 (읽씹)
+  { id: 'af_ghost', type: 'trigger', once: false, age: [20, 70],
+    text: '{fp}에게 보낸 메시지에 이틀째 답이 없다. 읽은 표시만 떠 있다.',
+    choices: [
+      { label: '한 번 더 보낸다', chance: .35,
+        success: { p: { close: [1, 3] }, text: '"아 미안, 요즘 정신이 없어서ㅠ" 늦은 답이 왔다. 그걸로 됐다.' },
+        fail: { effect: { happy: -2 }, text: '두 번째 메시지에도 답은 없었다. 휴대폰을 엎어 놓았다.' } },
+      { label: '그냥 넘긴다', effect: { happy: -1 }, text: '원래 그런 사이였다고 생각하기로 했다.' },
+    ] },
+  // 사귀는 사이 — 다음 날 메시지
+  { id: 'af_text_love', type: 'trigger', once: false, age: [20, 70],
+    text: '점심시간에 {fp}에게서 메시지가 왔다. "아직도 어제 생각나ㅎㅎ 오늘 일찍 와."',
+    choices: [
+      { label: '"나도. 칼퇴할게."', p: { heart: [2, 4], close: [1, 3] }, effect: { happy: 2 }, text: '오후 내내 시계만 봤다.' },
+      { label: '"오늘 야근이야ㅠ"', p: { heart: [-1, 0] }, text: '"힝." 우는 이모티콘이 왔다.' },
+    ] },
+  // 결혼했거나 애인 있는 사람 — "지워 줘"
+  { id: 'af_text_illicit', type: 'trigger', once: false, age: [20, 70],
+    text: '{fp}에게서 짧은 메시지가 왔다. "어제 일 아무한테도 말하지 마. 이 대화도 지워 줘."',
+    choices: [
+      { label: '알겠다고 하고 지운다', p: { trust: [3, 6] }, text: '대화방을 나왔다. 기록은 남지 않았다. 기억은 남았다.' },
+      { label: '"또 볼 수 있어?"', check: { stat: 'charm', diff: 70 },
+        success: { p: { heart: [3, 6] }, text: '한참 뒤에 답이 왔다. "…다음 주 수요일. 내가 장소 보낼게."' },
+        fail: { p: { trust: [-4, -2] }, text: '"안 돼. 이번이 마지막이야." 그 뒤로 번호가 바뀌었다.' } },
+    ] },
+);
 })();

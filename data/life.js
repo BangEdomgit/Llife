@@ -5,7 +5,7 @@ GAME_DATA.config = {
   endAge: 50,
   apPerYear: 10,              // (예전 기준) 1년 행동 수 — 지금은 단계마다 다름: js/game.js 시간(GAMEFLOW)
   dayEventChance: .012,       // 하루를 통째로 넘길 때 그날 랜덤 이벤트 확률
-  livingCost: 1200,
+  livingCost: 900,           // 한 해 생활비(만원) — 밥값은 따로 (data/food.js: 식당·배달·가방)
   randomEventChance: .14,
   placeEventChance: .25,    // 장소에 도착했을 때 랜덤 이벤트 확률
   flavorChance: .3,
@@ -344,7 +344,7 @@ GAME_DATA.actions = [
       ['세상이 빙글빙글 돈다.', '한 잔만 하려다 두 병을 비웠다. 기억이 군데군데 끊겼다.']][s.drunk] },
   { id: 'pray',      label: '기도',   icon: '🙏', pt: 5, minAge: 4,  effect: { happy: [1, 3] }, karma: [1, 3],
     text: ['눈을 감고 오래 앉아 있었다.', '두 손을 모으고 소원을 빌었다.', '마음이 조금 가라앉았다.'] },
-  { id: 'snack',     label: '간식',   icon: '🍙', pt: 3, minAge: 6,  cost: 5, effect: { happy: [1, 3] },
+  { id: 'snack',     label: '간식',   icon: '🍙', pt: 3, minAge: 6, maxAge: 18, cost: 5, effect: { happy: [1, 3] },
     text: ['삼각김밥과 바나나우유를 샀다.', '컵라면에 물을 붓고 3분을 기다렸다.', '1+1 과자를 두 개 집었다.'] },
   { id: 'watch',     label: '공연',   icon: '🎵', pt: 12, minAge: 15, cost: 40, effect: { happy: [5, 9], art: [1, 3] }, memoryChance: .2,
     text: ['목이 쉬도록 따라 불렀다.', '앙코르 곡에서 소름이 돋았다.', '공연이 끝나고도 귀가 웅웅거렸다.'] },

@@ -108,6 +108,13 @@ GAME_DATA.places = [
     arrive: ['번화가는 사람으로 북적였다.', '길거리 음식 냄새에 발걸음이 느려졌다.', '버스킹 소리가 멀리서 들려왔다.'],
     actions: ['shop', 'style', 'parttime'] },
 
+  // 🍽 동네 식당 — 백반·찌개·돈가스 (메뉴: data/food.js menus.diner). 점심·저녁에 붐빔
+  { id: 'diner', label: '식당', icon: '🍽', minAge: 19,
+    regulars: ['friend', 'neighbor', 'coworker'], regularsN: [0, 1], crowd: 'mixed', crowdN: [2, 4], hobby: 'cook',
+    doing: ['김치찌개를 떠먹고 있다', '혼자 TV를 보며 밥을 먹고 있다', '메뉴판을 한참 보고 있다', '반찬을 더 달라고 하고 있다', '계산대 앞에서 지갑을 꺼내고 있다', '동료들과 점심을 먹고 있다', '휴대폰을 세워 두고 밥을 먹고 있다'],
+    arrive: ['식당 문을 열자 찌개 끓는 냄새가 났다.', '"어서 오세요, 아무 데나 앉으세요."', '벽에 붙은 메뉴판 글씨가 바래 있었다.'],
+    actions: [] },
+
   { id: 'hospital', label: '병원', icon: '🏥', minAge: 5,
     regulars: [], regularsN: [0, 1], crowd: 'mixed', crowdN: [0, 2],
     doing: ['대기실에서 번호표를 쥐고 있다', '링거를 꽂은 채 복도를 걷고 있다', '접수창구 앞에서 서류를 쓰고 있다', '기침을 참고 있다', '깁스를 한 다리를 뻗고 앉아 있다'],
@@ -176,7 +183,7 @@ GAME_DATA.places = [
     regulars: ['classmate', 'friend'], crowd: 'peer',
     doing: ['식판을 들고 빈자리를 찾고 있다', '돈가스를 먹고 있다', '친구들과 밥을 먹으며 떠들고 있다', '혼자 이어폰을 끼고 밥을 먹고 있다', '메뉴판 앞에서 고민하고 있다'],
     arrive: ['학생식당에 긴 줄이 늘어서 있었다.', '오늘의 메뉴: 돈가스, 김치볶음밥, 라면.', '식판 부딪히는 소리가 요란했다.'],
-    actions: ['cafMeal', 'snack'] },
+    actions: [] },   // 학식 메뉴 (data/food.js menus.cafeteria)
   { id: 'ulib', label: '중앙도서관', icon: '📚', minAge: 19, campus: true, open: s => !!s.flags.student, closed: '학생만',
     regulars: ['classmate', 'friend'], crowd: 'peer', hobby: 'book',
     doing: ['열람실에서 전공 책을 보고 있다', '노트북으로 리포트를 쓰고 있다', '책상에 엎드려 자고 있다', '서가 사이를 서성이고 있다', '스터디룸에서 토론하고 있다'],
