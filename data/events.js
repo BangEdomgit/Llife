@@ -2142,6 +2142,26 @@ GAME_DATA.events = [
       { label: '오늘은 여기까지', p: { heart: [3, 6] }, effect: { happy: 1 },
         text: '이마를 맞댄 채 숨을 골랐다. "다음엔 안 놔줄 거야." {fp|이} 웃으며 먼저 골목을 나갔다.' },
     ] },
+  // 애인·배우자가 있는 상대가 먼저 제안 — 내 외모(첫인상)나 매력이 A 이상이고 플러팅·섹드립·스킨십으로 달아올랐을 때 (data/social.js inviteRoll)
+  //   집·모텔이면 바로 그날 밤, 밖이면 동행. 그 자리에선 상대 애인에게 안 들키고, 밤을 보낸 뒤 흔적(문자·자국)으로 들킬 수 있음
+  { id: 'takenInvite', type: 'trigger',
+    text: (s, a) => {
+      const p = a.focused() || {};
+      if (p.married) return p.ringOff ? '{fp|이} 빈 약지를 만지작거리며 말했다. "…오늘은 늦게 들어가도 돼."' : '{fp|이} 반지를 빼서 주머니에 넣었다. "오늘은 늦게 들어가도 돼. …조용한 데 갈래?"';
+      return '{fp|이} 휴대폰을 무음으로 돌렸다. "애인한텐 친구 만난다고 했어. …오늘 나랑 같이 있을래?"';
+    },
+    choices: [
+      { label: '같이 있자', if: s => s.place === 'home' || s.place === 'motel', intimate: true, fling: true, direct: true, mood: 14,
+        p: { heart: [6, 10], close: [3, 6] }, effect: { happy: [3, 6] }, memory: firstNight, pregnant: .05,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .2 : 0, riskTaken: .12,
+        text: (s, a) => '{fp|이} 먼저 문을 잠갔다. ' + nightLine(a, 'fling') },
+      { label: '같이 간다', if: s => s.place !== 'home' && s.place !== 'motel',
+        do: (s, a) => { const p = a.focused(); if (!p) return; a.setCompanion(p); if (s.place && !s.here.some(h => h.key === p.id)) s.here.push({ key: p.id, doing: '내 옆에 붙어 있다', used: true }); },
+        p: { heart: [3, 5] }, effect: { happy: [2, 4] },
+        text: '{fp|이} 내 팔짱을 끼고 걸음을 재촉했다. (동행 — 모텔이나 집으로 가면 같이 간다)' },
+      { label: '오늘은 들어가', p: { trust: [3, 6], heart: [1, 3] }, karma: 1,
+        text: '{fp|이} 잠깐 아쉬운 얼굴을 하더니 웃었다. "…그래서 네가 더 좋아."' },
+    ] },
   // 애인이 있는 상대가 고백을 받아줬을 때: 정리하고 만날지, 헤어지지 않은 채 몰래 만날지, 사귀지 않고 즐기기만 할지
   { id: 'takenConfess', type: 'trigger',
     text: (s, a) => { const p = a.focused(); return `{fp|이} 내 손을 잡은 채 망설였다. "근데 나… 아직 ${p && p.gender === 'm' ? '여자친구' : '남자친구'}가 있어."`; },

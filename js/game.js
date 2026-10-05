@@ -831,6 +831,7 @@ function applyOutcome(o, target, resumed) {
   if (sx) { if (S.scene) S.scene.text = text; afterSex(tp, sx, ctx); guiltCheck(tp, sx, ctx); }
   // 키스·포옹·끌어당기기 실루엣 연출 (화면이 S.scene을 보고 그림)
   if (o.scene && tp && S.age >= C.romanceMinAge && npcAge(tp) >= C.romanceMinAge) S.scene = { kind: o.scene, pid: tp.id, text, n: (S.sceneN = (S.sceneN || 0) + 1) };
+  if (sx && tp.taken && !tp.partner && !tp.spouse) scheduleTrace(tp, sx);   // 애인·배우자가 있는 상대와 보낸 밤 → 흔적
   const conceived = !!(o.pregnant && tp && (!o.intimate || sx) && conceive(tp, resolve(o.pregnant) * (sx ? sx.pregMul : 1)));
   if (conceived && S.scene) S.scene.preg = true;
   // 피임 없이 보냈는데 아이가 안 생겼으면, 70% 확률로 다음 계절에 불안이 찾아옴 (배우자는 제외)
@@ -888,9 +889,12 @@ function compareEx(p, sx, c) {
   else { S.vars.worseN = (S.vars.worseN || 0) + 1; log(text, { t: 'info', deltas: applyP(p, { heart: [-5, -3] }).concat(applyEffect({ happy: -3 })) }); }
 }
 // 얽힌 사이: 들키지 않으면 괜찮지만… (risk: 내 애인에게 / riskTaken: 상대 애인에게)
+//   상대 애인에게는: 그 애인이 같이 있을 때(커플로 만난 사람의 연인이 지금 여기 있음)가 아니면 그 자리에서는 거의 안 들킴 (×0.05)
+//   함께 밤을 보낸 건 그 자리에서 들키지 않고, 며칠 안에 문자 내역·몸 자국으로 들킬 수 있음 (scheduleTrace, 상대 성격마다)
+const mateHere = p => !!(p && p.mateId && S.place && S.here.some(h => h.key === p.mateId && !h.x));
 function riskCheck(o, p) {
   const low = p && p.fwb ? .6 : 1;   // 섹파는 감정이 깊지 않아서 들킬 위험도 낮음
-  const risk = (resolve(o.risk) || 0) * low, rt = (resolve(o.riskTaken) || 0) * low;
+  const risk = (resolve(o.risk) || 0) * low, rt = (resolve(o.riskTaken) || 0) * low * (mateHere(p) ? 1 : o.intimate ? 0 : .05);
   const m = mainPartner();
   if (risk && p && m && m !== p && Math.random() < risk + .05 * alive().filter(x => x.secret).length) {
     S.vars.mainId = m.id; S.vars.mainName = pname(m); S.vars.loverId = p.id; S.vars.lover = pname(p);
@@ -900,6 +904,34 @@ function riskCheck(o, p) {
     S.vars.fp = p.id;
     S.caughtN = (S.caughtN || 0) + 1;
     trigger(p.married ? 'spouseCaught' : 'rivalFound');   // 상대 애인에게 / 기혼이면 상대 배우자에게
+  }
+}
+
+// 흔적: 상대 성격마다 들킬 확률과 들키는 방식(문자 내역 / 몸 자국)이 다름. 격한 밤·높은 섹스 기술은 자국을, 배우자는 더 잘 알아챔
+//   1~3일 뒤 한 번 굴림. 같은 사람과 또 자면 더 높은 쪽으로
+const TRACE = { sunny: [.16, 'text'], playful: [.14, 'text'], bold: [.12, 'mark'], sensitive: [.1, 'text'], warm: [.08, 'text'], shy: [.06, 'mark'], cool: [.04, 'text'], sharp: [.03, 'mark'] };
+function scheduleTrace(p, sx) {
+  const [base, kind0] = TRACE[p.personality] || [.08, 'text'];
+  let ch = base * (sx.tier >= 4 ? 1.5 : sx.tier >= 3 ? 1.25 : 1) * (p.married ? 1.2 : 1);
+  const markK = (sx.tier >= 4 ? .15 : sx.tier >= 3 ? .08 : 0) + (sIdx(S.sexSkill) >= 6 ? .1 : 0);
+  const kind = Math.random() < (kind0 === 'mark' ? .75 : .15) + markK ? 'mark' : 'text';
+  const old = (S.traces || []).find(t => t.pid === p.id);
+  ch = Math.min(.35, Math.max(ch, old ? old.ch : 0));
+  S.traces = (S.traces || []).filter(t => t.pid !== p.id).concat({ pid: p.id, day: (S.dayN || 0) + rand(1, 3), ch, kind });
+}
+function checkTraces() {
+  if (!S.traces || !S.traces.length || S.pending.length) return;
+  const today = S.dayN || 0, due = S.traces.filter(t => t.day <= today);
+  if (!due.length) return;
+  S.traces = S.traces.filter(t => t.day > today);
+  for (const t of due) {
+    const p = person(t.pid);
+    if (!p || p.gone || !p.taken || p.partner || p.spouse || Math.random() >= t.ch) continue;
+    S.vars.fp = p.id;
+    log(fill(pick(D.traceLines[t.kind]), { mate: p.married ? (p.gender === 'f' ? '남편' : '아내') : p.gender === 'f' ? '남자친구' : '여자친구' }), { t: 'info' });
+    S.caughtN = (S.caughtN || 0) + 1;
+    trigger(p.married ? 'spouseCaught' : 'rivalFound');
+    return;
   }
 }
 
@@ -1091,6 +1123,7 @@ function nextDay() {
   const pm = S.date.m;
   S.date = { y: dt.getFullYear(), m: dt.getMonth() + 1, d: dt.getDate() };
   S.dayN = (S.dayN || 0) + 1;
+  checkTraces();
   if (S.date.m === pm) return;
   if (S.date.m === 3) { advanceYear(); if (S.ended) return; }
   monthly();
@@ -2133,12 +2166,14 @@ function talkTo(key) {
     return null;
   }
   delete h.x; delete x.approach;
+  const couple = !!x.couple;
   const p = enlist(x);
   h.key = p.id;
   // 일행: 대표와 이야기하면 나머지도 인사를 나눔 → 관계 목록에 (서로 아는 사이)
   const grp = (h.grp || []).map(m => { m.close = rand(3, 8); m.trust = rand(3, 6); const q = enlist(m); S.here.push({ key: q.id, doing: '일행과 함께', used: false }); return q; });
   delete h.grp;
   if (grp.length) { const ids = [p.id, ...grp.map(q => q.id)]; for (const q of [p, ...grp]) q.group = ids.filter(id => id !== q.id); }
+  if (couple && grp[0]) { p.mateId = grp[0].id; grp[0].mateId = p.id; }   // 커플: 서로의 연인 (같이 있으면 들키기 쉬움)
   const fl = firstLook(), romantic = canRomance(p);
   const deltas = applyP(p, { close: [6, 12], trust: [3, 7], heart: romantic ? [Math.max(0, (fl - 2) * 3), Math.max(3, (fl - 1) * 4)] : 0 });
   const hello = S.age < 13 ? pick(D.kidHello) : pt.hello;
@@ -2332,8 +2367,11 @@ function interactMult(p, iid) {
 // 대화하기·플러팅·섹드립 → 지금 상황·상대 성격에 맞는 장면 하나 → 고른 말의 말투(상대 성격과 궁합)·과감함에 따라 결과 (data/social.js run의 ch)
 //   같은 사람에게 최근 본 장면(8개)·전체 최근 장면(12개)은 다른 게 있으면 피함. 조건이 구체적인 장면일수록 더 잘 뽑힘
 //   대화 이벤트로 얻는 호감도는 그냥 행동보다 1.6배 (고르는 데 신경을 쓴 만큼)
-const DLG_KIND = { talk: 'talk', flirt: 'flirt', dirtyTalk: 'dirty' };
-const DLG_COND = ['pers', 'place', 'weather', 'season', 'drunk', 'taken', 'married', 'gender', 'if', 'night', 'heart'];
+const DLG_KIND = { talk: 'talk', flirt: 'flirt', dirtyTalk: 'dirty', touch: 'touch' };
+const DLG_COND = ['pers', 'place', 'weather', 'season', 'drunk', 'taken', 'married', 'gender', 'if', 'night', 'heart', 'look', 'theirLook'];
+// 외모 단계: 나는 첫인상 등급(A 이상 hi · D 이하 lo), 상대는 생김새 등급(B 이상 hi · E 이하 lo — NPC 상위 15% / 하위 40%)
+const myLook = () => { const i = firstLook(); return i >= 5 ? 'hi' : i <= 2 ? 'lo' : 'mid'; };
+const theirLook = p => { const i = p.face ?? 2; return i >= 4 ? 'hi' : i <= 1 ? 'lo' : 'mid'; };
 let DLG = null;
 const dlgById = id => { if (!DLG) { DLG = {}; for (const d of D.dialogues || []) DLG[d.id] = d; } return DLG[id]; };
 const dlgStage = p => lover(p) ? 'lover' : p.fwb ? 'fwb' : p.close >= 60 ? 'close' : p.close >= 30 ? 'friend' : p.close >= 15 ? 'acq' : 'new';
@@ -2356,6 +2394,8 @@ function dlgFits(d, p) {
   if (w.gender && p.gender !== w.gender) return false;
   if (w.me && S.gender !== w.me) return false;
   if (w.adult && (S.age < 19 || age < 19)) return false;
+  if (w.look && !w.look.includes(myLook())) return false;
+  if (w.theirLook && !w.theirLook.includes(theirLook(p))) return false;
   return !w.if || !!w.if(S, p, api);
 }
 // 이 상호작용이 대화 이벤트가 되는지: 13살부터, 내 아이(어린 자녀)와는 예전처럼 한 줄
@@ -2612,7 +2652,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, onPill, fertile, refusal, known, sss: () => SSS(), sexGrade: () => sexGrade(S.sexSkill), turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, refusal, known, myLook, theirLook, mateHere, sexIdx: () => sIdx(S.sexSkill), charmIdx: () => gIdx(S.stats.charm), lookIdx: () => firstLook(), sss: () => SSS(), sexGrade: () => sexGrade(S.sexSkill), turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,

@@ -376,11 +376,12 @@ function closeModal() {
   if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
 }
 
-const DLG_TITLE = { talk: '💬 대화', flirt: '😉 플러팅', dirty: '😏 섹드립' };
+const DLG_TITLE = { talk: '💬 대화', flirt: '😉 플러팅', dirty: '😏 섹드립', touch: '🤝 스킨십' };
 const DLG_HINT = {
   talk: '말투가 상대 성격과 맞으면 훨씬 가까워지고, 안 맞으면 오히려 멀어진다.',
   flirt: '과감할수록 크게 설레게 하지만 실패하면 크게 잃는다. 말투가 성격과 맞으면 잘 통한다.',
   dirty: '과감할수록 크게 달아오르지만 선을 넘으면 신뢰를 잃는다. ✋ 물러서기는 늘 안전하다.',
+  touch: '과감할수록 크게 달아오르지만 선을 넘으면 신뢰를 잃는다. 섹스 기술이 높을수록 손길이 잘 먹힌다.',
 };
 let dlgBack = null;
 // 플러팅·섹드립 선택지 끝의 ' · 살짝' / ' · 과감하게'를 작은 표시로

@@ -90,6 +90,11 @@ GAME_DATA.teaseLines = {
   takenMorning: ['{p}의 휴대폰에 {mate} 이름이 몇 번이나 떠 있었다. {p|은} 화면을 엎어놓고 내 쪽으로 돌아누웠다.', '"{mate}한테는 친구 집에서 잤다고 할게." {p|이} 옷을 챙기며 말했다.', '{p|이} 문 앞에서 돌아봤다. "우리 둘만 아는 거야."'],
   heatUp: ' {p}의 눈빛이 달라졌다.',
 };
+// 함께 밤을 보낸 뒤 상대 애인·배우자에게 들키는 계기 (js/game.js scheduleTrace — 상대 성격마다 확률·방식이 다름). {fp}: 상대, {mate}: 상대의 애인·배우자
+GAME_DATA.traceLines = {
+  text: ['{fp}의 {mate}가 {fp}의 휴대폰에서 나와 주고받은 문자를 봤다.', '{fp|이} 미처 지우지 못한 메시지 하나가 문제였다. {mate}가 먼저 봤다.', '{fp}의 휴대폰 알림에 내 이름이 떴다. 하필 {mate} 앞에서.', '{fp}의 {mate}가 통화 기록을 뒤졌다. 같은 번호가 새벽마다 찍혀 있었다.'],
+  mark: ['{fp}의 목덜미에 남은 자국을 {mate}가 봤다.', '{fp}의 어깨에 남은 자국 때문에 {mate}가 캐묻기 시작했다.', '{fp}의 셔츠 깃 아래 붉은 자국이 {mate} 눈에 띄었다.', '{fp}의 등에 남은 손톱자국을 {mate}가 봤다. 변명이 통하지 않았다.'],
+};
 const mateOf = p => p.married ? (p.gender === 'f' ? '남편' : '아내') : p.gender === 'f' ? '남자친구' : '여자친구';
 const takenLine = (a, p, set) => a.pick(GAME_DATA.teaseLines[set]).replace(/\{mate\}/g, mateOf(p));
 // 섹드립·스킨십 성공 여부: 꼬심 점수(외모·매력·관계) + 상대 성격 + 나를 향한 성욕 + 술기운. 같은 날 또 하면 덜 먹힘
@@ -118,7 +123,8 @@ function heat(s, p, a, gain, alley) {
   if (alley) p.alleyDay = today;
 }
 // 상대 상태별 문턱 (꼬심 점수에 더함): 유부녀·유부남 +12(술집에서 반지를 빼는 사람은 +4) / 애인 있음 +5 / 솔로 0
-const statusNeed = p => p.hooked ? 0 : p.married ? (p.ringOff ? 4 : 12) : p.taken ? 5 : 0;   // 섹스 기술 SSS에 빠진 사람은 상관없음
+//   내 외모(첫인상)·매력이 A 이상이면 등급마다 -3 (S·S면 문턱이 거의 사라짐 — 외모·매력이 높으면 유부도 넘어옴)
+const statusNeed = (p, a) => p.hooked ? 0 : Math.max(0, (p.married ? (p.ringOff ? 4 : 12) : p.taken ? 5 : 0) - (a ? Math.max(0, a.lookIdx() - 4) * 3 + Math.max(0, a.charmIdx() - 4) * 3 : 0));   // 섹스 기술 SSS에 빠진 사람은 상관없음
 // 들킬 위험: 유부녀·유부남은 배우자에게(spouseCaught), 애인 있음은 애인에게(rivalFound)
 const statusRisk = (p, k = 1) => (p.married ? .12 : p.taken ? .08 : 0) * k;
 const PRIVATE = ['home', 'motel'];
@@ -133,6 +139,7 @@ function talkChoice(s, p, a, ch) {
   const R = GAME_DATA.dlgReact.talk, lv = ch.fit > 0 ? 'great' : ch.fit < 0 ? 'meh' : 'good';
   const P = lv === 'great' ? { close: [6, 9], trust: [2, 4] } : lv === 'good' ? { close: [3, 5], trust: [1, 2] }
     : ['cool', 'brag', 'tease'].includes(ch.tone) ? { close: [-3, -1], trust: [-2, 0] } : { close: [0, 1], trust: [-1, 0] };
+  const me = a.myLook(), them = a.theirLook(p), lk = lv === 'meh' ? null : me === 'hi' && a.heartOk(p) ? 'hi' : them === 'hi' ? 'up' : me === 'lo' ? 'lo' : null;
   if (lv !== 'meh') {
     if (ch.tone === 'listen' || ch.tone === 'deep') P.trust = [P.trust[0] + 2, P.trust[1] + 2];   // 들어주기·진지하게: 신뢰 +2
     if (ch.tone === 'joke') P.close = [P.close[0] + 1, P.close[1] + 1];                          // 농담: 친밀 +1
@@ -142,38 +149,75 @@ function talkChoice(s, p, a, ch) {
   const f = ch.tone === 'ask' && lv !== 'meh' && DLG_REVEAL.find(k => !a.known(p, k));
   const tell = f && Math.random() < (lv === 'great' ? .8 : .5);
   return { p: P, effect: lv === 'meh' ? { happy: -1 } : { happy: [0, 1] }, do: tell ? () => { p.told = (p.told || []).concat(f); } : undefined,
-    text: ((lv === 'meh' ? ch.ng : ch.ok) || react(a, R[lv], p)) + (tell ? ' ' + GAME_DATA.pillowReveal[f] : '') };
+    text: ((lv === 'meh' ? ch.ng : ch.ok) || react(a, R[lv], p)) + (tell ? ' ' + GAME_DATA.pillowReveal[f] : '') + (lk && Math.random() < .3 ? ' ' + a.pick(GAME_DATA.lookReact.talk[lk]) : '') };
+}
+// 외모 차이 (내 첫인상 / 상대 생김새): 나 hi·상대 lo → 문턱 -8·얻는 것 ×1.25 / 둘 다 hi → ×1.15 / 상대 hi·나는 아님 → 문턱 +8 (눈이 높음)
+//   나 hi → 문턱 -3·×1.1 / 나 lo → 문턱 +3·×0.9. key: 이어 붙는 반응 대사 (data/dialogues.js lookReact)
+function lookGap(a, p) {
+  const me = a.myLook(), them = a.theirLook(p);
+  if (me === 'hi') return them === 'lo' ? { need: -8, k: 1.25, key: 'gap' } : them === 'hi' ? { need: 0, k: 1.15, key: 'both' } : { need: -3, k: 1.1, key: 'hi' };
+  if (them === 'hi') return { need: 8, k: 1, key: 'up' };
+  return me === 'lo' ? { need: 3, k: .9, key: 'lo' } : { need: 0, k: 1, key: null };
+}
+const lookLine = (a, set, key) => { const L = key && (GAME_DATA.lookReact[set] || {})[key]; return L && Math.random() < .5 ? ' ' + a.pick(L) : ''; };
+const kRange = ([lo, hi], k) => [Math.round(lo * k), Math.round(hi * k)];
+// 애인·배우자가 있는 상대가 먼저 제안 (takenInvite): 내 첫인상이나 매력이 A 이상이고 상대가 달아올랐을 때. 같은 사람은 7일에 한 번
+function inviteRoll(s, p, a, r) {
+  if (!p.taken || lover(p) || !a.canSex(p) || a.companion() === p) return false;
+  if (p.inviteDay != null && a.today() - p.inviteDay < 7) return false;
+  const li = a.lookIdx(), ci = a.charmIdx();
+  if (li < 5 && ci < 5 && !p.hooked) return false;
+  const ch = .1 + Math.max(0, li - 4) * .08 + Math.max(0, ci - 4) * .06 + ((p.libido || 0) >= 55 ? .15 : 0) + (p.heart >= 40 ? .05 : 0) + [0, .04, .08][r] + (p.hooked ? .3 : 0);
+  return Math.random() < Math.min(.6, ch);
 }
 function flirtChoice(s, p, a, ch) {
-  const r = ch.risk, R = GAME_DATA.dlgReact.flirt, g = a.faceGrade(), gg = g === 'SS' ? 'S' : g;
+  const r = ch.risk, R = GAME_DATA.dlgReact.flirt, lg = lookGap(a, p);
   if (ch.tone === 'back') return { p: ch.fit > 0 ? { trust: [2, 4], close: [1, 2] } : { trust: [0, 2] }, text: ch.ok || react(a, GAME_DATA.dlgReact.dirty.back, p) };   // 물러서기: 선을 지킴 (설렘은 없음)
-  const ok = a.charmed(p, null, a.need('flirt') + [-10, 0, 12][r] - ch.fit * 12);   // 과감할수록 문턱이 높고, 말투가 맞으면 낮아짐
+  const ok = a.charmed(p, null, a.need('flirt') + [-10, 0, 12][r] - ch.fit * 12 + lg.need);   // 과감할수록 문턱이 높고, 말투가 맞으면 낮아짐, 외모 차이
   const risk = a.main() && a.main() !== p ? [.1, .2, .3][r] : 0;
   if (ok) {
-    const k = ch.fit > 0 ? 1.3 : ch.fit < 0 ? .75 : 1, H = [[4, 7], [8, 13], [13, 20]][r];
-    const face = ['S', 'A'].includes(gg) && Math.random() < .35 ? ' ' + GAME_DATA.faceReact.flirt[gg] : '';
-    return { p: { heart: [Math.round(H[0] * k), Math.round(H[1] * k)], close: [[1, 2], [1, 3], [2, 4]][r] }, effect: { happy: r === 2 ? [2, 4] : [0, 2] },
-      risk, riskTaken: p.taken ? [.08, .15, .22][r] : 0, text: (ch.ok || react(a, r === 2 ? R.big : R.ok, p)) + face };
+    const k = (ch.fit > 0 ? 1.3 : ch.fit < 0 ? .75 : 1) * lg.k, invite = inviteRoll(s, p, a, r);
+    return { p: { heart: kRange([[4, 7], [8, 13], [13, 20]][r], k), close: [[1, 2], [1, 3], [2, 4]][r] }, effect: { happy: r === 2 ? [2, 4] : [0, 2] },
+      risk, riskTaken: p.taken ? [.08, .15, .22][r] : 0, do: invite ? () => { p.inviteDay = a.today(); } : undefined, then: invite ? 'takenInvite' : undefined,
+      text: (ch.ok || react(a, r === 2 ? R.big : R.ok, p)) + lookLine(a, 'flirtOk', lg.key) };
   }
   const P = [{ close: [-1, 0] }, { close: [-3, -1] }, { close: [-5, -3], trust: [-3, -1] }][r];
   if (ch.fit < 0 && r) P.grudge = [1, 3];
-  const face = ['D', 'E', 'F'].includes(gg) && Math.random() < .35 ? ' ' + GAME_DATA.faceReact.flirt[gg] : '';
-  return { p: P, effect: { happy: [-1, -2, -3][r] }, risk, riskTaken: p.taken ? [.05, .1, .15][r] : 0, text: (ch.ng || react(a, R.ng, p)) + face };
+  return { p: P, effect: { happy: [-1, -2, -3][r] }, risk, riskTaken: p.taken ? [.05, .1, .15][r] : 0, text: (ch.ng || react(a, R.ng, p)) + lookLine(a, 'flirtNg', lg.key) };
 }
 function dirtyChoice(s, p, a, ch) {
   const T = GAME_DATA.teaseLines, R = GAME_DATA.dlgReact.dirty, r = ch.risk;
   const risk = a.main() && a.main() !== p ? [.03, .05, .08][r] : 0;
   if (ch.tone === 'back') return { p: ch.fit > 0 ? { trust: [2, 4], close: [1, 2] } : ch.fit < 0 ? { close: [-1, 0] } : { trust: [0, 2] }, text: ch.ok || react(a, R.back, p) };   // 물러서기: 늘 안전
-  if (!teaseOk(s, p, a, 42 + [-8, 0, 10][r] - ch.fit * 10)) {
+  const lg = lookGap(a, p);
+  if (!teaseOk(s, p, a, 42 + [-8, 0, 10][r] - ch.fit * 10 + lg.need)) {
     const P = [{ trust: [-2, -1], close: [-1, 0] }, { trust: [-6, -3], grudge: [2, 5], close: [-4, -2] }, { trust: [-10, -6], grudge: [5, 9], close: [-6, -3] }][r];
     if (p.personality === 'sharp' && P.grudge) P.grudge = [P.grudge[0] + 2, P.grudge[1] + 3];
     return { p: P, effect: { happy: [-1, -2, -3][r] }, do: () => { p.teaseDay = a.today(); }, risk,
-      text: ch.ng || (p.personality === 'sharp' && r === 2 ? T.sayNoSharp : react(a, R.ng, p)) };
+      text: (ch.ng || (p.personality === 'sharp' && r === 2 ? T.sayNoSharp : react(a, R.ng, p))) + lookLine(a, 'dirtyNg', lg.key) };
   }
-  const gain = heatRoll(p, a, ...[[3, 6], [6, 12], [11, 18]][r]), alley = alleyReady(s, p, a, gain);
+  const gain = Math.round(heatRoll(p, a, ...[[3, 6], [6, 12], [11, 18]][r]) * lg.k), alley = alleyReady(s, p, a, gain), invite = !alley && inviteRoll(s, p, a, r);
   return { p: { heart: [[0, 2], [1, 3], [2, 5]][r], close: [1, 2] }, libido: [[1, 3], [3, 6], [5, 9]][r], effect: { happy: [1, 2] }, risk, riskTaken: p.taken ? [.02, .04, .07][r] : 0,
-    do: () => heat(s, p, a, gain, alley), scene: alley ? 'alley' : undefined, then: alley ? 'alleyHeat' : undefined,
-    text: () => (ch.ok || react(a, R.ok, p)) + (p.taken && Math.random() < .4 ? ' ' + takenLine(a, p, 'taken') : '') + (alley ? ALLEY_LINE : s.vars.heatUp ? T.heatUp : '') };
+    do: () => { heat(s, p, a, gain, alley); if (invite) p.inviteDay = a.today(); }, scene: alley ? 'alley' : undefined, then: alley ? 'alleyHeat' : invite ? 'takenInvite' : undefined,
+    text: () => (ch.ok || react(a, R.ok, p)) + lookLine(a, 'dirtyOk', lg.key) + (p.taken && !invite && Math.random() < .4 ? ' ' + takenLine(a, p, 'taken') : '') + (alley ? ALLEY_LINE : s.vars.heatUp ? T.heatUp : '') };
+}
+// 스킨십: 살짝(손) 문턱 42 / 보통(허리·어깨) 52 / 과감하게(끌어안기) 62. 섹스 기술 등급마다 문턱 -2·달아오름 +6%, A 이상이면 상대가 손길을 알아봄(신뢰 +1~2, 기술 반응)
+function touchChoice(s, p, a, ch) {
+  const T = GAME_DATA.teaseLines, R = GAME_DATA.dlgReact.touch, r = ch.risk, sk = a.sexIdx(), lg = lookGap(a, p);
+  const pub = s.place && !PRIVATE.includes(s.place), risk = a.main() && a.main() !== p ? (pub ? [.04, .08, .12][r] : .03) : 0;
+  if (ch.tone === 'back') return { p: ch.fit > 0 ? { trust: [2, 4], close: [1, 2] } : ch.fit < 0 ? { close: [-1, 0] } : { trust: [0, 2] }, text: ch.ok || react(a, R.back, p) };
+  if (!teaseOk(s, p, a, 52 + [-10, 0, 10][r] - ch.fit * 10 - sk * 2 + lg.need)) {
+    const P = [{ trust: [-3, -1], close: [-1, 0] }, { trust: [-8, -4], grudge: [3, 6], close: [-4, -2] }, { trust: [-12, -7], grudge: [6, 10], close: [-6, -3] }][r];
+    return { p: P, karma: r ? -1 : 0, effect: { happy: [-1, -3, -4][r] }, do: () => { p.teaseDay = a.today(); }, risk, text: (ch.ng || react(a, R.ng, p)) + lookLine(a, 'touchNg', lg.key) };
+  }
+  const gain = Math.round(heatRoll(p, a, ...[[4, 8], [8, 15], [12, 20]][r]) * (1 + sk * .06) * lg.k), alley = alleyReady(s, p, a, gain), invite = !alley && inviteRoll(s, p, a, r);
+  const skilled = sk >= 5 ? ((p.nights || 0) >= 1 && Math.random() < .5 ? R.remember : R.skilled) : null;
+  const P = { heart: [[1, 3], [2, 5], [3, 7]][r], close: [1, 3] };
+  if (skilled) P.trust = [1, 2];
+  return { p: P, libido: [[2, 4], [4, 8], [6, 10]][r], effect: { happy: [1, 3] }, risk, riskTaken: p.taken ? [.03, .06, .09][r] : 0,
+    scene: alley ? 'alley' : r === 2 ? 'hug' : undefined, then: alley ? 'alleyHeat' : invite ? 'takenInvite' : undefined,
+    do: () => { heat(s, p, a, gain, alley); if (invite) p.inviteDay = a.today(); },
+    text: () => (ch.ok || react(a, R.ok, p)) + (skilled ? ' ' + a.pick(skilled) : '') + lookLine(a, 'touchOk', lg.key) + (p.taken && !invite && Math.random() < .3 ? ' ' + takenLine(a, p, 'taken') : '') + (alley ? ALLEY_LINE : s.vars.heatUp ? T.heatUp : '') };
 }
 
 const nightText = (a, p) => lover(p) ? a.pick(GAME_DATA.nightLines.intro) + ' ' + pickLine(a, 'lover', p)
@@ -249,7 +293,8 @@ GAME_DATA.social = [
 
   { id: 'touch', label: '스킨십', icon: '🤝',
     if: (s, p, a) => a.canSex(p) && (lover(p) || p.fwb || p.close >= 30) && !a.jailed(),
-    run: (s, p, a) => {
+    run: (s, p, a, ch) => {
+      if (ch) return touchChoice(s, p, a, ch);
       const T = GAME_DATA.teaseLines, lv = lover(p) || p.fwb || p.nights ? 'close' : p.heart >= 40 ? 'mid' : 'light';
       const act = a.pick(T.touch[lv]) + ' ';
       const pub = s.place && s.place !== 'home', risk = a.main() && a.main() !== p ? (pub ? .08 : .03) : 0;
@@ -268,7 +313,7 @@ GAME_DATA.social = [
     if: (s, p, a) => a.canSex(p) && a.companion() !== p && !a.jailed(),
     run: (s, p, a) => {
       if (lover(p) || p.fwb) { const no = a.refusal(p); if (no) return { do: () => { s.vars.why = no; }, then: 'nightRefused' }; }
-      else if (!a.charmed(p, 'bed', a.need('bed') + statusNeed(p) + (p.close < 20 ? 12 : 0)))
+      else if (!a.charmed(p, 'bed', a.need('bed') + statusNeed(p, a) + (p.close < 20 ? 12 : 0)))
         return { p: { heart: [-6, -3], close: [-5, -2], grudge: p.close < 20 ? [4, 8] : [0, 2] }, effect: { happy: -2 },
           text: p.married ? '{p|이} 왼손 반지를 만지작거렸다. "나 결혼한 사람이야."' : p.taken ? `"나 ${mateOf(p)} 있어." {p|이} 선을 그었다.`
             : ['{p|이} 어이없다는 듯 웃었다. "갑자기?"', '{p|이} 고개를 저었다. "우리 그런 사이 아니잖아."'] };
@@ -292,7 +337,7 @@ GAME_DATA.social = [
   // 그저 즐기는 사이 (섹파) 제안 — 애인이 있는 상대도 헤어지지 않은 채로. 외모·매력이 높을수록 잘 받아줌
   { id: 'casualAsk', label: '가볍게 즐기자고 하기', icon: '🔥',
     if: (s, p, a) => a.canSex(p) && !lover(p) && !p.fwb && ((p.nights || 0) >= 1 || a.casualReady(p)) && !a.jailed(),
-    run: (s, p, a) => a.charmed(p, 'bed', a.need('bed') + statusNeed(p))
+    run: (s, p, a) => a.charmed(p, 'bed', a.need('bed') + statusNeed(p, a))
       ? { do: () => { p.fwb = true; p.fling = true; comeAlong(s, p, a); }, p: { close: [2, 4] }, effect: { happy: [2, 4] },
           scene: s.place && !PRIVATE.includes(s.place) && !ALLEY_NO.includes(s.place) ? 'alley' : undefined,
           text: (p.taken || p.married ? `"${mateOf(p)}한테는 비밀이야." {p|이} 웃으며 새끼손가락을 걸었다. 서로 즐기기만 하기로 했다.` : '"서로 부담 갖지 말자." {p|이} 웃었다. 즐기기만 하는 사이로 하기로 했다.')
