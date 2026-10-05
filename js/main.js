@@ -147,7 +147,8 @@ function render(S) {
   else if (modalMode === 'me') openMe();
   else if (modalMode === 'food') openFood();
   else if (modalMode === 'bag') openBag();
-  else if (modalMode === 'study' || modalMode === 'shop' || modalMode === 'map') closeModal();
+  else if (modalMode === 'study' || modalMode === 'shop') closeModal();
+  else if (modalMode === 'map') openMap(true);   // 지도 창은 그대로 두고 다시 그림 (교통수단 바꿔도 안 닫힘 — 핀으로 이동하면 따로 닫음)
   else if (PHONE_RENDER[modalMode] && inPhone) PHONE_RENDER[modalMode]();   // 📱 폰 앱은 그 화면 그대로 다시
   else if (modalMode === 'dateDress') openPerson(modalArg);   // 데이트 옷을 고르고 나면 그 사람 창으로
 }
@@ -292,10 +293,14 @@ const HH_LABEL = { single: '혼자 사는 사람', student: '학생', roommates:
 const HH_COLOR = { single: '#8fb8e8', student: '#a7d8c8', roommates: '#c8b4e8', couple: '#f2a3b8', married: '#f4c26b', family: '#9ed48a', elder: '#c9b08f' };
 const hhMix = hh => { const t = Object.values(hh).reduce((a, b) => a + b, 0) || 1; return `<div class="hh-bar">${Object.entries(hh).map(([k, v]) => `<i style="width:${v / t * 100}%;background:${HH_COLOR[k]}" title="${HH_LABEL[k]} ${Math.round(v / t * 100)}%"></i>`).join('')}</div>
     <div class="hh-leg">${Object.entries(hh).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span><b style="background:${HH_COLOR[k]}"></b>${HH_LABEL[k]} ${Math.round(v / t * 100)}%</span>`).join('')}</div>`; };
-function openMap() {
+// keep: 이미 열린 지도 창을 다시 그릴 때 (교통수단·차·상태가 바뀜) — 보던 자리·배율 그대로
+function openMap(keep) {
   const ti = G.timeInfo(), S = G.state(), mode = mapModeNow();
+  const old = keep === true && modalMode === 'map' && mBody.querySelector('.cmap-view'), sx = old ? old.scrollLeft : 0, sy = old ? old.scrollTop : 0;
   showModal('map', mode === 'campus' ? '🎓 캠퍼스 지도' : '🗺️ 지도', `${mapToggle(mode)}${mapHTML(G.places(), mode)}<p class="hint">${ti.phase === 'adult' ? `가고 싶은 곳을 누르면 바로 이동한다. ⚡ = 이동에 드는 행동력 (1 ≈ 11분), 옆은 교통수단·요금. 남은 행동력 ⚡${S.ap} · ⏰ ${ti.clock}` : `어디든 ⚡${G.teenPt}. 남은 행동력 ⚡${S.ap}`}</p>`);
-  requestAnimationFrame(() => centerMap(true));
+  const v = mBody.querySelector('.cmap-view');
+  if (old && v) { v.scrollLeft = sx; v.scrollTop = sy; }
+  else requestAnimationFrame(() => centerMap(true));
 }
 const ageBand = age => age < 13 ? '어린이' : age < 20 ? `${age < 16 ? '10대 중반' : '10대 후반'}` : `${Math.floor(age / 10) * 10}대${age % 10 < 4 ? ' 초반' : age % 10 < 7 ? ' 중반' : ' 후반'}`;
 // 낯선 사람: '낯선 여자 (~25)' — 나이는 5살 단위 어림, 일행이면 '외 n명', 반지가 보이면 (반지)
@@ -958,9 +963,9 @@ function rollAct() {
 
 // 지도 조작 (#where·지도 창 공통): 교통수단·차·크게/한눈에·내 위치
 function mapCtl(d) {
-  if (d.ride) { G.ride.set(d.ride); if (modalMode === 'map') openMap(); return true; }
-  if ('buycar' in d) { G.ride.buyCar(); if (modalMode === 'map') openMap(); return true; }
-  if ('sellcar' in d) { if (confirm('차를 팔까? 산 값의 60%를 받는다.')) G.ride.sellCar(); if (modalMode === 'map') openMap(); return true; }
+  if (d.ride) { G.ride.set(d.ride); return true; }   // 상태가 바뀌면 render가 지도(화면·창)를 제자리에서 다시 그림
+  if ('buycar' in d) { G.ride.buyCar(); return true; }
+  if ('sellcar' in d) { if (confirm('차를 팔까? 산 값의 60%를 받는다.')) G.ride.sellCar(); return true; }
   if ('mapzoom' in d) { mapZoom = mapZoom === 'big' ? 'fit' : 'big'; try { localStorage.setItem('llife-mapzoom', mapZoom); } catch (e) {} mapCenterKey = null; if (modalMode === 'map') openMap(); else render(G.state()); requestAnimationFrame(() => centerMap(true)); return true; }
   if ('mapcenter' in d) { centerMap(true); return true; }
   return false;

@@ -2380,7 +2380,7 @@ function routeOptions(a, b, dest, o = {}) {
   return out;
 }
 // 교통 설정 (지도 위 칩): 자동 / 걷기 / 자전거 / 버스 / 지하철 / 내 차 / 택시
-function setRide(m) { if (!RIDE_LB[m] && m !== 'auto') return; S.ride = m; emit(); }
+function setRide(m) { if (!RIDE_LB[m] && m !== 'auto') return; S.ride = m; save(); emit(); }
 const carPrice = () => rideCfg().car || 1500;
 function buyCar() {
   if (S.car || S.age < 20 || busy() || S.money < carPrice()) return;
