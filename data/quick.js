@@ -33,7 +33,7 @@ GAME_DATA.quick = {
   jobs: ['cvs', 'barista', 'rider', 'cook', 'hair', 'mechanic', 'creator', 'musician'],   // 고졸로 바로 시작할 수 있는 일
   money: { rich: [1000, 2000], comfy: [400, 800], normal: [100, 300], tight: [20, 50], poor: [0, 0], complex: [30, 150] },   // 시작 돈 (만원)
   wealthAdj: { rich: '부유한', comfy: '여유 있는', normal: '평범한', tight: '빠듯한', poor: '어려운', complex: '복잡한' },
-  home: [{ id: 'parents', label: '본가에서' }, { id: 'own', label: '자취' }],
+  home: [{ id: 'parents', label: '본가에서' }, { id: 'goshiwon', label: '고시원' }, { id: 'own', label: '원룸 자취' }, { id: 'officetel', label: '오피스텔' }],   // data/housing.js
   army: [{ id: 'now', label: '올봄 입대' }, { id: 'next', label: '내년 봄 입대' }, { id: 'exempt', label: '면제' }],
   parents: [{ id: 'both', label: '두 분 다 계심' }, { id: 'divorced', label: '이혼하심' }, { id: 'lost', label: '한 분을 여읨' }],
   builds: [{ id: 'slim', label: '마른' }, { id: 'avg', label: '보통' }, { id: 'fit', label: '탄탄한' }, { id: 'chubby', label: '통통한' }],

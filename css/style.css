@@ -516,3 +516,87 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .br-cell.on{border-color:var(--accent)}
 .br-cell.used{opacity:.6}
 .br-cell small{color:var(--text-dim);font-size:10.5px}
+/* 행동력 막대 (100 기준) — 하루 + 새벽(빨강) */
+.dots .apbar{flex:1 1 0;height:8px;border-radius:5px;background:rgba(255,255,255,.12);overflow:hidden;position:relative}
+.dots .apbar.late{flex:0 0 26%;box-shadow:inset 0 0 0 1.5px rgba(255,154,138,.6);background:transparent}
+.dots .apbar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:linear-gradient(90deg,var(--accent-2),var(--accent));box-shadow:0 0 6px rgba(255,211,107,.35);transition:width .25s}
+.dots .apbar.late i{background:rgba(255,154,138,.55);box-shadow:none}
+/* 지도 (js/citymap.js 배경 + 핀 버튼) */
+.cmap{position:relative;width:100%;max-width:440px;margin:0 auto;aspect-ratio:360/460;border-radius:14px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--panel-border)}
+.cmap .cm-svg{position:absolute;inset:0;width:100%;height:100%}
+.cmap.night .cm-svg{filter:brightness(.5) saturate(.75) hue-rotate(-12deg)}
+.cm-dl{font:800 17px var(--font);fill:rgba(40,46,60,.2);letter-spacing:.08em}
+.cm-river{font:700 11px var(--font);fill:rgba(255,255,255,.85);letter-spacing:.3em}
+.cm-n text{font:700 7px var(--font);fill:#333}
+.cmap .pin{position:absolute;transform:translate(-50%,-30%);display:flex;flex-direction:column;align-items:center;gap:0;padding:0;background:none;border:0;box-shadow:none;color:#1d2230;min-width:44px;cursor:pointer}
+.cmap .pin .pi{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#fff;font-size:16px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.35),0 0 0 2px rgba(255,255,255,.7);transition:transform .15s}
+.cmap .pin .pn{margin-top:2px;padding:0 4px;border-radius:5px;background:rgba(255,255,255,.88);font-size:10.5px;font-weight:700;line-height:1.35;white-space:nowrap}
+.cmap .pin small{font-size:9.5px;font-weight:700;color:#7a5200;background:rgba(255,236,190,.92);border-radius:5px;padding:0 3px;line-height:1.3;margin-top:1px;white-space:nowrap}
+.cmap .pin:hover:not(:disabled) .pi,.cmap .pin:focus-visible .pi{transform:scale(1.15)}
+.cmap .pin:disabled{cursor:default;opacity:1}
+.cmap .pin:disabled .pi{filter:grayscale(1);opacity:.6}
+.cmap .pin:disabled .pn{color:#5a6070}
+.cmap .pin:disabled small{color:#6a6a6a;background:rgba(232,232,232,.92);font-weight:600}
+.cmap .pin.here:disabled .pi{filter:none;opacity:1}
+.cmap .pin.here:disabled .pn{color:#1d2230}
+.cmap .pin.reg .pi{box-shadow:0 2px 6px rgba(0,0,0,.35),0 0 0 2px var(--accent)}
+.cmap .pin.here .pi,.cmap .pin.at .pi{box-shadow:0 0 0 3px #e74c3c,0 2px 8px rgba(0,0,0,.4)}
+.cmap .pin.here .pi::after,.cmap .pin.at .pi::after{content:'';position:absolute;width:30px;height:30px;border-radius:50%;border:2px solid #e74c3c;animation:pinPulse 1.6s ease-out infinite}
+.cmap .pin.here small,.cmap .pin.at small{color:#fff;background:#e74c3c}
+.cmap .pin.at .pn::before{content:'📍 '}
+.cmap.night .pin .pn{background:rgba(30,34,48,.88);color:#f1f2f6}
+@keyframes pinPulse{from{transform:scale(1);opacity:.9}to{transform:scale(1.9);opacity:0}}
+@media (prefers-reduced-motion:reduce){.cmap .pin .pi::after{animation:none}}
+.map-btn{background:var(--btn-on)!important}
+/* 부동산 창 */
+.house{padding:10px 2px 12px;border-bottom:1px solid var(--line);display:grid;gap:5px}
+.house.cur{background:rgba(255,211,107,.06);border-radius:10px;padding:10px 8px}
+.house-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.house-ic{font-size:20px}
+.house-m{margin-left:auto;font-size:12px}
+.house-d{margin:0;font-size:13px;line-height:1.5}
+.house-nb{margin:0;font-size:12px}
+.house button{justify-self:start;padding:7px 14px;border-radius:99px;font-size:13px}
+.hh-bar{display:flex;height:9px;border-radius:5px;overflow:hidden;background:rgba(255,255,255,.08)}
+.hh-bar i{display:block;height:100%}
+.hh-leg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--text-dim)}
+.hh-leg b{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:3px;vertical-align:0}
+/* 인간 관계망 (실 잇기) */
+.pview{display:flex;gap:6px;margin-bottom:8px}
+.pview button{flex:1;padding:8px;border-radius:99px;font-size:13px}
+.pview button[aria-selected="true"]{background:var(--btn-on);box-shadow:inset 0 0 0 1px rgba(255,211,107,.5)}
+.web{position:relative;width:100%;max-width:440px;margin:4px auto 6px;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 50% 50%,rgba(255,211,107,.08),rgba(255,255,255,.02) 60%,transparent 72%)}
+.wb-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.wb-n{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;padding:0;background:none;border:0;box-shadow:none;min-width:0;cursor:pointer;z-index:2}
+.wb-n .av,.wb-n svg{border-radius:50%;box-shadow:0 0 0 2px var(--c),0 2px 6px rgba(0,0,0,.4);background:var(--av-bg)}
+.wb-n > span{margin-top:2px;font-size:9.5px;line-height:1.2;white-space:nowrap;padding:0 3px;border-radius:4px;background:rgba(10,12,18,.72);color:var(--text);max-width:64px;overflow:hidden;text-overflow:ellipsis}
+.wb-n > span i{font-style:normal}
+.wb-n:hover .av,.wb-n:focus-visible .av{transform:scale(1.12)}
+.wb-me{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;z-index:3}
+.wb-me svg,.wb-me .av{border-radius:50%;box-shadow:0 0 0 3px var(--accent),0 0 16px rgba(255,211,107,.5)}
+.wb-me span{font-size:11px;font-weight:700;color:var(--accent)}
+.wb-ic{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:1px;padding:1px 4px 1px 3px;border-radius:99px;background:rgba(14,16,25,.88);box-shadow:0 0 0 1px rgba(255,111,168,.45);z-index:1;pointer-events:none}
+.wb-ic svg{width:15px;height:13px}
+.wb-ic b{color:#ff6fa8;font-size:10px;line-height:1}
+.wb-ic.sm{font-size:10px;padding:0 3px;box-shadow:0 0 0 1px rgba(244,197,66,.45)}
+.wb-leg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--text-dim);margin:2px 0 4px}
+.wb-leg b{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:4px;vertical-align:3px}
+.wb-legsex svg{width:15px;height:12px;vertical-align:-2px;margin-right:2px}
+/* 장소의 사람 목록 (한 줄씩) */
+.here{display:flex;flex-direction:column;gap:3px;max-height:460px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
+.here-g{margin:6px 2px 1px;font-size:11.5px;font-weight:700;color:var(--text-dim)}
+.here-g small{font-weight:400;margin-left:3px}
+.hp{grid-template-columns:28px minmax(0,1fr) auto;gap:8px;padding:4px 10px 4px 6px;border-radius:10px}
+.hp .av{width:28px;height:37px}
+.hp .hn{display:flex;align-items:center;gap:4px;min-width:0;flex-wrap:nowrap;overflow:hidden}
+.hp .hn b{flex:0 1 auto}
+.hp .hr{justify-self:end;white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.hp.x .hn b{font-weight:600}
+.bd{flex:none;font-size:10px;line-height:1.5;padding:0 5px;border-radius:99px;background:rgba(255,255,255,.08);color:var(--text-dim);white-space:nowrap}
+.bd.wed{background:rgba(244,197,66,.18);color:#f4d27a}
+.bd.cp{background:rgba(255,93,143,.16);color:#ff9dbb}
+.bd.hey{background:rgba(143,224,160,.16)}
+.bd.ph{background:none;padding:0}
+.br-info .bd{vertical-align:1px}
+.map-tog{justify-self:end;margin:0 0 4px auto;display:block;padding:6px 12px;border-radius:99px;font-size:12.5px}
+.cmap.campus .cm-dl{fill:rgba(40,46,60,.35);font-size:15px}

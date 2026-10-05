@@ -75,14 +75,13 @@ function renderLog(S) {
 }
 
 /* ---------- 전체 그리기 ---------- */
-// 행동력 칸: 어른은 18칸 + 새벽 6칸(빨강), 학교 턴은 그 턴의 칸
+// 행동력 막대 (100 기준): 어른은 하루 100 + 새벽 33(빨강), 학교 턴은 그 턴의 100·150
 function apDots(ti) {
   if (ti.phase === 'adult') {
-    let out = '';
-    for (let i = 0; i < ti.day + ti.lateMax; i++) { if (i === ti.day) out += '<i></i>'; out += `<b class="${i >= ti.day ? 'late' : ''}${i < ti.used ? ' u' : ''}">${i < ti.used ? '●' : '○'}</b>`; }   // 칸 = 둥근 막대 (글자는 숨김), 새벽 칸 앞에 틈
-    return out;
+    const day = Math.max(0, ti.day - ti.used), late = Math.min(ti.lateMax, Math.max(0, ti.day + ti.lateMax - Math.max(ti.used, ti.day)));
+    return `<span class="apbar"><i style="width:${day / ti.day * 100}%"></i></span><span class="apbar late"><i style="width:${late / ti.lateMax * 100}%"></i></span>`;
   }
-  if (ti.apMax) return Array.from({ length: ti.apMax }, (_, i) => i < ti.apMax - ti.ap ? '<b class="u">●</b>' : '<b>○</b>').join('');
+  if (ti.apMax) return `<span class="apbar"><i style="width:${Math.max(0, ti.ap) / ti.apMax * 100}%"></i></span>`;
   return '';
 }
 function timeText(ti) {
@@ -123,13 +122,13 @@ function render(S) {
   // 아래 큰 버튼: 단계마다 다름 (이야기 계속 / 다음 주 / 잠자기) + 어른은 밥·출근·넘기기 줄
   const ageBtn = $('#ageUp'), flow = $('#flow');
   const wait = !S.ended && (S.pending.length > 0 || !!S.report);
-  ageBtn.textContent = S.ended ? '↻ 새 인생 시작' : ti.phase === 'story' ? '▶ 계속' : ti.phase === 'adult' ? `😴 잠자기 (오늘 끝내기)` : S.ap > 0 ? `⏭ 다음 주로 (남은 ${S.ap}칸은 쉬기)` : '▶ 다음 주';
+  ageBtn.textContent = S.ended ? '↻ 새 인생 시작' : ti.phase === 'story' ? '▶ 계속' : ti.phase === 'adult' ? `😴 잠자기 (오늘 끝내기)` : S.ap > 0 ? `⏭ 다음 주로 (남은 ⚡${S.ap}은 쉬기)` : '▶ 다음 주';
   ageBtn.disabled = wait;
   if (ti.phase === 'adult' && !S.ended) {
     const d = ti.duty;
     flow.hidden = false;
-    flow.innerHTML = (d ? `<button type="button" data-flow="duty"${wait ? ' disabled' : ''}>${d.id === 'work' ? '💼' : d.id === 'class' ? '🎓' : '🪖'} ${d.label} <small>${d.ap}칸</small></button>` : '') +
-      `<button type="button" data-flow="eat"${wait || S.ap <= 0 || d ? ' disabled' : ''}>🍚 밥 먹기 <small>${ti.meals}끼</small></button>` +
+    flow.innerHTML = (d ? `<button type="button" data-flow="duty"${wait ? ' disabled' : ''}>${d.id === 'work' ? '💼' : d.id === 'class' ? '🎓' : '🪖'} ${d.label} <small>⚡${d.ap}</small></button>` : '') +
+      `<button type="button" data-flow="eat"${wait || S.ap <= 0 || d ? ' disabled' : ''}>🍚 밥 먹기 <small>${ti.meals}끼 · ⚡5</small></button>` +
       `<button type="button" data-flow="week"${wait ? ' disabled' : ''}>⏭ 이번 주 넘기기</button><button type="button" data-flow="month"${wait ? ' disabled' : ''}>⏩ 이번 달 넘기기</button><button type="button" data-flow="event"${wait ? ' disabled' : ''}>⏬ 다음 일까지</button>`;
   } else { flow.hidden = true; flow.innerHTML = ''; }
 
@@ -155,7 +154,8 @@ function render(S) {
   else if (modalMode === 'jobs') openJobs();
   else if (modalMode === 'crime') openCrime();
   else if (modalMode === 'me') openMe();
-  else if (modalMode === 'study' || modalMode === 'shop') closeModal();
+  else if (modalMode === 'study' || modalMode === 'shop' || modalMode === 'map') closeModal();
+  else if (modalMode === 'housing') openHousing();
   else if (modalMode === 'dateDress') openPerson(modalArg);   // 데이트 옷을 고르고 나면 그 사람 창으로
 }
 
@@ -163,7 +163,7 @@ function render(S) {
 // 장소에 가면 그 장소 그림, 장소 밖이면 지금 구역(집 근처 → 집, 수업 끝난 학교 쪽 → 강의실, 직장 → 사무실, 번화가 → 거리)
 //   대학은 '대학'에 가면 캠퍼스, 수업 시간(평일 9~17시 학교 쪽)엔 강의실. 중·고등학생은 학기 중 교실, 방학엔 집
 const PLACE_SCENE = { home: 'home', playground: 'playground', park: 'park', school: 'classroom', academy: 'academy', campus: 'campus', office: 'office', cafe: 'cafe', library: 'library', gym: 'gym',
-  pcbang: 'pcbang', mall: 'street', hospital: 'hospital', center: 'center', station: 'station', bar: 'bar', motel: 'motel', church: 'church', conveni: 'conveni', concert: 'concert', market: 'market' };
+  pcbang: 'pcbang', mall: 'street', hospital: 'hospital', center: 'center', station: 'station', bar: 'bar', motel: 'motel', church: 'church', conveni: 'conveni', concert: 'concert', market: 'market', block: 'street', realty: 'street', lecture: 'lecture', cafeteria: 'cafe', ulib: 'library', clubroom: 'academy', quad: 'campus', union: 'campus' };
 const SEASON_EN = { 봄: 'spring', 여름: 'summer', 가을: 'fall', 겨울: 'winter' };
 function sceneBG(S, ti) {
   if (!window.SceneBG) return;
@@ -185,9 +185,48 @@ function sceneBG(S, ti) {
 /* ---------- 하단: 장소 고르기 → 거기 있는 사람 + 할 수 있는 것 ---------- */
 function actButtons(acts) {
   return acts.map(a => {
-    const c = G.costOf(a);
-    return `<button type="button" class="act" data-a="${a.id}"${G.canDo(a) ? '' : ' disabled'}${c ? ` title="${G.fmtMoney(c)}"` : ''}><span class="ic" aria-hidden="true">${a.icon}</span>${a.label}${c ? `<small>${G.fmtMoney(c)}</small>` : ''}</button>`;
+    const c = G.costOf(a), ap = a.escape ? 0 : G.apOf(a);
+    return `<button type="button" class="act" data-a="${a.id}"${G.canDo(a) ? '' : ' disabled'}${c ? ` title="${G.fmtMoney(c)}"` : ''}><span class="ic" aria-hidden="true">${a.icon}</span>${a.label}<small>${ap ? `⚡${ap}` : ''}${c ? `${ap ? ' · ' : ''}${G.fmtMoney(c)}` : ''}</small></button>`;
   }).join('');
+}
+/* ---------- 지도: 핀을 누르면 그곳으로 이동 (js/citymap.js 배경 + data/map.js 위치) ---------- */
+// 핀: 아이콘 · 이름 · 이동 비용(⚡) 또는 못 가는 까닭. 지금 있는 곳은 빨간 고리, 장소 밖이면 서 있는 곳에 📍
+const WHY_SHORT = { '같이 갈 사람이 있어야': '동행 필요', '직업이 있어야': '직장인만', '지금은 못 감': '닫힘' };
+// mode: 'city' 시내 지도 / 'campus' 대학 캠퍼스 지도 (캠퍼스 안 장소들, 정문 = 시내의 '대학')
+let mapMode = null;
+const campusOK = () => G.places().some(p => p.campus && p.id !== 'campus');
+function mapHTML(list, mode) {
+  const S = G.state(), night = S.time === 2 || (S.sky ?? 0) > 1.6, cp = mode === 'campus';
+  const pins = list.filter(p => cp ? p.campus && p.cpos : p.pos).map(p => {
+    const xy = cp ? p.cpos : p.pos, sub = p.here ? '지금 여기' : p.why ? (WHY_SHORT[p.why] || p.why) : `⚡${p.cost}`;
+    return `<button type="button" class="pin${p.here ? ' here' : ''}${p.at ? ' at' : ''}${p.regular ? ' reg' : ''}" data-pl="${p.id}" style="left:${(xy[0] / 3.6).toFixed(1)}%;top:${(xy[1] / 4.6).toFixed(1)}%"${p.ok ? '' : ' disabled'}${p.why ? ` title="${esc(p.why)}"` : ''}>
+      <span class="pi" aria-hidden="true">${p.icon}</span><span class="pn">${esc(cp ? p.clabel : p.label)}${p.regular ? ' ★' : ''}</span><small>${esc(sub)}</small></button>`;
+  }).join('');
+  const univ = cp ? G.univLabel() : '';
+  return `<div class="cmap${night ? ' night' : ''}${cp ? ' campus' : ''}">${window.CityMap ? (cp ? CityMap.campusSvg(univ) : CityMap.svg(G.region())) : ''}${pins}</div>`;
+}
+// 지도 모드 고르기: 캠퍼스 안에 있으면 캠퍼스 지도부터 (버튼으로 바꿈)
+const mapModeNow = () => mapMode && (mapMode !== 'campus' || campusOK()) ? mapMode : G.onCampus() ? 'campus' : 'city';
+const mapToggle = mode => campusOK() ? `<button type="button" class="map-tog" data-mapmode="${mode === 'campus' ? 'city' : 'campus'}">${mode === 'campus' ? '🏙️ 시내 지도' : '🎓 캠퍼스 지도'}</button>` : '';
+/* 부동산: 집 종류 고르기 — 보증금·월세·이웃 구성(가구 비중)·지금 집. 이사는 행동력 30 + 보증금 차액 */
+const HH_LABEL = { single: '혼자 사는 사람', student: '학생', roommates: '룸메이트', couple: '동거 커플', married: '부부', family: '아이 있는 가족', elder: '어르신' };
+const HH_COLOR = { single: '#8fb8e8', student: '#a7d8c8', roommates: '#c8b4e8', couple: '#f2a3b8', married: '#f4c26b', family: '#9ed48a', elder: '#c9b08f' };
+function openHousing() {
+  const S = G.state(), cur = G.homeNow(), list = G.housing();
+  const mix = hh => { const t = Object.values(hh).reduce((a, b) => a + b, 0) || 1; return `<div class="hh-bar">${Object.entries(hh).map(([k, v]) => `<i style="width:${v / t * 100}%;background:${HH_COLOR[k]}" title="${HH_LABEL[k]} ${Math.round(v / t * 100)}%"></i>`).join('')}</div>
+    <div class="hh-leg">${Object.entries(hh).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span><b style="background:${HH_COLOR[k]}"></b>${HH_LABEL[k]} ${Math.round(v / t * 100)}%</span>`).join('')}</div>`; };
+  const married = h => { const t = Object.values(h.hh).reduce((a, b) => a + b, 0) || 1; return Math.round(((h.hh.married || 0) + (h.hh.family || 0) + (h.hh.elder || 0) * .6) / t * 100); };
+  const rows = list.map(h => `<div class="house${h.cur ? ' cur' : ''}">
+      <div class="house-h"><span class="house-ic">${h.icon}</span><b>${esc(h.label)}</b>${h.cur ? ' <span class="tag">지금 집</span>' : ''}<span class="dim house-m">${h.deposit ? `보증금 ${G.fmtMoney(h.deposit)}` : '보증금 없음'} · 월 ${h.rent ? G.fmtMoney(h.rent) : '0'}</span></div>
+      <p class="house-d">${esc(h.desc)}${h.guest ? '' : ' <b>손님 불가.</b>'}</p>
+      <p class="dim house-nb">이웃 구성 · 기혼 비율 약 ${married(h)}%</p>${mix(h.hh)}
+      ${h.cur ? '' : `<button type="button" data-move="${h.id}"${h.ok ? '' : ' disabled'}>이사하기 <small>⚡${G.movePt}${h.need ? ` · 보증금 ${G.fmtMoney(h.need)} 더 냄` : (S.home && S.home.dep || 0) > h.deposit ? ' · 보증금 일부 돌려받음' : ''}</small></button>${h.why && !h.cur ? ` <span class="dim">${esc(h.why)}</span>` : ''}`}
+    </div>`).join('');
+  showModal('housing', '🔑 부동산', `<p class="hint">지금 사는 곳: ${cur.icon} <b>${esc(cur.label)}</b>. 집에 따라 월세와 이웃(혼자 사는 사람·커플·부부·가족)이 달라진다. 이사하면 새 이웃이 생긴다. 남은 행동력 ⚡${S.ap}</p>${rows}`);
+}
+function openMap() {
+  const ti = G.timeInfo(), S = G.state(), mode = mapModeNow();
+  showModal('map', mode === 'campus' ? '🎓 캠퍼스 지도' : '🗺️ 지도', `${mapToggle(mode)}${mapHTML(G.places(), mode)}<p class="hint">${ti.phase === 'adult' ? `가고 싶은 곳을 누르면 바로 이동한다. ⚡ = 이동에 드는 행동력 (1 ≈ 11분). 남은 행동력 ⚡${S.ap} · ⏰ ${ti.clock}` : `어디든 ⚡${G.teenPt}. 남은 행동력 ⚡${S.ap}`}</p>`);
 }
 const ageBand = age => age < 13 ? '어린이' : age < 20 ? `${age < 16 ? '10대 중반' : '10대 후반'}` : `${Math.floor(age / 10) * 10}대${age % 10 < 4 ? ' 초반' : age % 10 < 7 ? ' 중반' : ' 후반'}`;
 // 낯선 사람: '낯선 여자 (~25)' — 나이는 5살 단위 어림, 일행이면 '외 n명', 반지가 보이면 (반지)
@@ -195,13 +234,24 @@ function strangerLabel(p, grp) {
   const a = G.npcAge(p), who = a < 13 ? (p.gender === 'f' ? '여자아이' : '남자아이') : p.gender === 'f' ? '여자' : '남자';
   return `낯선 ${who} (~${Math.max(5, Math.round(a / 5) * 5)})${grp ? ` 외 ${grp}명` : ''}`;
 }
-// 여기 있는 사람 한 줄: 아는 사람은 이름(나이) + 결혼 마커 + 관계, 모르는 사람은 낯선 사람 + 하고 있는 일 (NPC_ENCOUNTER)
+// 여기 있는 사람 한 줄 (목록): 아바타 · 이름(아는 사람) 또는 '낯선 여자 (~25)' · 배지 · 하고 있는 일 · 관계
+//   배지: 💍 기혼(반지가 보이면 바로) · 💑 부부 / 👫 커플 (짝과 같이 있음) · 👥 일행 · 👋 이쪽을 봄 · 📱 번호 있음
+function hereBadges(h) {
+  const p = h.p, b = [], mk = h.stranger ? '' : G.marker(p);
+  if (mk) b.push(`<span class="bd wed" title="${mk === '💍' ? '기혼' : '반지 — 기혼 추정'}">${mk}${mk === '💍' ? ' 기혼' : ''}</span>`);
+  else if (h.ring) b.push('<span class="bd wed" title="왼손에 결혼 반지">💍 반지</span>');
+  if (h.couple) b.push(`<span class="bd cp">${h.wed ? '💑 부부' : '👫 커플'}</span>`);
+  else if (h.withMate) b.push(`<span class="bd cp">👫 ${esc(G.mateWord(G.person(h.p.mateId) || {}))}와 함께</span>`);
+  else if (h.grp) b.push(`<span class="bd">👥 일행 ${h.grp}</span>`);
+  if (h.approach) b.push('<span class="bd hey" title="이쪽을 힐끔거린다">👋</span>');
+  if (h.phone) b.push('<span class="bd ph" title="번호 있음">📱</span>');
+  return b.join('');
+}
 function hereRow(h) {
-  const p = h.p, mk = h.stranger ? '' : G.marker(p);
-  const who = h.stranger ? `<b>${esc(strangerLabel(p))}${G.ringVisible(p) ? ' <span class="dim">(반지)</span>' : ''}${h.approach ? ' <span title="이쪽을 힐끔거린다">👋</span>' : ''}</b>${h.grp ? `<span class="hr">${h.couple ? '연인과 함께' : `일행 ${h.grp}명과 같이`}</span>` : ''}`
-    : `<b>${esc(G.pname(p))} <span class="dim">(${G.npcAge(p)})</span>${mk ? ` <span class="mk">${mk}</span>` : ''}</b><span class="hr">${esc(G.relLabel(p))}</span>`;
-  return `<button type="button" class="hp${h.used ? ' used' : ''}${h.grp ? ' grp' : ''}" data-hp="${h.key}" title="${esc(h.doing)}">${av(p, 32)}
-    <span class="hw">${who}<span class="hd">${h.used ? '이야기함' : esc(h.doing)}</span></span></button>`;
+  const p = h.p;
+  const who = h.stranger ? esc(strangerLabel(p)) : `${esc(G.pname(p))} <span class="dim">(${G.npcAge(p)})</span>`;
+  return `<button type="button" class="hp${h.used ? ' used' : ''}${h.stranger ? ' x' : ''}" data-hp="${h.key}" title="${esc(h.doing)}">${av(p, 28)}
+    <span class="hw"><span class="hn"><b>${who}</b>${hereBadges(h)}</span><span class="hd">${h.used ? '이야기함' : esc(h.doing)}</span></span>${h.stranger ? '' : `<span class="hr">${esc(G.relLabel(p))}</span>`}</button>`;
 }
 // 이 장소에 오는 사람들 한 줄 (장소 분포) + 지금 보이는 낯선 사람들 요약 (나이대·성비·커플)
 function crowdLine(here) {
@@ -223,24 +273,25 @@ function renderWhere(S) {
     const list = G.places();
     const ti = G.timeInfo();
     if (ti.phase === 'story') { box.innerHTML = '<p class="empty">어린 시절은 이야기로 흘러간다. <b>▶ 계속</b>을 누르면 다음 장면으로.</p>'; return; }
-    const adult = ti.phase === 'adult';
-    const head = adult ? `<p class="sec-t">지금 ${esc(ti.zone)} <span class="dim">· 같은 구역은 0칸, 다른 구역 1칸, 여행지 2칸</span></p>`
-      : ti.apMax ? `<p class="sec-t">${esc(ti.kindLabel)} 턴 <span class="dim">· 장소 1칸, 행동 1칸, 말 걸기는 0칸</span></p>` : '';
-    const duty = adult && ti.duty ? `<p class="hint">평일이다. 먼저 ${ti.duty.id === 'work' ? '출근' : ti.duty.id === 'class' ? '수업' : '훈련'}부터 (${ti.duty.ap}칸). 아침밥은 그 전에 먹을 수 있다.</p>` : '';
+    const adult = ti.phase === 'adult', at = list.find(p => p.at);
+    const head = adult ? `<p class="sec-t">🗺️ 어디로 갈까? <span class="dim">· ${at ? `지금 ${esc(at.label)} 근처` : `지금 ${esc(ti.zone)}`} · 핀을 누르면 이동 (⚡ 거리만큼)</span></p>`
+      : ti.apMax ? `<p class="sec-t">🗺️ ${esc(ti.kindLabel)} 턴 <span class="dim">· 이동 ⚡${G.teenPt} · 행동 ⚡${G.teenPt} · 같이 있는 사람에게 말 걸기는 행동력 안 씀</span></p>` : '';
+    const duty = adult && ti.duty ? `<p class="hint">평일이다. 먼저 ${ti.duty.id === 'work' ? '출근' : ti.duty.id === 'class' ? '수업' : '훈련'}부터 (⚡${ti.duty.ap}). 아침밥은 그 전에 먹을 수 있다.</p>` : '';
+    const mode = mapModeNow();
     box.innerHTML = list.length
-      ? `${head}${duty}<div class="acts places">${list.map(p => `<button type="button" class="act" data-pl="${p.id}"${p.ok ? '' : ' disabled'}${p.why ? ` title="${esc(p.why)}"` : ''}><span class="ic" aria-hidden="true">${p.icon}</span>${esc(p.label)}${p.why ? `<small>${esc(p.why)}</small>` : adult ? `<small>${p.cost ? p.cost + '칸' : '0칸'}${p.regular ? ' · 단골' : ''}</small>` : p.regular ? '<small>단골</small>' : ''}</button>`).join('')}</div>`
+      ? `${head}${duty}${mapToggle(mode)}${mapHTML(list, mode)}`
       : ti.apMax ? '<p class="empty">갈 수 있는 곳이 없다.</p>' : `<p class="empty">${esc(ti.kindLabel || '')} 주간이다. <b>▶ 다음 주</b>를 누르면 이어진다.</p>`;
     return;
   }
   const here = G.here(), acts = G.actionList();
   const nKnown = here.filter(h => !h.stranger).length, nNew = here.filter(h => h.stranger).reduce((t, h) => t + 1 + (h.grp || 0), 0);
   box.innerHTML = `
-    <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}${S.drunk ? ` <small class="drunk d${S.drunk}">🍺 ${G.drunkLabel()}</small>` : ''}</span><button type="button" data-leave>← 돌아가기</button></div>
+    <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}${S.drunk ? ` <small class="drunk d${S.drunk}">🍺 ${G.drunkLabel()}</small>` : ''}</span><button type="button" class="map-btn" data-map>🗺️ 지도</button></div>
     ${compBar(pl)}
-    <p class="sec-t">여기 있는 사람들 <span class="dim">· 아는 사람 ${nKnown}명 / 모르는 사람 ${nNew}명 · 말 걸기는 행동을 안 씀</span>${pl.crowd ? ' <button type="button" class="br-open" data-browse>👀 둘러보기</button>' : ''}</p>
+    <p class="sec-t">👥 여기 있는 사람 ${nKnown + nNew}명 <span class="dim">· 아는 사람 ${nKnown} · 처음 보는 사람 ${nNew} · 말 걸기는 행동력 안 씀</span>${pl.crowd ? ' <button type="button" class="br-open" data-browse>👀 둘러보기</button>' : ''}</p>
     ${crowdLine(here)}
-    <div class="here">${here.map(hereRow).join('') || '<p class="empty">아무도 없다.</p>'}</div>
-    <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· 행동 1</span></p>
+    <div class="here">${here.length ? [['아는 사람', here.filter(h => !h.stranger)], ['처음 보는 사람', here.filter(h => h.stranger)]].filter(g => g[1].length).map(([t, L]) => `<p class="here-g">${t} <small>${L.length}</small></p>${L.map(hereRow).join('')}`).join('') : '<p class="empty">아무도 없다.</p>'}</div>
+    <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· ⚡ = 드는 행동력</span></p>
     <div class="acts">${actButtons(acts) || '<p class="empty">여기선 딱히 할 게 없다.</p>'}</div>`;
 }
 
@@ -250,7 +301,7 @@ function compBar(pl) {
   if (!c) return '';
   const inside = pl.id === 'motel' || pl.id === 'home';
   const go = inside ? '' : G.places().filter(x => x.id === 'motel' || x.id === 'home').map(x =>
-    `<button type="button" data-pl="${x.id}"${x.ok ? '' : ' disabled'}>${x.icon} ${esc(G.josa(x.label, '으로'))}${x.cost ? ` <small>${x.cost}칸</small>` : ''}</button>`).join('');
+    `<button type="button" data-pl="${x.id}"${x.ok ? '' : ' disabled'}>${x.icon} ${esc(G.josa(x.label, '으로'))}${x.cost ? ` <small>⚡${x.cost}</small>` : ''}</button>`).join('');
   const enjoy = inside && G.interactions(c.id).some(i => i.id === 'enjoy') ? `<button type="button" class="hot" data-enjoy="${c.id}">♂♀ 즐기기</button>` : '';
   return `<p class="comp">🤝 동행: <b>${esc(G.pname(c))}</b> <span class="dim">${inside ? '— 단둘이' : '— 같이 간다'}</span><span class="go">${go}${enjoy}<button type="button" data-endco>헤어지기</button></span></p>`;
 }
@@ -477,7 +528,7 @@ function order(p) {
   if (p.kind === 'child') return 5;
   return 10;
 }
-let showAcq = false, peopleFilter = 'all';
+let showAcq = false, peopleFilter = 'all', peopleView = 'list';
 const kin = p => p.kind === 'family' || p.kind === 'child';
 const mine = p => p.partner || p.spouse || p.secret || p.fwb || p.fling;
 // 상태: 유부녀·유부남(결혼한 걸 알 때) / 애인 있음 (내 연인이 아닌데)
@@ -496,14 +547,96 @@ function openPeople() {
     if (p.grudge >= 15) extra.push(`원한 <b class="r">${mini(p.grudge)}</b>`);
     const mk = G.marker(p), st = statusTag(p);
     return `<button type="button" class="prow${G.faded(p) ? ' faded' : ''}" data-pv="${p.id}">${av(p, 32)}
-      <span><b>${esc(G.pname(p))}</b>${mk ? ` <span class="mk">${mk}</span>` : ''} <span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}${G.faded(p) ? ' · 소원해짐' : ''}</span>${st ? ` <span class="tag${st === '애인 있음' ? '' : ' warn'}">${st}</span>` : ''}</span>
+      <span><b>${esc(G.pname(p))}</b>${mk ? ` <span class="mk">${mk}</span>` : ''}${G.hasNumber(p) ? '' : ' <span class="dim" title="번호 없음">📵</span>'} <span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}${G.faded(p) ? ' · 소원해짐' : ''}</span>${st ? ` <span class="tag${st === '애인 있음' ? '' : ' warn'}">${st}</span>` : ''}</span>
       <span class="pl">${esc(G.relLabel(p))}</span>
       <span class="pm">친밀 <b>${mini(p.close)}</b>  ${extra.join('  ')}</span>
     </button>`;
   };
   const acqBox = acq.length ? `<button type="button" class="acq-t" data-acq aria-expanded="${showAcq}">${showAcq ? '▾' : '▸'} 얼굴만 아는 사람 ${acq.length}명 <span class="dim">같은 반·과·팀·이웃·단골 — 말을 걸면 관계가 된다</span></button>${showAcq ? `<div class="plist">${acq.map(row).join('')}</div>` : ''}` : '';
+  const tabs = `<div class="pview" role="tablist"><button type="button" role="tab" data-pview="list" aria-selected="${peopleView === 'list'}">📋 목록</button><button type="button" role="tab" data-pview="web" aria-selected="${peopleView === 'web'}">🕸️ 관계망</button></div>`;
+  const body = peopleView === 'web' ? webHTML(list)
+    : `<div class="plist">${list.map(row).join('') || '<p class="hint">여기에 해당하는 사람이 없다.</p>'}</div>${peopleFilter === 'all' ? acqBox : ''}`;
   showModal('people', `👥 관계 ${known.length}명`,
-    `${chips}<div class="plist">${list.map(row).join('') || '<p class="hint">여기에 해당하는 사람이 없다.</p>'}</div>${peopleFilter === 'all' ? acqBox : ''}<p class="hint">사람을 누르면 할 수 있는 게 나와. 관계는 가만두면 조금씩 멀어져. (남은 행동 ${S.ap})</p>`);
+    `${tabs}${chips}${body}<p class="hint">사람을 누르면 할 수 있는 게 나와. 관계는 가만두면 조금씩 멀어져. (남은 행동력 ⚡${S.ap})</p>`);
+}
+/* 인간 관계망 — 나를 가운데 두고 실로 잇기 (가까운 사이일수록 안쪽 고리)
+   실 색: 관계 종류 / 굵기: 친밀 / 화살표: 마음의 방향 (상대 설렘 40+ → 나에게, 내 성욕 50+ → 상대에게, 둘 다면 양쪽, 원한 50+ → 빨간 화살표)
+   함께 밤을 보낸 사이: 실 가운데 ⚤ + ♥ / 사람끼리의 실: 부부·커플(💍)·부모와 아이·같은 무리 */
+const WEB_COLOR = { spouse: '#f4c542', partner: '#ff5d8f', secret: '#b06cff', fwb: '#ff7ad9', family: '#5ccf7a', friend: '#5aa9ff', coworker: '#9fb3c8', classmate: '#4fd1c5', neighbor: '#d0a070', ex: '#9a9a9a', grudge: '#e24a3b', other: '#7f8794' };
+const WEB_LABEL = { spouse: '배우자', partner: '연인', secret: '몰래 만남', fwb: '섹파·썸', family: '가족', friend: '친구', coworker: '직장', classmate: '학교', neighbor: '이웃', ex: '전 연인', grudge: '원한', other: '아는 사이' };
+function webType(p) {
+  if (p.spouse) return 'spouse';
+  if (p.partner || p.teenLove) return 'partner';
+  if (p.secret) return 'secret';
+  if (p.fwb || p.fling) return 'fwb';
+  if (p.kind === 'family' || p.kind === 'child') return 'family';
+  if (p.grudge >= 50) return 'grudge';
+  if (p.ex) return 'ex';
+  if (p.close >= 45) return 'friend';
+  return { coworker: 'coworker', classmate: 'classmate', neighbor: 'neighbor' }[p.kind] || 'other';
+}
+const SEX_ICON = `<svg viewBox="0 0 26 22" aria-hidden="true"><circle cx="9" cy="9" r="5.2" fill="none" stroke="#ff6fa8" stroke-width="2.2"/><path d="M9 14.2V21M5.8 18h6.4" stroke="#ff6fa8" stroke-width="2.2" stroke-linecap="round"/><circle cx="15.5" cy="11" r="5.2" fill="none" stroke="#5aa9ff" stroke-width="2.2"/><path d="M19.2 7.3L24 2.5M19.6 2.5H24V6.9" fill="none" stroke="#5aa9ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function webHTML(list) {
+  const S = G.state(), lust = S.lust || {};
+  if (!list.length) return '<p class="hint">여기에 해당하는 사람이 없다.</p>';
+  const ringOf = p => { const t = webType(p); return ['spouse', 'partner', 'secret', 'fwb', 'family'].includes(t) ? 0 : (t === 'friend' || t === 'grudge' || p.heart >= 40 || p.nights) ? 1 : 2; };
+  const TORD = Object.keys(WEB_COLOR);
+  const rings = [[], [], []];
+  for (const p of list) rings[ringOf(p)].push(p);
+  const CAP = [12, 18, 26], R = [25, 37, 46.5];
+  const hidden = rings.reduce((t, r, i) => t + Math.max(0, r.length - CAP[i]), 0);
+  const pos = new Map();
+  rings.forEach((r, i) => {
+    // 같은 종류끼리, 짝(부부·커플)·같은 집은 나란히
+    r.sort((a, b) => TORD.indexOf(webType(a)) - TORD.indexOf(webType(b)) || String(a.hh || a.mateId || a.id).localeCompare(String(b.hh || b.mateId || b.id)) || b.close - a.close);
+    const shown = r.slice(0, CAP[i]), off = i * .55 - Math.PI / 2;
+    shown.forEach((p, k) => { const ang = off + k / shown.length * Math.PI * 2; pos.set(p.id, [50 + R[i] * Math.cos(ang), 50 + R[i] * Math.sin(ang)]); });
+  });
+  const shrink = (x1, y1, x2, y2, a, b) => { const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1; return [x1 + dx / L * a, y1 + dy / L * a, x2 - dx / L * b, y2 - dy / L * b, L]; };
+  const marks = new Set(), lines = [], icons = [];
+  let side = 1;
+  for (const p of list) {
+    const q = pos.get(p.id);
+    if (!q) continue;
+    const t = webType(p), c = WEB_COLOR[t], w = (1 + p.close / 28).toFixed(1);
+    const [x1, y1, x2, y2] = shrink(50, 50, q[0], q[1], 6.5, 5.2);
+    side = -side;
+    const mx = (x1 + x2) / 2 + (y2 - y1) * .08 * side, my = (y1 + y2) / 2 - (x2 - x1) * .08 * side;   // 살짝 휜 실
+    const toMe = p.heart >= 40 || p.grudge >= 50 || ['spouse', 'partner'].includes(t), toThem = (lust[p.id] || 0) >= 50 || ['spouse', 'partner'].includes(t);
+    const ac = p.grudge >= 50 ? WEB_COLOR.grudge : c;
+    if (toMe) marks.add(ac); if (toThem) marks.add(ac);
+    const id = ac.slice(1);
+    lines.push(`<path d="M${x1.toFixed(2)},${y1.toFixed(2)} Q${mx.toFixed(2)},${my.toFixed(2)} ${x2.toFixed(2)},${y2.toFixed(2)}" stroke="${c}" stroke-width="${w}" fill="none" vector-effect="non-scaling-stroke"${['secret', 'ex'].includes(t) ? ' stroke-dasharray="5 4"' : ''}${toMe ? ` marker-start="url(#wa${id})"` : ''}${toThem ? ` marker-end="url(#wa${id})"` : ''} opacity=".85"/>`);
+    const bz = (a, m, b, t) => (1 - t) * (1 - t) * a + 2 * (1 - t) * t * m + t * t * b;   // 실 위의 한 점 (t: 나 → 상대)
+    if (p.nights) icons.push(`<span class="wb-ic" style="left:${bz(x1, mx, x2, .58).toFixed(1)}%;top:${bz(y1, my, y2, .58).toFixed(1)}%" title="함께 밤을 보낸 사이 (${p.nights}번)">${SEX_ICON}<b>♥</b></span>`);
+  }
+  // 사람끼리: 부부·커플(짝), 부모와 아이(같은 집), 같은 무리
+  const done = new Set();
+  for (const p of list) {
+    const a = pos.get(p.id);
+    if (!a) continue;
+    const links = [];
+    if (p.mateId) links.push([p.mateId, p.married ? WEB_COLOR.spouse : WEB_COLOR.partner, p.married ? '💍' : '♡']);
+    for (const pid of p.parents || []) links.push([pid, WEB_COLOR.family, '']);
+    for (const gid of p.group || []) links.push([gid, '#8a93a6', '']);
+    for (const [oid, c, ic] of links) {
+      const b = pos.get(oid), key = [p.id, oid].sort().join('-');
+      if (!b || done.has(key)) continue;
+      done.add(key);
+      const [x1, y1, x2, y2] = shrink(a[0], a[1], b[0], b[1], 4.6, 4.6);
+      lines.push(`<path d="M${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)}" stroke="${c}" stroke-width="1.6" fill="none" vector-effect="non-scaling-stroke" stroke-dasharray="2 3" opacity=".9"/>`);
+      if (ic) icons.push(`<span class="wb-ic sm" style="left:${((x1 + x2) / 2).toFixed(1)}%;top:${((y1 + y2) / 2).toFixed(1)}%">${ic}</span>`);
+    }
+  }
+  const defs = [...marks].map(c => `<marker id="wa${c.slice(1)}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="3.2" markerHeight="3.2" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`).join('');
+  const nodes = list.filter(p => pos.has(p.id)).map(p => { const [x, y] = pos.get(p.id), t = webType(p), mk = G.marker(p);
+    return `<button type="button" class="wb-n" data-pv="${p.id}" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;--c:${WEB_COLOR[t]}" title="${esc(G.pname(p))} · ${esc(G.relLabel(p))}">${av(p, 30)}<span>${esc(G.pname(p))}${mk ? ` <i>${mk}</i>` : ''}</span></button>`; }).join('');
+  const used = [...new Set(list.filter(p => pos.has(p.id)).map(webType))];
+  const legend = `<div class="wb-leg">${used.map(t => `<span><b style="background:${WEB_COLOR[t]}"></b>${WEB_LABEL[t]}</span>`).join('')}<span>➝ 마음의 방향</span><span class="wb-legsex">${SEX_ICON}♥ 함께 밤</span><span>💍 부부 · ♡ 커플 (그 사람들끼리)</span></div>`;
+  return `<div class="web"><svg class="wb-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><defs>${defs}</defs>
+      ${R.map(r => `<circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(255,255,255,.06)" vector-effect="non-scaling-stroke"/>`).join('')}${lines.join('')}</svg>
+    ${icons.join('')}${nodes}<div class="wb-me">${window.Avatar && S.look ? Avatar.render(G.myLook(), 40) : '🙂'}<span>나</span></div></div>
+    ${legend}${hidden ? `<p class="hint">더 먼 사이 ${hidden}명은 목록에서 볼 수 있다.</p>` : ''}`;
 }
 
 /* 사람 한 명 */
@@ -538,7 +671,7 @@ function openPerson(id) {
   const prof = G.profile(p).map(f => `<dt>${f.label}</dt><dd${f.value == null ? ' class="unk"' : ''}>${f.value == null ? '???' : esc(f.value)}</dd>`).join('');
   const its = G.interactions(id), anyFree = its.some(it => it.free);
   const acts = its.map(it =>
-    `<button type="button" data-i="${it.id}"${it.ok ? '' : ' disabled'}>${it.icon} ${it.label}${it.cost ? ` <small>${G.fmtMoney(it.cost)}</small>` : ''}${anyFree && !it.free ? ' <small>행동 1</small>' : ''}</button>`).join('');
+    `<button type="button" data-i="${it.id}"${it.ok ? '' : ' disabled'}>${it.icon} ${it.label}${it.cost ? ` <small>${G.fmtMoney(it.cost)}</small>` : ''}${!it.free ? ` <small>⚡${it.ap}</small>` : ''}</button>`).join('');
   showModal('person', `${G.pname(p)}`, `
     <div class="p-top">${avBtn(id, av(p, 60))}<div class="p-who"><b>${esc(G.pname(p))}${G.marker(p) ? ` <span class="mk">${G.marker(p)}</span>` : ''}</b><span class="dim">${G.npcAge(p)}살 ${genderKo(p.gender)}, ${esc(G.relLabel(p))}${G.acquaintance(p) ? ' (얼굴만 아는 사이)' : ''}</span></div></div>
     ${fullView === id ? fullAv(G.look(p), G.npcAge(p), G.figure(p), p.personality, G.ringVisible(p), G.outfitCtx(p)) : ''}
@@ -548,7 +681,8 @@ function openPerson(id) {
     <dl class="prof">${prof}</dl>
     ${G.profile(p).some(f => f.value == null) ? '<p class="hint">더 친해지면 더 알 수 있다.</p>' : ''}
     <div class="igrid">${acts || '<p class="hint">지금은 할 수 있는 게 없다.</p>'}</div>
-    <p class="hint">${anyFree ? `지금 ${esc(G.place().label)}에 같이 있어서 한 번은 행동을 쓰지 않는다.` : '한 번에 행동 1을 써.'} (남은 행동 ${S.ap})</p>
+    ${!G.hasNumber(p) && !G.here().some(h => h.key === id) ? '<p class="hint">📵 번호가 없어서 따로 연락할 수 없다. 같은 곳에서 마주치면 번호를 물어보자.</p>' : ''}
+    <p class="hint">${anyFree ? `지금 ${esc(G.place().label)}에 같이 있어서 한 번은 행동력을 쓰지 않는다.` : '⚡ = 드는 행동력.'} (남은 행동력 ⚡${S.ap})</p>
     <button type="button" class="back" data-back>${personFrom === 'here' ? '← 닫기' : '← 목록'}</button>`, true, id);
 }
 
@@ -597,10 +731,10 @@ function openBrowse(ix) {
       <div class="br-card${hey ? ' hey' : ''}">${brPortrait(h)}${h.approach ? '<span class="br-bubble">저기요</span>' : ''}</div>
       <button type="button" class="br-nav" data-brnext aria-label="다음 사람">▶</button></div>
     <p class="br-n">${browseIx + 1} / ${n}</p>
-    <div class="br-info"><b>낯선 ${esc(strangerWho(p))} · ${esc(ageBand(age))}</b>${h.grp ? ` <span class="dim">· ${h.couple ? '연인과 함께' : `일행 ${h.grp}명과 같이`}</span>` : ''}
-      ${inf ? `<span>${esc(inf.sentence)}</span>` : ''}<span class="dim">${esc(h.doing)}.</span>${G.ringVisible(p) ? '<span class="dim">(왼손에 반지)</span>' : ''}
+    <div class="br-info"><b>낯선 ${esc(strangerWho(p))} · ${esc(ageBand(age))}</b> ${hereBadges(h)}
+      ${inf ? `<span>${esc(inf.sentence)}</span>` : ''}<span class="dim">${esc(h.doing)}.</span>${h.ring ? '<span class="dim">왼손 약지에 결혼 반지가 있다.</span>' : ''}${h.couple ? `<span class="dim">${h.wed ? '배우자' : '연인'}와 함께 있다 — 말을 걸면 짝이 끼어들지도.</span>` : ''}
       ${h.used ? '<span class="hint">대화가 이어지지 않았다. 다음에 또 마주칠지도.</span>' : h.approach ? '<span class="hint">상대가 먼저 다가왔다. 받아주면 거의 이어진다.</span>' : ''}</div>
-    <div class="choices br-acts"><button type="button" data-talk="${h.key}"${h.used ? ' disabled' : ''}>💬 ${h.approach ? '대답한다' : '말 걸기'} <small>행동 안 씀</small></button><button type="button" data-brnext>다음 사람 ▶</button><button type="button" data-brpass="${h.key}">그냥 지나간다</button></div>
+    <div class="choices br-acts"><button type="button" data-talk="${h.key}"${h.used ? ' disabled' : ''}>💬 ${h.approach ? '대답한다' : '말 걸기'} <small>행동력 안 씀</small></button><button type="button" data-ask="${h.key}"${h.used || age < 10 ? ' disabled' : ''}>📱 말 걸고 번호 묻기 <small>${G.timeInfo().phase === 'adult' ? '⚡2' : '행동력 안 씀'}</small></button><button type="button" data-brnext>다음 사람 ▶</button><button type="button" data-brpass="${h.key}">그냥 지나간다</button></div>
     <div class="br-foot"><span class="br-dots">${dots}</span><button type="button" data-brgrid>모아 보기 ▦</button></div>
     <div class="choices">${more}<button type="button" class="back" data-back>← 닫기</button></div>`, true, 'one');
   refocus();
@@ -628,7 +762,7 @@ function openJobs() {
   else if (S.flags.inArmy) html = '<p>군 복무 중이다.</p>';
   else {
     const can = G.canJobHunt();
-    html = `<p class="hint">지원하면 행동 1을 써.${S.record ? ' 전과가 있으면 붙기 어렵다.' : ''} (남은 행동 ${S.ap})</p>` + G.jobInfo().map(j => `
+    html = `<p class="hint">지원하면 행동력 ⚡6을 써.${S.record ? ' 전과가 있으면 붙기 어렵다.' : ''} (남은 행동력 ⚡${S.ap})</p>` + G.jobInfo().map(j => `
       <div class="row">
         <div><b>${esc(j.label)}</b> <span class="dim">${j.volatile ? '수입 랜덤' : '연봉 ' + G.fmtMoney(j.salary)}</span><div style="font-size:12.5px">${reqText(j)}</div></div>
         <button type="button" data-j="${j.id}"${can ? '' : ' disabled'}>지원</button>
@@ -652,7 +786,7 @@ function openCrime() {
     <div class="stats"><span>경찰의 관심</span><span class="bar low">${bar(S.heat)}</span><span class="num">${S.heat}</span></div>
     ${S.record ? `<p class="dim">전과 ${S.record}회</p>` : ''}
     ${rows}
-    <p class="hint">남은 행동 ${S.ap}</p>`);
+    <p class="hint">한 번에 행동력 ⚡${G.timeInfo().phase === 'adult' ? 6 : G.teenPt}. 남은 행동력 ⚡${S.ap}</p>`);
 }
 
 
@@ -1119,9 +1253,11 @@ $('#where').addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   const d = b.dataset;
-  if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) (a.id === 'shop' ? openShop() : openStudy()); else G.doAction(d.a); }
-  else if (d.pl) G.goPlace(d.pl);
+  if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) (a.id === 'shop' ? openShop() : a.id === 'houseHunt' ? openHousing() : openStudy()); else G.doAction(d.a); }
+  else if (d.pl) { mapMode = null; G.goPlace(d.pl); }
   else if ('leave' in d) G.leavePlace();
+  else if ('map' in d) openMap();
+  else if (d.mapmode) { mapMode = d.mapmode; render(G.state()); }
   else if ('browse' in d) startBrowse(null);
   else if ('endco' in d) G.endCompany();
   else if (d.enjoy) G.interact(d.enjoy, 'enjoy');
@@ -1159,6 +1295,8 @@ mBody.addEventListener('click', e => {
   if ('ntest' in d) { openNightTest(); return; }   // 💾 저장 칸 → 🧪 그날 밤 테스트
   if (modalMode === 'ntest') { if ('ntgo' in d) runNightTest(); return; }
   if (modalMode === 'quick') { quickClick(b); return; }
+  if (modalMode === 'map') { if (d.mapmode) { mapMode = d.mapmode; openMap(); } else if (d.pl) { G.goPlace(d.pl); mapMode = null; if (modalMode === 'map') closeModal(); } return; }   // 지도: 핀을 누르면 이동
+  if (modalMode === 'housing') { if (d.move) { G.moveHome(d.move); closeModal(); } return; }   // 부동산: 이사
   if ('intro' in d) { G.ackIntro(); return; }
   if ('rok' in d) { G.ackReport(); return; }
   if (modalMode === 'apply') {
@@ -1191,9 +1329,11 @@ mBody.addEventListener('click', e => {
   else if (d.pv) { personFrom = 'people'; openPerson(d.pv); }
   else if ('acq' in d) { showAcq = !showAcq; openPeople(); }
   else if (d.pf) { peopleFilter = d.pf; openPeople(); }
+  else if (d.pview) { peopleView = d.pview; openPeople(); }
   else if (d.i === 'date' && G.dateOutfits().length) openDateDress(modalArg);
   else if (d.i) { const pid = modalArg; G.interact(pid, d.i); dlgBack = G.state().pending.some(x => x.dlg) ? pid : null; }
   else if (d.talk) { const id = G.talkTo(d.talk); if (id && !G.state().pending.length) { personFrom = 'here'; openPerson(id); } }
+  else if (d.ask) { const id = G.askStranger(d.ask); if (id && !G.state().pending.length) { personFrom = 'here'; openPerson(id); } }
   else if ('back' in d) { if (modalMode === 'browse' || personFrom === 'here') closeModal(); else openPeople(); }
   else if (d.j) G.applyJob(d.j);
   else if (d.k) G.commitCrime(d.k);

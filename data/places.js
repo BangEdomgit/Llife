@@ -64,7 +64,7 @@ GAME_DATA.places = [
     arrive: ['학원 버스에서 내렸다.', '학원 계단을 올라갔다. 형광등이 눈부셨다.', '학원 복도에서 컵라면 냄새가 났다.'],
     actions: ['cram'] },
 
-  { id: 'campus', label: '대학', icon: '🎓', minAge: 19, routine: true,
+  { id: 'campus', label: '대학', campusLabel: '정문', icon: '🎓', minAge: 19, routine: true, campus: true,
     open: s => !!s.flags.student, closed: '학생만',
     regulars: ['friend', 'classmate'], crowd: 'peer',
     doing: ['과제를 하고 있다', '잔디밭에 앉아 있다', '동아리 홍보 전단을 나눠주고 있다', '학식 줄에 서 있다', '노트북으로 수강신청 화면을 보고 있다', '강의실 맨 뒷자리에서 졸고 있다'],
@@ -165,6 +165,51 @@ GAME_DATA.places = [
     doing: ['떡볶이 포장마차 앞에 서 있다', '덤으로 귤을 더 받아 웃고 있다', '흥정하고 있다', '어묵 국물을 호호 불고 있다', '장바구니를 들고 걷고 있다', '호떡을 기다리고 있다'],
     arrive: ['시장 골목에 기름 냄새가 가득했다.', '"싸요 싸!" 상인들 목소리가 골목을 채웠다.', '시장 입구에서 호떡 냄새가 났다.'],
     actions: ['snack', 'walk'] },
+
+  /* ── 대학 캠퍼스 (지도에서 '대학'에 들어가면 캠퍼스 지도 — data/map.js campus) — 학생만. 캠퍼스 안 이동은 행동력 1 ── */
+  { id: 'lecture', label: '강의실', icon: '🏫', minAge: 19, routine: true, campus: true, open: s => !!s.flags.student, closed: '학생만',
+    regulars: ['classmate', 'friend'], crowd: 'peer', kind: 'classmate',
+    doing: ['맨 앞자리에서 필기하고 있다', '노트북으로 과제를 하고 있다', '맨 뒷자리에서 졸고 있다', '출석 부르기 전에 뛰어 들어왔다', '조별 과제 카톡을 보고 있다', '교수님께 질문하러 가고 있다'],
+    arrive: ['강의실 뒷문으로 조용히 들어갔다.', '형광등 아래 책상들이 줄지어 있었다.', '칠판에 지난 수업 판서가 남아 있었다.'],
+    actions: ['study', 'read'] },
+  { id: 'cafeteria', label: '학생식당', icon: '🍱', minAge: 19, campus: true, open: s => !!s.flags.student, closed: '학생만',
+    regulars: ['classmate', 'friend'], crowd: 'peer',
+    doing: ['식판을 들고 빈자리를 찾고 있다', '돈가스를 먹고 있다', '친구들과 밥을 먹으며 떠들고 있다', '혼자 이어폰을 끼고 밥을 먹고 있다', '메뉴판 앞에서 고민하고 있다'],
+    arrive: ['학생식당에 긴 줄이 늘어서 있었다.', '오늘의 메뉴: 돈가스, 김치볶음밥, 라면.', '식판 부딪히는 소리가 요란했다.'],
+    actions: ['cafMeal', 'snack'] },
+  { id: 'ulib', label: '중앙도서관', icon: '📚', minAge: 19, campus: true, open: s => !!s.flags.student, closed: '학생만',
+    regulars: ['classmate', 'friend'], crowd: 'peer', hobby: 'book',
+    doing: ['열람실에서 전공 책을 보고 있다', '노트북으로 리포트를 쓰고 있다', '책상에 엎드려 자고 있다', '서가 사이를 서성이고 있다', '스터디룸에서 토론하고 있다'],
+    arrive: ['도서관 게이트에 학생증을 찍었다.', '열람실은 숨소리까지 들릴 만큼 조용했다.', '시험 기간이라 빈자리가 없었다.'],
+    actions: ['study', 'read'] },
+  { id: 'clubroom', label: '동아리방', icon: '🎸', minAge: 19, campus: true, open: s => !!s.flags.student, closed: '학생만',
+    regulars: (s, a) => a.clubMates(), regularsN: [2, 6],
+    doing: ['기타 줄을 갈고 있다', '소파에 누워 휴대폰을 보고 있다', '공연 포스터를 그리고 있다', '라면을 끓이고 있다', 'MT 장소를 검색하고 있다', '선배가 남긴 낙서를 읽고 있다'],
+    arrive: ['동아리방 문을 열자 낡은 소파와 기타가 보였다.', '"왔어?" 누군가 고개도 안 들고 말했다.', '벽에 역대 공연 사진이 빼곡했다.'],
+    actions: ['uclub'] },
+  { id: 'quad', label: '잔디밭', icon: '🌿', minAge: 19, campus: true, open: s => !!s.flags.student, closed: '학생만',
+    regulars: ['classmate', 'friend'], crowd: 'peer',
+    doing: ['돗자리를 펴고 누워 있다', '짜장면을 시켜 먹고 있다', '기타를 치며 노래하고 있다', '프리스비를 던지고 있다', '나무 그늘에서 책을 읽고 있다'],
+    arrive: ['잔디밭에 햇살이 가득했다.', '광장 한가운데서 누가 버스킹을 하고 있었다.', '벤치에 앉아 캠퍼스를 내려다봤다.'],
+    actions: ['walk', 'rest'] },
+  { id: 'union', label: '학생회관', icon: '🏛', minAge: 19, campus: true, open: s => !!s.flags.student, closed: '학생만',
+    regulars: ['classmate', 'friend'], crowd: 'peer',
+    doing: ['게시판에서 공모전 포스터를 보고 있다', '학생회실에서 회의를 하고 있다', '복사실 앞에 줄을 서 있다', '매점에서 삼각김밥을 고르고 있다', '분실물 센터를 기웃거리고 있다'],
+    arrive: ['학생회관 1층 게시판이 포스터로 뒤덮여 있었다.', '복사기 돌아가는 소리가 났다.', '매점 앞에 사람이 북적였다.'],
+    actions: ['coffee', 'snack'] },
+
+  /* ── 집·부동산 (data/housing.js) ── */
+  // 우리 집 앞 — 사는 집에 따라 이름이 바뀜 (원룸 건물 앞·아파트 단지·고시원 복도 …). 같은 건물·단지 이웃이 오감
+  { id: 'block', ms: true, label: '집 앞', icon: '🏘', minAge: 4,
+    regulars: (s, a) => a.neighbors(), regularsN: [2, 6],
+    doing: (s, p, a) => a.npcAge(p) < 13 ? ['킥보드를 타고 있다', '엄마 손을 잡고 서 있다', '책가방을 메고 뛰어간다', '놀이터에서 그네를 타고 있다', '아이스크림을 먹고 있다'] : a.homeSpot().doing,
+    arrive: (s, a) => [`${a.homeSpot().label}에 나왔다.`, '현관문을 나서자 이웃과 눈이 마주쳤다.', '분리수거 봉투를 들고 내려왔다.', '택배를 찾으러 나왔다.'],
+    actions: ['walk'] },
+  // 부동산 — 집 보러 다니기·이사 (본가·고시원·원룸·오피스텔·빌라·아파트·주택)
+  { id: 'realty', label: '부동산', icon: '🔑', minAge: 19, crowd: 'adult', crowdN: [0, 2],
+    doing: ['매물 전단을 보고 있다', '계약서를 읽고 있다', '중개사와 이야기하고 있다', '지도 앱으로 역까지 거리를 재고 있다', '보증금을 계산하고 있다'],
+    arrive: ['유리문에 매물 전단이 빽빽하게 붙어 있었다.', '중개사가 믹스커피를 타 줬다.', '"어떤 집 찾으세요?"'],
+    actions: ['houseHunt'] },
 ];
 
 // NPC가 자주 가는 곳 — 취미에 따라 (나이에 맞는 곳만 고름)

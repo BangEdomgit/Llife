@@ -23,7 +23,7 @@ const EVENTS = Object.fromEntries(D.events.concat(D.classEvents || []).map(e => 
 const PLACES = Object.fromEntries(D.places.map(p => [p.id, p]));
 const ACTIONS = Object.fromEntries(D.actions.map(a => [a.id, a]));
 const TIMES = ['아침', '낮', '저녁'];
-const TRANSIENT = ['classSubj', 'fp', 'sev', 'late', 'mainId', 'mainName', 'loverId', 'lover', 'debt', 'new', 'newId', 'attempt', 'uniScore', 'signal', 'fline', 'myValue', 'theirValue', 'satText', 'placeLabel'];
+const TRANSIENT = ['classSubj', 'fp', 'sev', 'late', 'mainId', 'mainName', 'loverId', 'lover', 'debt', 'new', 'newId', 'attempt', 'uniScore', 'signal', 'fline', 'myValue', 'theirValue', 'satText', 'placeLabel', 'nbUnit', 'mateName', 'mateId', 'mateWord'];
 
 const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -89,7 +89,7 @@ function applyRegion(id) {
   const P = R.patch || {};
   const byId = (list, map) => { if (list && map) for (const x of list) if (map[x.id]) for (const k in map[x.id]) setD(x, k, map[x.id][k]); };
   byId(D.places, P.places); byId(D.jobs, P.jobs); byId(D.hobbies, P.hobbies); byId(D.dreams, P.dreams);
-  byId(D.subjects, P.subjects); byId(D.tracks, P.tracks); byId(D.wealth, P.wealth); byId(D.actions, P.actions); byId(D.events, P.events);
+  byId(D.subjects, P.subjects); byId(D.tracks, P.tracks); byId(D.wealth, P.wealth); byId(D.actions, P.actions); byId(D.events, P.events); byId(D.housing, P.housing);
   if (R.features) setD(D, 'features', R.features);
   if (R.dogNames) setD(D, 'dogNames', R.dogNames);
   if (R.universities) setD(D, 'universities', R.universities);
@@ -216,6 +216,8 @@ function relLabel(p) {
   if (p.ex) return '전 연인';
   if (p.heart >= 40 && heartOk(p)) return '썸';
   if (p.role) return p.role;   // 교수님·옆집 할머니처럼 역할이 있는 사람
+  if (p.kind === 'neighbor' && p.unit && p.close < 45) return `이웃 · ${p.unit}`;   // 같은 건물·단지 이웃 (호수)
+  if (p.org === 'mate' && p.close < 45) { const m = person(p.mateId); if (m) return `${pname(m)}의 ${mateWord(p)}`; }   // 아는 사람의 연인·배우자
   if (p.close >= 75) return '절친';
   if (p.close >= 45) return '친구';
   if (p.rtag) return p.rtag;   // 20세 시작: 과 친구·과 선배 / 사람 풀: 같은 과·선후배·단골·동네 상인
@@ -280,6 +282,7 @@ function makePerson(spec) {
     pref: age >= 19 && Math.random() < .6 ? randomPref(gender) : null,   // 좋아하는 체형 (null이면 상관없음)
   };
   if (p.kind === 'child') p.role = '아이';
+  if (spec.rtag) p.rtag = spec.rtag;   // 이벤트로 만난 사람의 관계 이름표 (동아리 사람·선후배 …)
   // 좋은 소문(한 사람과 오래, 존중함)이 돌면 새로 만난 어른이 처음부터 조금 더 믿어줌
   if (S.rumorType === 'good' && (S.rumor || 0) >= 30 && age >= 19 && p.kind !== 'family') p.trust = clamp(p.trust + rand(5, 10), 0, 100);
   // 기혼 NPC — 친밀 20이면 반지가 보이고, 40이면 결혼한 걸 알게 됨. 늘 몰래 만나는 사이로만 시작
@@ -1216,10 +1219,13 @@ const SCHED = {
   hs2: [semOf('CFCFCMCFCFXVVVV'), semOf('CFCFCMCKFFXVVVV')],                       // 고2: 11월 모의고사 (선택)
   hs3: [semOf('CKCFCMCFKFXVVVV'), semOf('CKCMCFNFFARVVVV')],                       // 고3: 3·6월 모의고사 / 9월 모의고사·수능·원서·발표
 };
-const TURN_AP = { free: 2, vac: 3 };   // 자유 턴은 방과 후, 방학은 조금 더
+// 행동력 (100 기준): 학교 다닐 땐 자유 턴 100 · 방학 150, 장소 이동·행동·말 걸기가 한 번에 50 (한 주의 방과 후를 반씩)
+const TURN_AP = { free: 100, vac: 150 }, TEEN_PT = 50, JAIL_AP = 100;
 const TURN_LABEL = { class: '수업', free: '자유', mid: '중간고사', final: '기말고사', vac: '방학', mock: '모의고사', csat: '수능', apply: '원서 접수', result: '결과 발표' };
-const DAY_AP = 18, LATE_AP = 6;       // 하루 18칸 + 새벽 6칸 (1칸 = 1시간)
-const HPA = 18 / DAY_AP;              // 1칸이 몇 시간인지 (아침 6시 → 자정이 하루 칸)
+// 어른: 하루 100 (아침 6시 → 자정, 1 ≈ 11분) + 새벽 33. 행동마다 비용이 다름 (data/life.js pt, 기본 6 ≈ 1시간), 이동은 지도 거리로 (data/map.js)
+const DAY_AP = 100, LATE_AP = 33;
+const HPA = 18 / DAY_AP;              // 1이 몇 시간인지
+const PT = { act: 6, eat: 5, talk: 5, intimate: 12, crime: 6, job: 6 };   // 어른의 기본 비용 (행동·밥·말 걸기·함께 밤·범죄·면접)
 const hourOf = used => 6 + (used || 0) * HPA;
 // 지금 단계
 function phase() {
@@ -1301,7 +1307,7 @@ function beginPhase() {
 // 이 턴 시작: 수업·시험은 자동으로 처리, 자유·방학은 행동력
 function startTurn() {
   const k = turnKind(S.turn);
-  S.tkind = k; S.used = 0; S.ap = jailed() ? 2 : TURN_AP[k] || 0;
+  S.tkind = k; S.used = 0; S.ap = jailed() ? JAIL_AP : TURN_AP[k] || 0;
   S.place = null; S.here = [];
   S.weather = rollWeather();
   updateTime();
@@ -1310,7 +1316,7 @@ function startTurn() {
 // 이번 턴을 끝내고(남은 행동은 쉬면서) 행동이 필요한 다음 턴까지 넘김 — 수업·시험 턴은 자동, 선택지가 걸리면 멈춤
 function nextTurn() {
   if (busy() || !schedule()) return;
-  if (S.ap > 0 && TURN_AP[S.tkind]) log(S.tkind === 'vac' ? '남은 방학은 집에서 뒹굴며 보냈다.' : '남은 시간은 쉬면서 보냈다.', { t: 'info', deltas: applyEffect({ health: S.ap >= 2 ? 1 : 0, happy: 1 }) });
+  if (S.ap > 0 && TURN_AP[S.tkind]) log(S.tkind === 'vac' ? '남은 방학은 집에서 뒹굴며 보냈다.' : '남은 시간은 쉬면서 보냈다.', { t: 'info', deltas: applyEffect({ health: S.ap >= TEEN_PT * 2 ? 1 : 0, happy: 1 }) });
   let guard = 0;
   do {
     advanceTurn();
@@ -1335,17 +1341,17 @@ function advanceTurn() {
 function startDay(first) {
   const pen = S.wake || 0;
   S.wake = 0; S.used = pen; S.dayStart = pen; S.ap = DAY_AP + LATE_AP - pen; S.meals = 0; S.worked = false;
-  S.place = null; S.here = []; S.zone = 'home'; S.drunk = 0;
+  S.place = null; S.here = []; S.zone = 'home'; S.at = 'home'; S.drunk = 0;
   if (!first) S.weather = rollWeather();
   if (isWeekend() && (S.fatigue || 0) > 0) S.fatigue--;
   updateTime();
 }
-// 평일에 해야 하는 일 (직장 6칸 / 대학 수업 4칸 / 군 복무 8칸)
+// 평일에 해야 하는 일 (직장 45 ≈ 8시간 / 대학 수업 25 ≈ 4시간 반 / 군 복무 45). at: 끝나고 있는 곳 (지도)
 function dutyOf() {
   if (phase() !== 'adult' || jailed() || isWeekend()) return null;
-  if (S.flags.inArmy) return { id: 'army', ap: 8, label: '훈련', zone: 'home' };
-  if (S.job) return { id: 'work', ap: 6, label: '출근', zone: 'work' };
-  if (S.flags.student && (S.school.start ?? 0) <= S.age) return { id: 'class', ap: 4, label: '수업', zone: 'school' };
+  if (S.flags.inArmy) return { id: 'army', ap: 45, label: '훈련', zone: 'home', at: 'home' };
+  if (S.job) return { id: 'work', ap: 45, label: '출근', zone: 'work', at: 'office' };
+  if (S.flags.student && (S.school.start ?? 0) <= S.age) return { id: 'class', ap: 25, label: '수업', zone: 'school', at: 'campus' };
   return null;
 }
 const dutyPending = () => !!dutyOf() && !S.worked;
@@ -1355,7 +1361,7 @@ function doDuty(auto) {
   if (!d || S.worked || (!auto && busy())) return;
   S.worked = true;
   const n = Math.min(d.ap, Math.max(0, S.ap));
-  S.ap -= n; S.used += n; S.zone = d.zone; S.place = null; S.here = [];
+  S.ap -= n; S.used += n; S.zone = d.zone; S.at = d.at; S.place = null; S.here = [];
   updateTime();
   const tired = (S.fatigue || 0) >= 3 ? .6 : 1;
   if (!auto && S.sameClothes === (S.dayN || 0) && (d.id === 'work' || d.id === 'class') && Math.random() < .55 && EVENTS.sameClothes) { S.sameClothes = -1; S.vars.dutyKind = d.id; fire(EVENTS.sameClothes); }   // 어제 옷 그대로 출근·등교
@@ -1366,7 +1372,9 @@ function doDuty(auto) {
   } else if (d.id === 'class') {
     S.school.studyYear += .02 * tired;
     if (!auto) log(pick(['강의실 맨 뒷자리에서 수업을 들었다.', '전공 수업 두 개를 듣고 나왔다.', '조별 과제 회의가 길어졌다.']), { t: 'info' });
-    maybeRandom(['campus', 'study'], auto ? .01 : C.randomEventChance * .5);
+    // 수업이 끝나면 강의실에 남아 있음 (같은 과 사람들) — 캠퍼스 지도로 학생식당·도서관·동아리방…
+    if (!auto && PLACES.lecture) { enterPlace(PLACES.lecture); S.at = 'lecture'; }
+    maybeRandom(['lecture', 'campus', 'study'], auto ? .01 : C.randomEventChance * .8);
   } else if (!auto) log('하루 종일 훈련을 받았다.', { t: 'info' });
 }
 // 잠자기 — 하루 끝. 밥을 거르면 건강이 깎이고, 새벽까지 깨 있었으면 다음 날 늦게 일어나고 피로가 쌓임
@@ -1427,10 +1435,10 @@ function skip(kind) {
   if (phase() !== 'adult') beginPhase();
   after();
 }
-// 밥 먹기 (1칸) — 하루 두 끼를 안 먹으면 건강이 깎임
+// 밥 먹기 (5) — 하루 두 끼를 안 먹으면 건강이 깎임
 function eat() {
   if (busy() || phase() !== 'adult' || S.ap <= 0) return;
-  spend(1);
+  spend(PT.eat);
   S.meals = (S.meals || 0) + 1;
   const where = S.place ? PLACES[S.place].label : '집';
   log(pick(hourOf(S.used) <= 10.5 ? ['토스트 한 장으로 아침을 때웠다.', '아침밥을 든든하게 먹었다.'] : hourOf(S.used) <= 16.5 ? ['점심을 먹었다.', `${where} 근처에서 점심을 먹었다.`, '김치찌개 한 그릇을 비웠다.'] : ['저녁을 먹었다.', '배달 음식을 시켜 먹었다.', '라면을 끓여 먹었다.']), { t: 'info', deltas: applyEffect({ health: 1 }) });
@@ -1447,6 +1455,7 @@ function monthly() {
     S.money -= Math.round((C.livingCost + (S.flags.married ? 600 : 0) + kids * 400) / 12);   // 가족이 늘면 생활비도 늘어남
   }
   if (S.flags.onPill) S.money -= rand(3, 5);   // 피임약값 (한 달 3~5만원)
+  if (S.age >= 19 && !S.flags.inArmy && !jailed()) S.money -= homeNow().rent || 0;   // 월세·관리비 (data/housing.js)
 }
 // 화면용 시간 정보
 function timeInfo() {
@@ -1740,12 +1749,12 @@ function crimeOdds(c) {
   return clamp(o, .05, .95);
 }
 function canCrime(c) {
-  return !busy() && S.ap > 0 && !dutyPending() && phase() !== 'story' && !jailed() && S.age >= c.minAge && meets(c.req);
+  return !busy() && S.ap >= (phase() === 'adult' ? PT.crime : TEEN_PT) && !dutyPending() && phase() !== 'story' && !jailed() && S.age >= c.minAge && meets(c.req);
 }
 function commitCrime(id) {
   const c = D.crimes.find(x => x.id === id);
   if (!c || !canCrime(c)) return;
-  spend();
+  spend(phase() === 'adult' ? PT.crime : TEEN_PT);
   addKarma(c.karma);
   S.crimes++;
   const ok = Math.random() < crimeOdds(c);
@@ -1874,10 +1883,10 @@ function yearly() {
 
 function after() {
   for (const p of alive()) {
-    if (p.married && !p.marriedKnown && p.close >= 40) { p.marriedKnown = true; log(`알고 보니 ${josa(pname(p), '은')} 결혼한 사람이었다.`, { t: 'info' }); }
+    if (p.married && !p.marriedKnown && (p.close >= 25 || (p.mateId && S.here.some(h => h.key === p.mateId)))) { p.marriedKnown = true; log(`알고 보니 ${josa(pname(p), '은')} 결혼한 사람이었다.`, { t: 'info' }); }
     if (p.divorced && !p.divorcedKnown && Math.max(p.close, p.trust) >= 40) p.divorcedKnown = true;
   }
-  if (!S.ended) ensurePools();
+  if (!S.ended) { syncHome(); ensurePools(); }
   if (S.lust) syncLibido();
   if (!S.ended) {
     if (S.stats.health <= 0) { S.ended = 'death'; S.pending = []; }
@@ -1885,7 +1894,7 @@ function after() {
   }
   // 단계가 바뀌면(예: 재수하다 대학에 붙음) 그 단계로 시작
   if (!S.ended && S.date) { const ph = phase(); if (S.ph !== ph) { const was = S.ph; S.ph = ph; if (was) beginPhase(); } }
-  // 학교: 자유·방학 턴의 행동을 다 쓰면 다음 턴으로 / 어른: 18칸을 다 쓰면 쓰러지듯 잠듦
+  // 학교: 자유·방학 턴의 행동력을 다 쓰면 다음 턴으로 / 어른: 새벽까지 다 쓰면 쓰러지듯 잠듦
   if (!S.ended && !S.pending.length && !S.report && !S.apply && !S.intro) {
     const ph = phase();
     if ((ph === 'ms' || ph === 'hs') && S.ap <= 0 && TURN_AP[S.tkind]) { nextTurn(); return; }
@@ -1918,9 +1927,10 @@ function settleChildhood() {
 
 /* ═════════ 행동 ═════════ */
 const busy = () => !!S.ended || S.pending.length > 0 || !!S.report || !!S.apply || !!S.intro;
-// 행동력 쓰기 (어른은 시계가 1.5시간씩 감)
-function spend(n = 1) { S.ap -= n; S.used = (S.used || 0) + n; updateTime(); if (phase() !== 'adult') libidoTick(); }
-const apOf = a => phase() === 'adult' ? (a.ap || 1) : 1;
+// 행동력 쓰기 (어른은 1마다 시계가 약 11분 감). 기본: 어른 6 / 학교 다닐 때 50
+const unitAP = () => phase() === 'adult' ? PT.act : TEEN_PT;
+function spend(n = unitAP()) { S.ap -= n; S.used = (S.used || 0) + n; updateTime(); if (phase() !== 'adult') libidoTick(); }
+const apOf = a => phase() === 'adult' ? (a.pt ?? PT.act) : a.pt === 0 ? 0 : TEEN_PT;
 const costOf = a => a.cost && S.age >= 18 ? resolve(a.cost) : 0;
 // 지금 있는 장소에서 할 수 있는 행동 (수감 중엔 교도소 행동)
 function actionList() {
@@ -1930,13 +1940,14 @@ function actionList() {
   return pl.actions.map(id => ACTIONS[id]).filter(a => a && S.age >= a.minAge && (a.maxAge == null || S.age <= a.maxAge) && meets(a.req) && (!a.if || a.if(S)) && !(a.id === 'parttime' && S.flags.inArmy));
 }
 function canDo(a) { return !busy() && S.ap >= apOf(a) && !dutyPending() && (!costOf(a) || S.money >= costOf(a)); }
-const needsSubject = a => (a.id === 'study' && inSchool()) || (a.id === 'shop' && S.age >= 13 && !!window.Outfit && !!S.look);
+const needsSubject = a => a.id === 'houseHunt' || (a.id === 'study' && inSchool()) || (a.id === 'shop' && S.age >= 13 && !!window.Outfit && !!S.look);
 // 공부할 과목 고르기 화면용: 지금 과목들의 예상 점수
 const studyInfo = () => subjectsNow().map(id => ({ id, label: SUB(id).label, exp: Math.round(expScore(id)), prep: Math.round((S.school.prep || {})[id] || 0) }));
 function doAction(id, subj) {
   const a = actionList().find(x => x.id === id);
   if (!a || !canDo(a)) return;
   spend(apOf(a));
+  if (a.meal) S.meals = (S.meals || 0) + 1;   // 학식: 끼니로 침
   const gk = gainK();
   if (a.id === 'study') {
     const deltas = applyEffect(a.effect, gk);
@@ -2035,16 +2046,26 @@ function dateDress(p) {
 }
 
 /* ═════════ 장소 ═════════ */
-// 구역 (어른): 같은 구역 안은 공짜로 드나들고, 다른 구역은 1칸, 여행지(터미널)는 2칸
+// 구역 (어른): 장소 배경·동네 판정에 씀. 이동 비용은 지도 거리로 (data/map.js, travelCost)
 const ZONE = { home: 'home', conveni: 'home', playground: 'home', school: 'school', academy: 'school', library: 'school', campus: 'school',
   cafe: 'downtown', mall: 'downtown', gym: 'downtown', concert: 'downtown', bar: 'downtown', pcbang: 'downtown', motel: 'downtown',
   office: 'work', park: 'out', market: 'out', church: 'out', hospital: 'out', center: 'out', station: 'travel' };
 const ZONE_LABEL = { home: '집 근처', school: '학교 쪽', downtown: '번화가', work: '직장', out: '외곽', travel: '여행지' };
+// 지도 위치 (data/map.js — 나라별 덮어쓰기) / 지금 서 있는 곳: 장소 안이면 그 장소, 아니면 마지막에 있던 곳(출근·수업 뒤엔 직장·대학)
+const mapPos = id => { const M = D.map; if (!M) return null; if (PLACES[id] && PLACES[id].campus && id !== 'campus') id = 'campus'; const o = M.posBy && M.posBy[REGION]; return (o && o[id]) || M.pos[id] || null; };
+const campusPos = id => (D.map && D.map.campus && D.map.campus.pos[id]) || null;   // 캠퍼스 지도 위치
+const onCampus = id => !!(PLACES[id] && PLACES[id].campus);
+const standAt = () => S.place || S.at || 'home';
+// 이동 비용: 학교 다닐 땐 어디든 50. 어른은 지도 거리 — 바로 옆 1, 가까우면 2, 멀면 3~10 (1 ≈ 11분)
 function travelCost(pl) {
-  const ph = phase();
-  if (ph !== 'adult') return 1;
-  const z = ZONE[pl.id] || 'out';
-  return z === 'travel' ? 2 : z === (S.zone || 'home') ? 0 : 1;
+  if (phase() !== 'adult') return TEEN_PT;
+  const from = standAt();
+  if (from === pl.id) return 0;
+  if (onCampus(from) && onCampus(pl.id)) return 1;   // 캠퍼스 안은 걸어서 금방
+  const a = mapPos(from), b = mapPos(pl.id);
+  if (!a || !b) return 3;
+  const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+  return (d < 45 ? 1 : d < 80 ? 2 : clamp(Math.round(2 + d / 55), 3, 10)) + (onCampus(pl.id) && pl.id !== 'campus' ? 1 : 0);
 }
 const ageFits = (pl, age) => !!pl && age >= (pl.minAge || 0) && (pl.maxAge == null || age <= pl.maxAge);
 function pickHangout(hobby, age) {
@@ -2069,8 +2090,10 @@ function placeList() {
   if (jailed() || phase() === 'story') return [];
   return D.places.filter(pl => ageFits(pl, S.age) && phaseFits(pl)).map(pl => {
     const cost = travelCost(pl);
-    return { id: pl.id, label: pl.label, icon: pl.icon, why: closedWhy(pl), regular: !!S.regular[pl.id], cost, zone: ZONE_LABEL[ZONE[pl.id] || 'out'],
-      ok: !busy() && S.ap >= cost && (cost || S.ap > 0) && !dutyPending() && placeOpen(pl) };
+    return { id: pl.id, label: pl.label, icon: pl.icon, why: closedWhy(pl), regular: !!S.regular[pl.id], cost, zone: ZONE_LABEL[ZONE[pl.id] || 'out'], pos: pl.campus && pl.id !== 'campus' ? null : mapPos(pl.id),
+      campus: !!pl.campus, cpos: pl.campus ? campusPos(pl.id) : null, clabel: pl.campusLabel || pl.label,
+      here: S.place === pl.id, at: !S.place && standAt() === pl.id,
+      ok: S.place !== pl.id && !busy() && S.ap >= cost && (cost || S.ap > 0) && !dutyPending() && placeOpen(pl) };
   });
 }
 // 처음 보는 사람의 나이대
@@ -2198,10 +2221,16 @@ function fillHere(pl, bring, night) {
   //   열린 장소(시장·번화가·공원·터미널…)는 open 배율만큼만 — 대부분 그날그날 처음 보는 사람들
   const nK = Math.round(rand(kn[0], kn[1]) * m);
   const hits = shuffle(alive().filter(p => p !== bring && p.kind !== 'family' && p.kind !== 'child' && ageFits(pl, npcAge(p)) && Math.random() < encounterChance(p, pl) * open));
+  const MW = E.mateWith, mateOK = MW && S.age >= 19 && MW.at.includes(pl.id), wkd = isWeekend() ? .15 : 0;
   for (const p of hits) {
     if (here.length - (bring ? 1 : 0) >= nK || here.length >= E.maxHere) break;
     if (inHere.has(p)) continue;
     add(p);
+    // 연인·배우자와 같이 온 아는 사람 (주말엔 더 자주) — 짝이 없으면 이때 생김
+    if (mateOK && !p.spouse && !p.partner && !p.secret && npcAge(p) >= 19 && (p.married || p.taken) && Math.random() < (p.married ? MW.married : MW.taken) + wkd) {
+      const m = mateOf(p, true);
+      if (m && !inHere.has(m) && here.length < E.maxHere) add(m, false, null, p.married ? '배우자와 함께' : '연인과 함께');
+    }
     for (const id of p.group || []) { const g = person(id); if (g && !inHere.has(g) && here.length < E.maxHere && ageFits(pl, npcAge(g)) && Math.random() < .7) add(g, false, null, '일행과 함께'); }
   }
   // 처음 보는 사람 (일행은 한 줄로)
@@ -2226,30 +2255,38 @@ function setCompanion(p) { S.companion = p ? p.id : null; }
 function goPlace(id) {
   const pl = PLACES[id];
   const cost = pl ? travelCost(pl) : 0;
-  if (!pl || busy() || S.ap < cost || S.ap <= 0 || dutyPending() || !placeOpen(pl)) return;
+  if (!pl || S.place === id || busy() || S.ap < cost || S.ap <= 0 || dutyPending() || !placeOpen(pl)) return;
   const night = S.time === 2;   // 사람은 도착한 때(행동 쓰기 전) 기준으로 채움
   if (S.drunk && ZONE[pl.id] !== ZONE[S.place]) soberUp();
   if (cost) spend(cost);
-  S.zone = ZONE[pl.id] || 'out';
+  S.zone = ZONE[pl.id] || 'out'; S.at = pl.id;
   enterPlace(pl, companion(), night);   // 동행은 같이 옴
   log(`${pl.icon} ` + fill(textOf(pl.arrive) || `${josa(pl.label, '으로')} 갔다.`), { t: 'place' });
   if (!pl.routine) {
     S.visits[id] = (S.visits[id] || 0) + 1;
     if (S.visits[id] >= D.regularVisits && !S.regular[id]) { S.regular[id] = true; log(`이제 ${pl.label} 단골이다. 얼굴을 알아보는 사람이 생겼다.`, { t: 'info' }); }
   }
-  maybeRandom([id], cost ? C.placeEventChance : C.placeEventChance / 2);
+  coupleSpot();
+  maybeRandom(pl.campus ? [id, 'campus'] : [id], cost ? C.placeEventChance : C.placeEventChance / 2);
   after();
 }
 function leavePlace() {
   if (!S.place || S.ended) return;
   if (S.drunk) soberUp();
-  S.place = null; S.here = []; S.hereNote = null;
+  S.at = S.place; S.place = null; S.here = []; S.hereNote = null;
   save(); emit();
 }
 // 여기 있는 사람들 (화면용)
 function hereList() {
   if (!S.place) return [];
-  return S.here.map(h => ({ key: h.key, stranger: !!h.x, p: h.x || person(h.key), doing: h.doing, used: h.used, grp: (h.grp || []).length, couple: !!(h.x && h.x.couple), approach: !!(h.x && h.x.approach && !h.used) })).filter(h => h.p);
+  const ids = new Set(S.here.map(h => h.key));
+  return S.here.map(h => {
+    const p = h.x || person(h.key);
+    if (!p) return null;
+    const lead = h.x && h.x.couple && h.grp && h.grp[0];   // 처음 보는 커플: 같이 있는 짝
+    return { key: h.key, stranger: !!h.x, p, doing: h.doing, used: h.used, grp: (h.grp || []).length, couple: !!(h.x && h.x.couple), approach: !!(h.x && h.x.approach && !h.used),
+      wed: lead ? !!p.married : false, withMate: !h.x && !!p.mateId && ids.has(p.mateId), ring: ringVisible(p), phone: !h.x && hasNumber(p) };
+  }).filter(Boolean);
 }
 // 둘러보기 (FACE_UPGRADE 6-3): 그냥 지나가기 — 이번 방문 동안은 목록에서 빠짐
 function passBy(key) {
@@ -2290,6 +2327,7 @@ function talkTo(key) {
     after();
     return null;
   }
+  const came = !!x.approach;   // 먼저 다가온 사람 (번호까지 줌)
   delete h.x; delete x.approach;
   const couple = !!x.couple;
   const p = enlist(x);
@@ -2303,9 +2341,74 @@ function talkTo(key) {
   const deltas = applyP(p, { close: [6, 12], trust: [3, 7], heart: romantic ? [Math.max(0, (fl - 2) * 3), Math.max(3, (fl - 1) * 4)] : 0 });
   const hello = S.age < 13 ? pick(D.kidHello) : pt.hello;
   const react = romantic ? ' ' + D.faceReact.first[LETTERS[fl]] : '';
-  log(opener + fill(hello + react, { p: pname(p) }) + (grp.length ? ` 일행 ${josa(grp.map(pname).join(', '), '와')}도 인사를 나눴다.` : ''), { deltas });
+  // 번호: 먼저 다가온 사람은 번호까지 주고, 아니면 아직 없음 (📱 번호 묻기). 일행은 얼굴만 아는 사이
+  p.phone = came || S.age < 13;
+  grp.forEach(q => { q.phone = false; q.acq = true; if (couple) q.org = 'mate'; });
+  log(opener + fill(hello + react, { p: pname(p) }) + (grp.length ? ` 일행 ${josa(grp.map(pname).join(', '), '와')}도 인사를 나눴다.` : '') + (came && S.age >= 13 ? ' 헤어질 때 번호를 주고받았다.' : ''), { deltas });
+  // 연인·배우자와 같이 있던 사람에게 말을 걸었으면: 그 짝의 반응 (data/events2.js cp_talk)
+  if (couple && grp[0] && npcAge(p) >= 20 && S.age >= 20 && p.gender !== S.gender && EVENTS.cp_talk && eligible(EVENTS.cp_talk) && !S.pending.length) { setMateVars(p, grp[0]); fire(EVENTS.cp_talk); }
   after();
   return p.id;
+}
+/* ── 번호 묻기 (관계 쌓기) — 번호가 있어야 같은 곳에 없을 때도 연락(관계 창의 상호작용)할 수 있음 ──
+   가족·연인·배우자·같이 사는 사람은 늘 / 이벤트로 알게 된 사람은 번호가 있음 / 장소에서 말을 건 사람·얼굴만 아는 사이는 물어봐야
+   성공 확률: 친밀·신뢰·설렘 + 첫인상(이성) − 결혼·애인(이성) − 짝이 옆에 있음. 같은 성별·친구로는 쉽게. 하루에 한 번 */
+const hasNumber = p => !!p && (p.phone !== false || ['family', 'child'].includes(p.kind) || !!p.spouse || !!p.partner || !!p.livesWith);
+const mateWord = q => q.married ? (q.gender === 'm' ? '남편' : '아내') : (q.gender === 'm' ? '남자친구' : '여자친구');
+function setMateVars(p, m) { S.vars.fp = p.id; S.vars.mateId = m ? m.id : null; S.vars.mateName = m ? pname(m) : ''; S.vars.mateWord = m ? mateWord(m) : ''; }
+function numberOdds(p) {
+  const pt = personality(p), opp = p.gender !== S.gender && npcAge(p) >= 19 && S.age >= 19;
+  let o = .18 + p.close / 110 + p.trust / 220 + (p.heart || 0) / 90 + (pt.open || 0) + (trait().relMult ? .05 : 0);
+  if (opp) o += allure(p, 'first') / 80 - (p.married ? .3 : p.taken ? .18 : 0) - (mateHere(p) ? .25 : 0);
+  else o += .3;
+  return clamp(o, .05, .95);
+}
+const NUM_PT = 2;   // 번호 묻기 (어른 행동력 2, 학교 다닐 땐 0)
+function askNumber(pid) {
+  const p = person(pid), h = p && hereEntry(pid);
+  if (!p || !h || hasNumber(p) || busy() || p.askDay === (S.dayN || 0) || (phase() === 'adult' && S.ap < NUM_PT)) return;
+  if (phase() === 'adult') spend(NUM_PT);
+  p.askDay = S.dayN || 0;
+  const m = mateHere(p) ? person(p.mateId) : null;
+  // 짝이 옆에 있으면 끼어듦 (data/events2.js cp_number)
+  if (m && p.gender !== S.gender && npcAge(p) >= 20 && EVENTS.cp_number && eligible(EVENTS.cp_number)) { setMateVars(p, m); fire(EVENTS.cp_number); after(); return; }
+  S.vars.fp = p.id;
+  if (Math.random() < numberOdds(p)) {
+    p.phone = true;
+    const deltas = applyP(p, { close: [2, 4], trust: [1, 3] });
+    log(fill(pick(['{fp|이} 내 휴대폰을 받아 번호를 찍어 줬다.', '"연락해요." {fp|이} 내 휴대폰에 자기 이름을 저장했다.', '{fp|이} 웃으며 번호를 불러 줬다. 바로 문자를 하나 보냈다.', '"제 것도 저장해 주세요." 번호를 주고받았다.'])) + ' 📱', { deltas });
+  } else {
+    const deltas = applyP(p, { close: [-2, -1] });
+    const opp = p.gender !== S.gender && npcAge(p) >= 19;
+    log(fill(opp && p.married ? '"저 결혼했어요." {fp|이} 왼손을 살짝 들어 보였다.' : opp && p.taken ? `"${p.gender === 'f' ? '남자친구' : '여자친구'}가 있어서요." {fp|이} 미안하다는 듯 웃었다.`
+      : pick(['"아… 그건 좀." 어색한 웃음이 돌아왔다.', '{fp|이} "다음에요" 하며 말을 돌렸다.', '{fp|이} 휴대폰을 만지작거리다 "배터리가 없어서…"라고 했다.'])), { deltas: deltas.concat(applyEffect({ happy: -1 })) });
+  }
+  after();
+}
+// 장소에서 처음 보는 사람에게 말을 걸고 번호까지 (둘러보기·사람 목록)
+function askStranger(key) { const id = talkTo(key); if (id && !S.pending.length) askNumber(id); return id; }
+// 아는 사람의 연인·배우자: 있으면 그 사람, 없으면 만들어 둠 (얼굴만 아는 사이, 서로 mateId)
+function mateOf(p, create) {
+  let m = p.mateId && person(p.mateId);
+  if (m && !m.gone) return m;
+  if (!create || !(p.married || p.taken) || npcAge(p) < 19 || p.spouse || p.partner) return null;
+  const age = Math.max(19, npcAge(p) + rand(-4, 4));
+  m = enlist(makePerson({ kind: 'friend', gender: Math.random() < .94 ? (p.gender === 'm' ? 'f' : 'm') : p.gender, ageDiff: age - S.age, married: !!p.married, taken: true, close: rand(2, 6), trust: rand(2, 6), hangout: p.hangout, wealth: p.wealth }));
+  m.acq = true; m.phone = false; m.org = 'mate'; m.mateId = p.id; p.mateId = m.id;
+  if (p.married) m.marriedKnown = true;
+  return m;
+}
+// 장소에 도착했는데 아는 사람이 연인·배우자와 같이 있으면 (밤을 보낸 사이·나를 좋아하는 사람·친한 친구) — data/events2.js cp_spot_*
+function coupleSpot() {
+  if (S.pending.length || S.age < 20 || !S.place) return;
+  const cands = S.here.filter(h => !h.x).map(h => person(h.key)).filter(p => p && p.mateId && !p.spouse && !p.partner && npcAge(p) >= 20 && S.here.some(h => h.key === p.mateId));
+  const pickEv = p => (p.nights || p.secret || p.fling || p.fwb) ? 'cp_spot_secret' : p.heart >= 35 && p.gender !== S.gender ? 'cp_spot_crush' : p.close >= 45 ? 'cp_spot_friend' : null;
+  const p = pick(cands.filter(pickEv));
+  if (!p || Math.random() > .7) return;
+  const ev = EVENTS[pickEv(p)];
+  if (!ev || !eligible(ev)) return;
+  setMateVars(p, person(p.mateId));
+  fire(ev);
 }
 
 /* ═════════ NPC 출현 (NPC_ENCOUNTER.md, data/encounter.js) ═════════
@@ -2319,7 +2422,7 @@ function marker(p) {
   if (!p || p.kind === 'family' || p.kind === 'child' || p.spouse || npcAge(p) < 19) return '';
   if (p.divorced && (p.divorcedKnown || Math.max(p.close, p.trust) >= 40)) return '💍✕';
   if (p.married && p.marriedKnown) return '💍';
-  if (p.married && p.close >= 20 && ringVisible(p)) return '💍❓';
+  if (p.married && ringVisible(p)) return '💍❓';   // 반지는 처음 볼 때부터 보임 (기혼 추정)
   return '';
 }
 // 결혼 여부 (프로필): 친밀 40이면 확정, 20~39는 반지를 봤으면 추정
@@ -2329,7 +2432,7 @@ function marriageText(p) {
   if (p.married && p.marriedKnown) return '기혼';
   if (p.divorced && (p.divorcedKnown || deep >= 40)) return '이혼';
   if (!p.married && deep >= 40) return '미혼';
-  if (p.married && p.close >= 20 && ringVisible(p)) return '반지를 끼고 있다 (기혼 추정)';
+  if (p.married && ringVisible(p)) return '반지를 끼고 있다 (기혼 추정)';
   return null;
 }
 // 친밀 20~39인 기혼자와 이야기하다 보면 새어 나오는 것
@@ -2382,10 +2485,109 @@ function crowdMult(pl) {
 }
 const weatherMult = () => ({ rain: .6, storm: .6, snow: .4, sleet: .4 })[S.weather] || 1;
 const groupRoll = pl => weighted(D.encounter.groupSize.filter(([n]) => n < 4 || pl.id === 'bar'), g => g[1])[0];
+/* ═════════ 집·부동산 (data/housing.js) ═════════ */
+// S.home = { id: 집 종류, dep: 낸 보증금(이사 나갈 때 돌려받음), n: 이사 횟수, since: 들어온 날 }
+const housingOf = id => (D.housing || []).find(h => h.id === id) || (D.housing || [])[0] || { id: 'parents', label: '집', nb: { n: [6, 10], hh: { single: 1 } } };
+function homeNow() {
+  if (!S.home) S.home = { id: S.flags.married ? 'villa' : S.flags.ownPlace ? 'oneroom' : 'parents', dep: 0, n: 0, since: S.dayN || 0 };   // 예전 저장
+  return housingOf(S.home.id);
+}
+// 같이 사는 식구 수 (나 + 배우자·같이 사는 연인 + 스무 살 안 된 아이) — 집 크기(cap)를 넘으면 그 집으로는 못 감
+const HOUSE_CAP = { goshiwon: 1, oneroom: 2, officetel: 2, villa: 4, apt: 6, house: 8, parents: 9 };
+const householdN = () => 1 + alive().filter(p => p.spouse || p.livesWith || (p.kind === 'child' && npcAge(p) < 20)).length;
+// 독립·동거·결혼 이벤트로 집을 나가면 집 종류를 맞춤 (보증금은 그 이벤트에서 이미 씀 — dep 0)
+function syncHome() {
+  if (!D.housing || !S.date || S.age < 19) return;
+  const h = homeNow();
+  let want = null;
+  if (S.flags.married && HOUSE_CAP[h.id] < 4) want = 'villa';
+  else if (S.flags.ownPlace && h.id === 'parents') want = householdN() > 1 ? 'villa' : 'oneroom';
+  if (want) { S.home = { id: want, dep: 0, n: (S.home.n || 0) + 1, since: S.dayN || 0 }; log(`${housingOf(want).icon} 새 집은 ${housingOf(want).label}. 이웃도 새 얼굴들이다.`, { t: 'info' }); }
+  syncSpot();
+}
+// 우리 집 앞 (지도의 이웃 장소): 집 종류마다 이름·아이콘·풍경
+function syncSpot() {
+  const pl = PLACES.block, sp = homeNow().spot;
+  if (pl && sp) { pl.label = sp.label; pl.icon = sp.icon; }
+}
+const MOVE_PT = 30;   // 이삿날 (행동력 30 ≈ 5시간 반)
+function moveWhy(h) {
+  const cur = homeNow();
+  if (h.id === cur.id) return '지금 사는 곳';
+  if (S.age < (h.minAge || 0)) return `${h.minAge}살부터`;
+  if (h.id === 'parents' && (S.flags.married || alive().some(p => p.livesWith))) return '식구가 있어서';
+  if (householdN() > (HOUSE_CAP[h.id] || 9)) return '식구가 살기엔 좁다';
+  if (S.money + (S.home.dep || 0) < (h.deposit || 0)) return '보증금이 모자람';
+  return '';
+}
+const canMove = h => !busy() && S.place === 'realty' && !dutyPending() && S.ap >= MOVE_PT && !moveWhy(h);
+function housingList() {
+  const cur = homeNow();
+  return (D.housing || []).map(h => ({ id: h.id, label: h.label, icon: h.icon, desc: h.desc, deposit: h.deposit || 0, rent: h.rent || 0, cur: h.id === cur.id, why: moveWhy(h), ok: canMove(h),
+    hh: h.nb ? h.nb.hh : {}, guest: h.guest !== false, need: Math.max(0, (h.deposit || 0) - (S.home.dep || 0)) }));
+}
+function moveHome(id) {
+  const h = housingOf(id);
+  if (!h || h.id !== id || !canMove(h)) return;
+  spend(MOVE_PT);
+  S.money += (S.home.dep || 0) - (h.deposit || 0);
+  S.home = { id, dep: h.deposit || 0, n: (S.home.n || 0) + 1, since: S.dayN || 0 };
+  S.flags.ownPlace = id !== 'parents';
+  log(`${h.icon} ${josa(h.label, '으로')} 이사했다. ${pick(['상자를 다 풀고 나니 밤이었다.', '낯선 천장을 한참 올려다봤다.', '현관 비밀번호를 세 번 틀렸다.', '새 동네 냄새가 났다.'])}`, { memory: true, deltas: applyEffect({ happy: 3 }) });
+  syncSpot();
+  ensurePools();
+  after();
+}
+// 이웃 가구 만들기: 비중(nb.hh)대로 가구를 골라 사람 수(nb.n)가 찰 때까지. 부부·커플은 서로 짝(mateId), 가족은 아이까지
+//   같은 집 사람끼리는 hh(가구 번호)·unit(호수)·hhRole(남편·아내·아이·혼자 산다 …)이 같음. 부부·커플은 서로 mateId. 부부인 건 처음부터 앎 (같이 사는 걸 봄)
+function unitName(h, i, used) {
+  for (let k = 0; k < 30; k++) {
+    const u = h.id === 'apt' ? `${101 + (i % 3)}동 ${rand(3, 15)}0${rand(1, 4)}호` : h.id === 'officetel' ? `${rand(5, 22)}층 ${rand(1, 9)}호`
+      : h.id === 'goshiwon' ? `${rand(2, 3)}${String(rand(1, 24)).padStart(2, '0')}호` : h.id === 'oneroom' || h.id === 'villa' ? `${rand(1, 5)}0${rand(1, 4)}호`
+      : ['옆집', '앞집', '윗집', '아랫집', '골목 끝 집', '맞은편 집', '모퉁이 집', '대문 파란 집', '담장 낮은 집', '감나무 집'][(i + k) % 10];
+    if (!used.has(u)) { used.add(u); return u; }
+  }
+  return `${i + 1}번째 집`;
+}
+function neighborsFor(h, org) {
+  const NB = h.nb || { n: [6, 10], hh: { single: 1 } }, total = rand(NB.n[0], NB.n[1]), spots = ['block', ...D.encounter.neighborSpots];
+  let made = 0, hhN = 0;
+  const used = new Set();
+  while (made < total && hhN < 24) {
+    const unit = unitName(h, hhN, used), hh = `${org}:${++hhN}`;
+    const mk = (spec, role) => {
+      const age = S.age + spec.ageDiff, sp = spots.filter(id => PLACES[id] && ageFits(PLACES[id], age));
+      const p = poolPerson(Object.assign({ kind: 'neighbor', hangout: sp.length ? (Math.random() < .55 ? 'block' : pick(sp)) : null }, spec), org);
+      p.hh = hh; p.unit = unit; p.hhRole = role;
+      made++;
+      return p;
+    };
+    const A = (lo, hi) => rand(Math.max(0, lo), Math.max(0, hi)) - S.age, g = () => Math.random() < .5 ? 'm' : 'f', og = x => x === 'm' ? 'f' : 'm';
+    const pair = (p, q, wed) => { p.mateId = q.id; q.mateId = p.id; if (wed) p.marriedKnown = q.marriedKnown = true; };
+    const kind = pickKey(NB.hh);
+    if (kind === 'single' || kind === 'student') {
+      const r = kind === 'student' ? [19, 27] : NB.single || [22, 78];
+      mk({ gender: g(), married: false, ageDiff: A(r[0], r[1]) }, kind === 'student' ? '학생' : '혼자 산다');
+    } else if (kind === 'roommates') {
+      const x = g(), a = rand(21, 31);
+      mk({ gender: x, married: false, ageDiff: A(a, a) }, '룸메이트'); mk({ gender: x, married: false, ageDiff: A(a - 2, a + 2) }, '룸메이트');
+    } else if (kind === 'couple') {
+      const x = g(), a = rand(22, 37);
+      const p = mk({ gender: x, married: false, taken: true, ageDiff: A(a, a) }, '동거 중'), q = mk({ gender: og(x), married: false, taken: true, ageDiff: A(a - 3, a + 3) }, '동거 중');
+      pair(p, q, false);
+    } else if (kind === 'married' || kind === 'family' || kind === 'elder') {
+      const a = kind === 'elder' ? rand(62, 84) : kind === 'family' ? rand(31, 50) : NB.married ? rand(NB.married[0], NB.married[1]) : rand(26, 58);
+      if (kind === 'elder' && Math.random() < .4) { mk({ gender: Math.random() < .7 ? 'f' : 'm', married: false, taken: false, ageDiff: A(a, a) }, '혼자 사시는 어르신'); continue; }
+      const x = g(), p = mk({ gender: x, married: true, ageDiff: A(a, a) }, x === 'm' ? '남편' : '아내'), q = mk({ gender: og(x), married: true, ageDiff: A(a - 4, a + 3) }, x === 'm' ? '아내' : '남편');
+      pair(p, q, true);
+      if (kind === 'family') for (let k = rand(1, 2); k > 0; k--) { const c = mk({ gender: g(), married: false, taken: false, ageDiff: A(Math.max(0, a - 44), Math.min(17, a - 25)) }, '아이'); c.parents = [p.id, q.id]; }
+    }
+  }
+}
 // 사람 풀 — 얼굴만 아는 사이로 들어옴 (말을 걸거나 무슨 일이 생기면 관계로)
 function poolPerson(spec, org, tag) {
   const p = addPerson(Object.assign({ close: rand(2, 10), trust: rand(2, 10) }, spec));
-  p.org = org; p.acq = true;
+  p.org = org; p.acq = true; p.phone = false;   // 얼굴만 아는 사이 — 번호는 마주쳤을 때 물어봐야
   if (tag) p.rtag = tag;
   return p;
 }
@@ -2394,15 +2596,11 @@ function ensurePools() {
   if (!S || !S.date || !D.encounter) return;
   const E = D.encounter, P = E.pools, V = S.vars, ph = phase();
   const n = range => rand(range[0], range[1]);
-  // 이웃 (시작할 때, 이사하거나 결혼하면 새 동네)
-  const home = S.flags.married ? 'married' + (V.marriedAt ?? '') : S.flags.ownPlace ? 'own' : 'parents';
+  // 이웃 (시작할 때, 이사하면 새 동네) — 사는 집의 종류에 따라 가구 구성이 다름 (data/housing.js nb)
+  const hm = homeNow(), home = `${hm.id}:${S.home.n || 0}`;
   if (V.nbHome !== home) {
     V.nbHome = home; V.orgN = (V.orgN || 0) + 1; V.nbOrg = 'nb' + V.orgN;
-    for (let i = n(P.neighbors); i > 0; i--) {
-      const r = Math.random(), age = r < .5 ? rand(Math.max(25, S.age + 10), Math.max(70, S.age + 30)) : r < .8 ? rand(Math.max(0, S.age - 3), S.age + 3) : rand(Math.max(0, S.age - 10), S.age + 15);
-      const spots = E.neighborSpots.filter(id => ageFits(PLACES[id], age));
-      poolPerson(Object.assign({ kind: 'neighbor', hangout: spots.length && Math.random() < .7 ? pick(spots) : null }, ageSpec(age, age)), V.nbOrg);
-    }
+    neighborsFor(hm, V.nbOrg);
   }
   // 중학교·고등학교: 같은 반 (고등학교는 선배도)
   if ((ph === 'ms' || ph === 'hs') && S.age <= 18 && !V['pool_' + ph]) {
@@ -2418,6 +2616,11 @@ function ensurePools() {
       for (let i = n(P.classmates); i > 0; i--) poolPerson(Object.assign({ kind: 'classmate' }, ageSpec(S.age - 1, S.age + 2)), org, '같은 과');
       for (let i = n(P.seniors); i > 0; i--) poolPerson(Object.assign({ kind: 'classmate' }, ageSpec(Math.max(19, S.age - 2), S.age + 3)), org, '선후배');
     }
+  }
+  // 대학 동아리 사람들 (대학마다) — 동아리방에 나옴
+  if (S.flags.student && V.univOrg && V.clubOrg !== V.univOrg) {
+    V.clubOrg = V.univOrg;
+    for (let i = rand(6, 9); i > 0; i--) { const p = poolPerson(Object.assign({ kind: 'classmate', hangout: 'clubroom' }, ageSpec(Math.max(19, S.age - 2), S.age + 4)), 'club:' + V.univOrg, '동아리 사람'); if (Math.random() < .5) p.hobby = S.hobby; }
   }
   // 직장: 같은 팀 + 타 부서 (취업할 때마다)
   if (S.job && !jailed()) {
@@ -2444,25 +2647,29 @@ function ensurePools() {
 }
 
 /* ═════════ 사람과 상호작용 ═════════ */
-// 관계 창에서는 행동 1. 지금 장소에 같이 있는 사람이면 한 번은 행동 없이 (noFree면 늘 행동 1)
+// 관계 창에서는 행동력 5(학교 다닐 땐 50), 함께 밤은 12. 지금 장소에 같이 있는 사람이면 한 번은 행동력 없이 (noFree·함께 밤은 늘 씀)
 const socialCost = (it, p) => it.cost ? (resolve(it.cost) || 0) : 0;
-const INTIMATE_IDS = ['intimate', 'onenight', 'enjoy'];   // 함께 밤을 보내는 건 2칸 (어른)
-const socialAp = it => phase() === 'adult' && INTIMATE_IDS.includes(it.id) ? 2 : 1;
+const INTIMATE_IDS = ['intimate', 'onenight', 'enjoy'];   // 함께 밤을 보내는 건 12 (어른, 약 2시간)
+const socialAp = it => phase() !== 'adult' ? TEEN_PT : INTIMATE_IDS.includes(it.id) ? PT.intimate : PT.talk;
 function interactions(pid) {
   const p = person(pid);
   if (!p) return [];
-  const h = hereEntry(pid), here = !!h && !h.used;
-  return D.social.filter(it => it.if(S, p, api)).map(it => {
-    const cost = socialCost(it, p), free = here && !it.noFree && socialAp(it) === 1, ap = socialAp(it);
-    return { id: it.id, label: it.label, icon: it.icon, cost, free, ap, ok: !busy() && !dutyPending() && (free || S.ap >= ap) && (!cost || S.money >= cost) };
+  const h = hereEntry(pid), here = !!h && !h.used, reach = !!h || hasNumber(p);   // 같은 곳에 없으면 번호가 있어야 연락
+  const out = D.social.filter(it => it.if(S, p, api)).map(it => {
+    const cost = socialCost(it, p), free = here && !it.noFree && !INTIMATE_IDS.includes(it.id), ap = socialAp(it);
+    return { id: it.id, label: it.label, icon: it.icon, cost, free, ap, ok: reach && !busy() && !dutyPending() && (free || S.ap >= ap) && (!cost || S.money >= cost) };
   });
+  if (h && !hasNumber(p) && npcAge(p) >= 10) out.unshift({ id: 'askNum', label: '번호 묻기', icon: '📱', cost: 0, free: phase() !== 'adult', ap: phase() === 'adult' ? NUM_PT : 0,
+    ok: !busy() && p.askDay !== (S.dayN || 0) && (phase() !== 'adult' || S.ap >= NUM_PT) });
+  return out;
 }
 function interact(pid, iid) {
+  if (iid === 'askNum') { askNumber(pid); return; }
   const p = person(pid), it = D.social.find(x => x.id === iid);
   if (!p || !it || !it.if(S, p, api)) return;
   const cost = socialCost(it, p);
-  const ap = socialAp(it), h = hereEntry(pid), free = !!h && !h.used && !it.noFree && ap === 1;
-  if (busy() || dutyPending() || (!free && S.ap < ap) || (cost && S.money < cost)) return;
+  const ap = socialAp(it), h = hereEntry(pid), free = !!h && !h.used && !it.noFree && !INTIMATE_IDS.includes(it.id);
+  if (busy() || dutyPending() || (!free && S.ap < ap) || (cost && S.money < cost) || !(h || hasNumber(p))) return;
   const dlg = dlgFor(p, iid);
   if (!free) spend(ap);
   if (h) h.used = true;
@@ -2611,7 +2818,7 @@ function jobChecks(j) {
   return out;
 }
 const meetsJob = j => jobChecks(j).every(c => c[0]);
-const canJobHunt = () => !busy() && S.ap > 0 && !dutyPending() && S.age >= 19 && !S.flags.student && !S.flags.inArmy && !jailed() && !S.job;
+const canJobHunt = () => !busy() && S.ap >= PT.job && !dutyPending() && S.age >= 19 && !S.flags.student && !S.flags.inArmy && !jailed() && !S.job;
 const jobInfo = () => D.jobs.map(j => Object.assign({}, j, { ok: meetsJob(j), checks: jobChecks(j) }));
 function jobOdds(j) {
   let o = j.odds ?? .7;
@@ -2631,7 +2838,7 @@ function hire(j) {
 function applyJob(id) {
   const j = job(id);
   if (!j || !canJobHunt()) return;
-  spend();
+  spend(PT.job);
   if (meetsJob(j) && Math.random() < jobOdds(j)) hire(j);
   else log(S.record && Math.random() < .5 ? `${j.label} 면접에서 전과 이야기가 나왔다. 떨어졌다.` : `${j.label} 면접에서 떨어졌다.`, { deltas: applyEffect({ happy: -3 }) });
   after();
@@ -2811,6 +3018,10 @@ const api = {
   find: fn => alive().filter(p => !p.acq && p.kind !== undefined && fn(p)),   // 얼굴만 아는 사이(acq)는 빠짐 — 장소에서 마주치면 a.here()로
   main: mainPartner,
   focus: p => { S.vars.fp = p ? p.id : null; },
+  // 집·이웃 (data/housing.js): 지금 집, 집 앞 풍경, 지금 동네 이웃들
+  home: () => homeNow(), homeSpot: () => homeNow().spot || { label: '집 앞', doing: ['지나가고 있다'] },
+  neighbors: () => alive().filter(p => p.kind === 'neighbor' && p.org === S.vars.nbOrg && p.hh),
+  clubMates: () => alive().filter(p => p.rtag === '동아리 사람' && p.org === 'club:' + S.vars.univOrg),
   focused: () => person(S.vars.fp),
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
@@ -2833,7 +3044,7 @@ const labelOf = (list, id) => (list.find(x => x.id === id) || {}).label || '';
 function blankState(opt, gender, tr, name, sib) {
   return {
     v: 5, id: Date.now(), seq: 0, pseq: 0, xseq: 0, region: REGION, eth: REGION === 'kr' ? undefined : opt.eth || pickEth(),
-    name, gender, age: 0, money: 0, ap: 0, used: 0, seasonIdx: -1, trait: tr.id,
+    name, gender, age: 0, money: 0, ap: 0, used: 0, apv: 2, at: 'home', seasonIdx: -1, trait: tr.id,
     birthYear: rand(2000, 2006), date: null, dayN: 0, turn: 0, tkind: null, zone: 'home', fatigue: 0, meals: 0, wake: 0, worked: false, report: null,
     personality: opt.personality || pick(D.personalities).id,
     hobby: opt.hobby || pick(D.hobbies).id,
@@ -2994,7 +3205,8 @@ function newLife20(q = {}) {
   S.vars.dreamSpeech = dr.id === 'family' ? '행복한 가정을 꾸리고 싶어요!' : `${josa(dr.label, '이')} 되고 싶어요!`;
   const mr = Q.money[S.wealth] || [50, 100];
   S.money = rand(mr[0], mr[1]);
-  if (q.home === 'own') S.flags.ownPlace = true;
+  if (q.home && q.home !== 'parents') S.flags.ownPlace = true;
+  S.home = { id: q.home === 'own' ? 'oneroom' : housingOf(q.home).id === q.home ? q.home : 'parents', dep: 0, n: 0, since: 0 };   // 사는 집 (data/housing.js)
   if (REGION !== 'kr') S.flags.exempt = true;   // 뉴욕: 병역 없음
   else if (gender === 'm') { const ar = edu.id === 'retake' && q.army === 'now' ? 'next' : q.army; if (ar === 'exempt') S.flags.exempt = true; else S.vars.enlistAt = ar === 'now' ? 20 : 21; }
 
@@ -3068,7 +3280,7 @@ function newLife20(q = {}) {
     S.done.siblingBorn = 1;
     fam += ` ${josa(sp.role, '이')} 한 명 있다.`;
   } else fam += ' 외동이다.';
-  if (S.flags.ownPlace) fam += ' 지금은 혼자 산다.';
+  if (S.flags.ownPlace) fam += ` 지금은 ${homeNow().label}에서 혼자 산다.`;
   lines.unshift(['🏠', fam]);
 
   // 친구 (같은 대학이면 캠퍼스에서 자주 마주침) — 명문대는 인맥 보너스: 더 가깝고 과 선배 한 명
@@ -3161,6 +3373,14 @@ function load() {
 }
 // 같은 v5 안에서 새로 생긴 값 채우기: 크기 등급(small·avg·large·xlarge) → cm
 function patch(s) {
+  // 행동력 100 기준 (MAP): 예전 칸(어른 1칸 = 1시간 · 학교 턴 2~3칸) → 점수. 달력이 없던 저장은 아래에서 새로 시작
+  if (!s.apv && s.date) {
+    const prev = S; S = s;
+    const ph = phase(), k = ph === 'adult' ? DAY_AP / 18 : TEEN_PT;
+    if (ph === 'adult' || ph === 'ms' || ph === 'hs') for (const f of ['ap', 'used', 'dayStart', 'wake']) if (s[f]) s[f] = Math.round(s[f] * k);
+    S = prev;
+  }
+  s.apv = 2;
   // NPC_ENCOUNTER: 마지막으로 본 날, 기혼자 결혼 반지 (풀은 ensurePools가 채움)
   for (const p of s.people) { if (p.seen == null) p.seen = s.dayN || 0; if (p.married && p.ring == null) ringFor(p); }
   for (const x of [s, ...s.people]) {
@@ -3285,8 +3505,8 @@ window.Game = {
   },
   // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
   phase, timeInfo, storyNext, nextTurn, eat, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
-  actionList, canDo, costOf, doAction, needsSubject, shopToday, outfitCtx: (p, evId) => outfitCtx(p || null, evId), dateOutfits, setDateOutfit: ix => { S.vars.dateOutfit = ix; },
-  places: placeList, goPlace, leavePlace, here: hereList, hereNote: () => S.hereNote && S.hereNote.pl === S.place ? S.hereNote : null, talkTo, passBy, browseMore, browseLeft, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
+  actionList, canDo, costOf, apOf, doAction, needsSubject, shopToday, outfitCtx: (p, evId) => outfitCtx(p || null, evId), dateOutfits, setDateOutfit: ix => { S.vars.dateOutfit = ix; },
+  places: placeList, onCampus: () => onCampus(standAt()) && !!S.flags.student, teenPt: TEEN_PT, goPlace, leavePlace, hasNumber, askNumber, askStranger, mateWord, numberOdds, housing: housingList, moveHome, movePt: MOVE_PT, homeNow: () => homeNow(), here: hereList, hereNote: () => S.hereNote && S.hereNote.pl === S.place ? S.hereNote : null, talkTo, passBy, browseMore, browseLeft, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
   intimacy: p => canSex(p) && (p.nights || lover(p) || p.teased) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
   // 이 사람을 향한 내 성욕 (내 마음이라 늘 보임) / 지금 가장 높은 대상
