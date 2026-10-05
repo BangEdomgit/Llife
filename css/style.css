@@ -273,7 +273,18 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .nt-stage{position:relative;width:100%;max-width:380px}
 .bed{display:block;width:100%;height:auto;border-radius:3px}
 .bed .nt-star{animation:twinkle 2.6s ease-in-out infinite}
-.nt-face{position:absolute;left:1.8%;top:3.2%;width:15.6%;border-radius:8px;overflow:hidden;box-shadow:0 0 0 1.5px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.55);pointer-events:none}
+.nt-face{position:absolute;left:1.8%;top:3.2%;width:24%;border-radius:9px;overflow:hidden;box-shadow:0 0 0 1.5px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.55);pointer-events:none;background:#1c1830}
+.nt-face .av-bg{fill:transparent;stroke:none}
+/* 그날 밤 초상화 배경 = 시점 (js/night.js VIEW): 위에서 내려다봄 / 베개에 볼 / 앞에서(헤드보드) / 아래에서 올려다봄(천장) / 마주 보고(창·달빛) */
+.nt-face[data-view=pillow]{background:radial-gradient(ellipse 78% 34% at 50% 26%,#f6f1f8 0 58%,#e6dcec 64%,transparent 70%),linear-gradient(170deg,#d6c5e2,#a98fbe)}
+.nt-face[data-view=side]{background:radial-gradient(ellipse 70% 40% at 64% 36%,#f6f1f8 0 55%,#e2d6ea 63%,transparent 70%),linear-gradient(200deg,#cdb9da,#9a7fb1)}
+.nt-face[data-view=board]{background:linear-gradient(#2a1f2e 0 18%,#5a3c2c 18% 21%,#6e4a34 21% 52%,#4a3022 52% 55%,#2b2130 55%)}
+.nt-face[data-view=ceil]{background:radial-gradient(circle at 50% 4%,rgba(255,214,150,.75) 0 7%,rgba(255,190,120,.22) 24%,transparent 46%),linear-gradient(#2d2540,#15111f)}
+.nt-face[data-view=close]{background:radial-gradient(circle at 78% 18%,#f6ebc4 0 6%,rgba(246,235,196,.25) 9%,transparent 22%),linear-gradient(90deg,#141b38 0 70%,#2a3558 70% 73%,#141b38 73%)}
+.nt-pops{position:absolute;left:1.8%;top:3.2%;width:24%;aspect-ratio:3/4;pointer-events:none;overflow:visible}
+.nt-pop{position:absolute;font-size:13px;font-weight:800;line-height:1;transform:translate(-50%,0);animation:ntPop 1.2s ease-out forwards;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.nt-pop.ow{color:#ff8a7a}.nt-pop.gasp{color:#ffd36b}.nt-pop.love{color:#ff7aa8}.nt-pop.meh{color:#c9c3d6}
+@keyframes ntPop{0%{opacity:0;transform:translate(-50%,6px) scale(.6)}15%{opacity:1;transform:translate(-50%,0) scale(1.15)}100%{opacity:0;transform:translate(-50%,-16px) scale(1)}}
 .nt-face svg{display:block;width:100%;height:auto}
 .nt-sym{position:absolute;right:1.8%;top:3.2%;width:36%;border-radius:10px;background:rgba(10,12,26,.6);box-shadow:0 0 0 1.5px rgba(255,255,255,.18),0 4px 14px rgba(0,0,0,.5);pointer-events:none;transition:filter .6s}
 .nt-sym svg{display:block;width:100%;height:auto}

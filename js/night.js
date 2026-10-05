@@ -341,16 +341,19 @@ const POSES = {
     f.hand = add(lerp(sh, hip, .3), perp(sub(sh, hip), [0, -1]), M.r.chest * .9); f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [-.3, -1]);   // 남자 등을 감싸 안음
     return { m, f, act: 'm', dir: unit(sub(fhip, hip)) };
   },
-  // 후배위: 여자는 무릎과 팔꿈치로 엎드려 엉덩이를 들고, 남자는 뒤에서 무릎 꿇고 여자 등 위로 숙여 손을 짚음
+  // 후배위: 여자는 무릎과 팔꿈치로 엎드려 엉덩이를 들고, 남자는 뒤에서 무릎 꿇고 상체를 40°쯤 숙인 채 두 손으로 여자 골반을 잡음
+  //   상체는 골반을 따라 앞뒤로 움직이고, 세게 밀 땐 조금 더 숙여짐. 끝나면 앞으로 무너지듯 숙임
   doggy(s, M, F) {
     const fknee = [178, MY - F.r.shin[0] + 1 + s.sink * .3], fhip = polar(fknee, -1.66 + s.bs / F.thigh, F.thigh);
     const felbow = [118 + s.bs * .3, MY - F.r.farm[0]], fsh = meet(fhip, F.torso, felbow, F.uarm, [0, -1]);
     const f = legsBack(F, trunk(F, fsh, fhip, perp(sub(fsh, fhip), [0, 1]), -.35, s.jig.f), fknee);
     Object.assign(f, { elbow: felbow, hand: [felbow[0] - F.farm, MY - F.r.farm[1]] });
-    const knee = [fknee[0] + 30, MY - M.r.shin[0] + 1], hip = add(polar(knee, -1.73 + s.d / M.thigh, M.thigh), [0, s.tr + 4 * s.slump]);
-    const hand = [f.hand[0] + 16, MY - M.r.farm[1]], sh = meet(hip, M.torso, hand, (M.uarm + M.farm) * (.9 - .12 * s.slump), [0, -1]);
+    const knee = [fknee[0] + 26, MY - M.r.shin[0] + 1], hip = add(polar(knee, -1.66 + s.d / M.thigh, M.thigh), [0, s.tr + 4 * s.slump]);
+    const lean = -2.24 - .04 * Math.max(0, -s.d) - .4 * s.slump;   // 상체를 40°쯤 앞으로 → 끝나면 더 숙임 (이불이 등 위로 덮임)
+    const sh = polar(hip, lean, M.torso);
     const m = legsBack(M, trunk(M, sh, hip, perp(sub(sh, hip), [0, 1]), .3, s.jig.m), knee);
-    Object.assign(m, { hand, elbow: meet(sh, M.uarm, hand, M.farm, [1, 0]) });
+    const hand = add(f.hip, [-1.5, -F.r.hip * .75]);   // 여자 골반 위
+    Object.assign(m, { hand, elbow: meet(sh, M.uarm, hand, M.farm, [.6, .8]) });
     return { m, f, act: 'm', dir: unit(sub(fhip, hip)) };
   },
   // 기승위: 남자는 등을 대고 누움, 여자는 남자 골반 위에 무릎 꿇고 앉아 앞으로 숙여 남자 머리 옆을 짚음. 엉덩이가 오르내림
@@ -452,6 +455,11 @@ const BURY = { doggy: 1, prone: 1 };
 // 초상화 속 인물: 상대가 받는 쪽이면 부딪힐 때마다 밀렸다 돌아오고(방향은 체위마다), 움직이는 쪽(기승위·역기승위·좌위·뒤로 앉기)이면 박자를 따라 오르내림
 //   칸(초상화 테두리)은 그대로, 인물·머리·가슴이 따로 움직임 — 머리는 살짝 늦게, 가슴은 관성으로 출렁임
 const PUSH = { missionary: [0, -1], legsUp: [0, -1], doggy: [.55, -.6], prone: [.35, -.65], cowgirl: [0, .6], reverse: [0, .6], lotus: [0, .5], seated: [0, .6] };
+// 초상화 배경과 시점 (체위마다): pillow 위에서 내려다봄(베개·시트) / side 베개에 볼을 묻음 / board 앞에서 봄(헤드보드) / ceil 아래에서 올려다봄(천장·조명) / close 마주 보고 가까이(창·달빛)
+//   r 기울기, k 확대, x·y 옮김 (초상화 단위)
+const VIEW = { missionary: { v: 'pillow', r: -7, k: 1.05, x: 0, y: 3 }, legsUp: { v: 'pillow', r: 6, k: 1.05, x: 0, y: 3 }, prone: { v: 'side', r: 15, k: 1.08, x: 5, y: 8 },
+  doggy: { v: 'board', r: -5, k: 1.06, x: -2, y: 9 }, cowgirl: { v: 'ceil', r: 0, k: 1.12, x: 0, y: -2 }, reverse: { v: 'ceil', r: 4, k: 1.1, x: 2, y: -1 },
+  seated: { v: 'ceil', r: -3, k: 1.1, x: -1, y: 0 }, lotus: { v: 'close', r: 0, k: 1.2, x: 0, y: 6 } };
 // 성격별로 고를 확률
 const POSE_W = { shy: { missionary: 4, prone: 1, doggy: 1, cowgirl: .5, lotus: 2, legsUp: .6, reverse: .3, seated: .8 },
   bold: { cowgirl: 3, doggy: 2.5, missionary: 1, prone: 1.5, reverse: 2.5, legsUp: 2, lotus: 1, seated: 1.5 },
@@ -634,10 +642,24 @@ function run(stage, job, done) {
   // 초상화 속 인물 (상대 = p): 몸 figX·figY, 머리 늦음 hd, 가슴 출렁 bY (가슴이 클수록 크고 느리게)
   const her = p.gender === 'f' ? 'f' : 'm', chest = ((G && G.look(p) || {}).body || {}).chest, cupK = her === 'f' ? ({ small: .7, large: 1.35 }[chest] || 1) : 0;
   let figX = 0, figY = 0, figVX = 0, figVY = 0, lastVY = 0, hd = 0, hdV = 0, hdR = 0, bY = 0, bV = 0, figEl = null, headEls = [], bustEl = null, bustK = 1, bustCy = 0;
+  // 평소 반응 (절정 말고): 섹스 기술 등급·크기에 따라 달아오르는 속도(ar)와 표정·움찔(아픔)·헉·하트가 다름
+  let ar = 0, gaspAt = -9, jolt = 0, lastPop = 0;
+  const vw = Object.assign({}, VIEW[poseName] || VIEW.missionary), pops = stage.querySelector('.nt-pops');
+  if (face) face.dataset.view = vw.v;
+  function pop(txt, cls) {
+    if (!pops) return;
+    const el = document.createElement('span');
+    el.className = 'nt-pop ' + (cls || '');
+    el.textContent = txt;
+    el.style.left = (84 + Math.random() * 18) + '%'; el.style.top = (4 + Math.random() * 26) + '%';   // 초상화 오른쪽 가장자리 (얼굴을 가리지 않게)
+    pops.appendChild(el);
+    setTimeout(() => el.remove(), 1300);
+    lastPop = t;
+  }
   const hearts = [];
   function poseNow() {
     pi = Math.min(pi, plan.poses.length - 1);
-    while (pi < plan.poses.length - 1 && t >= plan.poses[pi + 1].at) { pi++; poseName = plan.poses[pi].name; stage.dataset.pose = poseName; showPose(); }
+    while (pi < plan.poses.length - 1 && t >= plan.poses[pi + 1].at) { pi++; poseName = plan.poses[pi].name; stage.dataset.pose = poseName; showPose(); if (face) face.dataset.view = (VIEW[poseName] || VIEW.missionary).v; }
     const cur = POSES[poseName](ms, M, F), at0 = plan.poses[pi].at;
     return pi && t - at0 < 1.1 ? blendPose(POSES[plan.poses[pi - 1].name](ms, M, F), cur, ease((t - at0) / 1.1)) : cur;
   }
@@ -725,6 +747,13 @@ function run(stage, job, done) {
     const force = str * (.55 + .1 * grade);
     if (force > limit) { ouchAt = t; symXV += 60 * str; symEV -= 8; }   // 움찔
     else if (good) for (let j = Math.round(force / 1.2 * [0, 0, 1, 1.6, 2.3][tier]); j > 0; j--) symHeart();
+    // 평소 반응: 크기가 체형에 맞을수록(받아들일 수 있는 세기의 80~100%) 빨리 달아오르고 가끔 헉, 넘치면 움찔(질끈 감은 눈), 작으면 잘 못 느낌. 섹스 기술이 높을수록 빨리
+    if (!s.her) {
+      const fr = force / limit, sizeK = fr > 1 ? .45 : fr > .8 ? 1.3 : fr > .45 ? 1 : .55;
+      ar = Math.min(1, ar + .04 * (.35 + gi * .13) * sizeK * (good ? 1 : .35) * (s.kind === 'n' ? 1 : 1.6));
+      if (fr > 1) { figVY -= 45 * str; jolt -= .5; if (t - lastPop > .5) pop('!', 'ow'); }
+      else if (good && fr > .8 && (s.kind !== 'n' || Math.random() < .1 + gi * .03)) { gaspAt = t; jolt += .4; if (t - lastPop > .6) pop(ar > .5 ? '♡' : '!?', 'gasp'); }
+    }
     jyV += (s.kind === 'n' ? 7 : 22) * str; jxV -= (s.kind === 'n' ? 2.5 : 9) * str;
     const pu = PUSH[poseName] || [0, -1], mine = P.act === her;   // 초상화 인물: 받는 쪽이면 크게 밀리고, 움직이는 쪽이면 내려앉으며 쿵
     figVX += pu[0] * (mine ? 18 : 120) * str; figVY += (mine ? 70 : pu[1] * 120) * str;
@@ -776,6 +805,13 @@ function run(stage, job, done) {
       hdV += (-760 * hd - 16 * hdV - acc * .3) * DT; hd += hdV * DT;   // 머리: 살짝 늦게
       hdR = react ? react.k * Math.max(0, Math.min(1, (t - react.t0) / .15)) * (t < react.hold ? 1 : Math.max(0, 1 - (t - react.hold) / .7)) : hdR * .96;   // 절정: 고개가 젖혀짐
       if (quiv && t < quiv.until) figX += quiv.amp * 6 * Math.sin(t * 88);
+      jolt *= Math.exp(-DT * 6);
+      if (t < end && t > 1.5) {   // 달아오를수록 하트·땀이 자주, 시큰둥하면 가끔 '…'
+        if (good && ar > .55 && t - lastPop > 2.8 - ar * 1.4) pop(ar > .85 && Math.random() < .4 ? '💦' : '♡', 'love');
+        else if (!good && t - lastPop > 3.2) pop('…', 'meh');
+      }
+      const tv = VIEW[poseName] || VIEW.missionary, e = Math.min(1, DT * 3);
+      for (const k of ['r', 'k', 'x', 'y']) vw[k] += (tv[k] - vw[k]) * e;
     }
     for (const b of blobs) {
       const pj = P[b.w][b.at];
@@ -821,11 +857,12 @@ function run(stage, job, done) {
   function faceNow() {
     if (t >= end + .3) return good ? (tier >= 3 ? 'bliss' : 'content') : 'disappointed';
     if (t < peakUntil) return peakKind === 'major' ? 'major' : peakKind === 'mid' ? 'p3' : 'p2';   // 절정: 소 = 풀린 눈, 중 = 성격별 절정 얼굴, 대 = 질끈 감은 눈·벌어진 입
+    if (t - ouchAt < .45) return 'wince';   // 아픔·너무 꽉 참
+    if (t - gaspAt < .32) return 'gasp';    // 헉
     if (!good) return t / end < (tier ? .4 : .25) ? 'p0' : 'bored';
     const cur = S[si];
     if (cur.fin && cur.kind !== 'n') return 'p3';   // 마무리 (같이)
-    if (t < 4) return 'p0';
-    return cur.T > .44 ? 'p1' : 'p2';
+    return ar < .15 ? 'p0' : ar < .4 ? 'p1' : ar < .7 ? 'p2' : 'p3';   // 달아오른 정도 (섹스 기술·크기에 따라 빠르기가 다름)
   }
   const curve = Q => Q.slice(0, -1).map((b, i) => {
     const a = Q[i - 1] || b, c = Q[i + 1], e = Q[i + 2] || c;
@@ -877,17 +914,17 @@ function run(stage, job, done) {
     if (face && window.Avatar && G) {
       const key = faceNow();
       if (key !== faceKey) {
-        faceKey = key;
+        faceKey = key; face.dataset.key = key;
         const du = key === 'major' ? { lv: 3, major: true, tongue: gi >= 7 } : key[0] === 'p' && key.length === 2 ? { lv: +key[1] } : { mood: key };   // 대절정: SS 이상이면 혀까지
-        face.innerHTML = Avatar.render(G.look(p), 64, { age: G.npcAge(p), during: Object.assign(du, { personality: p.personality, fig: sc.fig }) });
+        face.innerHTML = Avatar.render(G.look(p), 110, { age: G.npcAge(p), during: Object.assign(du, { personality: p.personality, fig: sc.fig }) });
         figEl = face.querySelector('.av-fig'); headEls = [...face.querySelectorAll('.av-head, .av-hb')]; bustEl = face.querySelector('.av-bust');
         if (bustEl) { bustK = +bustEl.dataset.k || 1; bustCy = +bustEl.dataset.cy || 0; }
       }
       face.classList.toggle('peak', t < peakUntil || (key === 'p3' && good));   // 절정: 초상화가 확 바뀌며 분홍빛으로 반짝
       face.classList.toggle('big', key === 'major');
       // 칸은 고정, 안의 인물이 움직임: 몸(이불째) → 머리(살짝 늦게, 절정엔 젖혀짐) → 가슴(출렁)
-      if (figEl) figEl.setAttribute('transform', `translate(${f(figX)},${f(figY)})`);
-      const tilt = hdR * (P && P.act === her ? 7 : -9);
+      if (figEl) figEl.setAttribute('transform', `translate(${f(vw.x + figX)},${f(vw.y + figY)}) translate(60 104) rotate(${f(vw.r)}) scale(${vw.k.toFixed(3)}) translate(-60 -104)`);
+      const tilt = hdR * (P && P.act === her ? 7 : -9) + (2 + ar * 5) * Math.sin(t * 1.3) * .3 - jolt * 8;   // 달아오를수록 고개가 더 움직이고, 헉·움찔엔 젖혀졌다 숙여짐
       for (const el of headEls) el.setAttribute('transform', `translate(0,${f(hd)}) rotate(${f(tilt)} 60 104)`);
       if (bustEl) { const ly = bY * bustK, sy = 1 - bY * .03; bustEl.setAttribute('transform', `translate(0,${ly.toFixed(2)}) translate(60 ${bustCy}) scale(${(1 + bY * .012).toFixed(4)} ${sy.toFixed(4)}) translate(-60 ${-bustCy})`); }
     }
@@ -975,7 +1012,7 @@ function run(stage, job, done) {
 }
 
 window.Night = {
-  html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div>${SYM}</div>`,
+  html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div><div class="nt-pops"></div>${SYM}</div>`,
   foreplay, uterus, alley,
   run, stop: () => { cancelAnimationFrame(raf); ender = skipper = null; }, finish: () => !!ender && ender(), skip: () => !!skipper && skipper(),
   poseLabel: POSE_LABEL,
