@@ -195,12 +195,18 @@ function mapHTML(list, mode) {
   const pins = list.filter(p => cp ? p.campus && p.cpos : p.pos).map(p => {
     const xy = cp ? p.cpos : p.pos, rd = !cp && p.ride && !p.here ? p.ride : null;
     const sub = p.here || (p.at && !p.cost) ? '지금 여기' : p.why ? (WHY_SHORT[p.why] || p.why) : `⚡${p.cost}${rd && rd.mode !== 'walk' ? ` ${rd.ic}` : ''}${rd && rd.money ? ` ${rd.moneyT}` : ''}`;
-    return `<button type="button" class="pin${p.here ? ' here' : ''}${p.at ? ' at' : ''}${p.regular ? ' reg' : ''}${p.id === 'home' ? ' home' : ''}${!p.ok && !p.here && p.why ? ' off' : ''}" data-pl="${p.id}" style="left:${(xy[0] / W * 100).toFixed(2)}%;top:${(xy[1] / H * 100).toFixed(2)}%"${p.ok ? '' : ' disabled'}${p.why ? ` title="${esc(p.why)}"` : ''}>
+    return `<button type="button" class="pin${p.here ? ' here' : ''}${p.at ? ' at' : ''}${p.regular ? ' reg' : ''}${p.id === 'home' ? ' home' : ''}${!p.ok && !p.here && p.why ? ' off' : ''}${p.ok && !p.here && !p.at ? ' go' : ''}" data-pl="${p.id}" style="left:${(xy[0] / W * 100).toFixed(2)}%;top:${(xy[1] / H * 100).toFixed(2)}%"${p.ok ? '' : ' disabled'}${p.why ? ` title="${esc(p.why)}"` : ''}>
       <span class="pi" aria-hidden="true">${p.icon}</span><span class="pn">${esc(cp ? p.clabel : p.label)}${p.regular ? ' ★' : ''}</span><small>${esc(sub)}</small></button>`;
   }).join('');
   const univ = cp ? G.univLabel() : '';
   const map = `<div class="cmap${night ? ' night' : ''}${cp ? ' campus' : ''}">${window.CityMap ? (cp ? CityMap.campusSvg(univ) : CityMap.svg(G.region())) : ''}${pins}</div>`;
   if (cp) return map;
+  if (G.region() === 'kr') {   // 서울: 휠·두 손가락으로 확대/축소, 끌어서 이동, ＋/－ (지도 폭 = 720 × 배율)
+    return `${rideBar()}<div class="cmap-wrap"><div class="cmap-view kr${mapScale < .75 ? ' zs' : ''}">${map.replace('<div class="cmap', `<div style="width:${Math.round(720 * mapScale)}px" class="cmap`)}</div>
+      <div class="cm-zbtn" role="group" aria-label="지도 확대·축소"><button type="button" data-mapz="in" aria-label="확대">＋</button><button type="button" data-mapz="out" aria-label="축소">－</button><button type="button" data-mapz="fit" aria-label="전체 보기">⤢</button></div></div>
+      <p class="cm-legend"><span><i class="k me"></i>내 위치</span><span><i class="k go"></i>갈 수 있는 곳</span><span><i class="k kinder">유</i>유치원</span><span><i class="k elem">초</i>초등</span><span><i class="k mid">중</i>중</span><span><i class="k high">고</i>고</span><span>🚇 역</span><button type="button" class="cm-zoom" data-mapcenter>📍 내 위치</button></p>
+      <p class="hint cm-hint">마우스 휠·두 손가락으로 확대/축소, 끌어서 이동</p>`;
+  }
   return `${rideBar()}<div class="cmap-view ${mapZoom}">${map}</div>
     <p class="cm-legend"><span><i class="k kinder">유</i>유치원</span><span><i class="k elem">초</i>초등</span><span><i class="k mid">중</i>중학교</span><span><i class="k high">고</i>고등학교</span><span>🚇 지하철역</span><button type="button" class="cm-zoom" data-mapzoom>${mapZoom === 'big' ? '🗺️ 한눈에' : '🔍 크게'}</button><button type="button" class="cm-zoom" data-mapcenter>📍 내 위치</button></p>`;
 }
@@ -216,8 +222,8 @@ function rideBar() {
 }
 // 지도 가운데 맞추기 (지금 있는 곳 → 없으면 집)
 function centerMap(force) {
-  const v = document.querySelector('.cmap-view');
-  if (!v || mapZoom !== 'big') return;
+  const v = (modalMode === 'map' ? mBody : $('#where')).querySelector('.cmap-view') || document.querySelector('.cmap-view');
+  if (!v || (mapZoom !== 'big' && !v.classList.contains('kr'))) return;
   const S = G.state(), key = `${S.place || S.at || 'home'}:${S.dayN}:${G.region()}`;
   if (!force && key === mapCenterKey) return;
   mapCenterKey = key;
@@ -226,6 +232,58 @@ function centerMap(force) {
   const m = v.querySelector('.cmap'), x = parseFloat(pin.style.left) / 100 * m.offsetWidth, y = parseFloat(pin.style.top) / 100 * m.offsetHeight;
   v.scrollLeft = Math.max(0, x - v.clientWidth / 2); v.scrollTop = Math.max(0, y - v.clientHeight / 2);
 }
+// 서울 지도 확대·축소: 배율(mapScale) — 기준점(ax, ay: 보이는 칸 안 좌표)이 그 자리에 머물게 스크롤을 맞춤
+let mapScale = (() => { try { return +localStorage.getItem('llife-mapscale') || 1; } catch (e) { return 1; } })();
+function setMapScale(v, s, ax, ay) {
+  const m = v && v.querySelector('.cmap');
+  if (!m) return;
+  const min = Math.min(1, v.clientWidth / 720), s2 = Math.max(min, Math.min(3, s));
+  if (ax == null) { ax = v.clientWidth / 2; ay = v.clientHeight / 2; }
+  const fx = (v.scrollLeft + ax) / m.offsetWidth, fy = (v.scrollTop + ay) / m.offsetHeight;
+  m.style.width = Math.round(720 * s2) + 'px';
+  mapScale = s2;
+  v.classList.toggle('zs', s2 < .75);
+  v.scrollLeft = fx * m.offsetWidth - ax; v.scrollTop = fy * m.offsetHeight - ay;
+  clearTimeout(setMapScale.t); setMapScale.t = setTimeout(() => { try { localStorage.setItem('llife-mapscale', String(mapScale)); } catch (e) {} }, 300);
+}
+const zoomView = el => el && el.closest && el.closest('.cmap-view.kr');
+document.addEventListener('wheel', e => {   // 휠 = 확대/축소
+  const v = zoomView(e.target);
+  if (!v) return;
+  e.preventDefault();
+  const r = v.getBoundingClientRect();
+  setMapScale(v, mapScale * Math.exp(-e.deltaY * (e.deltaMode === 1 ? .06 : .0022)), e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+let pinch = null;   // 두 손가락 = 확대/축소 (한 손가락은 그냥 밀어서 이동)
+const tDist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+document.addEventListener('touchstart', e => { const v = zoomView(e.target); if (v && e.touches.length === 2) pinch = { v, d: tDist(e.touches) || 1, s: mapScale }; }, { passive: true });
+document.addEventListener('touchmove', e => {
+  if (!pinch || e.touches.length !== 2) return;
+  e.preventDefault();
+  const r = pinch.v.getBoundingClientRect(), [a, b] = e.touches;
+  setMapScale(pinch.v, pinch.s * tDist(e.touches) / pinch.d, (a.clientX + b.clientX) / 2 - r.left, (a.clientY + b.clientY) / 2 - r.top);
+}, { passive: false });
+document.addEventListener('touchend', e => { if (pinch && e.touches.length < 2) pinch = null; });
+let mdrag = null, mdragClick = false;   // 마우스로 끌어서 이동 (끈 뒤의 클릭은 핀 이동으로 치지 않음)
+document.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button !== 0) return; const v = zoomView(e.target); if (v) mdrag = { v, x: e.clientX, y: e.clientY, sl: v.scrollLeft, st: v.scrollTop, moved: false }; });
+document.addEventListener('pointermove', e => {
+  if (!mdrag) return;
+  const dx = e.clientX - mdrag.x, dy = e.clientY - mdrag.y;
+  if (!mdrag.moved && Math.hypot(dx, dy) < 6) return;
+  mdrag.moved = true; mdrag.v.classList.add('drag');
+  mdrag.v.scrollLeft = mdrag.sl - dx; mdrag.v.scrollTop = mdrag.st - dy;
+});
+document.addEventListener('pointerup', () => { if (!mdrag) return; mdrag.v.classList.remove('drag'); if (mdrag.moved) { mdragClick = true; setTimeout(() => { mdragClick = false; }, 0); } mdrag = null; });
+document.addEventListener('click', e => {
+  if (mdragClick) { e.stopPropagation(); e.preventDefault(); mdragClick = false; return; }
+  const b = e.target.closest && e.target.closest('[data-mapz]');
+  if (!b) return;
+  e.stopPropagation();
+  const v = b.closest('.cmap-wrap') && b.closest('.cmap-wrap').querySelector('.cmap-view');
+  if (!v) return;
+  const z = b.dataset.mapz;
+  setMapScale(v, z === 'in' ? mapScale * 1.4 : z === 'out' ? mapScale / 1.4 : 0);
+}, true);
 // 지도 모드 고르기: 캠퍼스 안에 있으면 캠퍼스 지도부터 (버튼으로 바꿈)
 const mapModeNow = () => mapMode && (mapMode !== 'campus' || campusOK()) ? mapMode : G.onCampus() ? 'campus' : 'city';
 const mapToggle = mode => campusOK() ? `<button type="button" class="map-tog" data-mapmode="${mode === 'campus' ? 'city' : 'campus'}">${mode === 'campus' ? '🏙️ 시내 지도' : '🎓 캠퍼스 지도'}</button>` : '';

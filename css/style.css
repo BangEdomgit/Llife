@@ -925,3 +925,53 @@ b.pos{color:var(--plus)}
 .act-text{margin:6px 0 2px;line-height:1.55}
 .act-d{margin:0;font-size:13px}
 @media (prefers-reduced-motion:reduce){.die.rolling,.die.land,.act-res{animation:none}}
+/* 서울 지도: 확대/축소 (휠·두 손가락·＋/－) + 갈 수 있는 곳은 크게, 위에 빨간 표시 */
+.cmap-wrap{position:relative}
+.cmap-view.kr{cursor:grab;touch-action:pan-x pan-y;user-select:none;-webkit-user-select:none}
+.cmap-view.kr.drag{cursor:grabbing}
+.cmap-view.kr .cmap{aspect-ratio:720/920;max-width:none}
+.cm-zbtn{position:absolute;right:10px;top:10px;z-index:5;display:flex;flex-direction:column;gap:6px}
+.cm-zbtn button{width:40px;height:40px;padding:0;border-radius:12px;font-size:20px;font-weight:800;line-height:1;background:rgba(255,255,255,.94);color:#1d2230;border:1px solid rgba(0,0,0,.12);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.cm-hint{margin:2px 0 0;font-size:12px}
+.cmap-view.kr .pin{z-index:1}
+.cmap-view.kr .pin .pi{position:relative}
+.cmap-view.kr .pin.go{z-index:3}
+.cmap-view.kr .pin.go .pi{width:42px;height:42px;font-size:22px;box-shadow:0 3px 10px rgba(0,0,0,.4),0 0 0 3px #e53935}
+.cmap-view.kr .pin.go .pn{margin-top:3px;font-size:12.5px;font-weight:800;padding:1px 6px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.cmap-view.kr .pin.go small{font-size:11px;padding:0 4px}
+/* 빨간 핀 표시 (아이콘 위) */
+.cmap-view.kr .pin.go .pi::before{content:'';position:absolute;left:50%;top:-24px;width:18px;height:18px;margin-left:-9px;background:#e53935;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 4px rgba(0,0,0,.4);animation:goBob 1.4s ease-in-out infinite}
+.cmap-view.kr .pin.go .pi::after{content:'';position:absolute;left:50%;top:-18px;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:#fff;animation:goDot 1.4s ease-in-out infinite}
+@keyframes goBob{0%,100%{transform:translateY(0) rotate(-45deg)}50%{transform:translateY(-5px) rotate(-45deg)}}
+@keyframes goDot{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.cmap-view.kr .pin.go:hover .pi,.cmap-view.kr .pin.go:focus-visible .pi{transform:scale(1.12)}
+/* 못 가는 곳은 작고 흐리게 */
+.cmap-view.kr .pin.off .pi,.cmap-view.kr .pin:disabled:not(.here):not(.at) .pi{width:26px;height:26px;font-size:14px}
+.cmap-view.kr .pin:disabled:not(.here):not(.at){opacity:.6}
+/* 많이 줄였을 때: 갈 수 있는 곳만 이름 */
+.cmap-view.kr.zs .pin:not(.go):not(.here):not(.at) .pn,.cmap-view.kr.zs .pin:not(.go) small{display:none}
+.cmap-view.kr.zs .pin.go .pi{width:34px;height:34px;font-size:18px}
+.cmap-view.kr.zs .pin.go .pn{font-size:11px}
+.cm-legend .k.go{background:#e53935;border-radius:50% 50% 50% 0;transform:rotate(-45deg);width:12px;height:12px}
+.cmap.night .pin.go .pn{background:#fff;color:#1d2230}
+@media (prefers-reduced-motion:reduce){.cmap-view.kr .pin.go .pi::before,.cmap-view.kr .pin.go .pi::after{animation:none}}
+.cmap-wrap{min-width:0;width:100%;max-width:100%}
+.cmap-view.kr{width:100%;max-width:100%}
+/* 내 위치: 파란 점 + 퍼지는 고리 + '나' 말풍선 (갈 수 있는 곳의 빨강과 구분) */
+.cmap-view.kr .pin.here,.cmap-view.kr .pin.at{z-index:6}
+.cmap-view.kr .pin.here .pi,.cmap-view.kr .pin.at .pi{width:48px;height:48px;font-size:24px;background:#fff;box-shadow:0 0 0 4px #1a73e8,0 0 0 7px rgba(255,255,255,.95),0 4px 14px rgba(0,0,0,.45);filter:none;opacity:1}
+.cmap-view.kr .pin.here .pi::after,.cmap-view.kr .pin.at .pi::after{content:'';position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border:0;border-radius:50%;background:rgba(26,115,232,.35);animation:mePulse 1.8s ease-out infinite;z-index:-1}
+.cmap-view.kr .pin.here .pi::before,.cmap-view.kr .pin.at .pi::before{content:'나';position:absolute;left:50%;top:-30px;transform:translateX(-50%);padding:2px 9px;border-radius:999px;background:#1a73e8;color:#fff;font:800 12px var(--font);white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.cmap-view.kr .pin.here .pn,.cmap-view.kr .pin.at .pn{margin-top:5px;font-size:12.5px;font-weight:800;background:#1a73e8;color:#fff;padding:1px 7px}
+.cmap-view.kr .pin.here small,.cmap-view.kr .pin.at small{background:#1a73e8;color:#fff}
+.cmap-view.kr .pin.at .pn::before{content:''}
+@keyframes mePulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(2.6);opacity:0}}
+.cm-legend .k.me{background:#1a73e8;border-radius:50%;box-shadow:0 0 0 2px #fff,0 0 0 3px #1a73e8;width:11px;height:11px}
+@media (prefers-reduced-motion:reduce){.cmap-view.kr .pin.here .pi::after,.cmap-view.kr .pin.at .pi::after{animation:none;opacity:.5;transform:scale(1.6)}}
+.cmap-view.kr.zs .pin.go small{display:none}
+.cmap-view.kr.zs .pin.go .pi{width:30px;height:30px;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.4),0 0 0 2.5px #e53935}
+.cmap-view.kr.zs .pin.go .pi::before{top:-21px;width:15px;height:15px;margin-left:-7.5px}
+.cmap-view.kr.zs .pin.go .pi::after{top:-16px;width:6px;height:6px;margin-left:-3px}
+.cmap-view.kr.zs .pin.go .pn{font-size:10.5px;padding:0 4px}
+.cmap-view.kr.zs .pin.here .pi,.cmap-view.kr.zs .pin.at .pi{width:38px;height:38px;font-size:19px}
+.cmap-view.kr.zs .pin.here .pi::after,.cmap-view.kr.zs .pin.at .pi::after{width:38px;height:38px;margin:-19px 0 0 -19px}
