@@ -323,7 +323,7 @@ function hereBadges(h) {
 }
 function hereRow(h) {
   const p = h.p;
-  const who = h.stranger ? esc(strangerLabel(p)) : `${esc(G.pname(p))} <span class="dim">(${G.npcAge(p)})</span>`;
+  const who = h.stranger ? esc(strangerLabel(p)) : `${h.staff ? `<span class="bd staff">${esc(p.role || G.relLabel(p))}</span> ` : ''}${esc(G.pname(p))} <span class="dim">(${G.npcAge(p)})</span>`;
   return `<button type="button" class="hp${h.used ? ' used' : ''}${h.stranger ? ' x' : ''}" data-hp="${h.key}" title="${esc(h.doing)}">${av(p, 28)}
     <span class="hw"><span class="hn"><b>${who}</b>${hereBadges(h)}</span><span class="hd">${h.used ? '이야기함' : esc(h.doing)}</span></span>${h.stranger ? '' : `<span class="hr">${esc(G.relLabel(p))}</span>`}</button>`;
 }
@@ -361,13 +361,13 @@ function renderWhere(S) {
     return;
   }
   const here = G.here(), acts = G.actionList();
-  const nKnown = here.filter(h => !h.stranger).length, nNew = here.filter(h => h.stranger).reduce((t, h) => t + 1 + (h.grp || 0), 0);
+  const nStaff = here.filter(h => h.staff).length, nKnown = here.filter(h => !h.stranger && !h.staff).length, nNew = here.filter(h => h.stranger).reduce((t, h) => t + 1 + (h.grp || 0), 0);
   box.innerHTML = `
     <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}${S.drunk ? ` <small class="drunk d${S.drunk}">🍺 ${G.drunkLabel()}</small>` : ''}</span><button type="button" class="map-btn" data-map>🗺️ 지도</button></div>
     ${compBar(pl)}
-    <p class="sec-t">👥 여기 있는 사람 ${nKnown + nNew}명 <span class="dim">· 아는 사람 ${nKnown} · 처음 보는 사람 ${nNew} · 말 걸기는 행동력 안 씀</span>${pl.crowd ? ' <button type="button" class="br-open" data-browse>👀 둘러보기</button>' : ''}</p>
+    <p class="sec-t">👥 여기 있는 사람 ${nStaff + nKnown + nNew}명 <span class="dim">· ${nStaff ? `일하는 사람 ${nStaff} · ` : ''}아는 사람 ${nKnown} · 처음 보는 사람 ${nNew} · 말 걸기는 행동력 안 씀</span>${pl.crowd ? ' <button type="button" class="br-open" data-browse>👀 둘러보기</button>' : ''}</p>
     ${crowdLine(here)}
-    <div class="here">${here.length ? [['아는 사람', here.filter(h => !h.stranger)], ['처음 보는 사람', here.filter(h => h.stranger)]].filter(g => g[1].length).map(([t, L]) => `<p class="here-g">${t} <small>${L.length}</small></p>${L.map(hereRow).join('')}`).join('') : '<p class="empty">아무도 없다.</p>'}</div>
+    <div class="here">${here.length ? [['🧑‍💼 여기서 일하는 사람', here.filter(h => h.staff)], ['아는 사람', here.filter(h => !h.stranger && !h.staff)], ['처음 보는 사람', here.filter(h => h.stranger)]].filter(g => g[1].length).map(([t, L]) => `<p class="here-g">${t} <small>${L.length}</small></p>${L.map(hereRow).join('')}`).join('') : '<p class="empty">아무도 없다.</p>'}</div>
     ${foodBar(G.food.here())}
     <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· ⚡ = 드는 행동력</span></p>
     <div class="acts">${actButtons(acts) || '<p class="empty">여기선 딱히 할 게 없다.</p>'}</div>`;
@@ -1191,7 +1191,7 @@ function quickStep(n) {
     if (e.tiers) {
       const unis = G.quick.tierUnis(e.tiers), u = unis.find(x => x.id === q.univ);
       more = qFld('대학', `<div class="chips unis">${unis.map(x => qChip('univ', x.id, `${logo(x.id, 18)} ${esc(x.short || x.name)}`, x.id === q.univ, x.name)).join('')}</div>`, `${esc(u.name)} · ${esc(G.tierLabel(u.tier))} · "${esc(u.motto || '')}"`)
-        + qFld('학과', `<div class="chips">${u.departments.map(id => { const d = G.departments.find(x => x.id === id); return qChip('dept', id, esc(d.icon + ' ' + d.name), id === q.dept); }).join('')}</div>`, '1학년을 마친 2학년으로 시작한다. 1학년 학점은 능력치로 정해진다.');
+        + qFld('학과', `<div class="chips">${u.departments.map(id => { const d = G.departments.find(x => x.id === id); return qChip('dept', id, esc(d.icon + ' ' + d.name), id === q.dept); }).join('')}</div>`, '갓 입학한 1학년으로, 3월 입학식 날부터 시작한다. OT·수강신청·첫 수업·동아리·MT 같은 1학년 이야기가 이어진다.');
     } else if (q.edu === 'work') {
       more = qFld('하는 일', `<div class="chips">${G.quick.jobs().map(j => qChip('job', j.id, `${esc(j.label)} <small>${esc(G.fmtMoney(j.salary))}</small>`, j.id === q.job)).join('')}</div>`, '연봉 (만원). 고졸로 바로 시작할 수 있는 일.');
     }

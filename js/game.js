@@ -18,7 +18,7 @@ const PSTATS = ['close', 'trust', 'heart', 'grudge'];
 const LABEL = Object.assign({}, D.statLabel, { close: '친밀', trust: '신뢰', heart: '설렘', grudge: '원한', sat: '만족감' });
 const GR = D.grades;
 const SUBJ = D.subjects.map(x => x.id);   // 모든 과목 id (지금 듣는 과목은 subjectsNow)
-const KIND_LABEL = { classmate: '같은 반', friend: '친구', coworker: '동료', rival: '앙숙', child: '아이', family: '가족', neighbor: '이웃' };
+const KIND_LABEL = { classmate: '같은 반', friend: '친구', coworker: '동료', rival: '앙숙', child: '아이', family: '가족', neighbor: '이웃', staff: '일하는 사람' };
 const EVENTS = Object.fromEntries(D.events.concat(D.classEvents || []).map(e => [e.id, e]));   // 수업 이벤트도 id로 찾음 (뽑는 건 classTurn만)
 const PLACES = Object.fromEntries(D.places.map(p => [p.id, p]));
 const ACTIONS = Object.fromEntries(D.actions.map(a => [a.id, a]));
@@ -2561,6 +2561,32 @@ function doingFor(pl, p, night, taken) {
 }
 // 장소에 도착하면 (NPC_ENCOUNTER.md): 아는 사람은 한 명씩 재출현 확률을 굴려 장소별 수까지, 처음 보는 사람은 장소별 수 × 시간대·요일·날씨, 40%는 일행과 같이
 //   집은 같이 사는 사람 (regulars 함수)
+// 장소에서 일하는 사람 (data/places.js GAME_DATA.staff) — 그 장소에 가면 늘 있음
+//   한 번 만들면 같은 사람 (org = staff:장소[:동네][:해]:번호). 집 근처 장소는 사는 동네마다, 학교 담임은 해마다
+//   tag가 있으면 대학 1학년 고정 인물과 같은 사람 (교수님·동아리 회장)
+const STAFF_YEARLY = ['school', 'elem', 'kinder'];
+function staffKey(pl, i) {
+  const local = D.map && ((D.map.local || {})[pl.id] || KID_PLACE[pl.id]);
+  const uni = PLACES[pl.id] && PLACES[pl.id].campus || pl.id === 'campus' ? `:${(S.school && S.school.univ) || ''}` : '';
+  return `staff:${pl.id}${local ? ':' + homeDong() : ''}${uni}${STAFF_YEARLY.includes(pl.id) ? ':' + S.age : ''}${pl.id === 'office' ? ':' + (S.vars.jobOrg || S.job || '') : ''}:${i}`;
+}
+const staffRole = sp => (REGION !== 'kr' && sp.ny) || sp.role;
+function staffOf(pl) {
+  const L = (D.staff || {})[pl.id] || [], out = [];
+  L.forEach((sp, i) => {
+    if (sp.when && !sp.when(S, api)) return;
+    const key = staffKey(pl, i);
+    let p = sp.tag ? alive().find(x => x.tag === sp.tag) : alive().find(x => x.org === key);
+    if (!p) {
+      p = poolPerson({ kind: sp.tag ? 'friend' : 'staff', role: staffRole(sp), gender: sp.gender, ageDiff: rand(sp.age[0], sp.age[1]) - S.age, personality: sp.pers ? pick(sp.pers) : undefined, hangout: null, close: rand(2, 8), trust: rand(5, 12) }, key);
+      if (sp.tag) { p.tag = sp.tag; if (sp.tag === 'prof') p.name = (REGION === 'kr' ? p.name.slice(0, 1) : p.name.split(' ').pop()) + ' 교수님'; }
+      p.staffAt = pl.id;
+      if (sp.job) p.npcJob = sp.job;
+    }
+    out.push({ p, sp });
+  });
+  return out;
+}
 function fillHere(pl, bring, night) {
   const here = [], taken = [], E = D.encounter, inHere = new Set();
   const add = (p, x, grp, doing) => {
@@ -2571,6 +2597,8 @@ function fillHere(pl, bring, night) {
     if (!x) p.seen = S.dayN || 0;
   };
   if (bring) add(bring);
+  // 일하는 사람 먼저 (교수님·담임 선생님·점원·사장님 …)
+  for (const { p, sp } of staffOf(pl)) if (!inHere.has(p) && ageFits(pl, S.age)) { add(p, false, null, pick(sp.doing || ['일하고 있다'])); here[here.length - 1].staff = true; }
   if (typeof pl.regulars === 'function') {
     const cands = pl.regulars(S, api).filter(p => p !== bring && ageFits(pl, npcAge(p)));
     const [lo, hi] = pl.regularsN || [1, 2];
@@ -2581,7 +2609,7 @@ function fillHere(pl, bring, night) {
   // 아는 사람: 이 장소가 단골 장소·소속(학교·직장)·동네면 잘 나옴. 일행(group)이 있으면 같이 올 때가 많음
   //   열린 장소(시장·번화가·공원·터미널…)는 open 배율만큼만 — 대부분 그날그날 처음 보는 사람들
   const nK = Math.round(rand(kn[0], kn[1]) * m);
-  const hits = shuffle(alive().filter(p => p !== bring && p.kind !== 'family' && p.kind !== 'child' && ageFits(pl, npcAge(p)) && Math.random() < encounterChance(p, pl) * open));
+  const hits = shuffle(alive().filter(p => p !== bring && p.kind !== 'family' && p.kind !== 'child' && !(p.staffAt && !lover(p)) && ageFits(pl, npcAge(p)) && Math.random() < encounterChance(p, pl) * open));   // 일하는 사람은 자기 일터에서만 (친해져 사귀면 예외)
   const MW = E.mateWith, mateOK = MW && S.age >= 19 && MW.at.includes(pl.id), wkd = isWeekend() ? .15 : 0;
   for (const p of hits) {
     if (here.length - (bring ? 1 : 0) >= nK || here.length >= E.maxHere) break;
@@ -2650,7 +2678,7 @@ function hereList() {
     const p = h.x || person(h.key);
     if (!p) return null;
     const lead = h.x && h.x.couple && h.grp && h.grp[0];   // 처음 보는 커플: 같이 있는 짝
-    return { key: h.key, stranger: !!h.x, p, doing: h.doing, used: h.used, grp: (h.grp || []).length, couple: !!(h.x && h.x.couple), approach: !!(h.x && h.x.approach && !h.used),
+    return { key: h.key, stranger: !!h.x, staff: !!h.staff, p, doing: h.doing, used: h.used, grp: (h.grp || []).length, couple: !!(h.x && h.x.couple), approach: !!(h.x && h.x.approach && !h.used),
       wed: lead ? !!p.married : false, withMate: !h.x && !!p.mateId && ids.has(p.mateId), ring: ringVisible(p), phone: !h.x && hasNumber(p) };
   }).filter(Boolean);
 }
@@ -2819,6 +2847,7 @@ function orgActive(p) {
   if (o === 'ms' || o === 'hs') return phase() === o;
   if (o.startsWith('univ')) return !!S.flags.student && o === V.univOrg;
   if (o.startsWith('job')) return !!S.job && o === V.jobOrg;
+  if (o.startsWith('staff:')) { const pl = PLACES[p.staffAt]; return !!pl && o === staffKey(pl, +o.split(':').pop()); }   // 지금 다니는 곳에서 일하는 사람
   return o.startsWith('reg');
 }
 const orgPlace = p => { const o = p.org || ''; return o === 'ms' || o === 'hs' ? 'school' : o.startsWith('univ') ? 'campus' : o.startsWith('job') ? 'office' : null; };
@@ -4074,13 +4103,13 @@ function newLife20(q = {}) {
   if (uniEdu) {
     const cb = d.cut_bonus || 0;
     nae = toward(Math.max(1, u.cut.수시 + cb), 2); sat = toward(Math.max(1, u.cut.정시가 + cb), 2);
-    Object.assign(sc, { univ: u.id, dept: d.id, tier: u.tier, start: 19, years: d.years || (u.tier === 5 && d.id !== 'nursing' ? 2 : 4) });
-    const y = clamp(1.8 + rand(2, 5) * .3 + gIdx(S.stats.smart) * .1 + (d.stat ? gIdx(S.stats[d.stat]) * .06 : 0) + rand(-3, 3) / 10, 1, 4.5);
-    sc.gpa = Math.round(y * 100) / 100; sc.gpaN = 1;
+    // 입학 시점에서 시작: 오늘이 1학년 입학식 날 (학점은 아직 없음) → 대학 1학년 이야기(data/freshman.js)가 처음부터
+    Object.assign(sc, { univ: u.id, dept: d.id, tier: u.tier, start: 20, years: d.years || (u.tier === 5 && d.id !== 'nursing' ? 2 : 4) });
+    sc.gpa = 0; sc.gpaN = 0;
     S.flags.student = true;
     if (S.wealth === 'poor') S.money = -rand(100, 300);   // 학자금 대출
-    lines.push(['📚', `${josa(hs, '을')} 졸업하고 ${u.name} ${d.name}에 입학했다. ${sc.years - 1 <= 1 ? '지금은 2학년, 올겨울 졸업 예정.' : '지금은 2학년.'}`,
-      `내신 ${nae}등급 · 수능 ${sat}등급 · 1학년 학점 ${sc.gpa.toFixed(2)}`]);
+    lines.push(['📚', `${josa(hs, '을')} 졸업하고 ${u.name} ${d.name}에 합격했다. 오늘은 입학식 날, 1학년의 첫 봄이다.${sc.years <= 2 ? ' 2년제라 두 해 뒤면 졸업이다.' : ''}`,
+      `내신 ${nae}등급 · 수능 ${sat}등급 · ${u.short || u.name} ${sc.years}년제`]);
   } else if (edu.id === 'retake') {
     nae = clamp(r1(g0 + rand(-3, 3) / 10), 1, 9); sat = clamp(r1(g0 + rand(3, 10) / 10), 1, 9);
     S.flags.retake = true;
@@ -4130,14 +4159,14 @@ function newLife20(q = {}) {
   lines.unshift(['🏠', fam]);
 
   // 친구 (같은 대학이면 캠퍼스에서 자주 마주침) — 명문대는 인맥 보너스: 더 가깝고 과 선배 한 명
-  const campus = p => { if (uniEdu) { p.uni = sc.univ; p.hangout = 'campus'; p.rtag = p.rtag || '과 친구'; } };
+  const campus = p => { if (uniEdu) { p.uni = sc.univ; p.hangout = 'campus'; p.rtag = p.rtag || '같은 대학 간 친구'; } };
   const friends = [];
   for (let i = 0; i < clamp(+q.friends || 0, 0, 3); i++) {
     const f = addPerson({ kind: 'friend', ageDiff: rand(-1, 1), close: rand(40, 60) + (edu.id === 'elite' ? 8 : 0), trust: rand(35, 55) });
     if (i < 2) campus(f);
     friends.push(f);
   }
-  if (edu.id === 'elite') { const sr = addPerson({ kind: 'friend', ageDiff: rand(1, 3), close: rand(28, 38), trust: rand(30, 42) }); sr.rtag = '과 선배'; campus(sr); }
+  if (edu.id === 'elite') { const sr = addPerson({ kind: 'friend', ageDiff: rand(1, 3), close: rand(28, 38), trust: rand(30, 42) }); sr.rtag = '같은 과 고교 선배'; campus(sr); }
 
   // 연인 / 전 연인
   const exp = !!q.exp || (q.love === 'yes' && !!q.lsex);

@@ -22,11 +22,11 @@ GAME_DATA.quick = {
     { id: 'allround', label: '만능',    v: [55, 55, 50, 50, 50, 40] },
     { id: 'allmax', label: '올맥스',    v: [100, 100, 100, 100, 100, 100], sandbox: true },   // 샌드박스 전용
   ],
-  // 학력 — 대학은 data/school.js의 해당 등급 대학 중에서 고르고 학과까지. 이미 1학년을 마친 2학년으로 시작 (1학년 학점이 잡혀 있음)
+  // 학력 — 대학은 data/school.js의 해당 등급 대학 중에서 고르고 학과까지. 갓 입학한 1학년으로, 3월 입학식 날부터 시작 (대학 1학년 이야기 data/freshman.js)
   edu: [
-    { id: 'elite',   label: '명문대 재학', tiers: [1, 2], desc: '지능 보너스, 인맥 보너스(친구가 더 가깝고 선배 한 명). 돈은 집안대로.', bonus: { smart: 15 } },
-    { id: 'normal',  label: '일반대 재학', tiers: [3, 4], desc: '평범한 대학 2학년.' },
-    { id: 'college', label: '전문대 재학', tiers: [5],    desc: '손재주·실무 보너스. 올겨울이면 졸업.', bonus: { craft: 15 } },
+    { id: 'elite',   label: '명문대 입학', tiers: [1, 2], desc: '갓 입학한 1학년. 지능 보너스, 인맥 보너스(친구가 더 가깝고 같은 과 선배 한 명). 돈은 집안대로.', bonus: { smart: 15 } },
+    { id: 'normal',  label: '일반대 입학', tiers: [3, 4], desc: '갓 입학한 1학년. 입학식 날부터 시작한다.' },
+    { id: 'college', label: '전문대 입학', tiers: [5],    desc: '갓 입학한 1학년. 손재주·실무 보너스. 2년제라 금방 졸업.', bonus: { craft: 15 } },
     { id: 'retake',  label: '재수 중',     desc: '올해 수능을 한 번 더 본다. 시간은 많지만 돈이 없고 스트레스가 크다.' },
     { id: 'work',    label: '취업 (고졸)', desc: '고등학교를 졸업하고 바로 일을 시작했다. 모아둔 돈은 있지만 학력은 없다.' },
   ],

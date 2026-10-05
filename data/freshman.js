@@ -242,6 +242,9 @@ D.talkMemory = {
 
 /* 기억 라벨 — 1년 회고, 앨범 요약에 씀 */
 D.memLabel = {
+  entrance_photo: '입학식 날 정문 사진', id_laugh: '학생증 사진 대결', lost_together: '같이 헤맨 첫 주 강의실', first_meal_group: '첫 학식',
+  daemyeon_song: '대면식 노래', class_rep: '과대 선거', class_rep_push: '과대로 떠민 날', advisor_dream: '지도교수님께 말한 꿈',
+  gongang_match: '맞춘 공강', first_package: '엄마의 반찬 택배', first_housewarming: '원룸 첫 집들이',
   ot_funny: 'OT 자기소개', ot_silence: 'OT의 정적', sugang_pcbang: 'PC방 수강신청', sugang_fail: '1교시 폭탄 시간표',
   sat_next: '첫 수업 옆자리', carried_home: '환영회 날 업혀 간 밤', cider: '술자리의 사이다', umbrella_lent: '비 오는 날 빌려준 우산',
   umbrella_shared: '같이 쓴 우산', project_carry: '둘이서 끝낸 조별과제', project_callout: '단톡방 사건', all_nighter: '도서관 밤샘',
@@ -347,7 +350,20 @@ const mk = t => (s, a) => cast(a, t, SPEC[t](s, a));
 const mkFocus = t => (s, a) => a.focus(cast(a, t, SPEC[t](s, a)));
 
 const FR = [
-  /* ───────── 봄: 입학 (계절 시작에 세 장면 연속) ───────── */
+  /* ───────── 봄: 입학식 → OT → 수강신청 → 첫 수업 (계절 시작에 연속) ───────── */
+  { id: 'fr_entrance', type: 'must', season: ['봄'], when: fresh,
+    onStart: (s, a) => a.focus(mom(a) || null),
+    text: (s, a) => mom(a)
+      ? '입학식 날. 정문에 "신입생 여러분 환영합니다" 현수막이 걸려 있었다. {fp|이} 꽃다발을 들고 사람들 사이에서 나를 찾고 있었다.'
+      : '입학식 날. 정문에 "신입생 여러분 환영합니다" 현수막이 걸려 있었다. 꽃다발을 든 가족들 사이로 혼자 걸어 들어갔다.',
+    choices: [
+      { label: '정문 앞에서 사진을 남긴다', text: (s, a) => mom(a) ? '{fp|이} 휴대폰을 세로로, 가로로, 다시 세로로 돌려가며 스무 장을 찍었다. "우리 애가 대학생이네." 목소리가 조금 떨렸다.' : '학교 이름이 박힌 정문 앞에서 셀카를 한 장 찍었다. 생각보다 잘 나왔다. 엄마한테 보냈더니 우는 이모티콘이 왔다.',
+        p: { close: [4, 7] }, effect: { happy: 4 }, do: rem('entrance_photo'), memory: true },
+      { label: '총장님 축사를 끝까지 듣는다', text: '축사가 40분 동안 이어졌다. "여러분은 이제 진리의 바다에…" 옆자리 신입생이 고개를 꾸벅꾸벅 떨궜다. 그래도 끝까지 들었다. 이상하게 마음이 단단해졌다.',
+        effect: { smart: 1, happy: 1 } },
+      { label: '과 단톡방부터 들어간다', set: 'fr_groupchat', text: '과 단톡방에 들어가자마자 알림이 300개 쌓였다. "18학번 선배인데 궁금한 거 물어봐~", "OT 버스 몇 시예요?" 이름을 외우려다 포기했다.',
+        effect: { charm: 1, happy: 2 } },
+    ] },
   { id: 'fr_ot', type: 'must', season: ['봄'], when: fresh,
     onStart: (s, a) => { mk('dongi3')(s, a); mkFocus('dongi1')(s, a); },
     text: '신입생 OT. 강당에 처음 보는 얼굴이 이백 명쯤 있었다. 옆자리 {fp|이} "너도 혼자 왔어?" 하고 속삭였다. 곧 자기소개 차례가 돌아왔다.',
@@ -391,6 +407,81 @@ const FR = [
         text: '맨 끝에 혼자 앉은 {fp} 옆에 앉았다. {fp|이} 깜짝 놀라더니 필통을 내 쪽으로 조금 밀어줬다. 같이 쓰자는 뜻 같았다.',
         p: { close: [6, 9], trust: [4, 6] }, effect: { happy: 2 } },
       { label: '뒷자리에서 조용히 듣는다', text: '뒷자리에서 듣기만 했다. 첫 수업부터 졸음이 왔다.', effect: { smart: -1 } },
+    ] },
+
+  /* ───────── 봄: 입학하고 첫 몇 주 (캠퍼스 곳곳에서) ───────── */
+  { id: 'fr_studentid', type: 'random', on: ['campus', 'union'], season: ['봄'], when: fresh, weight: 5,
+    onStart: mkFocus('dongi3'),
+    text: '학생회관에서 학생증이 나왔다. 증명사진은 수능 원서 사진 그대로였다. 옆에서 {fp|이} 내 학생증을 낚아채더니 "이거 너야? 범죄자 아니야?" 하고 웃었다.',
+    choices: [
+      { label: '같이 웃는다', text: '둘이 서로 학생증을 바꿔 보며 한참 웃었다. {fp}의 사진도 만만치 않았다.', p: { close: [5, 8] }, effect: { happy: 3 }, do: rem('id_laugh'), memory: true },
+      { label: '"너 거 보여 줘" 하고 받아친다', check: { stat: 'charm', diff: 40 },
+        success: { text: '{fp}의 학생증을 들어 보이자 주변 동기들까지 모여들었다. 그날 과 단톡방 프로필 사진은 학생증 사진 대회가 됐다.', p: { close: [6, 9] }, effect: { happy: 3, charm: 1 } },
+        fail: { text: '{fp|이} 학생증을 재빨리 주머니에 넣었다. "내 건 비밀이야." 한 판 졌다.', p: { close: [2, 4] } } },
+      { label: '조용히 지갑에 넣는다', text: '아무 말 없이 지갑 깊숙이 넣었다. 4년 내내 꺼낼 일이 없기를 바랐다.', effect: { happy: -1 } },
+    ] },
+  { id: 'fr_lost', type: 'random', on: ['campus', 'lecture'], season: ['봄'], when: fresh, weight: 5,
+    onStart: mkFocus('crush'),
+    text: '첫 주. 시간표엔 "공학관 B동 301"이라고 적혀 있는데, B동이 두 개였다. 계단참에서 시간표를 들고 두리번거리는 {fp|와} 눈이 마주쳤다. "혹시… 너도 301 찾아?"',
+    choices: [
+      { label: '같이 찾아다닌다', text: '둘이 건물 세 개를 돌았다. 결국 10분 늦게 뒷문으로 들어갔다. 숨을 고르며 서로를 보고 소리 없이 웃었다.', p: { close: [6, 9], heart: [3, 5] }, effect: { happy: 3 }, do: rem('lost_together'), memory: true },
+      { label: '지도 앱을 켜서 길을 알려 준다', check: { stat: 'smart', diff: 35 },
+        success: { text: '캠퍼스 지도를 3초 만에 읽어 냈다. "이쪽이야." {fp|이} "와, 길 진짜 잘 찾는다" 하며 따라왔다.', p: { close: [4, 7], trust: [3, 5], heart: [2, 3] }, effect: { happy: 2 } },
+        fail: { text: '자신 있게 앞장섰다가 도서관에 도착했다. {fp|이} 어이없다는 듯 웃었다. "…그냥 같이 헤매자."', p: { close: [5, 7] }, effect: { happy: 1 } } },
+      { label: '지나가는 선배에게 묻는다', do: mkFocus('sunbae1'), text: '과잠을 입은 {fp|이} "아, 거기 다들 헤매. B동은 뒤쪽에 하나 더 있어" 하고 직접 데려다줬다.', p: { trust: [4, 6], close: [3, 5] }, effect: { happy: 2 } },
+    ] },
+  { id: 'fr_firstlunch', type: 'random', on: ['cafeteria'], season: ['봄'], when: fresh, weight: 6,
+    onStart: mkFocus('dongi1'),
+    text: '첫 학식. 오늘 메뉴는 제육볶음. 배식대의 이모가 내 얼굴을 보더니 "신입생이지?" 하며 밥을 꾹꾹 눌러 담아 줬다. 식판을 들고 돌아서니 {fp|이} 손을 흔들었다.',
+    choices: [
+      { label: '동기들 사이에 앉는다', text: '{fp}의 테이블엔 이미 동기 다섯 명이 앉아 있었다. 고향, 기숙사, 수강신청 망한 얘기로 점심시간이 금방 갔다.', p: { close: [5, 8] }, effect: { happy: 3 }, do: rem('first_meal_group') },
+      { label: '이모에게 "잘 먹겠습니다" 하고 인사한다', text: '"그래, 많이 먹어." 다음 날부터 이모는 내 식판에만 계란말이를 하나씩 더 얹어 줬다.', effect: { happy: 2 }, karma: 1 },
+      { label: '창가에서 혼밥한다', text: '창가 자리에서 혼자 먹었다. 캠퍼스를 내려다보며 먹는 밥도 나쁘지 않았다. {fp|이} 나중에 "왜 혼자 먹어, 다음엔 같이 먹자" 하고 연락했다.', p: { close: [2, 4] }, effect: { happy: 1 } },
+    ] },
+  { id: 'fr_daemyeon', type: 'random', on: ['campus', 'bar'], season: ['봄'], when: fresh, weight: 5,
+    onStart: (s, a) => { mk('dongi1')(s, a); mkFocus('sunbae1')(s, a); },
+    text: '과 대면식. 선배들이 강의실 앞에 일렬로 앉아 있었다. 과대 선배 {fp|이} "새내기들 한 명씩 앞에 나와서 자기소개랑 장기자랑!" 하고 외쳤다. 과잠 주문서도 돌았다.',
+    choices: [
+      { label: '노래를 한 소절 부른다', check: { stat: 'art', diff: 40 },
+        success: { text: '첫 소절에 강의실이 조용해졌다. 끝나자 선배들이 휴대폰 플래시를 흔들었다. {fp|이} "올해 과 축제 무대 너다" 하고 말했다.', p: { close: [6, 9], trust: [3, 5] }, effect: { happy: 4, art: 1, charm: 1 }, do: rem('daemyeon_song'), memory: true },
+        fail: { text: '음이 반 키 올라갔다. 그래도 선배들이 떼창으로 받쳐 줬다. 망했는데 이상하게 기분이 좋았다.', p: { close: [5, 7] }, effect: { happy: 2 }, do: rem('daemyeon_song') } },
+      { label: '과잠 사이즈 정리를 자원한다', text: '과잠 주문서를 들고 동기들 사이를 돌았다. 덕분에 이름을 반쯤 외웠다. {fp|이} "일 잘하네" 하며 어깨를 두드렸다.', p: { trust: [5, 8], close: [3, 5] }, effect: { charm: 1, happy: 2 } },
+      { label: '이름만 말하고 들어간다', text: '이름과 고향만 말했다. "에이~" 하는 야유가 잠깐 들렸지만 곧 다음 차례로 넘어갔다.', effect: { happy: -1 } },
+    ] },
+  { id: 'fr_classrep', type: 'random', on: ['lecture', 'campus'], season: ['봄'], when: fresh, weight: 3,
+    onStart: mkFocus('dongi3'),
+    text: '전공 수업이 끝나고 조교가 말했다. "1학년 과대 뽑아야 해요. 하고 싶은 사람?" 강의실에 정적이 흘렀다. {fp|이} 옆에서 내 옆구리를 쿡 찔렀다.',
+    choices: [
+      { label: '손을 든다', check: { stat: 'charm', diff: 45 },
+        success: { set: 'fr_classRep', text: '손을 들자 박수가 터졌다. 그날부터 과 단톡방 공지는 내 몫이 됐다. 피곤하지만 모르는 동기가 없어졌다.', p: { close: [4, 6] }, effect: { charm: 2, happy: 3 }, do: rem('class_rep'), memory: true },
+        fail: { text: '손을 들었는데 뒤에서 누가 "저요!" 하고 동시에 일어났다. 가위바위보에서 졌다. 부과대가 됐다.', p: { close: [3, 5] }, effect: { charm: 1, happy: 1 } } },
+      { label: '옆자리 동기를 추천한다', text: '"{fp|이} 잘할 것 같아요!" 강의실이 웃음바다가 됐다. {fp|은} 결국 과대가 됐고, 나를 부과대로 지명했다.', p: { close: [5, 8], grudge: [0, 1] }, effect: { happy: 2 }, do: rem('class_rep_push'), memory: true },
+      { label: '눈을 피한다', text: '바닥만 봤다. 결국 제비뽑기로 정했다. 다행히 내가 아니었다.' },
+    ] },
+  { id: 'fr_advisor', type: 'random', on: ['lecture', 'campus'], season: ['봄'], when: fresh, weight: 3,
+    onStart: mkFocus('prof'),
+    text: '신입생 지도교수 면담 날. 연구실 문을 두드리자 책 냄새가 확 끼쳤다. {fp|이} 안경을 내리며 물었다. "그래서, 4년 뒤에 뭐 하고 있을 것 같아요?"',
+    choices: [
+      { label: '꿈을 솔직하게 말한다', text: (s) => `"${s.vars.dreamLabel || '하고 싶은 일'}, 그게 꿈이에요." 말하고 나니 얼굴이 뜨거워졌다. {fp|은} 고개를 끄덕이며 메모를 했다. "그럼 2학년 때 이 수업은 꼭 들어요."`,
+        p: { trust: [6, 9], close: [3, 5] }, effect: { happy: 2 }, do: rem('advisor_dream'), memory: true },
+      { label: '학점 잘 받는 법을 묻는다', text: '{fp|이} 피식 웃었다. "출석, 과제 마감, 그리고 질문. 그것만 해도 B+는 나와요." 받아 적었다.', p: { close: [2, 4] }, effect: { smart: 1 } },
+      { label: '"아직 잘 모르겠어요"', text: '"모르는 게 정상이에요. 1학년은 모르는 걸 알아 가는 해죠." 생각보다 다정한 말에 마음이 놓였다.', p: { trust: [4, 6] }, effect: { happy: 1 } },
+    ] },
+  { id: 'fr_addrop', type: 'random', on: ['lecture', 'campus', 'cafe'], season: ['봄'], when: (s, a) => fresh(s) && has(a, 'dongi1'), weight: 3,
+    onStart: focusT('dongi1'),
+    text: '수강 정정 기간. {fp|이} 노트북을 들고 와 내 시간표 옆에 자기 시간표를 붙였다. "우리 화요일 공강 맞추자. 그래야 같이 놀지."',
+    choices: [
+      { label: '공강을 맞춘다', text: '수업 하나를 바꿔서 화요일 오후를 통째로 비웠다. 그날부터 화요일은 둘이 학교 앞을 쏘다니는 날이 됐다.', p: { close: [6, 9] }, effect: { happy: 3 }, do: rem('gongang_match'), memory: true },
+      { label: '듣고 싶은 수업을 지킨다', text: '"미안, 이건 꼭 듣고 싶어." {fp|은} 아쉬워했지만 "그럼 수요일 저녁은 무조건 나랑이다" 하고 받아쳤다.', p: { close: [3, 5], trust: [2, 4] }, effect: { smart: 1 } },
+    ] },
+  { id: 'fr_alone', type: 'random', on: ['home'], season: ['봄'], when: (s) => fresh(s) && !!s.flags.ownPlace, weight: 5,
+    onStart: (s, a) => a.focus(mom(a) || null),
+    text: '혼자 사는 첫 주. 현관 앞에 택배 상자가 와 있었다. 열어 보니 김치, 멸치볶음, 장조림, 그리고 "밥 꼭 챙겨 먹어"라고 적힌 쪽지.',
+    choices: [
+      { label: '바로 전화한다', text: (s, a) => mom(a) ? '"반찬 받았어." 한마디에 {fp|은} 한 시간을 이야기했다. 끊고 나니 방이 조금 덜 넓어 보였다.' : '전화를 걸려다 멈췄다. 대신 반찬 사진을 찍어 가족 단톡방에 올렸다. 하트가 줄줄이 달렸다.',
+        p: { close: [5, 8] }, effect: { happy: 3 }, do: rem('first_package'), memory: true },
+      { label: '동기들을 불러 나눠 먹는다', do: all(mkFocus('dongi1'), rem('first_housewarming')), text: '{fp|와} 동기 둘이 라면을 사 들고 왔다. 좁은 원룸 바닥에 둘러앉아 장조림을 순식간에 비웠다. 첫 집들이였다.', p: { close: [6, 9] }, effect: { happy: 4 }, memory: true },
+      { label: '아껴 먹는다', text: '반찬통을 냉장고에 차곡차곡 넣었다. 한 달 동안 매일 한 칸씩 꺼내 먹었다.', effect: { health: 1, happy: 1 } },
     ] },
 
   /* ───────── 봄: 캠퍼스에서 가끔 ───────── */

@@ -975,3 +975,5 @@ b.pos{color:var(--plus)}
 .cmap-view.kr.zs .pin.go .pn{font-size:10.5px;padding:0 4px}
 .cmap-view.kr.zs .pin.here .pi,.cmap-view.kr.zs .pin.at .pi{width:38px;height:38px;font-size:19px}
 .cmap-view.kr.zs .pin.here .pi::after,.cmap-view.kr.zs .pin.at .pi::after{width:38px;height:38px;margin:-19px 0 0 -19px}
+/* 장소에서 일하는 사람 (교수님·담임 선생님·점원·사장님 …) */
+.bd.staff{background:#2f6fd6;color:#fff;font-weight:800}
