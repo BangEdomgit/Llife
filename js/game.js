@@ -141,7 +141,7 @@ function enlist(p) {
   makeRoom(p.kind);
   p.id = 'p' + (++S.pseq);
   p.met = S.age;
-  delete p.stranger;
+  delete p.stranger; delete p.couple;
   lookOf(p);
   S.people.push(p);
   S.vars.new = p.name; S.vars.newId = p.id;
@@ -157,7 +157,7 @@ function makePerson(spec) {
     ageDiff = rand(Math.max(0, r[0]), Math.max(0, r[1])) - S.age;
   }
   const age = S.age + ageDiff;
-  const hobby = spec.hobby || pick(D.hobbies).id;
+  const hobby = spec.hobby || (spec.hobbyW ? wpickId(D.hobbies, spec.hobbyW) : pick(D.hobbies).id);
   const p = {
     id: null, kind: spec.kind || 'friend', role: spec.role || null,
     name: spec.name || pick(gender === 'm' ? D.namesM : D.namesF), gender, ageDiff,
@@ -165,12 +165,12 @@ function makePerson(spec) {
     taken: spec.taken ?? (age >= 24 ? Math.random() < .35 : age >= 19 ? Math.random() < .15 : false),
     met: S.age, debt: 0, sibling: !!spec.sibling,
     // 프로필 — 친해질수록 보임
-    personality: spec.personality || pick(D.personalities).id,
+    personality: spec.personality || (spec.persW ? wpickId(D.personalities, spec.persW) : pick(D.personalities).id),
     hobby,
     value: spec.value || pick(D.values).id,
-    wealth: spec.wealth || weighted(D.wealth).id,
+    wealth: spec.wealth || (spec.wealthW ? weighted(D.wealth, w => (w.weight ?? 1) * (spec.wealthW[w.id] ?? 1)) : weighted(D.wealth)).id,
     dream: pick(D.dreams).id,
-    npcJob: age >= 23 ? pick(D.npcJobs) : null,
+    npcJob: age >= 23 ? npcJobFor(age, spec.jobW) : null,
     feature: pick(D.features),
     hangout: spec.hangout !== undefined ? spec.hangout : pickHangout(hobby, age),   // 자주 가는 곳
     // 외모 3층 (등급 번호 0=F … 6=S). 몸은 체형(appearance.body)에서 계산
@@ -186,12 +186,25 @@ function makePerson(spec) {
   if (S.rumorType === 'good' && (S.rumor || 0) >= 30 && age >= 19 && p.kind !== 'family') p.trust = clamp(p.trust + rand(5, 10), 0, 100);
   // 기혼 NPC — 친밀 20이면 반지가 보이고, 40이면 결혼한 걸 알게 됨. 늘 몰래 만나는 사이로만 시작
   // 나이별 기혼 확률 (data/encounter.js) — 기혼자 85%는 반지를 끼고, 그중 일부는 술집·번화가에선 반지를 뺌
-  if (spec.married ?? (!['family', 'child'].includes(p.kind) && spec.taken !== false && Math.random() < marriedChance(age))) { p.married = true; p.taken = true; }
+  if (spec.married ?? (!['family', 'child'].includes(p.kind) && spec.taken !== false && Math.random() < Math.min(.95, marriedChance(age) * (spec.marriedK ?? 1)))) { p.married = true; p.taken = true; }
   if (p.married) ringFor(p);
   p.seen = S.dayN || 0;
   // 피임약을 먹고 있는 사람 (20살 이상 여자, 냉철형·무심형이 조금 더 많음) — 피임을 물을 때 드러남
   if (gender === 'f' && age >= C.sexMinAge && !['family', 'child'].includes(p.kind) && Math.random() < (['sharp', 'cool'].includes(p.personality) ? .35 : .2)) p.pill = true;
   return p;
+}
+// 비중 배율로 고르기 (m에 없는 건 1) — 장소 분포(data/encounter.js crowds)의 성격·취미
+const wpickId = (list, m) => weighted(list, x => m[x.id] ?? 1).id;
+// 어른 NPC 직업: 나이에 맞는 것 중 비중대로 (data/jobs.js npcJobW). mult: 장소 분포의 직업 배율. 퇴직자는 58살부터, 65살부터는 대부분
+function npcJobFor(age, mult) {
+  const W = D.npcJobW;
+  if (!W) return pick(D.npcJobs);
+  const list = D.npcJobs.map(j => {
+    const [w0, lo, hi] = W[j] || [1, 23, 62];
+    const w = age < lo || age > hi ? 0 : j === '퇴직자' ? (age >= 65 ? 12 : 2) : w0;
+    return [j, w * ((mult || {})[j] ?? 1)];
+  }).filter(x => x[1] > 0);
+  return list.length ? weighted(list, x => x[1])[0] : pick(D.npcJobs);
 }
 function npcStyle(hobby, age) {
   if (age < 13) return rand(0, 1);
@@ -225,9 +238,10 @@ function syncMyBody() {
   if (S.look && S.look.body) S.look.body.build = myBuild();
 }
 // 생김새 (js/avatar.js). 같은 인생의 같은 id면 늘 같은 얼굴. 가족·아이는 피부색이 나와 같음
-function lookOf(p) {
+// opt: Avatar.make에 더 넘길 것 (장소 분포의 체격 비중 build)
+function lookOf(p, opt) {
   if (!p.appearance && window.Avatar) {
-    p.appearance = Avatar.make(`${S.id}:${p.sk || p.id}`, p.gender, { feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null, personality: p.personality, hobby: p.hobby, job: p.npcJob });
+    p.appearance = Avatar.make(`${S.id}:${p.sk || p.id}`, p.gender, Object.assign({ feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null, personality: p.personality, hobby: p.hobby, job: p.npcJob }, opt));
     // 최고 미녀·미남 (BEAUTY): 20~39살 남(가족·아이 아님)의 0.5%는 성격에 맞는 유형으로 설계한 얼굴 — 지나가던 사람들이 돌아보는 사람
     const ag = npcAge(p);
     if (Avatar.beauty && !p.faceFixed && !['family', 'child'].includes(p.kind) && ag >= 20 && ag < 40 && Math.random() < .005)
@@ -1652,7 +1666,7 @@ function yearly() {
     // 나를 향한 성욕: 나에게 끌리는 만큼(설렘, 내 몸이 취향, 함께 보낸 밤) 해마다 쌓임
     if (canSex(p) && !p.acq) p.libido = clamp((p.libido || 0) + Math.round(rand(6, 14) * (na < 30 ? 1.2 : na < 40 ? 1 : .7) * (.4 + p.heart / 80 + (figPref(p) || prefMatch(p) ? .2 : 0) + (p.nights ? .3 : 0))), 0, 100);
     else if (!lover(p)) p.libido = 0;
-    if (!p.npcJob && npcAge(p) >= 23 && p.kind !== 'family') p.npcJob = pick(D.npcJobs);
+    if (!p.npcJob && npcAge(p) >= 23 && p.kind !== 'family') p.npcJob = npcJobFor(npcAge(p));
     if (p.hangout && !ageFits(PLACES[p.hangout], npcAge(p))) p.hangout = pickHangout(p.hobby, npcAge(p));
   }
   // 생활비·피임약값은 매달(monthly)
@@ -1896,25 +1910,52 @@ function crowdRange(type) {
   if (a < 13) return r < .6 ? crowdRange('kid') : [30, 75];
   return r < .4 ? crowdRange('peer') : r < .7 ? [Math.max(30, a + 15), Math.max(60, a + 40)] : [Math.max(8, a - 12), a + 12];
 }
-function makeStranger(pl, night, lead, sk) {
+// 장소 분포 (data/encounter.js crowds): 기본값에 지금 시간·요일 규칙을 위에서부터 덮어씀 (성격·취미·직업·형편·체격 배율 표는 합침)
+const PROF_MAPS = ['pers', 'hobby', 'job', 'wealth', 'build'], PROF_IF = ['h', 'we', 'fri', 'days', 'night', 'when'];
+function crowdProfile(pl, night) {
+  const C = D.encounter.crowds && D.encounter.crowds[pl.id];
+  if (!C) return null;
+  const adult = phase() === 'adult', h = clockHour(), d = dow(), we = d === 0 || d === 6, out = {};
+  const put = o => { for (const k in o) if (!PROF_IF.includes(k)) out[k] = PROF_MAPS.includes(k) ? Object.assign({}, out[k], o[k]) : o[k]; };
+  put(C);
+  for (const w of C.when || []) {
+    if (w.h && (!adult || h < w.h[0] || h >= w.h[1])) continue;
+    if (w.we != null && w.we !== we) continue;
+    if (w.fri && !(d === 5 && (adult ? h >= 17 : night))) continue;
+    if (w.days && !w.days.includes(d)) continue;
+    if (w.night != null && w.night !== !!night) continue;
+    put(w);
+  }
+  return out;
+}
+// 처음 보는 사람 한 명. P: 장소 분포 (어른이 된 뒤엔 나이도 분포대로, 그 전엔 또래·어른 나이대) / lead: 일행의 첫 사람 / mate: lead의 연인(커플)
+function makeStranger(pl, night, lead, sk, P, mate) {
   let type = (night && pl.nightCrowd) || pl.crowd;
   if (Array.isArray(type)) type = pick(type);
-  const E = D.encounter, fr = pl.id === 'conveni' && clockHour() >= 21 ? E.femaleRatio.conveniNight : E.femaleRatio[pl.id] ?? .5;
+  const E = D.encounter, fr = P && P.female != null ? P.female : pl.id === 'conveni' && clockHour() >= 21 ? E.femaleRatio.conveniNight : E.femaleRatio[pl.id] ?? .5;
   const la = lead ? npcAge(lead) : 0;
+  let ageRange;
+  if (mate) ageRange = [Math.max(19, la - 3), la + 3];
+  else if (lead) ageRange = [Math.max(pl.minAge || 0, la - 4), Math.min(pl.maxAge ?? 99, la + 4)];
+  else if (P && S.age >= 19) { const b = weighted(P.age, x => x[x.length - 1]); ageRange = b[0] === 'peer' ? crowdRange('peer') : [b[0], b[1]]; }
+  else ageRange = crowdRange(type);
   const p = makePerson({
-    kind: pl.kind || 'friend', gender: Math.random() < fr ? 'f' : 'm',
-    ageRange: lead ? [Math.max(pl.minAge || 0, la - 4), Math.min(pl.maxAge ?? 99, la + 4)] : crowdRange(type), hangout: pl.id,
-    personality: lead && Math.random() < .5 ? lead.personality : undefined,   // 일행끼리는 비슷한 사람
-    hobby: pl.hobby && Math.random() < .6 ? pl.hobby : undefined,
+    kind: pl.kind || 'friend', gender: mate ? (Math.random() < .94 ? (lead.gender === 'f' ? 'm' : 'f') : lead.gender) : Math.random() < fr ? 'f' : 'm',
+    ageRange, hangout: pl.id,
+    personality: lead && !mate && Math.random() < .5 ? lead.personality : undefined,   // 일행끼리는 비슷한 사람
+    hobby: mate ? (Math.random() < .4 ? lead.hobby : undefined) : !P && pl.hobby && Math.random() < .6 ? pl.hobby : undefined,
+    persW: P && P.pers, hobbyW: P && P.hobby, jobW: P && P.job, wealthW: P && P.wealth, marriedK: P ? P.married : undefined,
+    married: mate ? !!lead.married : undefined, taken: mate ? true : undefined,   // 커플: 기혼이면 배우자, 아니면 서로 사귀는 사이
     close: rand(4, 10), trust: rand(4, 10),
   });
   p.id = 'x' + (++S.xseq);
   p.stranger = true;
   if (sk) p.sk = sk;
-  // 직진형·장난형은 가끔 먼저 말을 걸어옴 (FACE_UPGRADE 6-3) — 어른은 어른끼리, 10대는 비슷한 또래끼리만
   const a = npcAge(p);
+  if (P && P.style && a >= 13) p.style = clamp(p.style + Math.floor(P.style + Math.random()), 0, 6);   // 번화가·공연장은 잘 꾸민 사람, 시장·병원은 편한 차림
+  // 직진형·장난형은 가끔 먼저 말을 걸어옴 (FACE_UPGRADE 6-3) — 어른은 어른끼리, 10대는 비슷한 또래끼리만
   if (!lead && ['bold', 'playful'].includes(p.personality) && Math.random() < .3 && (S.age >= 20 ? a >= 20 && Math.abs(a - S.age) <= 12 : S.age >= 13 && a < 20 && Math.abs(a - S.age) <= 2)) p.approach = true;
-  lookOf(p);
+  lookOf(p, P && P.build ? { build: P.build } : null);
   return p;
 }
 // 길거리 즉석 생성 (FACE_UPGRADE 6-2): 씨앗 = 인생·날짜·장소·시간대·둘러본 횟수 → 같은 날 같은 장소·시간이면 같은 사람들, 다음 날은 새 사람들
@@ -1931,14 +1972,21 @@ function crowdSeed(pl) {
   const slot = phase() === 'adult' ? 'h' + Math.floor(clockHour() / 3) : 't' + (S.time || 0);   // 어른: 3시간 단위, 학생: 턴의 때
   return `${S.id}:${S.dayN || 0}:${pl.id}:${slot}:${browseState().n[pl.id] || 0}`;
 }
+//   무리 중 일부는 커플 (장소 분포의 couple — 주말 번화가·공원에 많음): 어른 둘, 대개 남녀, 기혼이면 배우자
 function spawnCrowd(pl, night, room) {
-  const st = (D.encounter.count[countKey(pl)] || [null, pl.crowdN || [0, 2]])[1], seed = crowdSeed(pl);
+  const st = (D.encounter.count[countKey(pl)] || [null, pl.crowdN || [0, 2]])[1], seed = crowdSeed(pl), P = crowdProfile(pl, night);
   const met = new Set(S.people.map(p => p.sk).filter(Boolean)), out = [];
   withSeed(seed, () => {
     let nS = Math.round(rand(st[0], st[1]) * crowdMult(pl) * weatherMult()), i = 0;
     while (nS > 0) {
-      const size = Math.min(nS, groupRoll(pl)), lead = makeStranger(pl, night, null, `${seed}:${i++}`), grp = [];
-      for (let k = 1; k < size; k++) grp.push(makeStranger(pl, night, lead, `${seed}:${i++}`));
+      const lead = makeStranger(pl, night, null, `${seed}:${i++}`, P), grp = [];
+      const couple = !!(P && P.couple) && nS >= 2 && npcAge(lead) >= 19 && Math.random() < P.couple;
+      const size = couple ? 2 : Math.min(nS, groupRoll(pl));
+      if (couple) {
+        const m = makeStranger(pl, night, lead, `${seed}:${i++}`, P, true);
+        lead.taken = true; lead.couple = m.couple = true; lead.approach = false;
+        grp.push(m);
+      } else for (let k = 1; k < size; k++) grp.push(makeStranger(pl, night, lead, `${seed}:${i++}`, P));
       nS -= size;
       if (!met.has(lead.sk)) out.push({ lead, grp });
     }
@@ -1947,6 +1995,7 @@ function spawnCrowd(pl, night, room) {
   for (const g of out) { if (room <= 0) break; g.grp = g.grp.slice(0, room - 1); room -= 1 + g.grp.length; res.push(g); }
   return res;
 }
+const grpDoing = (pl, p) => { const E = D.encounter, L = p.couple ? E.coupleDoing : E.groupDoing; return L[pl.id] || L._; };
 function doingFor(pl, p, night, taken) {
   let list = (night && pl.nightDoing) || pl.doing;
   if (typeof list === 'function') list = list(S, p, api);
@@ -1958,7 +2007,7 @@ function doingFor(pl, p, night, taken) {
 function fillHere(pl, bring, night) {
   const here = [], taken = [], E = D.encounter, inHere = new Set();
   const add = (p, x, grp, doing) => {
-    const roll = () => doing || (grp ? pick(E.groupDoing[pl.id] || E.groupDoing._) : doingFor(pl, p, night, taken));
+    const roll = () => doing || (grp ? pick(grpDoing(pl, p)) : doingFor(pl, p, night, taken));
     const d = x && p.sk ? withSeed(p.sk + ':do', roll) : roll();   // 같은 사람은 같은 일을 하는 중
     taken.push(d); inHere.add(p);
     here.push({ key: p.id, x: x ? p : undefined, doing: d, used: false, grp: grp || undefined });
@@ -1971,10 +2020,11 @@ function fillHere(pl, bring, night) {
     for (const p of shuffle(cands).slice(0, rand(lo, hi))) add(p);
     return here;
   }
-  const [kn] = E.count[countKey(pl)] || [[1, 2]], m = crowdMult(pl);
+  const [kn] = E.count[countKey(pl)] || [[1, 2]], m = crowdMult(pl), P = crowdProfile(pl, night), open = P && P.open != null ? P.open : 1;
   // 아는 사람: 이 장소가 단골 장소·소속(학교·직장)·동네면 잘 나옴. 일행(group)이 있으면 같이 올 때가 많음
+  //   열린 장소(시장·번화가·공원·터미널…)는 open 배율만큼만 — 대부분 그날그날 처음 보는 사람들
   const nK = Math.round(rand(kn[0], kn[1]) * m);
-  const hits = shuffle(alive().filter(p => p !== bring && p.kind !== 'family' && p.kind !== 'child' && ageFits(pl, npcAge(p)) && Math.random() < encounterChance(p, pl)));
+  const hits = shuffle(alive().filter(p => p !== bring && p.kind !== 'family' && p.kind !== 'child' && ageFits(pl, npcAge(p)) && Math.random() < encounterChance(p, pl) * open));
   for (const p of hits) {
     if (here.length - (bring ? 1 : 0) >= nK || here.length >= E.maxHere) break;
     if (inHere.has(p)) continue;
@@ -1985,9 +2035,15 @@ function fillHere(pl, bring, night) {
   if (pl.crowd) for (const { lead, grp } of spawnCrowd(pl, night, E.maxHere - here.length)) add(lead, true, grp.length ? grp : null);
   return here;
 }
+// 지금 이 장소에 오는 사람들 한 줄 (장소 분포의 note, 어른이 된 뒤) — 도착한 시각 기준
+function crowdNote(pl, night) {
+  const P = S.age >= 19 && pl.crowd ? crowdProfile(pl, night) : null;
+  return P && P.note ? { pl: pl.id, t: P.note, open: (P.open ?? 1) < .5 } : null;
+}
 function enterPlace(pl, bring, night = S.time === 2) {
   S.place = pl.id; S.placeNight = night;
   S.here = fillHere(pl, bring, night);
+  S.hereNote = crowdNote(pl, night);
   S.vars.placeLabel = pl.label;
 }
 // 장소에 가기 (행동 1). 거기 있는 사람에겐 행동 없이 한 번씩 말을 걸 수 있음
@@ -2014,13 +2070,13 @@ function goPlace(id) {
 function leavePlace() {
   if (!S.place || S.ended) return;
   if (S.drunk) soberUp();
-  S.place = null; S.here = [];
+  S.place = null; S.here = []; S.hereNote = null;
   save(); emit();
 }
 // 여기 있는 사람들 (화면용)
 function hereList() {
   if (!S.place) return [];
-  return S.here.map(h => ({ key: h.key, stranger: !!h.x, p: h.x || person(h.key), doing: h.doing, used: h.used, grp: (h.grp || []).length, approach: !!(h.x && h.x.approach && !h.used) })).filter(h => h.p);
+  return S.here.map(h => ({ key: h.key, stranger: !!h.x, p: h.x || person(h.key), doing: h.doing, used: h.used, grp: (h.grp || []).length, couple: !!(h.x && h.x.couple), approach: !!(h.x && h.x.approach && !h.used) })).filter(h => h.p);
 }
 // 둘러보기 (FACE_UPGRADE 6-3): 그냥 지나가기 — 이번 방문 동안은 목록에서 빠짐
 function passBy(key) {
@@ -2037,11 +2093,12 @@ function browseMore() {
   B.n[pl.id] = (B.n[pl.id] || 0) + 1;
   const keep = S.here.filter(h => !h.x), taken = keep.map(h => h.doing), night = !!S.placeNight;
   const fresh = spawnCrowd(pl, night, D.encounter.maxHere - keep.length).map(({ lead, grp }) => {
-    const d = withSeed(lead.sk + ':do', () => grp.length ? pick(D.encounter.groupDoing[pl.id] || D.encounter.groupDoing._) : doingFor(pl, lead, night, taken));
+    const d = withSeed(lead.sk + ':do', () => grp.length ? pick(grpDoing(pl, lead)) : doingFor(pl, lead, night, taken));
     taken.push(d);
     return { key: lead.id, x: lead, doing: d, used: false, grp: grp.length ? grp : undefined };
   });
   S.here = keep.concat(fresh);
+  S.hereNote = crowdNote(pl, night);
   log(`${pl.icon} ${pl.label}의 다른 쪽을 둘러봤다.`, { t: 'place' });
   save(); emit();
   return true;
@@ -2053,7 +2110,7 @@ function talkTo(key) {
   if (!h || h.used || busy()) return null;
   h.used = true;
   const x = h.x, pt = personality(x);
-  const odds = clamp(.2 + allure(x, 'first') / 55 + (pt.open || 0) + (trait().relMult ? .1 : 0) + (x.ringOff && D.encounter.ringOffAt.includes(S.place) ? .1 : 0) + (x.approach ? .4 : 0), .15, .95);   // 첫인상은 생김새·꾸밈이 크게 / 먼저 말을 걸어온 사람은 거의 받아줌
+  const odds = clamp(.2 + allure(x, 'first') / 55 + (pt.open || 0) + (trait().relMult ? .1 : 0) + (x.ringOff && D.encounter.ringOffAt.includes(S.place) ? .1 : 0) + (x.approach ? .4 : 0) - (x.couple ? .15 : 0), .15, .95);   // 첫인상은 생김새·꾸밈이 크게 / 먼저 말을 걸어온 사람은 거의 받아줌
   const opener = x.approach ? '"저기요." 처음 보는 사람이 먼저 말을 걸어왔다. ' : '처음 보는 사람에게 말을 걸었다. ';
   if (Math.random() >= odds) {
     log(fill(opener + (x.approach ? '어색하게 몇 마디 나누다 흐지부지 헤어졌다.' : pt.snub)), { deltas: applyEffect({ happy: -1 }) });
@@ -2926,7 +2983,7 @@ window.Game = {
   // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
   phase, timeInfo, storyNext, nextTurn, eat, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
   actionList, canDo, costOf, doAction, needsSubject, shopToday, outfitCtx: (p, evId) => outfitCtx(p || null, evId), dateOutfits, setDateOutfit: ix => { S.vars.dateOutfit = ix; },
-  places: placeList, goPlace, leavePlace, here: hereList, talkTo, passBy, browseMore, browseLeft, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
+  places: placeList, goPlace, leavePlace, here: hereList, hereNote: () => S.hereNote && S.hereNote.pl === S.place ? S.hereNote : null, talkTo, passBy, browseMore, browseLeft, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
   intimacy: p => canSex(p) && (p.nights || lover(p) || p.teased) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
   // 이 사람을 향한 내 성욕 (내 마음이라 늘 보임) / 지금 가장 높은 대상

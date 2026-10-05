@@ -196,10 +196,19 @@ function strangerLabel(p, grp) {
 // 여기 있는 사람 한 줄: 아는 사람은 이름(나이) + 결혼 마커 + 관계, 모르는 사람은 낯선 사람 + 하고 있는 일 (NPC_ENCOUNTER)
 function hereRow(h) {
   const p = h.p, mk = h.stranger ? '' : G.marker(p);
-  const who = h.stranger ? `<b>${esc(strangerLabel(p))}${G.ringVisible(p) ? ' <span class="dim">(반지)</span>' : ''}${h.approach ? ' <span title="이쪽을 힐끔거린다">👋</span>' : ''}</b>${h.grp ? `<span class="hr">일행 ${h.grp}명과 같이</span>` : ''}`
+  const who = h.stranger ? `<b>${esc(strangerLabel(p))}${G.ringVisible(p) ? ' <span class="dim">(반지)</span>' : ''}${h.approach ? ' <span title="이쪽을 힐끔거린다">👋</span>' : ''}</b>${h.grp ? `<span class="hr">${h.couple ? '연인과 함께' : `일행 ${h.grp}명과 같이`}</span>` : ''}`
     : `<b>${esc(G.pname(p))} <span class="dim">(${G.npcAge(p)})</span>${mk ? ` <span class="mk">${mk}</span>` : ''}</b><span class="hr">${esc(G.relLabel(p))}</span>`;
   return `<button type="button" class="hp${h.used ? ' used' : ''}${h.grp ? ' grp' : ''}" data-hp="${h.key}" title="${esc(h.doing)}">${av(p, 32)}
     <span class="hw">${who}<span class="hd">${h.used ? '이야기함' : esc(h.doing)}</span></span></button>`;
+}
+// 이 장소에 오는 사람들 한 줄 (장소 분포) + 지금 보이는 낯선 사람들 요약 (나이대·성비·커플)
+function crowdLine(here) {
+  const note = G.hereNote(), xs = here.filter(h => h.stranger);
+  if (!note) return '';
+  const ages = xs.map(h => G.npcAge(h.p)).sort((a, b) => a - b), mid = ages.length ? ages[ages.length >> 1] : 0;
+  const nF = xs.filter(h => h.p.gender === 'f').length, nC = xs.filter(h => h.couple).length;
+  const sum = xs.length ? [`주로 ${Math.floor(mid / 10) * 10}대`, `여자 ${nF} · 남자 ${xs.length - nF}`, nC ? `커플 ${nC}쌍` : ''].filter(Boolean).join(' · ') : '';
+  return `<p class="crowd-note"><span>${note.open ? '📅' : '👥'} ${esc(note.t)}</span>${sum ? `<small>${esc(sum)}${note.open ? ' · 매일 다른 사람들' : ''}</small>` : ''}</p>`;
 }
 function renderWhere(S) {
   const box = $('#where');
@@ -227,6 +236,7 @@ function renderWhere(S) {
     <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}${S.drunk ? ` <small class="drunk d${S.drunk}">🍺 ${G.drunkLabel()}</small>` : ''}</span><button type="button" data-leave>← 돌아가기</button></div>
     ${compBar(pl)}
     <p class="sec-t">여기 있는 사람들 <span class="dim">· 아는 사람 ${nKnown}명 / 모르는 사람 ${nNew}명 · 말 걸기는 행동을 안 씀</span>${pl.crowd ? ' <button type="button" class="br-open" data-browse>👀 둘러보기</button>' : ''}</p>
+    ${crowdLine(here)}
     <div class="here">${here.map(hereRow).join('') || '<p class="empty">아무도 없다.</p>'}</div>
     <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· 행동 1</span></p>
     <div class="acts">${actButtons(acts) || '<p class="empty">여기선 딱히 할 게 없다.</p>'}</div>`;
@@ -527,7 +537,8 @@ function openBrowse(ix) {
   const pl = G.place(), S = G.state();
   if (!pl) { closeModal(); return; }
   const list = G.here().filter(h => h.stranger), n = list.length, left = G.browseLeft(), ti = G.timeInfo(), wx = WX[S.weather];
-  const head = `<p class="br-head">${pl.icon} ${esc(pl.label)} · ${esc(ti.phase === 'adult' ? ti.slot : G.timeLabel())}${wx ? ` · ${wx.icon} ${esc(wx.label)}` : ''}</p>`;
+  const note = G.hereNote();
+  const head = `<p class="br-head">${pl.icon} ${esc(pl.label)} · ${esc(ti.phase === 'adult' ? ti.slot : G.timeLabel())}${wx ? ` · ${wx.icon} ${esc(wx.label)}` : ''}${note ? `<small>${esc(note.t)}</small>` : ''}</p>`;
   const more = pl.crowd ? `<button type="button" data-brmore${left > 0 ? '' : ' disabled'}>🔄 새로 둘러보기 <small>${left > 0 ? `오늘 ${left}번 더` : '오늘은 여기까지'}</small></button>` : '';
   if (!n) {
     showModal('browse', '👀 둘러보기', `${head}<p class="empty">눈에 띄는 낯선 사람이 없다.</p><div class="choices">${more}<button type="button" class="back" data-back>← 닫기</button></div>`, true, 'x');
@@ -553,7 +564,7 @@ function openBrowse(ix) {
       <div class="br-card${hey ? ' hey' : ''}">${brPortrait(h)}${h.approach ? '<span class="br-bubble">저기요</span>' : ''}</div>
       <button type="button" class="br-nav" data-brnext aria-label="다음 사람">▶</button></div>
     <p class="br-n">${browseIx + 1} / ${n}</p>
-    <div class="br-info"><b>낯선 ${esc(strangerWho(p))} · ${esc(ageBand(age))}</b>${h.grp ? ` <span class="dim">· 일행 ${h.grp}명과 같이</span>` : ''}
+    <div class="br-info"><b>낯선 ${esc(strangerWho(p))} · ${esc(ageBand(age))}</b>${h.grp ? ` <span class="dim">· ${h.couple ? '연인과 함께' : `일행 ${h.grp}명과 같이`}</span>` : ''}
       ${inf ? `<span>${esc(inf.sentence)}</span>` : ''}<span class="dim">${esc(h.doing)}.</span>${G.ringVisible(p) ? '<span class="dim">(왼손에 반지)</span>' : ''}
       ${h.used ? '<span class="hint">대화가 이어지지 않았다. 다음에 또 마주칠지도.</span>' : h.approach ? '<span class="hint">상대가 먼저 다가왔다. 받아주면 거의 이어진다.</span>' : ''}</div>
     <div class="choices br-acts"><button type="button" data-talk="${h.key}"${h.used ? ' disabled' : ''}>💬 ${h.approach ? '대답한다' : '말 걸기'} <small>행동 안 씀</small></button><button type="button" data-brnext>다음 사람 ▶</button><button type="button" data-brpass="${h.key}">그냥 지나간다</button></div>

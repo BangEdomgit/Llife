@@ -74,7 +74,8 @@ const FACE_N = 6, EYE_N = 20, BROW_N = 5, MOUTH_N = 6;
 // 두 색 섞기 (t: b 쪽 비율)
 const mixC = (a, b, t) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
 const TOPS = [0, 1, 2, 3, 5, 6, 7, 8];   // 4는 교복이라 뽑지 않음
-// opt: { feature, skin, personality, hobby, job } — 머리색 비율에 씀
+const BUILD_W = [['slim', 3], ['avg', 4], ['fit', 2], ['chubby', 1.2]];
+// opt: { feature, skin, personality, hobby, job } — 머리색 비율에 씀 / build: 체격 비중 배율 (장소 분포 — 헬스장은 탄탄한 사람이 많음)
 function make(seed, gender, opt = {}) {
   const r = rng(seed), n = k => Math.floor(r() * k);
   const f = opt.feature || '', g = gender === 'f' ? 'f' : 'm';
@@ -105,10 +106,11 @@ function make(seed, gender, opt = {}) {
   const pickW = w => { let t = r() * w.reduce((x, y) => x + y[1], 0); for (const [k, v] of w) { t -= v; if (t <= 0) return k; } return w[0][0]; };
   a.body = {
     height: a.tall ? 'tall' : pickW([['short', 3], ['avg', 5], ['tall', 3]]),
-    build: pickW([['slim', 3], ['avg', 4], ['fit', 2], ['chubby', 1.2]]),
+    build: pickW(BUILD_W),
   };
   if (a.g === 'f') a.body.chest = pickW([['small', 3], ['avg', 5], ['large', 2.5]]);
   else a.body.shoulder = pickW([['narrow', 2.5], ['avg', 5], ['wide', 3]]);
+  if (opt.build) a.body.build = pickW(BUILD_W.map(([k, w]) => [k, w * (opt.build[k] ?? 1)]));   // 맨 끝에서 한 번 더 뽑음 (앞의 값은 그대로)
   return a;
 }
 // 세부 — make() 값에서 늘 똑같이 나옴 (예전 저장의 얼굴도 그대로 살아남)

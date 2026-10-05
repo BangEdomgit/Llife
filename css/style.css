@@ -148,6 +148,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .here-head button{margin-left:auto;padding:6px 12px;font-size:12.5px;white-space:nowrap;flex:none;border-radius:99px}
 .here-head > span{min-width:0}
 .here .empty{margin:0;font-size:12.5px;color:var(--text-dim);grid-column:1/-1}
+.crowd-note{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;padding:6px 10px;font-size:12.5px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.crowd-note small{font-size:11px;color:var(--text-dim)}
 .hp.used{opacity:.62}
 .log .place{color:var(--text-dim)}
 .drunk{font-size:11.5px;color:var(--accent)}
@@ -430,6 +432,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* 둘러보기 (FACE_UPGRADE 6-3): 낯선 사람을 한 명씩 넘겨봄 */
 .sec-t .br-open{margin-left:6px;padding:2px 8px;font-size:12px;color:var(--accent)}
 .br-head{margin:0 0 6px;text-align:center;font-size:12.5px;color:var(--text-dim)}
+.br-head small{display:block;margin-top:2px;font-size:11.5px;color:var(--text)}
 .br-stage{display:flex;align-items:center;justify-content:center;gap:10px}
 .br-nav{width:38px;height:64px;padding:0;font-size:16px}
 .br-card{position:relative;width:160px;flex:none}
