@@ -1435,6 +1435,7 @@ function timetable() {
     list.sort((a, b) => a.days[0] - b.days[0] || a.h * 60 + a.m - b.h * 60 - b.m);
     sc.tt = { key: t.key, term: t.name, list };
     log(`🎓 ${t.name} 시간표: ${list.map(x => `${x.name}(${x.days.map(d => '일월화수목금토'[d]).join('')} ${hm(x.h + x.m / 60)})`).join(' · ')}`, { t: 'info' });
+    save();   // 화면을 그리다 처음 만들어질 수도 있어서 바로 저장 (안 그러면 저장본이 기록 한 줄 뒤처짐)
   }
   return sc.tt;
 }

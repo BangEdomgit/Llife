@@ -290,6 +290,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .nt-say.peak{background:#ffe1ee;color:#8f1d4f;font-weight:700}
 .nt-say.ow{background:#fff0e6;color:#8a3a1c}
 .nt-say.gasp{color:#8a5a00}
+.nt-say.meh{background:#eceaf0;color:#5a5566}
 .nt-form{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin:8px 0}
 .nt-row{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--dim,#a9a2b8)}
 .nt-row select,.nt-row input{font:inherit;font-size:13px;padding:5px 6px;border-radius:7px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:inherit;min-width:0}

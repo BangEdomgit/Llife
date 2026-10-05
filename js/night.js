@@ -198,33 +198,38 @@ function room(kind) {
 </g></svg>`;
 }
 
-// 오른쪽 위 ♂♀ 패널. ♀ 고리는 옆으로 40°쯤 돌아선 고리(뒤쪽 반은 화살 뒤, 앞쪽 반은 화살 앞)라 화살이 고리를 꿰뚫어 보임
-//   그리는 순서: 빛 → 고리 안 → 물결 → 고리 뒤쪽 반 → 잔상 → ♂ 화살 → 고리 앞쪽 반·하이라이트·십자 → 부딪힘 선·반짝 → 하트
+// 오른쪽 위 ♂♀ 패널: 왼쪽은 구불구불한 분홍 벽(♀ 기호가 벽 속에 묻혀 도드라짐), 가운데 높이에 일자로 갈라진 틈.
+//   오른쪽의 ♂ 화살이 틈으로 탄력 있게 파고듦 — 들어가면 틈이 벌어지고 벽 가장자리가 눌렸다 출렁이며 돌아옴, 화살은 용수철처럼 튕김
+//   그리는 순서: 빛 → 벽 → 벽 달아오름 → 묻힌 ♀ → 틈 → 잔상 → ♂ 화살 → 벽 가장자리 하이라이트(화살 위로 덮임) → 부딪힘 선·반짝 → 하트
+const SY_Y = 32, SY_WE = 56, SY_IN = 14;   // 틈의 높이, 벽 가장자리 x, 틈 안쪽 끝 x
 const SYM = `<div class="nt-sym"><svg viewBox="0 0 150 64" aria-hidden="true"><defs>
   <radialGradient id="ntSG"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".6"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient>
-  <radialGradient id="syIn"><stop offset="0" stop-color="#ff9fbd" stop-opacity=".75"/><stop offset="1" stop-color="#ff6f9a" stop-opacity=".1"/></radialGradient>
-  <linearGradient id="syBack" gradientUnits="userSpaceOnUse" x1="94" y1="0" x2="106" y2="0"><stop offset="0" stop-color="#8e3156"/><stop offset="1" stop-color="#cf4f79"/></linearGradient>
-  <linearGradient id="syFront" gradientUnits="userSpaceOnUse" x1="106" y1="0" x2="118" y2="0"><stop offset="0" stop-color="#e5588a"/><stop offset=".7" stop-color="#ff86ab"/><stop offset="1" stop-color="#ffc2d6"/></linearGradient>
+  <linearGradient id="syWall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e5588a"/><stop offset=".6" stop-color="#ff86ab"/><stop offset="1" stop-color="#ffb3ca"/></linearGradient>
+  <linearGradient id="syCrack" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4a0f27"/><stop offset="1" stop-color="#8e2450"/></linearGradient>
   <linearGradient id="syMg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9dcff"/><stop offset=".55" stop-color="#5aa8ff"/><stop offset="1" stop-color="#2f6bd0"/></linearGradient>
   <linearGradient id="syShaft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4ebff"/><stop offset=".45" stop-color="#5aa8ff"/><stop offset="1" stop-color="#2a60c4"/></linearGradient>
   <linearGradient id="syHead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9e5ff"/><stop offset=".5" stop-color="#4f9cf3"/><stop offset="1" stop-color="#2455b4"/></linearGradient>
   <radialGradient id="syDrop" cx=".65" cy=".35" r=".8"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#c8ecff"/><stop offset="1" stop-color="#5fb8f0"/></radialGradient>
   <filter id="sySh" x="-20%" y="-30%" width="140%" height="160%"><feDropShadow dx="0" dy="1.1" stdDeviation=".9" flood-color="#000" flood-opacity=".5"/></filter>
+  <clipPath id="syWC"><path class="sy-wclip"/></clipPath>
 </defs>
-  <circle class="sy-glow" cx="106" cy="28" r="23" fill="url(#ntSG)" opacity="0"/>
-  <ellipse class="sy-fill" cx="106" cy="28" rx="9" ry="12" fill="url(#syIn)" opacity="0"/>
-  <ellipse class="sy-rip" fill="none" stroke="#ff9fbd" opacity="0"/>
-  <path class="sy-back" fill="none" stroke="url(#syBack)" stroke-width="3.4" stroke-linecap="round"/>
+  <circle class="sy-glow" cx="${SY_WE}" cy="${SY_Y}" r="26" fill="url(#ntSG)" opacity="0"/>
+  <path class="sy-crack" fill="url(#syCrack)"/>
   <g class="sy-trail" fill="none" stroke="#5aa8ff" stroke-width="3.6"><circle class="sy-g1" r="13.5" opacity="0"/><circle class="sy-g2" r="13.5" opacity="0"/></g>
-  <g class="sy-m" transform="translate(40,28)" filter="url(#sySh)"><circle r="13.5" fill="none" stroke="url(#syMg)" stroke-width="5.2"/><path d="M-10.4,-6 A12.1,12.1 0 0 1 -1.3,-12.1" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".55"/>
+  <g class="sy-m" transform="translate(130,${SY_Y}) scale(-1,1)" filter="url(#sySh)"><circle r="13.5" fill="none" stroke="url(#syMg)" stroke-width="5.2"/><path d="M-10.4,-6 A12.1,12.1 0 0 1 -1.3,-12.1" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".55"/>
     <rect class="sy-shaft" x="13.5" y="-3.5" height="7" rx="3.5" fill="url(#syShaft)"/><path class="sy-head" fill="url(#syHead)" stroke="#2457b5" stroke-width=".7" stroke-linejoin="round"/><path class="sy-hh" fill="none" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity=".55"/></g>
-  <g class="sy-front" filter="url(#sySh)"><path class="sy-fr" fill="none" stroke="url(#syFront)" stroke-width="4.2" stroke-linecap="round"/><path class="sy-spec" fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round" opacity=".6"/>
-    <path class="sy-cross" fill="none" stroke="#f0618f" stroke-width="3.6" stroke-linecap="round"/></g>
+  <path class="sy-wall" fill="url(#syWall)" fill-rule="evenodd"/>
+  <path class="sy-flush" fill="#ff2d6f" fill-rule="evenodd" opacity="0"/>
+  <g class="sy-fem" clip-path="url(#syWC)" fill="none" stroke-linecap="round"><g class="sy-femg">
+    <circle cx="25" cy="15" r="8.5" stroke="#ffd0de" stroke-width="3.4" opacity=".55" transform="translate(.8,.9)"/><circle cx="25" cy="15" r="8.5" stroke="#b8336a" stroke-width="3.4" opacity=".75"/>
+    <path d="M25,23.5 V27.5 M21,25.6 H29" stroke="#ffd0de" stroke-width="3" opacity=".5" transform="translate(.8,.9)"/><path d="M25,23.5 V27.5 M21,25.6 H29" stroke="#b8336a" stroke-width="3" opacity=".7"/></g></g>
+  <path class="sy-crackhl" fill="none" stroke="#ffd9e6" stroke-width=".8" stroke-linecap="round" opacity=".75"/>
+  <path class="sy-edge" fill="none" stroke="#ffd6e4" stroke-width="1.3" stroke-linecap="round" opacity=".8"/>
   <path class="sy-tak" fill="none" stroke="#ffe08a" stroke-width="1.6" stroke-linecap="round" opacity="0"/>
   <path class="sy-spark" fill="#fff6c8" opacity="0"/>
-  <g class="sy-ouch" opacity="0"><path d="M126,6 Q123,11 126,13 Q129,11 126,6 Z" fill="#cfeeff" stroke="#86bfdc" stroke-width=".7"/><path d="M134,4 V12 M134,15.5 V16" stroke="#ffd36b" stroke-width="2.4" stroke-linecap="round"/></g>
-  <g class="sy-sq"></g><g class="sy-hs"></g><g transform="translate(88,10)"><path class="sy-h" d="${HEART}" fill="#ff4f86"/></g>
-  <text class="sy-beat" x="0" y="0" font-size="13" text-anchor="middle" dominant-baseline="central" transform="translate(20,55)"></text></svg></div>`;
+  <g class="sy-ouch" opacity="0"><path d="M72,6 Q69,11 72,13 Q75,11 72,6 Z" fill="#cfeeff" stroke="#86bfdc" stroke-width=".7"/><path d="M80,4 V12 M80,15.5 V16" stroke="#ffd36b" stroke-width="2.4" stroke-linecap="round"/></g>
+  <g class="sy-sq"></g><g class="sy-hs"></g><g transform="translate(28,52)"><path class="sy-h" d="${HEART}" fill="#ff4f86"/></g>
+  <text class="sy-beat" x="0" y="0" font-size="13" text-anchor="middle" dominant-baseline="central" transform="translate(140,55)"></text></svg></div>`;
 // 크기(cm) → 등급 1~6 (단소·소형·보통·큰 편·대물·흉기)
 const sizeGrade = cm => cm < 10 ? 1 : cm < 13 ? 2 : cm < 16 ? 3 : cm < 18 ? 4 : cm < 20 ? 5 : 6;
 
@@ -537,7 +542,75 @@ const POSES = {
     m.hand = add(f.butt, [3, -1]); m.elbow = meet(msh, M.uarm, m.hand, M.farm, [0, 1]);
     return { m, f, act: 'f', dir: [0, 1] };
   },
+  /* ── 애무 (그날 밤 앞부분, 맞물리기 전) — s.fs: 천천히 흔들리는 박자(−1~1), s.fk: 달아오른 정도(0~1) ── */
+  // 포개어 키스: 여자는 등을 대고 눕고(다리는 모아 한쪽 무릎만 세움), 남자는 옆에서 반쯤 포개 팔꿈치로 짚고 얼굴을 맞댐
+  kissOver(s, M, F) {
+    const [fsh, fhip] = lie(F, 102, s.sink, 0);
+    const f = trunk(F, fsh, fhip, [0, -1], .28 + .06 * s.fk, s.jig.f);
+    f.ankle = [fhip[0] + 58 - 6 * s.fk, MY - F.r.shin[1]]; f.knee = meet(fhip, F.thigh, f.ankle, F.shin, [.3, -1]); f.toe = [f.ankle[0] + F.foot * .8, MY - 2];
+    const hip = [fhip[0] + 10, MY - M.r.hip - 3 + s.sink], elbow = [fsh[0] - 18, MY - M.r.farm[0] - 1];
+    const sh = add(meet(hip, M.torso, elbow, M.uarm, [0, -1]), [0, 2 + 1.4 * s.fs]);
+    const m = trunk(M, sh, hip, perp(sub(sh, hip), [0, 1]), .25 + .1 * s.fs, s.jig.m);   // 고개를 숙여 얼굴을 맞댐
+    m.knee = [hip[0] + M.thigh, MY - M.r.thigh[1]]; m.ankle = [m.knee[0] + M.shin, MY - M.r.shin[1]]; m.toe = [m.ankle[0] + M.foot * .8, MY - 2];
+    Object.assign(m, { elbow, hand: [elbow[0] - M.farm * .9, MY - M.r.farm[1] - 2] });
+    f.hand = add(lerp(sh, hip, .25), perp(sub(sh, hip), [0, -1]), M.r.chest * .8 + 1.5 * s.fs); f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [-.3, -1]);   // 남자 등을 감음
+    return { m, f, act: 'm', dir: [0, 1], fore: 1 };
+  },
+  // 목덜미에 입맞춤: 여자는 누워 고개를 옆으로 젖히고, 남자는 위에서 팔을 짚고 목덜미로 얼굴을 묻음. 손은 허리를 쓸어내림
+  neckKiss(s, M, F) {
+    const [fsh, fhip] = lie(F, 102, s.sink, 0);
+    const f = trunk(F, fsh, fhip, [0, -1], -.1 - .25 * s.fk, s.jig.f);   // 고개를 젖혀 목을 내줌 (달아오를수록 더)
+    f.ankle = [fhip[0] + 62, MY - F.r.shin[1]]; f.knee = meet(fhip, F.thigh, f.ankle, F.shin, [.2, -1]); f.toe = [f.ankle[0] + F.foot * .8, MY - 2];
+    const hip = [fhip[0] + 14, MY - M.r.hip - 9 + s.sink], hand = [fsh[0] - 6, MY - M.r.farm[1]];
+    const sh = add(meet(hip, M.torso, hand, (M.uarm + M.farm) * .56, [0, -1]), [0, 2.5 + 2 * s.fs]);
+    const m = trunk(M, sh, hip, perp(sub(sh, hip), [0, 1]), 1.25, s.jig.m);
+    m.knee = [hip[0] + M.thigh * .95, MY - M.r.thigh[1]]; m.ankle = [m.knee[0] + M.shin, MY - M.r.shin[1]]; m.toe = [m.ankle[0] + M.foot * .8, MY - 2];
+    Object.assign(m, { hand, elbow: meet(sh, M.uarm, hand, M.farm, [1, 0]) });
+    f.hand = add(m.head, [6, -2]); f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [-.4, -1]);   // 남자 머리를 감싸 쥠
+    return { m, f, act: 'm', dir: [0, 1], fore: 1 };
+  },
+  // 백허그: 둘 다 앉아서, 남자가 뒤에서 끌어안고 어깨에 입맞춤. 여자는 남자 가슴에 등을 기대고 고개를 돌림
+  backHug(s, M, F) {
+    const mhip = [112, MY - M.r.butt + 3 + s.sink * .5], msh = polar(mhip, -1.82, M.torso);
+    const m = trunk(M, msh, mhip, perp(sub(msh, mhip), [1, 0]), .55 + .08 * s.fs, s.jig.m);
+    m.knee = [mhip[0] + M.thigh * .8, MY - M.r.thigh[1] - 14]; m.ankle = [m.knee[0] + M.shin * .75, MY - M.r.shin[1]]; m.toe = [m.ankle[0] + M.foot * .8, MY - 2];
+    const fhip = [mhip[0] + 22, MY - F.r.butt + 3 + s.sink * .5], fsh = polar(fhip, -1.68 - .1 * s.fk + .02 * s.fs, F.torso);
+    const f = trunk(F, fsh, fhip, perp(sub(fsh, fhip), [1, 0]), -.3 - .2 * s.fk, s.jig.f);   // 고개를 뒤로 기댐
+    f.knee = [fhip[0] + F.thigh * .8, MY - F.r.thigh[1] - 16]; f.ankle = [f.knee[0] + F.shin * .7, MY - F.r.shin[1]]; f.toe = [f.ankle[0] + F.foot * .8, MY - 2];
+    m.hand = add(f.waist, f.front, F.r.waist * .9 + 1.2 * s.fs); m.elbow = meet(msh, M.uarm, m.hand, M.farm, [0, 1]);   // 배를 감싼 팔
+    f.hand = add(m.hand, [3, -2]); f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [1, .4]);   // 그 손에 손을 얹음
+    return { m, f, act: 'm', dir: [1, 0], fore: 1 };
+  },
+  // 무릎 위 끌어안기: 남자는 책상다리로 앉고, 여자가 마주 보고 무릎 위에 올라앉아 목을 감고 입 맞춤 (좌위와 비슷하지만 떨어져 있고 오르내리지 않음)
+  lapHug(s, M, F) {
+    const mhip = [132, MY - M.r.butt + 3 + s.sink * .5], msh = polar(mhip, -1.62 + .05 * s.fs, M.torso);
+    const m = trunk(M, msh, mhip, perp(sub(msh, mhip), [1, 0]), .35, s.jig.m);
+    Object.assign(m, { knee: [mhip[0] + 40, MY - M.r.thigh[1] - 6], ankle: [mhip[0] + 16, MY - M.r.shin[1] - 1], toe: [mhip[0] + 8, MY - 3] });
+    const fhip = [mhip[0] + 30, mhip[1] - 12 + s.sink * .5], fsh = polar(fhip, -1.52 - .06 * s.fk - .03 * s.fs, F.torso);
+    const f = trunk(F, fsh, fhip, perp(sub(fsh, fhip), [-1, 0]), .4, s.jig.f);
+    f.hand = add(m.neck, [-6, 2]); f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [0, -1]);
+    f.ankle = [mhip[0] - 18, MY - F.r.shin[1] - 2]; f.knee = meet(fhip, F.thigh, f.ankle, F.shin, [0, -1]); f.toe = [f.ankle[0] - 6, f.ankle[1] + 3];
+    m.hand = add(f.waist, f.front, -F.r.waist * .9 + 1.5 * s.fs); m.elbow = meet(msh, M.uarm, m.hand, M.farm, [0, 1]);
+    return { m, f, act: 'm', dir: [-1, 0], fore: 1 };
+  },
+  // 벽에 밀어붙여 키스 (골목·화장실): 여자는 벽에 등을 대고 서고, 남자가 마주 서서 한 손은 벽을 짚고 고개를 숙여 입 맞춤
+  wallKiss(s, M, F) {
+    const fhip = [WX + F.r.butt + 3, FY - (F.shin + F.thigh) * .97], fsh = polar(fhip, -1.62, F.torso);
+    const f = trunk(F, fsh, fhip, [1, 0], .2 - .15 * s.fk, s.jig.f);
+    const hip = [fhip[0] + F.r.hip + M.r.hip + 9 - 2 * s.fk, fhip[1] + 4], sh = add(polar(hip, -1.72, M.torso), [s.fs * 1.2, 0]);
+    const m = trunk(M, sh, hip, [-1, 0], .25, s.jig.m);
+    const leg = (B, J, ax, ax2, pref) => {
+      J.ankle = [ax, FY - B.r.foot[0]]; J.knee = meet(J.hip, B.thigh, J.ankle, B.shin, pref); J.toe = [J.ankle[0] + pref[0] * B.foot * .8, FY - 1.2];
+      J.ankle2 = [ax2, FY - B.r.foot[0]]; J.knee2 = meet(J.hip, B.thigh, J.ankle2, B.shin, pref); J.toe2 = [J.ankle2[0] + pref[0] * B.foot * .8, FY - 1.2];
+    };
+    leg(F, f, fhip[0] + 6, fhip[0] - 1, [1, 0]); leg(M, m, hip[0] + 4, hip[0] + 13, [-1, 0]);
+    m.hand = [WX + 1.5, fsh[1] - 4]; m.elbow = meet(sh, M.uarm, m.hand, M.farm, [.2, 1]);   // 벽을 짚은 손
+    f.hand = add(m.waist, [2, 1 + s.fs]); f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [0, 1]);   // 남자 허리를 끌어당김
+    return { m, f, act: 'm', dir: [-1, 0], fore: 1 };
+  },
 };
+// 애무 체위 (그날 밤 앞부분) — 장소마다
+const FORE_POSES = { bed: ['kissOver', 'neckKiss', 'backHug', 'lapHug'], stand: ['wallKiss'] };
 // 체위 바꿀 때: 두 체위의 관절을 k만큼 섞음
 function blendPose(A, B, k) {
   const mix = (a, b) => { const o = {}; for (const key in b) o[key] = Array.isArray(a[key]) && Array.isArray(b[key]) ? lerp(a[key], b[key], k) : b[key]; return o; };
@@ -554,7 +627,9 @@ function headReact(J, k, bury, jx, jy) {
   if (!bury) J.waist = add(J.waist, J.front, 2.6 * k);
   if (J.breast) J.breast = add(J.breast, [jx * .5, jy * .5]);
 }
-const POSE_LABEL = { missionary: '정상위', doggy: '후배위', cowgirl: '기승위', prone: '엎드려서', reverse: '역기승위', lotus: '좌위', legsUp: '굴곡위', seated: '뒤로 앉기', wall: '벽에 기대어', standBack: '뒤에서 선 채로', seatLap: '변기에 앉아' };
+const POSE_LABEL = { missionary: '정상위', doggy: '후배위', cowgirl: '기승위', prone: '엎드려서', reverse: '역기승위', lotus: '좌위', legsUp: '굴곡위', seated: '뒤로 앉기', wall: '벽에 기대어', standBack: '뒤에서 선 채로', seatLap: '변기에 앉아',
+  kissOver: '애무 · 포개어 키스', neckKiss: '애무 · 목덜미', backHug: '애무 · 백허그', lapHug: '애무 · 무릎 위 끌어안기', wallKiss: '애무 · 벽 키스' };
+const isFore = name => !!name && POSE_LABEL[name] && POSE_LABEL[name].startsWith('애무');
 // 절정 때 상대 고개: 엎드린 체위는 베개에 파묻고, 나머지는 뒤로 젖힘
 const BURY = { doggy: 1, prone: 1, standBack: 1 };
 // 초상화 속 인물: 상대가 받는 쪽이면 부딪힐 때마다 밀렸다 돌아오고(방향은 체위마다), 움직이는 쪽(기승위·역기승위·좌위·뒤로 앉기)이면 박자를 따라 오르내림
@@ -562,15 +637,16 @@ const BURY = { doggy: 1, prone: 1, standBack: 1 };
 const PUSH = { missionary: [0, -1], legsUp: [0, -1], doggy: [.55, -.6], prone: [.35, -.65], cowgirl: [0, .6], reverse: [0, .6], lotus: [0, .5], seated: [0, .6], wall: [-.2, -.9], standBack: [.55, -.6], seatLap: [0, .6] };
 // 섹스 기술 등급(F~SSS)에 따라 받는 쪽 더미가 반응하는 모양 — 같은 체위라도 천차만별
 //   [마중(깊이 들어올 때 골반을 맞춰 밀어붙임, −면 살짝 피함), 휨(가슴을 내밀고 허리가 휨), 골반 굴림, 다리 떨림, 고개 젖힘]
-//   F·E: 뻣뻣하게 버티다 살짝 피함 / D·C: 약하게 휨 / B·A: 마중하며 허리가 휨 / S 이상: 크게 휘고 골반을 굴리며 다리가 떨리고 고개를 젖힘
-const REACT = [[-1.2, 0, 0, 0, .1], [-.6, .3, 0, 0, .2], [.3, .8, .2, 0, .4], [.8, 1.4, .4, .1, .6], [1.4, 2.2, .7, .25, .9],
-  [2, 3, 1, .45, 1.2], [2.6, 3.8, 1.4, .7, 1.5], [3, 4.4, 1.7, .9, 1.8], [3.4, 5, 2, 1.1, 2.1]];
+//   F·E: 몸을 웅크리고(− 휨) 고개를 숙인 채 뒤로 빼며 버팀 / D·C: 약하게 휨 / B·A: 마중하며 허리가 휨 / S 이상: 활처럼 크게 휘고 골반을 굴리며 다리가 떨리고 고개를 한껏 젖힘
+const REACT = [[-2.2, -.8, 0, 0, -.35], [-1.3, -.25, 0, 0, -.1], [0, .5, .1, 0, .25], [.8, 1.3, .4, .1, .55], [1.5, 2.3, .8, .3, .9],
+  [2.2, 3.3, 1.2, .55, 1.3], [3, 4.5, 1.7, .9, 1.85], [3.6, 5.5, 2.2, 1.2, 2.35], [4.2, 6.5, 2.7, 1.5, 2.85]];
 // 초상화 배경과 시점 (체위마다): pillow 위에서 내려다봄(베개·시트) / side 베개에 볼을 묻음 / board 앞에서 봄(헤드보드) / ceil 아래에서 올려다봄(천장·조명) / close 마주 보고 가까이(창·달빛)
 //   r 기울기, k 확대, x·y 옮김 (초상화 단위)
 const VIEW = { missionary: { v: 'pillow', r: -6, k: 1, x: 0, y: 0 }, legsUp: { v: 'pillow', r: 5, k: 1, x: 0, y: 0 }, prone: { v: 'side', r: 14, k: 1.02, x: 4, y: 4 },
   doggy: { v: 'board', r: -4, k: 1.02, x: -2, y: 4 }, cowgirl: { v: 'ceil', r: 0, k: 1.04, x: 0, y: -3 }, reverse: { v: 'ceil', r: 4, k: 1.02, x: 2, y: -2 },
   seated: { v: 'ceil', r: -3, k: 1.02, x: -1, y: -1 }, lotus: { v: 'close', r: 0, k: 1.08, x: 0, y: 2 },
-  wall: { v: 'close', r: 2, k: 1.06, x: 0, y: 1 }, standBack: { v: 'board', r: -6, k: 1.02, x: -2, y: 4 }, seatLap: { v: 'close', r: 0, k: 1.08, x: 0, y: 2 } };
+  wall: { v: 'close', r: 2, k: 1.06, x: 0, y: 1 }, standBack: { v: 'board', r: -6, k: 1.02, x: -2, y: 4 }, seatLap: { v: 'close', r: 0, k: 1.08, x: 0, y: 2 },
+  kissOver: { v: 'pillow', r: -3, k: 1.06, x: 0, y: 1 }, neckKiss: { v: 'pillow', r: 9, k: 1.04, x: 2, y: 1 }, backHug: { v: 'close', r: -4, k: 1.04, x: 0, y: 1 }, lapHug: { v: 'close', r: 0, k: 1.08, x: 0, y: 2 }, wallKiss: { v: 'close', r: 3, k: 1.08, x: 0, y: 1 } };
 // 서서 하는 곳은 초상화 배경도 그 장소 (골목 벽돌 / 화장실 타일)
 const viewOf = (name, kind) => kind === 'alley' ? 'brick' : kind === 'toilet' ? 'tile' : (VIEW[name] || VIEW.missionary).v;
 // 성격별로 고를 확률
@@ -581,11 +657,22 @@ const POSE_W0 = { missionary: 2, doggy: 1.5, cowgirl: 1.5, prone: 1, lotus: 1.2,
 // 체위 고르기 (not: 방금 한 체위는 빼고). 주소에 ?pose=doggy 처럼 고정 가능
 function pickPose(personality, not) {
   const forced = FORCE_POSE || (location.search.match(/[?&]pose=(\w+)/) || [])[1];
-  if (forced && POSES[forced] && (!POOL || POOL.includes(forced))) return forced;
+  if (forced && POSES[forced] && !isFore(forced) && (!POOL || POOL.includes(forced))) return forced;
   if (POOL) { const ks = POOL.length > 1 ? POOL.filter(k => k !== not) : POOL; return ks[Math.floor(Math.random() * ks.length)]; }   // 서서 하는 곳: 그 장소의 체위만
   const w = POSE_W[personality] || POSE_W0, ks = Object.keys(w).filter(k => k !== not);
   let r = Math.random() * ks.reduce((a, k) => a + w[k], 0);
   return ks.find(k => (r -= w[k]) < 0) || ks[0];
+}
+// 애무 체위 고르기: 서서 하는 곳은 벽 키스, 침대는 성격대로 (수줍으면 포개어 키스·백허그, 대담하면 무릎 위)
+const FORE_W = { shy: { kissOver: 3, backHug: 2.5, neckKiss: 1, lapHug: .5 }, bold: { lapHug: 3, neckKiss: 2, kissOver: 1, backHug: 1 }, playful: { lapHug: 2, backHug: 2, kissOver: 1.5, neckKiss: 1.5 } };
+function pickFore(personality) {
+  const forced = FORCE_POSE || (location.search.match(/[?&]pose=(\w+)/) || [])[1];
+  const pool = POOL ? FORE_POSES.stand : FORE_POSES.bed;
+  if (forced && pool.includes(forced)) return forced;
+  if (pool.length === 1) return pool[0];
+  const w = FORE_W[personality] || {}, ks = pool;
+  let r = Math.random() * ks.reduce((a, k) => a + (w[k] ?? 1.5), 0);
+  return ks.find(k => (r -= (w[k] ?? 1.5)) < 0) || ks[0];
 }
 // 캡슐 윗면의 y (x에서). 없으면 Infinity
 function capTop([ax, ay, bx, by, ra, rb], x) {
@@ -637,8 +724,10 @@ function nightPlan(sc, tier, personality) {
   const fl = sc.flow || { dur: [2, 4, 7, 10, 13][tier], early: tier === 0, grade: 3, minor: Math.max(0, tier - 1), mid: tier >= 3 ? 1 : 0, major: tier >= 4 ? 1 : 0 };
   const gi = fl.grade ?? 3, T = Math.max(fl.early ? 5 : 8, fl.dur * 60 / SPEED);
   const Tb = .64 - .028 * gi, Tf = .38 - .018 * gi, jit = gi <= 2 ? .22 : gi <= 5 ? .1 : .05, A0 = 2.6 + .45 * gi;
-  const S = [], poses = [{ name: pickPose(personality), at: 0 }];
-  let t = .9, end = Infinity, bc = 0;   // 처음 0.9초: ♂♀가 양쪽에서 들어와 맞물림
+  // 애무: 맞물리기 전 앞부분 FP초 — 등급이 높을수록 길게 (일찍 끝나는 밤·급한 곳은 짧게). 그 뒤 1.3초 동안 첫 체위로 옮기며 다가감
+  const FP = (fl.early ? 2.4 : Math.min(Math.max(3, T * (.08 + .02 * gi)), 4 + 1.5 * gi)) * (sc.quick ? .6 : 1);
+  const S = [], poses = [{ name: pickFore(personality), at: 0, fore: true }, { name: pickPose(personality), at: FP }];
+  let t = FP + 1.3, end = Infinity, bc = 0;   // 애무가 끝나고 1.3초: ♂♀가 다가와 맞물림
   const add = (T, A, kind = 'n', o) => { S.push(Object.assign({ t0: t, T, A, kind }, o)); t += T; };
   // 박자의 세부 시간 (from 이후만 새로 계산 — 진행 중인 박자는 건드리지 않음)
   const fix = from => {
@@ -679,20 +768,21 @@ function nightPlan(sc, tier, personality) {
   // 일정
   const types = [].concat(Array(fl.minor || 0).fill('minor'), Array(fl.mid || 0).fill('mid'), Array(fl.major || 0).fill('major'))
     .map(ty => ({ ty, k: { minor: 0, mid: 1, major: 2 }[ty] + Math.random() * 1.6 })).sort((a, b) => a.k - b.k);
-  const N = types.length, a0 = T * .14, a1 = T * .94, gap = (a1 - a0) / Math.max(1, N - 1);
-  const ev = types.map((x, i) => ({ kind: 'climax', ty: x.ty, at: N === 1 ? T * .7 : a0 + gap * i + (Math.random() - .5) * gap * .4 }));
+  const O = t, N = types.length, a0 = O + T * .14, a1 = O + T * .94, gap = (a1 - a0) / Math.max(1, N - 1);   // O: 애무 뒤 첫 박자
+  const ev = types.map((x, i) => ({ kind: 'climax', ty: x.ty, at: N === 1 ? O + T * .7 : a0 + gap * i + (Math.random() - .5) * gap * .4 }));
   const np = fl.early ? 1 : Math.max(1, Math.min(5, 1 + Math.floor(fl.dur / 4)));
-  for (let i = 1; i < np; i++) ev.push({ kind: 'pose', at: T * i / np });
+  for (let i = 1; i < np; i++) ev.push({ kind: 'pose', at: O + T * i / np });
   ev.sort((a, b) => a.at - b.at);
   for (const e of ev) {
     if (e.kind === 'pose') { cruise(e.at); e.start = t; poses.push({ name: pickPose(personality, poses[poses.length - 1].name), at: t }); add(1.3, 4, 'shift'); continue; }
     cruise(e.at - CLIMAX[e.ty].W); e.start = t; build(e.at); climax(e.ty);
   }
-  cruise(T - 2.5); const fe = { kind: 'end', start: t }; ev.push(fe); build(T); finale(false);
+  cruise(O + T - 2.5); const fe = { kind: 'end', start: t }; ev.push(fe); build(O + T); finale(false);
+  ev.unshift({ kind: 'fore', start: FP + .6 });   // ⏩ 애무 건너뛰기
   fix(0);
   let done = false;
   return {
-    S, poses, fl, end: () => end, total: () => end,
+    S, poses, fl, fore: FP, end: () => end, total: () => end,
     // ⏩ 건너뛰기: 다음 일(절정 앞에서 빨라지기 시작·체위 바꾸기·마무리) 직전까지
     next: tt => { if (done) return null; const e = ev.find(x => x.start > tt + 1.2); return e ? e.start - .6 : null; },
     // 종료: 지금 박자는 마저 하고 나머지(절정·체위 바꾸기)를 지운 뒤 마무리
@@ -721,7 +811,9 @@ function run(stage, job, done) {
   const plan = nightPlan(sc, tier, p.personality), S = plan.S, SLUMP = .7, AFTER = SLUMP + (good ? 1.9 : 2.3);
   let end = plan.end(), END = end + AFTER;
   // 섹스 기술 등급: 부딪힘의 찰짐(snap), 절정 반응의 크기
-  const gi = plan.fl.grade ?? 3, snap = .7 + .07 * gi;
+  const gi = plan.fl.grade ?? 3, snap = .7 + .07 * gi, FP = plan.fore;
+  // 등급별 반응 폭: lowS(F·E) 서툴러서 뻣뻣·시큰둥 / hiS(S 이상) 녹아내림. skillK: 하트·반응 배수
+  const lowS = gi <= 1, hiS = gi >= 6, skillK = .35 + gi * .21, band3 = gi <= 2 ? 'low' : gi >= 6 ? 'high' : 'mid';
   // 체위: 일정대로 바뀌고, 바뀔 때 1.1초 동안 관절을 이어 옮김
   let pi = 0, poseName = plan.poses[0].name;
   stage.dataset.pose = poseName;
@@ -734,33 +826,34 @@ function run(stage, job, done) {
   showPose();
   const HB = [null, null, { n: .6, strong: 4, fount: 7 }, { n: 1.5, strong: 7, fount: 14 }, { n: 2.6, strong: 10, fount: 22, ring: 12 }][tier];
   const n = CX.length, y = new Float64Array(n), v = new Float64Array(n), surf = new Float64Array(n), sv = new Float64Array(n), rest = new Float64Array(n), hemL = new Float64Array(n), DT = 1 / 240;
-  const ms = { d: 0, tr: 0, slump: 0, sink: 0, bs: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } };
+  const ms = { d: 0, tr: 0, slump: 0, sink: 0, bs: 0, fs: 0, fk: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } };
   // 출렁이는 살: 붙은 관절이 갑자기 서거나 움직이면 관성으로 어긋났다가 용수철처럼 돌아옴
   const blobs = [['f', 'butt', 'hip'], ['f', 'breast', 'chest'], ['m', 'butt', 'hip']].map(([w, k, at]) => ({ w, k, at, o: [0, 0], v: [0, 0], p1: null, p2: null }));
-  // 오른쪽 위 ♂♀: ♂ 화살표는 d를 따라 드나들고, ♀ 원은 부딪힐 때 눌렸다 튕김(symE), 밀림(symX)
-  const sym = stage.querySelector('.nt-sym'), sq = c => sym.querySelector(c), symM = sq('.sy-m'), symC = sq('.sy-fill'), symG = sq('.sy-glow'), symH = sq('.sy-h');
-  // 화살 길이는 남자 크기(cm)에 비례: 보통(14cm)부터 고리를 꿰뚫고 나감
+  // 오른쪽 위 ♂♀: 분홍 벽(♀ 기호가 묻혀 있음)의 틈으로 ♂ 화살이 파고듦 — 틈이 벌어지고 출렁임(symE), 벽 가장자리가 눌렸다 돌아옴(symX)
+  const sym = stage.querySelector('.nt-sym'), sq = c => sym.querySelector(c), symM = sq('.sy-m'), symG = sq('.sy-glow'), symH = sq('.sy-h');
+  // 화살 길이는 남자 크기(cm)에 비례
   const cm = sc.cm || { small: 11, avg: 14, large: 17, xlarge: 20 }[sc.size] || 14, grade = sizeGrade(cm), shaft = 10 + 1.7 * cm;
-  // ♂ 화살: 원(반지름 13.5, 굵기 5.2) → 굵은 대(7) → 큰 촉(높이 20) (촉 밑동 hb, 끝 ht). 길이는 크기(cm)에 비례
+  // ♂ 화살: 원(반지름 13.5, 굵기 5.2) → 굵은 대(7) → 큰 촉(높이 20) (촉 밑동 hb, 끝 ht). 길이는 크기(cm)에 비례 — 그림은 오른쪽을 보게 그리고 좌우로 뒤집어 왼쪽(벽)을 향함
   const MR = 13.5, MO = MR + 2.6, hb = MR + shaft - 13, ht = MR + shaft;
   sq('.sy-shaft').setAttribute('width', f(hb - MR + .5));
   sq('.sy-head').setAttribute('d', `M${f(hb - 2)},-10 L${f(ht)},0 L${f(hb - 2)},10 Q${f(hb + 2.6)},0 ${f(hb - 2)},-10 Z`);
   sq('.sy-hh').setAttribute('d', `M${f(hb)},-7 L${f(ht - 3.4)},-1.3`);
-  // ♀ 고리: 반지름 15를 옆으로 돌려 가로 폭은 0.78배. 맞닿음 = ♂ 원 바깥이 고리 왼쪽(뒤쪽) 끝에 걸림
-  const FR = 12, RX0 = FR * .78, GX0 = 106 - RX0 - MO + 1;   // ♀ 고리 반지름 12 (예전 15의 0.8배)
-  const E = Object.fromEntries(['back', 'fr', 'spec', 'cross', 'rip', 'tak', 'spark', 'g1', 'g2', 'ouch'].map(k => [k, sq('.sy-' + k)])), GB = sym.querySelector('#syBack'), GF = sym.querySelector('#syFront');
+  // 다 들어갔을 때의 깊이 (크기에 비례, 틈 안쪽 끝은 넘지 않음) → d = 0일 때 ♂ 원 중심 GX0
+  const DEPTH = Math.min(SY_WE - SY_IN - 4, Math.max(8, shaft * .62)), GX0 = SY_WE - DEPTH + ht;
+  const E = Object.fromEntries(['wall', 'flush', 'crack', 'crackhl', 'edge', 'femg', 'tak', 'spark', 'g1', 'g2', 'ouch'].map(k => [k, sq('.sy-' + k)])), WCL = sq('.sy-wclip');
+  let ax = null, av = 0, lastTip = null;   // 화살은 용수철처럼 목표 자리를 따라감 (살짝 넘었다 돌아와서 탄력 있게)
   // 받아들일 수 있는 세기: 체형이 가늘수록 낮음. 크기 × 세기가 넘으면 움찔, 아니면 하트
   const limit = { slim: 1.85, avg: 2.15, fit: 2.25, chubby: 2.35 }[sc.build] || 2.15, symHearts = [], symHS = sq('.sy-hs');
   let symE = 0, symEV = 0, symX = 0, symXV = 0, ouchAt = -9, beatK = 0, beatKV = 0, beatTxt = '', impT = -9, impS = 0, impExit = false, lastGx = null, lastHb = null, gv = 0;
   const beatEl = sq('.sy-beat'), sqEl = sq('.sy-sq'), drops = [];
-  let peakUntil = -9, peakKind = '', sqBig = false, sqUntil = -9, lastSq = -9, ringX = 106, ringY = 28, ringRX = 9, ringRY = 12;   // 상대 절정: 초상화·♀ 물
+  let peakUntil = -9, peakKind = '', sqBig = false, sqUntil = -9, lastSq = -9, ringX = SY_WE, ringY = SY_Y, ringRX = 1, ringRY = 1;   // 상대 절정: 초상화·틈 입구의 물
   let t = 0, si = 0, hi = 0, sinkV = 0, bsV = 0, jy = 0, jyV = 0, jx = 0, jxV = 0, heat = 0, shakeAt = -9, shakeK = 0, buzz = 0, fount = 0;
   let P = null, capsM = [], capsF = [], lastD = 0, dEnd = null, faceKey = '', finale = false, acc = 0, last = 0;
   // 초상화 속 인물 (상대 = p): 몸 figX·figY, 머리 늦음 hd, 가슴 출렁 bY (가슴이 클수록 크고 느리게)
   const her = p.gender === 'f' ? 'f' : 'm', chest = ((G && G.look(p) || {}).body || {}).chest, cupK = her === 'f' ? ({ small: .7, large: 1.35 }[chest] || 1) : 0;
   let figX = 0, figY = 0, figVX = 0, figVY = 0, lastVY = 0, hd = 0, hdV = 0, hdR = 0, bY = 0, bV = 0, figEl = null, headEls = [], bustEl = null, bustK = 1, bustCy = 0;
   // 평소 반응 (절정 말고): 섹스 기술 등급·크기에 따라 달아오르는 속도(ar)와 표정·움찔(아픔)·헉·하트가 다름
-  let ar = 0, gaspAt = -9, jolt = 0, lastPop = 0;
+  let ar = 0, gaspAt = -9, jolt = 0, lastPop = 0, lastFH = 0;
   const vw = Object.assign({}, VIEW[poseName] || VIEW.missionary), pops = stage.querySelector('.nt-pops');
   if (face) face.dataset.view = viewOf(poseName, stage.dataset.kind);
   function pop(txt, cls) {
@@ -863,6 +956,7 @@ function run(stage, job, done) {
     if (t >= end) pool = NARR.after[good ? 'good' : 'bad'];
     else if (t < peakUntil) pool = NARR.climax[peakKind] || NARR.climax.minor;
     else if (t < 5) pool = NARR.start[good ? 'good' : 'bad'];
+    else if (t < FP + .6 && NARR.fore) pool = NARR.fore[band3];
     else if (Math.random() < .4 && NARR.pose[poseName]) pool = NARR.pose[poseName][band === 'low' ? 0 : 1];
     else pool = NARR.band[band];
     const txt = pickOf(stand ? (pool || []).filter(x => !BEDWORD.test(x)) : pool);   // 골목·화장실엔 이불·침대 말 없이
@@ -910,16 +1004,16 @@ function run(stage, job, done) {
     if (hudEl) hudEl.hidden = !on;
   }
   // 받는 쪽 더미의 반응 (섹스 기술 등급 × 달아오른 정도). mine: 상대가 움직이는 쪽(기승위 등)이면 마중 대신 골반을 더 굴림
-  function herMotion(J, mine, dir) {
-    const R = REACT[Math.max(0, Math.min(8, gi))], e = (good ? .35 + .65 * ar : .3) * (t < end ? 1 : Math.max(0, 1 - (t - end) / SLUMP));
+  function herMotion(J, mine, dir, fore) {
+    const R = REACT[Math.max(0, Math.min(8, gi))], e = (lowS ? .75 : good ? .35 + .65 * ar : .3) * (t < end ? 1 : Math.max(0, 1 - (t - end) / SLUMP)) * (fore ? .6 : 1);   // 서툴면 만족감과 상관없이 뻣뻣
     if (e <= 0 || !J || !J.front) return;
-    const deep = Math.max(0, 1 - Math.max(0, ms.d) / 10), toHim = [-dir[0], -dir[1]];
+    const deep = fore ? 0 : Math.max(0, 1 - Math.max(0, ms.d) / 10), toHim = [-dir[0], -dir[1]];
     const meetA = R[0] * e * deep * (mine ? .3 : 1);
     for (const [k, w] of [['hip', 1], ['butt', 1], ['waist', .6], ['chest', .3], ['breast', .3], ['sh', .25], ['knee', .3]]) if (J[k]) J[k] = add(J[k], toHim, meetA * w);
     const arch = R[1] * e * (.55 + .45 * Math.sin(t * (2 + gi * .25)));   // 물결처럼 휘었다 풀림
     for (const [k, w] of [['chest', .7], ['breast', .8], ['sh', 1], ['neck', 1], ['head', 1], ['elbow', .5], ['hand', .2]]) if (J[k]) J[k] = add(J[k], J.front, arch * w);
     if (J.head) J.head = add(J.head, J.front, -R[4] * e * (.6 + .4 * Math.sin(t * 3.7)) * 1.6);   // 고개를 젖힘
-    const rw = 3.2 + gi * .2, rl = R[2] * e * (mine ? 1.5 : 1);   // 골반을 둥글게 굴림
+    const rw = 3.2 + gi * .2, rl = R[2] * e * (mine ? 1.5 : 1) * (fore ? .4 : 1);   // 골반을 둥글게 굴림 (애무 중엔 살짝 몸을 비트는 정도)
     for (const k of ['hip', 'butt']) if (J[k]) J[k] = add(add(J[k], dir, Math.sin(t * rw) * rl), J.front, Math.cos(t * rw) * rl * .6);
     if (ar > .35) { const sh2 = R[3] * e * (ar - .35) * 2; for (const [k, ph] of [['knee', 0], ['ankle', 1.3], ['toe', 2.1]]) if (J[k]) J[k] = add(J[k], [Math.sin(t * 47 + ph), Math.cos(t * 53 + ph)], sh2); }   // 다리가 떨림
   }
@@ -942,7 +1036,7 @@ function run(stage, job, done) {
       const u = Math.min(1, (t - end) / SLUMP);
       return [dEnd + (-1 - dEnd) * ease(u), 0, ease(u)];
     }
-    if (t < s.t0) return [0, 0, 0];
+    if (t < s.t0) { const k = Math.max(0, (t - FP) / Math.max(.1, s.t0 - FP)); return [t < FP ? 7 : 7 * (1 - ease(k)), 0, 0]; }   // 애무 중엔 떨어져 있다가 다가감
     const tau = t - s.t0, rel = s.t0 + s.T - (s.kind === 'final' ? .14 : 0), u = t - s.hit;
     if (s.kind === 'shift') { const k = Math.min(1, tau / s.T); lastD = s.from + (s.to - s.from) * ease(k) + 9 * Math.sin(Math.PI * k); return [lastD, 0, 0]; }   // 체위 바꾸기: 잠깐 떨어졌다가
     const squish = s.top * .08 * Math.exp(-u * 18) * Math.sin(6.283 * 7 * u);   // 부딪힌 뒤 살이 눌렸다 튕김
@@ -976,15 +1070,15 @@ function run(stage, job, done) {
   const at = (arr, x) => { const k = Math.max(0, Math.min(n - 1.001, (x - CX[0]) / (CX[n - 1] - CX[0]) * (n - 1))), i = Math.floor(k); return arr[i] + (arr[i + 1] - arr[i]) * (k - i); };
   const actHip = () => P[P.act].hip;
   const burstAt = (cnt, o) => { for (let j = 0; j < cnt; j++) { const x = actHip()[0] - 30 + Math.random() * 60; heart(x, at(y, x) - 6, typeof o === 'function' ? o(j) : o); } };
-  // ♀ 고리 위로 튀어나오는 작은 하트
+  // 벽 위로 튀어나오는 작은 하트
   function symHeart() {
     const el = document.createElementNS(NS, 'use');
     el.setAttribute('href', '#ntH');
     symHS.appendChild(el);
     const side = Math.random() < .5 ? -1 : 1;
-    symHearts.push({ el, t0: t, x: 106 + side * (4 + Math.random() * 6), dx: side * (10 + Math.random() * 18), dy: -(4 + Math.random() * 7), s: .36 + Math.random() * .2 });   // 고리 위에서 양옆으로 퐁퐁
+    symHearts.push({ el, t0: t, x: SY_WE - 8 - Math.random() * 30, y: SY_Y - 8, dx: side * (6 + Math.random() * 12), dy: -(10 + Math.random() * 12), s: .36 + Math.random() * .2 });   // 분홍 벽 위로 퐁퐁
   }
-  // ♀ 고리에서 물이 뿜어져 나옴: 고리 오른쪽 아래에서 위·오른쪽으로 부채꼴 (pw: 세기)
+  // 틈 입구에서 물이 뿜어져 나옴: 위·오른쪽으로 부채꼴 (pw: 세기)
   function squirt(cnt, pw) {
     for (let j = 0; j < cnt; j++) {
       const el = document.createElementNS(NS, 'path');
@@ -997,7 +1091,7 @@ function run(stage, job, done) {
   }
   // 상대 절정 (소·중·대): 초상화·고개·떨림·♀ 고리·물·하트가 크기마다 다름
   function climax(s) {
-    const ty = s.her, big = ty === 'major', mid = ty === 'mid', amp = .65 + .045 * gi;   // 등급이 높을수록 반응이 큼
+    const ty = s.her, big = ty === 'major', mid = ty === 'mid', amp = .5 + .08 * gi;   // 등급이 높을수록 반응이 큼 (F 0.5배 ~ SSS 1.1배)
     if (SY) say(pickOf(SY.climax[ty]), 'peak', big ? 2.2 : 1.5);
     if (face) { face.classList.remove('flash'); void face.offsetWidth; face.classList.add('flash'); }   // 절정 순간에만 번쩍 (헉·움찔로 표정이 바뀔 때마다 번쩍이지 않게)
     if (DETAIL) {
@@ -1015,25 +1109,25 @@ function run(stage, job, done) {
     symEV += big ? 34 : mid ? 22 : 14; heat = 1;
     if (ty !== 'minor') { sqUntil = s.t0 + s.T - .1; sqBig = big; squirt(big ? 22 : 11, big ? 1.3 : 1.05); }
     if (big) { flashK = 1; shakeAt = t; shakeK = Math.max(shakeK, 1.5); }
-    for (let j = big ? 4 : mid ? 2 : 1; j > 0; j--) symHeart();
-    if (HB || ty !== 'minor') burstAt(big ? 6 : mid ? 4 : 2, () => ({ s: .8 + Math.random() * .5, dy: -(50 + Math.random() * 30) }));
+    for (let j = Math.round((big ? 4 : mid ? 2 : 1) * skillK); j > 0; j--) symHeart();
+    if (HB || ty !== 'minor') burstAt(Math.round((big ? 6 : mid ? 4 : 2) * skillK), () => ({ s: .8 + Math.random() * .5, dy: -(50 + Math.random() * 30) }));
     if (big && s.count) for (let j = 0; j < 12; j++) { const a = Math.PI * (1.05 + .9 * j / 11), r = 46 + Math.random() * 16, hx = actHip()[0]; heart(hx, at(y, hx) - 4, { dx: Math.cos(a) * r, dy: Math.sin(a) * r * .8 - 10, s: .8 + Math.random() * .3, life: 1.3 }); }
   }
   function impact(s) {
     const str = (s.kind === 'final' ? 2.2 : s.kind === 'strong' ? 1.8 : Math.min(1.2, .45 + .75 * s.A / 7)) * (s.her || s.fin ? 1 : snap);   // 찰짐: 섹스 기술 등급
     sinkV += 40 * str; bsV -= 24 * str; symEV += 17 * str; symXV += 55 * str; beatKV += 9 * str;
-    impT = t; impS = Math.min(1.4, str); impExit = GX0 + ht > 106 + RX0 + 1;   // 탁: 부딪힘 선·물결, 촉이 고리 밖으로 나가면 반짝
+    impT = t; impS = Math.min(1.4, str); impExit = DEPTH > 18;   // 탁: 틈 입구의 부딪힘 선, 깊이 들어가면 반짝
     const force = str * (.55 + .1 * grade);
     const lim = limit * (1 + gi * .03);   // 섹스 기술이 높을수록 상대가 받아들일 수 있게 맞춰 줌
     if (force > lim) { ouchAt = t; symXV += 60 * str; symEV -= 8; }   // 움찔
-    else if (good) for (let j = Math.round(force / 1.2 * [0, 0, 1, 1.6, 2.3][tier]); j > 0; j--) symHeart();
+    else if (good) for (let j = Math.round(force / 1.2 * [0, 0, 1, 1.6, 2.3][tier] * skillK); j > 0; j--) symHeart();
     // 평소 반응: 크기가 체형에 맞을수록(받아들일 수 있는 세기의 80~100%) 빨리 달아오르고 가끔 헉, 넘치면 움찔(질끈 감은 눈), 작으면 잘 못 느낌. 섹스 기술이 높을수록 빨리
     if (!s.her) {
       const fr = force / lim, sizeK = fr > 1 ? .45 : fr > .8 ? 1.3 : fr > .45 ? 1 : .55;
-      ar = Math.min(1, ar + .04 * (.35 + gi * .13) * sizeK * (good ? 1 : .35) * (s.kind === 'n' ? 1 : 1.6));
+      ar = Math.min(1, ar + .04 * (.1 + gi * .22) * sizeK * (good ? 1 : .35) * (s.kind === 'n' ? 1 : 1.6));   // F는 거의 안 오르고 SSS는 금방 (약 18배)
       lastFr = fr;
       if (fr > 1) { stats.ouch++; figVY -= 45 * str; jolt -= .5; if (t - lastPop > .5) pop('!', 'ow'); if (SY && t - lastSay > 1.2 && Math.random() < .6) say(pickOf(SY.ouch), 'ow', 1.1); }
-      else if (good && fr > .8 && (s.kind !== 'n' || Math.random() < .1 + gi * .03)) { stats.gasp++; gaspAt = t; jolt += .4; if (t - lastPop > .6) pop(ar > .5 ? '♡' : '!?', 'gasp'); if (SY && t - lastSay > 1 && Math.random() < .5) say(pickOf(SY.gasp), 'gasp', .9); }
+      else if (good && !lowS && (fr > .8 || (hiS && fr > .5)) && (s.kind !== 'n' || Math.random() < .06 + gi * .04)) { stats.gasp++; gaspAt = t; jolt += .4; if (t - lastPop > .6) pop(ar > .5 ? '♡' : '!?', 'gasp'); if (SY && t - lastSay > 1 && Math.random() < .5) say(pickOf(SY.gasp), 'gasp', .9); }
       // 디테일: 내가 남긴 자국이 하나씩 (목 → 쇄골 → 가슴 위 → 어깨 손자국은 아주 달아올랐을 때)
       if (DETAIL && good && s.kind !== 'n' && ar > .45 && t - lastMk > 3 && mkN < (ar > .8 ? 7 : 6) && Math.random() < .5) { mkN++; lastMk = t; pop('💋', 'love'); }
     }
@@ -1057,8 +1151,8 @@ function run(stage, job, done) {
     heat = Math.max(heat, good ? Math.min(1, .3 + .3 * str) : .12);
     if (s.her) { climax(s); return; }
     if (!HB) return;
-    if (s.kind === 'n') { const m = HB.n * (Math.min(1, s.t0 / 30) * .6 + .4); burstAt(Math.floor(m) + (Math.random() < m % 1 ? 1 : 0), {}); }
-    else burstAt(HB.strong, () => ({ s: .95 + Math.random() * .45, dy: -(60 + Math.random() * 26) }));
+    if (s.kind === 'n') { const m = HB.n * skillK * (Math.min(1, (s.t0 - FP) / 30) * .6 + .4); burstAt(Math.floor(m) + (Math.random() < m % 1 ? 1 : 0), {}); }
+    else burstAt(Math.round(HB.strong * skillK), () => ({ s: .95 + Math.random() * .45, dy: -(60 + Math.random() * 26) }));
     if (s.kind === 'final' && HB.ring) for (let j = 0; j < HB.ring; j++) { const a = Math.PI * (1.05 + .9 * j / (HB.ring - 1)), r = 46 + Math.random() * 16, hx = actHip()[0]; heart(hx, at(y, hx) - 4, { dx: Math.cos(a) * r, dy: Math.sin(a) * r * .8 - 10, s: .8 + Math.random() * .3, life: 1.3 }); }
   }
   // 실망: 초상화를 가리키는 말풍선(…), 만족감이 아주 낮으면 깨진 하트
@@ -1076,9 +1170,12 @@ function run(stage, job, done) {
     bsV += (-300 * ms.bs - 18 * bsV) * DT; ms.bs += bsV * DT;
     jyV += (-900 * jy - 24 * jyV) * DT; jy += jyV * DT;
     jxV += (-700 * jx - 20 * jxV) * DT; jx += jxV * DT;
-    Object.assign(ms, { d, tr, slump });
+    // 애무 박자: 서툴면 들쭉날쭉 꼼지락, 능숙하면 느리고 고르게. 애무 중엔 달아오름이 등급만큼 오름 (F는 거의 그대로, SSS는 반쯤)
+    const fs = lowS ? .6 * Math.sin(t * 2.7) + .4 * Math.sin(t * 7.9 + 1) : Math.sin(t * (1.5 + gi * .06));
+    Object.assign(ms, { d, tr, slump, fs, fk: Math.min(1, ar * 1.6) });
+    if (!settle && t < FP) ar = Math.min(.62, ar + DT * (.0075 + .0034 * gi) * (good ? 1 : .4));
     P = poseNow();
-    if (!settle) herMotion(P[her], P.act === her, P.dir);
+    if (!settle) herMotion(P[her], P.act === her, P.dir, !!P.fore);
     if (react && !settle) {   // 상대 절정: 고개를 젖히거나 베개에 파묻고 부들부들
       const a = t - react.t0, env = Math.min(1, a / .15) * (t < react.hold ? 1 : Math.max(0, 1 - (t - react.hold) / .7));
       if (env <= 0 && t > react.hold) react = null;
@@ -1104,8 +1201,9 @@ function run(stage, job, done) {
       hdR = react ? react.k * Math.max(0, Math.min(1, (t - react.t0) / .15)) * (t < react.hold ? 1 : Math.max(0, 1 - (t - react.hold) / .7)) : hdR * .96;   // 절정: 고개가 젖혀짐
       if (quiv && t < quiv.until) figX += quiv.amp * 6 * Math.sin(t * 88);
       jolt *= Math.exp(-DT * 6);
-      if (t < end && t > 1.5) {   // 달아오를수록 하트·땀이 자주, 시큰둥하면 가끔 '…'
-        if (good && ar > .55 && t - lastPop > 2.8 - ar * 1.4) pop(ar > .85 && Math.random() < .4 ? '💦' : '♡', 'love');
+      if (t < end && t > 1.5) {   // 달아오를수록 하트·땀이 자주, 시큰둥하면 가끔 '…'. 서툴면(F·E) 만족감과 상관없이 '…·?' / 능숙하면(S 이상) 일찍부터 하트
+        if (lowS && t - lastPop > 2.3) pop(pickOf(['…', '?', '😐', '…', '😅']), 'meh');
+        else if (good && (ar > .55 || (hiS && ar > .15)) && t - lastPop > (hiS ? 2 : 2.8) - ar * 1.4) pop(ar > .85 && Math.random() < .4 ? '💦' : t < FP ? (Math.random() < .5 ? '💋' : '♡') : hiS && Math.random() < .35 ? '💕' : '♡', 'love');
         else if (!good && t - lastPop > 3.2) pop('…', 'meh');
       }
       const tv = VIEW[poseName] || VIEW.missionary, e = Math.min(1, DT * 3);
@@ -1114,10 +1212,14 @@ function run(stage, job, done) {
       pv += (pt - pv) * Math.min(1, DT * 3);
       // 말풍선: 달아오를수록 자주. 소리 절반 / 짧은 말 절반 (만족감 단계별 · 실제로 튀어나오는 말 · 사이별, tier 3 이상이면 가끔 성격별 말)
       if (SY && t < end && t > 1.2 && t - lastSay > (good ? 3.4 - ar * 1.7 : 4.6) && t >= peakUntil) {
-        if (Math.random() < .48) say(pickOf(SY.moan[!good ? 'bad' : ar < .3 ? 'low' : ar < .65 ? 'mid' : 'high']), 'moan', 1.2);
+        if (t < FP + .6 && SY.fore) say(pickOf(SY.fore[band3]), band3 === 'low' ? 'meh' : '', 1.6);   // 애무 중 (등급마다 전혀 다른 말)
+        else if (SY.skill && (lowS || hiS) && Math.random() < .3) say(pickOf(SY.skill[lowS ? 'low' : 'high']), lowS ? 'meh' : '', 1.6);
+        else if (Math.random() < .48) say(pickOf(SY.moan[!good ? 'bad' : ar < .3 ? 'low' : ar < .65 ? 'mid' : 'high']), 'moan', 1.2);
         else say(tier >= 3 && SY.pers[p.personality] && Math.random() < .25 ? SY.pers[p.personality] : pickOf(linePool()), '', 1.8);
       }
       stats.maxPl = Math.max(stats.maxPl, pv);
+      if (t < FP && good && gi >= 4 && t - lastFH > 2.4 - gi * .15 - ar) { lastFH = t; symHeart(); }   // 능숙한 애무: 분홍 벽 위로 하트가 퐁퐁
+      if (DETAIL && t < FP && sfxG && t - lastSfx > (lowS ? 2.2 : 1.7 - .08 * gi)) { const hh = P.m.head; sfxAt(lowS && Math.random() < .4 ? '꾹' : '쪽', hh[0] - 4, hh[1] - 10, .8); }   // 입맞춤 소리
       if (DETAIL) {
         // 숨: 달아오를수록 빠르게 (절정·끝난 뒤엔 더 가쁘게). 내쉴 때 이불 장면 머리맡에 숨결
         brPh += DT * 6.283 * (.35 + ar * .9 + (t < peakUntil ? .5 : 0) + (t > end && t < end + 3 ? .4 : 0));
@@ -1180,9 +1282,11 @@ function run(stage, job, done) {
     if (t - ouchAt < .45) return 'wince';   // 아픔·너무 꽉 참
     if (t - gaspAt < .32) return 'gasp';    // 헉
     if (!good) return t / end < (tier ? .4 : .25) ? 'p0' : 'bored';
+    if (lowS && (t < FP ? Math.floor(t / 2.2) % 2 : Math.sin(t * .9) > .65)) return 'bored';   // 서툴면 가끔 딴생각 (애무 중엔 자주)
     const cur = S[si];
     if (cur.fin && cur.kind !== 'n') return 'p3';   // 마무리 (같이)
-    return ar < .15 ? 'p0' : ar < .4 ? 'p1' : ar < .7 ? 'p2' : 'p3';   // 달아오른 정도 (섹스 기술·크기에 따라 빠르기가 다름)
+    const sh = hiS ? .12 : gi >= 4 ? .05 : lowS ? -.12 : 0;   // 능숙할수록 같은 달아오름에도 표정이 먼저 풀림
+    return ar < .15 - sh ? 'p0' : ar < .4 - sh ? 'p1' : ar < .7 - sh ? 'p2' : 'p3';   // 달아오른 정도 (섹스 기술·크기에 따라 빠르기가 다름)
   }
   const curve = Q => Q.slice(0, -1).map((b, i) => {
     const a = Q[i - 1] || b, c = Q[i + 1], e = Q[i + 2] || c;
@@ -1274,33 +1378,43 @@ function run(stage, job, done) {
       for (const el of headEls) el.setAttribute('transform', `translate(0,${f(hd)}) rotate(${f(tilt)} 60 104)`);
       if (bustEl) { const ly = bY * bustK, sy = 1 - bY * .03; bustEl.setAttribute('transform', `translate(0,${ly.toFixed(2)}) translate(60 ${bustCy}) scale(${(1 + bY * .012).toFixed(4)} ${sy.toFixed(4)}) translate(-60 ${-bustCy})`); }
     }
-    // ♂ 화살은 d를 따라 드나들고 맞닿으면 ♂ 원이 고리 뒤쪽 끝에 탁 걸림(더 밀면 고리째 밀려남). 만족감이 낮으면 끝나고 빠지며 고개를 숙임
+    // ♂ 화살은 d를 따라 틈으로 드나듦 — 용수철처럼 목표를 따라가 살짝 넘었다 돌아오고, 들어가면 틈이 벌어지며 벽 가장자리가 눌렸다 출렁임. 만족감이 낮으면 끝나고 빠지며 고개를 숙임
     const intro = ease(Math.min(1, t / .8)), u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0;
-    const gx = Math.max(MO + 2, GX0 - 2.6 * Math.max(-2.5, ms.d + (good ? 0 : 14 * ease(u)))) - (1 - intro) * 80;   // 크게 빼고, 걸릴 때까지 밀어붙임
-    const ouch = t - ouchAt < .6 ? 1 - (t - ouchAt) / .6 : 0, jit = ouch * 1.6 * Math.sin((t - ouchAt) * 190);
-    const qv = quiv && t < quiv.until ? quiv.amp * Math.sin(t * 82) : 0;   // 절정: ♀ 고리가 바르르 (대절정은 크게)
-    const rx = RX0 * (1 - .32 * symE) * (1 - .1 * ouch) * (1 + qv), ry = FR * (1 + .28 * symE) * (1 - .1 * ouch) * (1 - qv);
-    const press = Math.max(0, gx + MO - (106 + symX - rx));   // ♂ 원이 고리를 누르는 만큼 고리가 밀림
-    const cx0 = 106 + symX + jit + press + (1 - intro) * 50, cy0 = 28 + ms.tr * .8;
-    // 화살 속도(잔상)·촉 밑동이 고리 끝을 지날 때 고리가 꿀렁 벌어짐·안에 있을 땐 화살이 고리를 끌고 감
-    const fdt = lastGx == null ? 0 : 1 / 60;
+    // 애무 중: 화살은 벽 앞에서 머뭇거리며 가장자리를 톡톡 (서툴면 들쭉날쭉, 능숙하면 부드럽게) → 끝나면 용수철처럼 틈으로
+    const foreW = SY_WE + ht + 4 + 2.6 * ms.fs - 1.5 * ms.fk, fk2 = t < FP ? 1 : Math.max(0, 1 - (t - FP) / .5);
+    const want = Math.min(136, (GX0 + 2.6 * Math.max(-2.5, ms.d + (good ? 0 : 14 * ease(u))) + symX * .3) * (1 - fk2) + foreW * fk2) + (1 - intro) * 60;
+    if (ax == null) ax = want;
+    const fdt = 1 / 60;
+    av += ((want - ax) * 900 - av * 21) * fdt; ax += av * fdt;
+    const gx = ax, tip = gx - ht, ouch = t - ouchAt < .6 ? 1 - (t - ouchAt) / .6 : 0, jit = ouch * 1.6 * Math.sin((t - ouchAt) * 190);
+    const qv = quiv && t < quiv.until ? quiv.amp * Math.sin(t * 82) : 0;   // 절정: 벽이 바르르 (대절정은 크게)
+    const cy0 = SY_Y + ms.tr * .6, depth = Math.max(0, SY_WE - tip), inK = Math.min(1, depth / 10);
+    const push = Math.max(0, -ms.d) * .9 * inK + symX * .45 + jit + qv * 18;   // 벽 가장자리가 안쪽으로 눌린 정도
+    const open = .7 + 2.9 * inK + 1.4 * Math.max(0, symE) + ouch * .8 + Math.abs(qv) * 6 + (gi >= 4 ? ar * (gi - 3) * .22 : 0);   // 틈 입구가 벌어진 반높이 (능숙할수록 달아오르며 더 벌어짐)
+    // 벽 가장자리: 구불구불 + 틈 둘레만 눌리고 출렁임
+    const pts = [];
+    for (let yy = -2; yy <= 66; yy += 4) { const near = Math.exp(-(((yy - cy0) / 11) ** 2)); pts.push([SY_WE + 2.4 * Math.sin(yy * .32 + 1) + 1.2 * Math.sin(yy * .71) - push * near + symE * 1.6 * near * Math.sin(t * 26 + yy * .2), yy]); }
+    const near0 = 1, mx = SY_WE + 2.4 * Math.sin(cy0 * .32 + 1) + 1.2 * Math.sin(cy0 * .71) - push * near0;
+    // 틈: 안쪽 끝은 실금, 입구로 갈수록 벌어짐. 화살이 들어간 만큼은 대 굵기만큼 벌어짐
+    const hAt = x => { let h = .35 + (open - .35) * Math.pow(Math.max(0, (x - SY_IN) / Math.max(1, mx - SY_IN)), .7); if (depth > 0 && x >= tip - 2) h = Math.max(h, 3.9 + Math.max(0, symE) * .5); return h; };
+    const xs = Array.from({ length: 10 }, (_, k) => SY_IN + (mx - SY_IN) * k / 9), topL = xs.map(x => [x, cy0 - hAt(x)]), botL = xs.map(x => [x, cy0 + hAt(x)]).reverse();
+    const hm = hAt(mx), crackD = `M${f(SY_IN)},${f(cy0)} L${topL.map(p => f(p[0]) + ',' + f(p[1])).join(' L')} L${f(mx + 2.5)},${f(cy0 - hm * .9)} L${f(mx + 2.5)},${f(cy0 + hm * .9)} L${botL.map(p => f(p[0]) + ',' + f(p[1])).join(' L')} Z`;
+    const wallD = `M-2,-2 L${f(pts[0][0])},${f(pts[0][1])}${curve(pts)} L-2,66 Z`;
+    E.wall.setAttribute('d', wallD + crackD); E.flush.setAttribute('d', wallD + crackD); WCL.setAttribute('d', wallD);
+    E.crack.setAttribute('d', crackD);
+    E.crackhl.setAttribute('d', `M${topL.slice(2).map(p => f(p[0]) + ',' + f(p[1] - .5)).join(' L')} M${botL.slice(0, -2).map(p => f(p[0]) + ',' + f(p[1] + .5)).join(' L')}`);
+    const up = pts.filter(p => p[1] < cy0 - hm - 2), dn = pts.filter(p => p[1] > cy0 + hm + 2);
+    E.edge.setAttribute('d', (up.length > 1 ? `M${f(up[0][0])},${f(up[0][1])}${curve(up)}` : '') + (dn.length > 1 ? ` M${f(dn[0][0])},${f(dn[0][1])}${curve(dn)}` : ''));
+    E.femg.setAttribute('transform', `translate(${f(-push * .12 + jit * .3)},${f(Math.max(0, symE) * .5)})`);   // 벽에 묻힌 ♀도 같이 들썩
+    // 화살 속도(잔상) · 촉이 입구를 지날 때 틈이 꿀렁 · 들어가 있으면 미는 만큼 벽이 눌림
     gv = lastGx == null ? 0 : gv * .6 + .4 * (gx - lastGx) / fdt;
-    const hbX = gx + hb, edge = cx0 - rx;
-    if (lastHb != null && (lastHb - edge) * (hbX - edge) < 0) symEV += 5;
-    if (gx + ht > edge) symXV += Math.max(-300, Math.min(300, gv)) * .012;
-    lastGx = gx; lastHb = hbX;
-    symM.setAttribute('transform', `translate(${f(gx)},${f(28 + ms.tr * 1.6)}) rotate(${f(good ? 0 : 35 * ease(u))})`);
-    [[E.g1, .03, .22], [E.g2, .06, .12]].forEach(([el, k, o]) => { el.setAttribute('cx', f(gx - gv * k)); el.setAttribute('cy', f(28 + ms.tr * 1.6)); el.setAttribute('opacity', (gv > 80 ? Math.min(o, gv / 2500) : 0).toFixed(2)); });
-    // 고리: 뒤쪽 반(왼쪽, 어둡게·가늘게) / 앞쪽 반(오른쪽, 밝게·굵게) + 앞쪽 하이라이트, 그라데이션은 고리를 따라 옮김
-    const RP = a => `${f(cx0 + rx * Math.cos(a))},${f(cy0 + ry * Math.sin(a))}`, Pi = (a, k) => `${f(cx0 + (rx - k) * Math.cos(a))},${f(cy0 + (ry - k) * Math.sin(a))}`, rad = d => d * Math.PI / 180;
-    E.back.setAttribute('d', `M${RP(rad(-90))} A${f(rx)},${f(ry)} 0 0 0 ${RP(rad(90))}`);
-    E.fr.setAttribute('d', `M${RP(rad(-90))} A${f(rx)},${f(ry)} 0 0 1 ${RP(rad(90))}`);
-    E.spec.setAttribute('d', `M${Pi(rad(-62), 1)} A${f(rx - 1)},${f(ry - 1)} 0 0 1 ${Pi(rad(-18), 1)}`);
-    for (const [g, x1, x2] of [[GB, cx0 - rx, cx0], [GF, cx0, cx0 + rx]]) { g.setAttribute('x1', f(x1)); g.setAttribute('x2', f(x2)); }
-    E.cross.setAttribute('d', `M${f(cx0)},${f(cy0 + ry)} V${f(cy0 + ry + 13)} M${f(cx0 - 6)},${f(cy0 + ry + 6.8)} H${f(cx0 + 6)}`);
-    symC.setAttribute('cx', f(cx0)); symC.setAttribute('cy', f(cy0)); symC.setAttribute('rx', f(rx)); symC.setAttribute('ry', f(ry));
-    ringX = cx0; ringY = cy0; ringRX = rx; ringRY = ry;
-    // ♀ 물방울: 포물선으로 튀고 떨어지며 흐려짐 (날아가는 쪽으로 길쭉)
+    if (lastTip != null && (lastTip - mx) * (tip - mx) < 0) symEV += 6;
+    if (depth > 0) symXV += Math.max(-300, Math.min(300, -gv)) * .01;
+    lastGx = gx; lastTip = tip;
+    symM.setAttribute('transform', `translate(${f(gx)},${f(cy0)}) scale(-1,1) rotate(${f(good ? 0 : 35 * ease(u))})`);
+    [[E.g1, .03, .22], [E.g2, .06, .12]].forEach(([el, k, o]) => { el.setAttribute('cx', f(gx - gv * k)); el.setAttribute('cy', f(cy0)); el.setAttribute('opacity', (Math.abs(gv) > 80 ? Math.min(o, Math.abs(gv) / 2500) : 0).toFixed(2)); });
+    ringX = mx + 1; ringY = cy0; ringRX = 1; ringRY = hm;
+    // 물방울: 포물선으로 튀고 떨어지며 흐려짐 (날아가는 쪽으로 길쭉)
     for (let i = drops.length - 1; i >= 0; i--) {
       const d = drops[i], a = t - d.t0, k = a / d.life;
       if (k >= 1) { d.el.remove(); drops.splice(i, 1); continue; }
@@ -1308,28 +1422,25 @@ function run(stage, job, done) {
       d.el.setAttribute('transform', `translate(${f(x)},${f(yy)}) rotate(${f(Math.atan2(vy, vx) * 57.3)}) scale(${(d.s * (1 + Math.min(.6, Math.hypot(vx, vy) / 260))).toFixed(2)},${d.s.toFixed(2)})`);
       d.el.setAttribute('opacity', (k < .08 ? k / .08 : k > .55 ? (1 - k) / .45 : 1).toFixed(2));
     }
-    symC.setAttribute('opacity', (good ? .15 + heat * .85 : .1).toFixed(2)); symG.setAttribute('opacity', Math.min(1, Math.max(good ? heat : heat * .3, flashK)).toFixed(2));
-    // 탁: 맞닿은 곳에서 위아래로 튀는 선 + 고리가 퍼지는 물결 + (꿰뚫었으면) 촉 끝 반짝
-    const ia = t - impT, rip = E.rip, tak = E.tak, spk = E.spark;
+    E.flush.setAttribute('opacity', Math.min(.6, Math.max(good ? heat * .42 : heat * .12, flashK * .5)).toFixed(2)); symG.setAttribute('opacity', Math.min(1, Math.max(good ? heat : heat * .3, flashK)).toFixed(2));
+    // 탁: 틈 입구에서 위아래로 튀는 선 + (깊이 들어가면) 입구 반짝
+    const ia = t - impT, tak = E.tak, spk = E.spark, rad = d => d * Math.PI / 180;
     if (ia < .42) {
-      const k = ia / .42;
-      rip.setAttribute('cx', f(cx0)); rip.setAttribute('cy', f(cy0)); rip.setAttribute('rx', f(rx * (1 + k * 1.1))); rip.setAttribute('ry', f(ry * (1 + k * .8)));
-      rip.setAttribute('stroke-width', f(2.4 * (1 - k))); rip.setAttribute('opacity', ((1 - k) * .7 * impS).toFixed(2));
-      const r1 = 3 + k * 9, r2 = r1 + 5 * (1 - k), px = edge - 1;
-      tak.setAttribute('d', [-128, -100, -72, 72, 100, 128].map(dg => { const a = rad(dg); return `M${f(px + r1 * Math.cos(a))},${f(cy0 + r1 * Math.sin(a))} L${f(px + r2 * Math.cos(a))},${f(cy0 + r2 * Math.sin(a))}`; }).join(''));
+      const k = ia / .42, r1 = 3 + k * 9, r2 = r1 + 5 * (1 - k), px = mx + 1;
+      tak.setAttribute('d', [-52, -80, -108, 52, 80, 108].map(dg => { const a = rad(dg); return `M${f(px + r1 * Math.cos(a))},${f(cy0 + r1 * Math.sin(a))} L${f(px + r2 * Math.cos(a))},${f(cy0 + r2 * Math.sin(a))}`; }).join(''));
       tak.setAttribute('opacity', (Math.max(0, 1 - ia / .3) * impS).toFixed(2));
-      if (impExit) { const tx = gx + ht + 1, s2 = (k < .3 ? k / .3 : 1) * 4.5 * (1 - k * .5); spk.setAttribute('d', `M${f(tx)},${f(cy0 - s2)} Q${f(tx + .6)},${f(cy0 - .6)} ${f(tx + s2)},${f(cy0)} Q${f(tx + .6)},${f(cy0 + .6)} ${f(tx)},${f(cy0 + s2)} Q${f(tx - .6)},${f(cy0 + .6)} ${f(tx - s2)},${f(cy0)} Q${f(tx - .6)},${f(cy0 - .6)} ${f(tx)},${f(cy0 - s2)} Z`); spk.setAttribute('opacity', (1 - k).toFixed(2)); }
-    } else { rip.setAttribute('opacity', '0'); tak.setAttribute('opacity', '0'); spk.setAttribute('opacity', '0'); }
+      if (impExit) { const tx = mx + 4, s2 = (k < .3 ? k / .3 : 1) * 4.5 * (1 - k * .5); spk.setAttribute('d', `M${f(tx)},${f(cy0 - s2)} Q${f(tx + .6)},${f(cy0 - .6)} ${f(tx + s2)},${f(cy0)} Q${f(tx + .6)},${f(cy0 + .6)} ${f(tx)},${f(cy0 + s2)} Q${f(tx - .6)},${f(cy0 + .6)} ${f(tx - s2)},${f(cy0)} Q${f(tx - .6)},${f(cy0 - .6)} ${f(tx)},${f(cy0 - s2)} Z`); spk.setAttribute('opacity', (1 - k).toFixed(2)); }
+    } else { tak.setAttribute('opacity', '0'); spk.setAttribute('opacity', '0'); }
     E.ouch.setAttribute('opacity', ouch.toFixed(2));
     // 박자 아이콘: 💓 → 💓💓 → 🔥 → (끝나면) ✨. 부딪힐 때마다 통통
-    const bc = S[si], bt = t >= end + .3 ? (good ? '✨' : '') : t < peakUntil ? '💦' : bc.kind !== 'n' ? '🔥' : bc.T > .44 ? '💓' : bc.T > .3 ? '💓💓' : '🔥';
+    const bc = S[si], bt = t >= end + .3 ? (good ? '✨' : '') : t < peakUntil ? '💦' : !bc || t < bc.t0 ? '💋' : bc.kind !== 'n' ? '🔥' : bc.T > .44 ? '💓' : bc.T > .3 ? '💓💓' : '🔥';
     if (bt !== beatTxt) { beatTxt = bt; beatEl.textContent = bt; }
-    beatEl.setAttribute('transform', `translate(20,55) scale(${(1 + .35 * Math.max(-.5, beatK)).toFixed(3)})`);
+    beatEl.setAttribute('transform', `translate(140,55) scale(${(1 + .35 * Math.max(-.5, beatK)).toFixed(3)})`);
     for (let i = symHearts.length - 1; i >= 0; i--) {
       const h = symHearts[i], k = (t - h.t0) / .9;
       if (k >= 1) { h.el.remove(); symHearts.splice(i, 1); continue; }
       const m = 1 - (1 - k) ** 2;
-      h.el.setAttribute('transform', `translate(${f(h.x + h.dx * m)},${f(cy0 - ry + h.dy * m)}) scale(${(h.s * (k < .15 ? k / .15 : 1)).toFixed(3)})`);
+      h.el.setAttribute('transform', `translate(${f(h.x + h.dx * m)},${f(h.y + h.dy * m)}) scale(${(h.s * (k < .15 ? k / .15 : 1)).toFixed(3)})`);
       h.el.setAttribute('opacity', (k > .6 ? (1 - k) / .4 : 1).toFixed(2));
     }
     sym.style.transform = sk > .02 ? `translate(${f(cx * 1.2)}px,${f(cy * 1.2)}px)` : '';
@@ -1366,6 +1477,6 @@ window.Night = {
   run, stop: () => { cancelAnimationFrame(raf); ender = skipper = null; }, finish: () => !!ender && ender(), skip: () => !!skipper && skipper(),
   poseLabel: POSE_LABEL,
   // 실험용: 체위 이름과 움직임 상태 → 관절 좌표
-  pose: (name, st = {}) => POSES[name](Object.assign({ d: 0, tr: 0, slump: 0, sink: 0, bs: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } }, st), BODY.m, BODY.f),
+  pose: (name, st = {}) => POSES[name](Object.assign({ d: 0, tr: 0, slump: 0, sink: 0, bs: 0, fs: 0, fk: 0, jig: { f: { butt: [0, 0], breast: [0, 0] }, m: { butt: [0, 0], breast: [0, 0] } } }, st), BODY.m, BODY.f),
 };
 })();
