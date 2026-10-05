@@ -1155,6 +1155,9 @@ function whoIn(raw) {
 }
 const trigger = id => { if (EVENTS[id]) fire(EVENTS[id]); };
 const choicesOf = ev => ev.choices.filter(c => !c.if || c.if(S, api));
+// 등급 판정 (check: { stat, g }): 능력치가 기준 등급 g의 문턱이면 50%, 30점(한 등급쯤)마다 ±18%p, 5~95% — 선택지에 미리 보임
+const checkPct = c => clamp(Math.round(50 + ((S.stats[c.stat] || 0) - gradeMin(c.g)) * .6 + (c.bonus ? resolve(c.bonus) : 0)), 5, 95);
+const choiceLabel = c => fill(resolve(c.label)) + (c.check && c.check.g ? ` 〔🎲 ${LABEL[c.check.stat]} ${checkPct(c.check)}%〕` : '');
 
 function currentEvent() {
   const p = S.pending[0];
@@ -1170,7 +1173,7 @@ function currentEvent() {
   if (!ev) { S.pending.shift(); return currentEvent(); }
   Object.assign(S.vars, p.tv);
   const wp = p.who && person(p.who);
-  return { text: p.text, who: wp ? whoView(wp, p.id) : null, choices: choicesOf(ev).map(c => fill(resolve(c.label))) };
+  return { text: p.text, who: wp ? whoView(wp, p.id) : null, choices: choicesOf(ev).map(choiceLabel) };
 }
 // 이벤트 창 위에 보이는 사람 (나를 향한 성욕 → 표정)
 const whoView = (wp, evId) => ({ look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp), fig: figure(wp), libido: canSex(wp) ? wp.libido || 0 : 0, ctx: outfitCtx(wp, evId) });
@@ -1190,7 +1193,11 @@ function choose(i) {
   S.pending.shift();
   log('▸ ' + fill(resolve(ch.label)), { t: 'pick' });
   let o = ch;
-  if (ch.check && ch.check.dice) {   // 주사위: (능력치 lvl / 난이도) × 100 + rand(-20, 20), 5~95%
+  if (ch.check && ch.check.g) {   // 등급 판정
+    const pc = checkPct(ch.check), ok = rand(1, 100) <= pc;
+    log(`🎲 ${LABEL[ch.check.stat]} 판정 ${pc}% → ${ok ? '성공' : '실패'}`, { t: 'info' });
+    o = ok ? ch.success : ch.fail;
+  } else if (ch.check && ch.check.dice) {   // 주사위: (능력치 lvl / 난이도) × 100 + rand(-20, 20), 5~95%
     const pc = clamp(Math.round(lvl(S.stats[ch.check.stat]) / ch.check.diff * 100) + rand(-20, 20), 5, 95), roll = rand(1, 100), ok = roll <= pc;
     log(`🎲 ${LABEL[ch.check.stat]} 판정 ${pc}% → ${ok ? '성공' : '실패'}`, { t: 'info' });
     o = ok ? ch.success : ch.fail;
