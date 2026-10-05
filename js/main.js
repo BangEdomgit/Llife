@@ -384,6 +384,7 @@ function showModal(mode, title, html, closable = true, arg = null) {
 }
 function closeModal() {
   modal.hidden = true;
+  if (modalMode === 'create' || modalMode === 'quick') G.syncRegion();   // 새 인생 화면에서 미리 본 나라 → 지금 인생의 나라로
   modalMode = null; modalArg = null;
   if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
 }
@@ -726,8 +727,9 @@ const SRC = { trait: 'traits', personality: 'personalities', wealth: 'wealth', h
 let draft = null;
 const optsOf = f => f[2] || G.creation[SRC[f[0]]];
 const rnd = arr => arr[Math.floor(Math.random() * arr.length)];
-function randomDraft(mode) {
-  const d = { name: '', mode: mode || 'full', step: 0 };
+function randomDraft(mode, region) {
+  const d = { name: '', mode: mode || 'full', step: 0, region: region || G.region() };
+  G.previewRegion(d.region);   // 나라에 맞는 이름표(꿈·취미 …)로 보여 줌
   CREATE_FIELDS.forEach(f => { d[f[0]] = rnd(optsOf(f)).id; });
   return d;
 }
@@ -735,6 +737,9 @@ function openCreate(closable) {
   if (!draft) draft = randomDraft();
   if (draft.mode === 'q20' && draft.step > 0) { openQuick(closable); return; }
   const q20 = draft.mode === 'q20';
+  G.previewRegion(draft.region);
+  const regs = Object.values(G.regions), rsel = G.regions[draft.region] || regs[0];
+  const regionFld = `<div class="fld"><div class="fl"><span>나라</span></div><div class="chips mode">${regs.map(r => `<button type="button" data-region="${r.id}" aria-pressed="${r.id === draft.region}">${r.flag} ${esc(r.label)}</button>`).join('')}</div><p class="desc">${esc(rsel.desc || '')}</p></div>`;
   const fields = CREATE_FIELDS.filter(f => !q20 || Q20_FIELDS.includes(f[0])).map(f => {
     const opts = optsOf(f);
     const sel = opts.find(o => o.id === draft[f[0]]);
@@ -746,7 +751,8 @@ function openCreate(closable) {
     <div class="fld"><div class="fl"><span>시작</span></div><div class="chips mode">
       <button type="button" data-mode="full" aria-pressed="${!q20}">처음부터 (0세~)</button><button type="button" data-mode="q20" aria-pressed="${q20}">20세 시작</button></div>
       <p class="desc">${q20 ? '0~19살을 건너뛴다. 학력·능력치·몸·관계를 직접 정하고 스무 살 봄부터.' : '태어나는 순간부터. 어린 시절의 선택이 성격과 취향이 된다.'}</p></div>
-    <div class="fld"><div class="fl"><span>이름 (비우면 랜덤)</span></div><input id="cName" maxlength="6" value="${esc(draft.name)}" placeholder="예: 김하늘" autocomplete="off"></div>
+    ${regionFld}
+    <div class="fld"><div class="fl"><span>이름 (비우면 랜덤)</span></div><input id="cName" maxlength="${draft.region === 'kr' ? 6 : 12}" value="${esc(draft.name)}" placeholder="${draft.region === 'kr' ? '예: 김하늘' : '예: 에밀리 존슨'}" autocomplete="off"></div>
     ${fields}
     <div class="create-go"><button type="button" data-rall>🎲 전부 랜덤</button><button type="button" class="go" data-go>${q20 ? '다음 →' : '태어나기'}</button></div>
   </div>`, !!closable, 'create');
@@ -755,9 +761,10 @@ function createClick(b) {
   const d = b.dataset;
   const nameEl = $('#cName'); if (nameEl) draft.name = nameEl.value;
   if (d.mode) draft.mode = d.mode;
+  else if (d.region) { draft.region = d.region; G.previewRegion(d.region); }
   else if (d.cf) { const f = CREATE_FIELDS.find(x => x[0] === d.cf); draft[d.cf] = typeof optsOf(f)[0].id === 'number' ? +d.cv : d.cv; }
   else if (d.rf) { const f = CREATE_FIELDS.find(x => x[0] === d.rf); draft[d.rf] = rnd(optsOf(f)).id; }
-  else if ('rall' in d) { const n = draft.name, m = draft.mode; draft = randomDraft(m); draft.name = n; }
+  else if ('rall' in d) { const n = draft.name, m = draft.mode, r = draft.region; draft = randomDraft(m, r); draft.name = n; }
   else if ('go' in d) {
     if (draft.mode === 'q20') { quickSync(); draft.step = 1; draft.maxStep = Math.max(draft.maxStep || 1, 1); openQuick(!$('#mClose').hidden); return; }
     const opt = draft; draft = null; G.newLife(opt); closeModal(); return;
@@ -962,7 +969,7 @@ function quickClick(b) {
   if ('qback' in d) { draft.step--; if (draft.step <= 0) { draft.step = 0; openCreate(!$('#mClose').hidden); } else openQuick(); return; }
   if ('qnext' in d) { draft.step = Math.min(6, draft.step + 1); draft.maxStep = Math.max(draft.maxStep || 1, draft.step); openQuick(); return; }
   if (d.qstep) { draft.step = +d.qstep; openQuick(); return; }
-  if ('qgo' in d) { const opt = Object.assign({}, q, { name: draft.name, gender: draft.gender, month: draft.month }); draft = null; closeModal(); G.newLife20(opt); return; }   // 닫고 나서 만들어야 '나의 20년' 창이 뜸
+  if ('qgo' in d) { const opt = Object.assign({}, q, { name: draft.name, gender: draft.gender, month: draft.month, region: draft.region }); draft = null; closeModal(); G.newLife20(opt); return; }   // 닫고 나서 만들어야 '나의 20년' 창이 뜸
   if (d.qf) {
     const f = d.qf, v = QNUM.includes(f) ? +d.qv : QBOOL.includes(f) ? d.qv === '1' : d.qv;
     q[f] = v;
@@ -1060,7 +1067,7 @@ function openSlots() {
     const btns = x.current ? '<span class="tag">지금 칸 · 자동 저장</span>'
       : (x.empty ? `<button type="button" data-sv="${x.n}">여기에 저장</button><button type="button" data-snew="${x.n}">새 인생</button>`
         : `<button type="button" data-sl="${x.n}">불러오기</button><button type="button" data-sv="${x.n}">덮어쓰기</button><button type="button" data-sdel="${x.n}">지우기</button>`);
-    return `<div class="row"><div>${x.n}번 칸 · ${info}</div><div class="slot-btns">${btns}</div></div>`;
+    return `<div class="row"><div>${x.n}번 칸 · ${x.region && G.regions[x.region] ? G.regions[x.region].flag + ' ' : ''}${info}</div><div class="slot-btns">${btns}</div></div>`;
   }).join('');
   const S = G.state(), ntOk = S && !S.ended && S.age >= 20;
   showModal('slots', '💾 저장 칸', `${rows}<p class="hint">지금 칸에는 행동·턴·하루가 끝날 때마다 자동으로 저장돼. 다른 칸에 저장하면 그 칸으로 옮겨가서 이어서 저장돼.</p>` +
@@ -1219,6 +1226,24 @@ $('#sky').addEventListener('click', () => { if (app.classList.contains('off')) t
 WeatherBG.init($('#sky'));
 if (window.SceneBG) SceneBG.init($('#backdrop'));
 WeatherBG.setWeather(WX.partly.p, true);
+// 뉴욕 인생: 화면에 나오는 모든 글의 한국 낱말·원화 금액을 뉴욕식으로 (data/region.js dict, 조사 자동 — js/game.js loc)
+//   그리는 쪽은 그대로 두고, 화면에 붙는 글 조각마다 바꿈 (한 번 바꾼 글은 다시 바뀌지 않음)
+function locText(n) { const t = n.nodeValue; if (t && /[가-힣\d]/.test(t)) { const u = G.loc(t); if (u !== t) n.nodeValue = u; } }
+function locTree(root) {
+  if (G.region() === 'kr' || !root) return;
+  if (root.nodeType === 3) { locText(root); return; }
+  if (root.nodeType !== 1 || root.closest && root.closest('script,style')) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) locText(n);
+}
+new MutationObserver(ms => {
+  if (G.region() === 'kr') return;
+  for (const m of ms) {
+    if (m.type === 'characterData') locText(m.target);
+    else for (const n of m.addedNodes) locTree(n);
+  }
+}).observe(document.body, { childList: true, subtree: true, characterData: true });
+G.subscribe(S => { if (G.region() !== 'kr') locTree(document.body); });   // 나라가 바뀐 뒤 처음 그릴 때 이미 있던 글까지
 G.subscribe(render);
 if (!G.init()) openCreate(false);
 })();

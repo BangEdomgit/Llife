@@ -48,10 +48,99 @@ function josa(word, j) {
   return pair ? word + (jong ? pair[0] : pair[1]) : word + j;
 }
 function fmtMoney(v) {
+  if (REGION !== 'kr') return fmtUSD(v);
   const sign = v < 0 ? '-' : '', a = Math.abs(Math.round(v));
   if (a === 0) return '0원';
   if (a >= 10000) { const man = a % 10000; return `${sign}${Math.floor(a / 10000)}억${man ? ' ' + man.toLocaleString() + '만' : ''}원`; }
   return `${sign}${a.toLocaleString()}만원`;
+}
+
+/* ═════════ 나라 (data/region.js) ═════════
+   새 인생을 만들 때 고른 나라(S.region). 한국은 data/*.js 그대로, 뉴욕은 데이터 항목을 덮어쓰고(되돌릴 수 있게 원래 값을 기억)
+   화면 글의 한국 낱말·원화 금액을 뉴욕식으로 바꿈(loc — js/main.js가 화면에 나오는 글마다 적용) */
+const REG = D.regions || { kr: { id: 'kr' } };
+let REGION = 'kr', LOC = null;
+const ORIG = [];   // [객체, 키, 원래 값, 원래 있었나]
+function setD(obj, key, v) {
+  if (!ORIG.some(o => o[0] === obj && o[1] === key)) ORIG.push([obj, key, obj[key], key in obj]);
+  obj[key] = v;
+}
+// 원화(만원 단위) → 달러 글: 1,250달러 / 3.2만 달러 / 1.5억 달러 (조사가 '원'과 똑같이 붙도록 '달러')
+function fmtUSD(v) {
+  const d = Math.round(v * ((REG[REGION] || {}).money || 15)), sign = d < 0 ? '-' : '', a = Math.abs(d);
+  if (a === 0) return '0달러';
+  if (a >= 1e8) return `${sign}${(a / 1e8).toFixed(a >= 1e9 ? 0 : 1).replace(/\.0$/, '')}억 달러`;
+  if (a >= 1e4) return `${sign}${(a / 1e4).toFixed(a >= 1e5 ? 0 : 1).replace(/\.0$/, '')}만 달러`;
+  return `${sign}${a.toLocaleString('en-US')}달러`;
+}
+function applyRegion(id) {
+  for (let i = ORIG.length - 1; i >= 0; i--) { const [o, k, v, had] = ORIG[i]; if (had) o[k] = v; else delete o[k]; }
+  ORIG.length = 0;
+  REGION = REG[id] ? id : 'kr'; LOC = null;
+  const R = REG[REGION];
+  if (REGION === 'kr') return;
+  const P = R.patch || {};
+  const byId = (list, map) => { if (list && map) for (const x of list) if (map[x.id]) for (const k in map[x.id]) setD(x, k, map[x.id][k]); };
+  byId(D.places, P.places); byId(D.jobs, P.jobs); byId(D.hobbies, P.hobbies); byId(D.dreams, P.dreams);
+  byId(D.subjects, P.subjects); byId(D.tracks, P.tracks); byId(D.wealth, P.wealth);
+  if (R.features) setD(D, 'features', R.features);
+  if (R.dogNames) setD(D, 'dogNames', R.dogNames);
+  if (R.universities) setD(D, 'universities', R.universities);
+  if (R.departments) byId(D.departments, R.departments);
+  if (R.weather) for (const s of SEASONS) if (R.weather[s.id]) setD(s, 'weather', R.weather[s.id]);
+  if (R.names) {   // 아무 데서나 이름을 뽑을 때(인종을 모를 때)는 전체에서
+    const all = k => [...new Set(Object.values(R.names).flatMap(x => x[k]))];
+    setD(D, 'namesM', all('m')); setD(D, 'namesF', all('f')); setD(D, 'surnames', all('s'));
+  }
+  if (R.apply) R.apply(D, setD);   // 그 밖의 덮어쓰기 (data/region.js)
+}
+const NORM = k => ((REG[REGION] || {}).norms || {})[k];
+// 인종 (뉴욕만): 외모의 피부·머리색·눈동자·머리결과 이름에만 씀 — 매력 점수와 무관
+function pickEth() { const E = (REG[REGION] || {}).eth; return E ? pickKey(E) : null; }
+function nameFor(g, eth, full) {
+  const N = (REG[REGION] || {}).names;
+  if (!N) return (full ? pick(D.surnames) : '') + pick(g === 'm' ? D.namesM : D.namesF);
+  const pool = N[eth] && Math.random() < .8 ? N[eth] : N[pick(Object.keys(N))], sp = N[eth] && Math.random() < .85 ? N[eth] : N[pick(Object.keys(N))];   // 이름·성은 가끔 다른 배경에서 (섞여 사는 도시)
+  const given = pick(g === 'm' ? pool.m : pool.f);
+  return full ? `${given} ${pick(sp.s)}` : given;
+}
+// 화면 글의 한국 낱말 → 뉴욕식 (조사 자동), 원화 금액 → 달러
+const JOSA_V = { '이': '이', '가': '이', '을': '을', '를': '을', '은': '은', '는': '은', '과': '와', '와': '와', '이랑': '이랑', '랑': '이랑', '으로': '으로', '로': '으로' };
+const hasJong = w => { const c = w.charCodeAt(w.length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 > 0; };
+function fixPart(part, w) {
+  if (!part) return '';
+  if (JOSA_V[part]) return josa(w, JOSA_V[part]).slice(w.length);
+  const j = hasJong(w);
+  if (part === '이에요' || part === '예요') return j ? '이에요' : '예요';
+  if (part === '이었' || part === '였') return j ? '이었' : '였';
+  if (part === '이야') return j ? '이야' : '야';
+  if (part === '이나') return j ? '이나' : '나';
+  return part;
+}
+const PART = '이에요|이지만|이랑|이야|이었|이다|이고|이면|이라|이나|으로|에서|에게|까지|부터|처럼|보다|마다|하고|예요|랑|였|로|을|를|은|는|과|와|이|가|인|에|의|도|만|들';
+function compileLoc() {
+  const R = REG[REGION] || {}, pairs = R.dict || [], map = Object.fromEntries(pairs);
+  const esc = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const keys = pairs.map(p => p[0]).sort((a, b) => b.length - a.length);
+  const re = keys.length ? new RegExp(`(?<![가-힣A-Za-z0-9])(${keys.map(esc).join('|')})(?:(${PART})|(?![가-힣A-Za-z0-9]))`, 'g') : null;
+  const won = v => fmtUSD(v);
+  const num = x => +String(x).replace(/,/g, '');
+  return t => {
+    let u = t;
+    if (/원/.test(u)) u = u.replace(/(\d[\d,]*(?:\.\d+)?)\s?억(?:\s?(\d[\d,]*)\s?만)?\s?원/g, (m, a, b) => won(num(a) * 10000 + (b ? num(b) : 0)))
+      .replace(/(\d[\d,]*(?:\.\d+)?)\s?만\s?원/g, (m, a) => won(num(a)))
+      .replace(/(\d[\d,]*)\s?천\s?원/g, (m, a) => won(num(a) / 10))
+      .replace(/(\d[\d,]*)\s?원(?![가-힣])/g, (m, a) => won(num(a) / 10000));
+    if (re) u = u.replace(re, (m, k, part) => map[k] + fixPart(part, map[k]));
+    // '원'(받침 있음) 뒤에 붙어 있던 조사 → '달러'(받침 없음)에 맞게
+    if (/달러/.test(u)) u = u.replace(/달러(이랑|으로|을|은|과|이(?=[\s.,!?)"'…]|$))/g, (m, part) => '달러' + fixPart(part, '달러'));
+    return u;
+  };
+}
+function loc(t) {
+  if (REGION === 'kr' || typeof t !== 'string' || !t) return t;
+  if (!LOC) LOC = compileLoc();
+  return LOC(t);
 }
 
 /* ---------- 능력치 등급 ---------- */
@@ -151,6 +240,7 @@ function addPerson(spec) { return enlist(makePerson(spec || meetDefault())); }
 // 사람 한 명 만들기 (아직 관계 목록에는 안 넣음)
 function makePerson(spec) {
   const gender = spec.gender || (Math.random() < .5 ? 'm' : 'f');
+  const eth = REGION === 'kr' ? undefined : spec.eth || (spec.kind === 'family' || spec.kind === 'child' ? S.eth : null) || pickEth();   // 뉴욕: 가족은 나와 같은 배경
   let ageDiff = spec.ageDiff;
   if (ageDiff == null) {
     const r = spec.ageRange || [S.age, S.age];
@@ -160,7 +250,7 @@ function makePerson(spec) {
   const hobby = spec.hobby || (spec.hobbyW ? wpickId(D.hobbies, spec.hobbyW) : pick(D.hobbies).id);
   const p = {
     id: null, kind: spec.kind || 'friend', role: spec.role || null,
-    name: spec.name || pick(gender === 'm' ? D.namesM : D.namesF), gender, ageDiff,
+    name: spec.name || nameFor(gender, eth), gender, ageDiff, eth,
     close: spec.close ?? rand(15, 30), trust: spec.trust ?? rand(15, 30), heart: spec.heart && age >= 19 && S.age >= 19 ? spec.heart : 0, grudge: spec.grudge ?? 0,
     taken: spec.taken ?? (age >= 24 ? Math.random() < .35 : age >= 19 ? Math.random() < .15 : false),
     met: S.age, debt: 0, sibling: !!spec.sibling,
@@ -241,7 +331,7 @@ function syncMyBody() {
 // opt: Avatar.make에 더 넘길 것 (장소 분포의 체격 비중 build)
 function lookOf(p, opt) {
   if (!p.appearance && window.Avatar) {
-    p.appearance = Avatar.make(`${S.id}:${p.sk || p.id}`, p.gender, Object.assign({ feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null, personality: p.personality, hobby: p.hobby, job: p.npcJob }, opt));
+    p.appearance = Avatar.make(`${S.id}:${p.sk || p.id}`, p.gender, Object.assign({ feature: p.feature, skin: p.kind === 'family' || p.kind === 'child' ? S.skin : null, personality: p.personality, hobby: p.hobby, job: p.npcJob, eth: p.eth }, opt));
     // 최고 미녀·미남 (BEAUTY): 20~39살 남(가족·아이 아님)의 0.5%는 성격에 맞는 유형으로 설계한 얼굴 — 지나가던 사람들이 돌아보는 사람
     const ag = npcAge(p);
     if (Avatar.beauty && !p.faceFixed && !['family', 'child'].includes(p.kind) && ag >= 20 && ag < 40 && Math.random() < .005)
@@ -2692,6 +2782,8 @@ function myProfile() {
 const api = {
   rand, pick, josa, money: fmtMoney, dateDress,
   givenName: g => pick(g === 'm' ? D.namesM : g === 'f' ? D.namesF : D.namesM.concat(D.namesF)),
+  region: () => REGION, regions: REG, loc, previewRegion: id => applyRegion(id), syncRegion: () => applyRegion(S ? S.region : 'kr'), norm: NORM,
+  myGiven: () => !S ? '' : REGION === 'kr' ? (S.name.length >= 3 ? S.name.slice(1) : S.name) : S.name.split(' ')[0],
   meet: spec => addPerson(spec),
   person, npcAge, canRomance, heartOk, jailed, gradeMin, gradeOf, pGrade,
   faceStep: dir => { S.stats.face = gradeStep(S.stats.face, dir, LETTERS.indexOf('S')); },
@@ -2730,7 +2822,7 @@ const labelOf = (list, id) => (list.find(x => x.id === id) || {}).label || '';
 // 빈 인생 (0살 상태) — 새 인생·20세 시작이 같이 씀
 function blankState(opt, gender, tr, name, sib) {
   return {
-    v: 5, id: Date.now(), seq: 0, pseq: 0, xseq: 0,
+    v: 5, id: Date.now(), seq: 0, pseq: 0, xseq: 0, region: REGION, eth: REGION === 'kr' ? undefined : opt.eth || pickEth(),
     name, gender, age: 0, money: 0, ap: 0, used: 0, seasonIdx: -1, trait: tr.id,
     birthYear: rand(2000, 2006), date: null, dayN: 0, turn: 0, tkind: null, zone: 'home', fatigue: 0, meals: 0, wake: 0, worked: false, report: null,
     personality: opt.personality || pick(D.personalities).id,
@@ -2751,13 +2843,15 @@ function blankState(opt, gender, tr, name, sib) {
   };
 }
 function newLife(opt = {}) {
+  applyRegion(opt.region || 'kr');
   const gender = opt.gender === 'm' || opt.gender === 'f' ? opt.gender : (Math.random() < .5 ? 'm' : 'f');
   const tr = D.traits.find(t => t.id === opt.trait) || pick(D.traits);
-  const name = (opt.name || '').trim().slice(0, 6) || pick(D.surnames) + pick(gender === 'm' ? D.namesM : D.namesF);
+  if (REGION !== 'kr' && !opt.eth) opt = Object.assign({}, opt, { eth: pickEth() });
+  const name = (opt.name || '').trim().slice(0, REGION === 'kr' ? 6 : 12) || nameFor(gender, opt.eth, true);
   const sib = D.siblings.find(x => x.id === opt.sibling) || (Math.random() < .35 ? D.siblings[0] : pick(D.siblings.slice(1)));
   S = blankState(opt, gender, tr, name, sib);
   if (tr.start) for (const k in tr.start) S.stats[k] = COND.includes(k) ? clamp(S.stats[k] + tr.start[k], 0, 100) : S.stats[k] + tr.start[k];
-  S.look = window.Avatar ? Avatar.make(`${S.id}:me`, gender) : null;
+  S.look = window.Avatar ? Avatar.make(`${S.id}:me`, gender, { eth: S.eth }) : null;
   fitMyFace();
   S.skin = S.look ? S.look.skin : 1;
   S.frame = S.look && S.look.body.build !== 'fit' ? S.look.body.build : 'avg';
@@ -2819,7 +2913,7 @@ function customFig(g, build, c) {
 // 고른 생김새 (머리·머리색·피부·눈 + 체형). 세부(코·점·귀걸이…)는 seed로 고정 — 머리를 바꿔도 얼굴이 흔들리지 않음
 function quickLook(q) {
   if (!window.Avatar) return null;
-  const g = q.gender === 'f' ? 'f' : 'm', a = Avatar.make(`${q.seed || 'qs'}:me`, g);
+  const g = q.gender === 'f' ? 'f' : 'm', a = Avatar.make(`${q.seed || 'qs'}:me`, g, { eth: q.eth || (REGION === 'kr' ? null : S && S.eth) });
   a.xseed = String(q.seed || 'qs');
   for (const k of ['hair', 'hc', 'skin', 'eyes']) if (q[k] != null && q[k] !== '') a[k] = +q[k];
   // 직접 고른 얼굴형·눈썹·속눈썹·눈썹 진하기 (안 고르면 얼굴 유전자대로) — 생김새 등급을 맞출 때도 그대로 남음
@@ -2840,13 +2934,15 @@ const QS_TRACK = { cs: 'tech', medicine: 'life', nursing: 'life', biology: 'life
 const r1 = v => Math.round(v * 10) / 10;
 const ida = w => josa(w, '이').slice(-1) === '이' ? w + '이다' : w + '다';
 function newLife20(q = {}) {
+  applyRegion(q.region || 'kr');
   const Q = QD(), gender = q.gender === 'f' ? 'f' : 'm', opp = gender === 'm' ? 'f' : 'm';
   const tr = D.traits.find(t => t.id === q.trait) || pick(D.traits);
-  const name = (q.name || '').trim().slice(0, 6) || pick(D.surnames) + pick(gender === 'm' ? D.namesM : D.namesF);
+  const eth = REGION === 'kr' ? undefined : q.eth || pickEth();
+  const name = (q.name || '').trim().slice(0, REGION === 'kr' ? 6 : 12) || nameFor(gender, eth, true);
   const sib = D.siblings.find(x => x.id === q.sibling) || D.siblings[0];
   const hob = [...new Set((q.hobbies || []).filter(h => D.hobbies.some(x => x.id === h)))].slice(0, 2);
   const valid = (list, id) => list.some(x => x.id === id) ? id : null;
-  S = blankState({ personality: valid(D.personalities, q.personality), hobby: hob[0], value: valid(D.values, q.value), wealth: valid(D.wealth, q.wealth), dream: valid(D.dreams, q.dream), month: q.month }, gender, tr, name, sib);
+  S = blankState({ personality: valid(D.personalities, q.personality), hobby: hob[0], value: valid(D.values, q.value), wealth: valid(D.wealth, q.wealth), dream: valid(D.dreams, q.dream), month: q.month, eth }, gender, tr, name, sib);
   S.hobby2 = hob[1] || null;
   S.quickstart = true;
   // 난이도: 하드 240 · 보통 300 · 이지 360 · 샌드박스 제한 없음 (저장에 sandbox 표시 — 기록용)
@@ -3133,12 +3229,12 @@ function migrateFaces() {
   if (S.look && (S.look.gfit || 0) < FACE_V) { const inf = Avatar.faceInfo(S.look); if (inf && inf.grade === gradeOf(S.stats.face)) S.look.gfit = FACE_V; else fitMyFace(); }   // 등급이 그대로면 얼굴도 그대로
   for (const p of S.people) if (p.appearance && (p.faceG || 0) < FACE_V) faceFromLook(p);
 }
-function init() { S = load(); if (S) { migrateFaces(); after(); return true; } return false; }
+function init() { S = load(); if (S) { applyRegion(S.region); migrateFaces(); after(); return true; } return false; }
 // 저장 칸 목록 (화면용 요약)
 function slotList() {
   return Array.from({ length: SLOTS_N }, (_, i) => {
     const n = i + 1, s = n === slot && S ? S : readSlot(n);
-    return { n, current: n === slot, empty: !s, name: s && s.name, age: s && s.age, gender: s && s.gender, date: s && s.date, ended: s && s.ended, quick: !!(s && s.quickstart), sandbox: !!(s && s.sandbox) };
+    return { n, current: n === slot, empty: !s, name: s && s.name, age: s && s.age, gender: s && s.gender, date: s && s.date, ended: s && s.ended, quick: !!(s && s.quickstart), sandbox: !!(s && s.sandbox), region: s && (s.region || 'kr') };
   });
 }
 // 다른 칸으로: 비어 있으면 false (화면이 새 인생 만들기를 열고, newLife가 그 칸에 저장)
@@ -3148,8 +3244,9 @@ function useSlot(n) {
   slot = n;
   try { localStorage.setItem(SLOT_KEY, String(n)); } catch (e) { /* */ }
   const s = readSlot(n);
-  if (!s) { S = null; return false; }
+  if (!s) { S = null; applyRegion('kr'); return false; }
   S = patch(s); held = null;
+  applyRegion(S.region);
   migrateFaces();
   after();
   return true;
@@ -3159,6 +3256,9 @@ function saveTo(n) { n = clamp(+n || 1, 1, SLOTS_N); if (!S) return; slot = n; s
 function deleteSlot(n) { if (n === slot) return; try { localStorage.removeItem(slotKey(n)); } catch (e) { /* */ } emit(); }
 
 window.Game = {
+  // 나라 (data/region.js)
+  region: () => REGION, regions: REG, loc, previewRegion: id => applyRegion(id), syncRegion: () => applyRegion(S ? S.region : 'kr'), norm: NORM,
+  myGiven: () => !S ? '' : REGION === 'kr' ? (S.name.length >= 3 ? S.name.slice(1) : S.name) : S.name.split(' ')[0],
   init, subscribe: f => subs.push(f), state: () => S,
   slots: slotList, useSlot, saveTo, deleteSlot, slot: () => slot,
   newLife, choose, currentEvent,

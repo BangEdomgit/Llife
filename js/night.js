@@ -704,7 +704,7 @@ function run(stage, job, done) {
   // 아침 카드의 '어젯밤 기록' — 종료로 넘겨도 그때까지의 값
   LAST = () => ({ poses: stats.poses, ouch: stats.ouch, gasp: stats.gasp, maxPl: Math.round(stats.maxPl * 100), marks: mkN, lip: lipMe, counts: Object.assign({}, counts), dur: plan.fl.dur, early: !!plan.fl.early, pow: plan.fl.pow, grade: gradeTxt, cm, sat: sc.sat, contra: sc.contra, detail: DETAIL });
   const nameOf = () => (G && G.pname ? G.pname(p) : '');
-  const fillT = txt => String(txt).replace(/\{p\|(.)\}/g, (_, j) => (G && G.josa ? G.josa(nameOf(), j) : nameOf() + j)).replace(/\{p\}/g, nameOf()).replace(/\{me\}/g, meS && meS.name ? meS.name.slice(-2) : '너');
+  const fillT = txt => String(txt).replace(/\{p\|(.)\}/g, (_, j) => (G && G.josa ? G.josa(nameOf(), j) : nameOf() + j)).replace(/\{p\}/g, nameOf()).replace(/\{me\}/g, G && G.myGiven ? G.myGiven() || '너' : '너');
   function buildDetail() {
     dxBuilt = true;
     const hc = Avatar.topColor(G.look(p)), mc = Avatar.topColor(G.myLook()), pers = p.personality || 'warm';

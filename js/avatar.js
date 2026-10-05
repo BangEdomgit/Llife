@@ -44,23 +44,43 @@ let UID = 0;   // clipPath id (그릴 때마다 새로)
 let LOD = 2, LW = 1;
 
 /* ---------- 팔레트 ---------- */
-// 피부 4톤: 밝은, 보통, 어두운, 진한
-const SKIN = ['#f7dcc5', '#e9bf98', '#c68b60', '#8b5a3c'];
+// 피부 10톤: 0 밝은, 1 보통, 2 어두운, 3 진한 + (뉴욕 등에서) 4 아주 밝은, 5 밝은 올리브, 6 올리브, 7 따뜻한 갈색, 8 짙은 갈색, 9 아주 짙은
+//   피부색은 그림에만 쓰고 생김새 점수·등급과는 무관
+const SKIN = ['#f7dcc5', '#e9bf98', '#c68b60', '#8b5a3c', '#fbe6d6', '#efcba7', '#d6a274', '#a8693f', '#7a4a2c', '#57331f'];
 // 머리색 (2-5): 0 흑발, 1 짙은 갈색, 2 밝은 갈색, 3 회색(예전 저장), 4 와인, 5 애쉬 금발, 6 애쉬브라운, 7 구릿빛, 8 밀크티 베이지, 9 핑크 브라운,
 //   10 흑갈색, 11 밀크브라운, 12 다크초코, 13 탈색 금발, 14 애쉬그레이, 15 핑크, 16 블루블랙, 17 레드
+//   18 골든 금발, 19 밝은 금발, 20 스트로베리 블론드, 21 진저 레드, 22 적갈색(오번), 23 더티 블론드 — 타고난 색 (염색 아님)
 const HAIR = ['#23201f', '#4b3022', '#7d5536', '#a19d98', '#7e3343', '#c9a66c', '#6c625a', '#9a5a35', '#cdb594', '#9b6266',
-  '#2e2420', '#a07c5c', '#4a2c22', '#dcc38f', '#9c9ca2', '#d08aa2', '#1e2333', '#8c2f33'];
+  '#2e2420', '#a07c5c', '#4a2c22', '#dcc38f', '#9c9ca2', '#d08aa2', '#1e2333', '#8c2f33', '#d5b16e', '#e6cf9c', '#c98b58', '#a5512c', '#6c3622', '#a88a5c'];
 const GRAY = 3;
-const DYED = new Set([4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17]);   // 염색 — 정수리·가르마에 원래 머리색 뿌리가 보임
+const DYED = new Set([4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17]);   // 18~23은 타고난 색   // 염색 — 정수리·가르마에 원래 머리색 뿌리가 보임
 const HC_NAT = [0, 0, 0, 10, 10, 1, 1], HC_MILD = [6, 11, 12, 8], HC_BOLD = [13, 14, 15, 16, 17, 4, 5, 9];
 const TOP_COLORS = ['#4f6d8f', '#9a4f5f', '#5f8f6a', '#d0a443', '#ece7dd', '#3b3e48', '#8a6fb0', '#d9784a', '#6aa3c8', '#7a8a5a'];
 const UNIFORM = { blazer: '#2f3a5a', shirt: '#f3f1ec', tie: ['#9b2f3a', '#2c4a7a', '#3d6b4a'], skirt: '#3b4766' };
 const LINE = '#33241f';
-const IRIS = ['#2b1d16', '#5b3a26', '#8a5c38', '#6e5a32', '#4d4c4b'];   // 검정, 갈색, 밝은 갈색, 헤이즐(드묾), 짙은 회색(드묾)
+const IRIS = ['#2b1d16', '#5b3a26', '#8a5c38', '#6e5a32', '#4d4c4b', '#3f6fa4', '#6f9cc4', '#55794a', '#7f7440', '#76838f'];   // 검정, 갈색, 밝은 갈색, 헤이즐, 짙은 회색 + 파랑, 하늘색, 초록, 초록 헤이즐, 회색
 const METAL = ['#d8b45a', '#c9ced6'];   // 귀걸이·목걸이·안경테: 금, 은
 const WHITE = '#fbf8f4', PUPIL = '#120c09', MOUTH_IN = '#7a2f33';
 const LIPS = ['#d4707a', '#c9606b', '#b8434f', '#e0898f'];   // 어른 여자 립 색
-const NATURAL_LIP = ['#e0a49b', '#cf8f80', '#a9654f', '#7d4535'];
+const NATURAL_LIP = ['#e0a49b', '#cf8f80', '#a9654f', '#7d4535', '#e8aaa2', '#d4977f', '#b97c62', '#93573f', '#6f3d2b', '#562b1f'];
+// 배경(인종)별 타고난 색 비중 — 뉴욕처럼 섞여 사는 곳에서 피부·머리색·눈동자·머리 스타일을 고를 때만 씀 (점수와 무관)
+const ETH = {
+  white:  { skin: { 4: 3, 0: 4, 5: 2, 1: 1 }, hc: { 18: 2, 19: 1, 23: 2.5, 2: 3, 1: 3, 0: .5, 10: 1, 21: .6, 20: .5, 22: .7 }, iris: { 1: 3, 2: 2, 3: 1.5, 5: 2.5, 6: 1.5, 7: 1.2, 8: 1, 9: .8 }, lid: [2, 2, 2, 1], freckle: .14 },
+  latino: { skin: { 5: 3, 1: 3, 6: 3, 2: 2, 0: 1, 7: 1 }, hc: { 0: 4, 10: 4, 1: 3, 2: 1 }, iris: { 1: 5, 2: 3, 3: 1.5, 0: 2, 7: .3, 5: .2 }, lid: [2, 2, 2, 1], freckle: .04 },
+  black:  { skin: { 7: 3, 3: 3, 8: 3, 9: 2, 2: 1 }, hc: { 0: 7, 10: 3 }, iris: { 0: 5, 1: 4, 2: 1 }, lid: [2, 2, 2, 1], freckle: .03 },
+  asian:  { skin: { 0: 3, 1: 3, 5: 2, 6: 1, 4: 1 }, hc: { 0: 7, 10: 3, 1: 1 }, iris: { 0: 6, 1: 3 }, lid: [0, 0, 1, 1, 2], freckle: .03 },
+  mixed:  { skin: { 1: 2, 5: 2, 6: 2, 2: 2, 7: 2 }, hc: { 10: 3, 1: 3, 2: 2, 0: 2, 23: .5 }, iris: { 1: 4, 2: 3, 3: 1.5, 7: .5, 5: .3 }, lid: [2, 2, 1, 0], freckle: .08 },
+};
+// 머리 스타일 비중 (배경별): set — 이 스타일은 이 비중으로, 나머지는 기본 비중 × rest (한국식 남자 펌·쉼표머리는 kr 배율로 줄임)
+const KR_M = { comma: .3, p64: .3, p55: .3, ash: .4, cover: .4, twoblock: .5 };
+const ETH_HAIR = {
+  black:  { f: { set: { afro: 3, braids: 4, puff: 3, curlS: 2, curlL: 2 }, rest: .4 }, m: { set: { afroM: 2.5, cornrow: 2.5, fade: 3, curlS: 2, buzz: 2 }, rest: .4, k: KR_M } },
+  latino: { f: { set: { curlL: 2, wave: 2.5, curlS: 1, braids: .5, puff: .4 }, rest: 1 }, m: { set: { fade: 3, curlS: 1.2, buzz: 1.5, cornrow: .3 }, rest: 1, k: KR_M } },
+  white:  { f: { set: { wave: 2, curlL: .7 }, rest: 1 }, m: { set: { fade: 1.5, curlS: .8 }, rest: 1, k: KR_M } },
+  asian:  { f: { set: {}, rest: 1 }, m: { set: { fade: 1 }, rest: 1 } },
+  mixed:  { f: { set: { curlL: 2.5, curlS: 2, afro: 1.2, puff: 1.2, braids: 1.5 }, rest: 1 }, m: { set: { curlS: 2, afroM: 1, fade: 2.5, cornrow: .8 }, rest: 1, k: KR_M } },
+};
+const wPick = (r, w) => { const ks = Object.keys(w); let t = r() * ks.reduce((a, k) => a + w[k], 0); for (const k of ks) { t -= w[k]; if (t <= 0) return +k; } return +ks[0]; };
 
 const shade = (hex, k) => {   // k<1 어둡게, k>1 밝게
   const n = parseInt(hex.slice(1), 16);
@@ -80,7 +100,9 @@ function make(seed, gender, opt = {}) {
   const r = rng(seed), n = k => Math.floor(r() * k);
   const f = opt.feature || '', g = gender === 'f' ? 'f' : 'm';
   // 머리 스타일 (여 18 / 남 14, 비중대로) + 머리색: 자연 65% / 무난한 염색 25% / 튀는 염색 10% (직진·장난·패션 취미 ×2, 회사원·공무원·선생님·은행원 ×0.2)
-  const hw = HW[g]; let ht = r() * hw.reduce((x, y) => x + y, 0), hi = 0;
+  const EH = opt.eth && ETH_HAIR[opt.eth] ? ETH_HAIR[opt.eth][g] : null;
+  const hw = EH ? HW[g].map((x, i) => { const id = HSTYLES[g][i].id; return id in EH.set ? EH.set[id] : x * EH.rest * ((EH.k || {})[id] ?? 1); }) : HW[g];
+  let ht = r() * hw.reduce((x, y) => x + y, 0), hi = 0;
   for (; hi < hw.length - 1; hi++) { ht -= hw[hi]; if (ht <= 0) break; }
   const boldK = (['bold', 'playful'].includes(opt.personality) || opt.hobby === 'fashion' ? 2 : 1) * (/회사원|공무원|선생님|은행원/.test(opt.job || '') ? .2 : 1);
   const hcN = HC_NAT[n(HC_NAT.length)], cr = r() * (.9 + .1 * boldK), hcK = n(8);
@@ -111,6 +133,15 @@ function make(seed, gender, opt = {}) {
   if (a.g === 'f') a.body.chest = pickW([['small', 3], ['avg', 5], ['large', 2.5]]);
   else a.body.shoulder = pickW([['narrow', 2.5], ['avg', 5], ['wide', 3]]);
   if (opt.build) a.body.build = pickW(BUILD_W.map(([k, w]) => [k, w * (opt.build[k] ?? 1)]));   // 맨 끝에서 한 번 더 뽑음 (앞의 값은 그대로)
+  // 배경(인종, 뉴욕 등): 피부·타고난 머리색을 그 배경 비중으로 다시 고름 (가족은 내 피부를 그대로 받음). 맨 끝에서 뽑아 한국 사람의 생김새는 그대로
+  const E = opt.eth && ETH[opt.eth];
+  if (E) {
+    a.eth = opt.eth;
+    if (opt.skin == null) a.skin = wPick(r, E.skin); else r();
+    const nat = wPick(r, E.hc), keep = DYED.has(a.hc);
+    a.hcN = nat; if (!keep) a.hc = nat;
+    if (r() < E.freckle + (nat === 21 || nat === 20 ? .4 : 0)) a.freckles = true;
+  }
   return a;
 }
 // 세부 — make() 값에서 늘 똑같이 나옴 (예전 저장의 얼굴도 그대로 살아남)
@@ -139,6 +170,8 @@ function extras(a) {
   X.liner = r() < .45;                                         // 아이라인 꼬리 (어른 여자)
   X.glc = n(4);                                                // 안경테: 검정 / 뿔테 갈색 / 금 / 은
   X.pinC = n(TOP_COLORS.length);                               // 머리띠 색
+  const E = a.eth && ETH[a.eth];
+  if (E) { X.iris = wPick(r, E.iris); X.lid = E.lid[n(E.lid.length)]; }   // 배경별 눈동자색·쌍꺼풀 (점수와 무관)
   return X;
 }
 
@@ -576,6 +609,10 @@ const HSTYLES = {
     { id: 'curlS', label: '곱슬 숏', w: 36, ys: 72, v: 1.06, curly: true, side: 'curly', fronts: [['curly', 1]] },
     { id: 'curlL', label: '곱슬 롱', w: 37.5, ys: 78, v: 1.08, curly: true, back: 'curlLong', side: 'curly', fronts: [['curly', 2], ['none_center', 1]] },
     { id: 'tiedbob', label: '묶은 단발', w: 33, ys: 74, tie: 'stub', wisps: 3, side: 'short', fronts: [['seethrough', 2], ['none_side', 2], ['none_center', 1.5]] },
+    // (뉴욕 등) 코일리·브레이드 — 끝에 붙여 예전 번호는 그대로
+    { id: 'afro', label: '아프로', w: 42, ys: 78, v: 1.2, crown: 5, curly: true, coily: true, side: 'curly', fronts: [['curly', 1]] },
+    { id: 'braids', label: '박스 브레이드', w: 35, ys: 78, back: 'long', side: 'long', braids: true, fronts: [['none_center', 3], ['none_side', 2]] },
+    { id: 'puff', label: '하이 퍼프', w: 32.5, ys: 70, crown: 1, tie: 'puff', coily: true, wisps: 2, fronts: [['up', 2], ['none_center', 1]] },
   ],
   m: [
     { id: 'dandy', label: '댄디컷', w: 32, ys: 66, fronts: [['side_swept', 2], ['full', 1], ['seethrough', .6]] },
@@ -592,6 +629,9 @@ const HSTYLES = {
     { id: 'curlS', label: '곱슬 숏', w: 34.5, ys: 66, v: 1.05, crown: 2, curly: true, fronts: [['curly', 1]] },
     { id: 'longtie', label: '장발 묶음', w: 32.5, ys: 70, tie: 'nape', wisps: 2, fronts: [['none_center', 1], ['none_side', 1]] },
     { id: 'cover', label: '덮은 머리', w: 33, ys: 70, fronts: [['full_low', 1]] },
+    { id: 'afroM', label: '아프로', w: 37.5, ys: 66, v: 1.16, crown: 4, curly: true, coily: true, fronts: [['curly', 1]] },
+    { id: 'cornrow', label: '콘로우', w: 30.5, ys: 60, crown: 1, rows: true, fronts: [['slick', 1]] },
+    { id: 'fade', label: '하이 페이드', w: 30.5, ys: 56, crown: 2, block: true, fronts: [['short_crop', 1]] },
   ],
 };
 const HX = {   // 나이별 특수 스타일
@@ -604,7 +644,7 @@ const HX = {   // 나이별 특수 스타일
   kidlong: { id: 'kidlong', label: '긴 머리', w: 34.5, ys: 78, v: 1.06, back: 'long', side: 'long', fronts: [['full', 1], ['none_center', 1], ['seethrough', 1]] },
 };
 // 처음 고를 때 비중 (예전 일자 바가지 앞머리가 너무 많던 것 → 풀뱅은 10% 아래)
-const HW = { f: [2, 1.5, .6, 1.2, 1.5, 1, .6, .5, .8, .8, 1, .7, .5, .2, .4, .3, .3, .6], m: [2, 2, 1.5, 1, .6, .6, 1.5, 1.5, .5, 1, .6, .5, .3, 1] };
+const HW = { f: [2, 1.5, .6, 1.2, 1.5, 1, .6, .5, .8, .8, 1, .7, .5, .2, .4, .3, .3, .6, .02, .02, .02], m: [2, 2, 1.5, 1, .6, .6, 1.5, 1.5, .5, 1, .6, .5, .3, 1, .02, .02, .15] };
 // 예전 저장의 머리 번호 → 새 스타일 (hv 없음)
 const OLD_HAIR = { f: [4, 3, 0, 9, 8, 10, 6, 1, 11, 14, 0, 3], m: [7, 8, 6, 13, 10, 12, 0, 5, 11, 10] };
 const OLD_BANG = { straight: 'full', side: 'side_swept', center: 'none_center', up: 'up', see: 'seethrough', comma: 'comma', low: 'full_low', slick: 'slick', curly: 'curly' };
@@ -698,6 +738,15 @@ function lock(kind, s, L) {
   return `M${X(30)},${top} C${X(36.2)},${top + 14} ${X(35.6)},${f1(yb - 24)} ${X(34)},${yb} ${end} C${X(25.5)},${f1(yb - 22)} ${X(25)},${top + 22} ${X(26.5)},${top + 4} Z`;
 }
 // 땋은 머리: (x0,y0)에서 (x1,y1)로 내려옴. 굵기가 줄어드는 몸통 + 엇갈려 맞물리는 마디 선 + 마디마다 윤기 + 끈 + 끝 술
+// 박스 브레이드 질감: x0~x1 사이 가는 땋은 가닥들 (갈매기 무늬 + 가닥 사이 어두운 틈)
+function braidRows(x0, x1, y0, y1, hc) {
+  const gap = 3.6, d = [], g = [];
+  for (let x = x0; x <= x1; x += gap) {
+    g.push(`M${f1(x + gap / 2)},${f1(y0)} L${f1(x + gap / 2 + .6)},${f1(y1)}`);
+    for (let y = y0; y < y1; y += 2.6) d.push(`M${f1(x + .4)},${f1(y)} l${f1(gap / 2 - .4)},1.3 l${f1(gap / 2 - .4)},-1.3`);
+  }
+  return `<path d="${g.join(' ')}" stroke="${shade(hc, .45)}" stroke-width=".8" opacity=".55" fill="none"/><path d="${d.join(' ')}" stroke="${shade(hc, 1.35)}" stroke-width=".45" opacity=".45" fill="none"/>`;
+}
 function braidSVG(hc, x0, y0, x1, y1, w0, tieC) {
   const n = Math.max(4, Math.round((y1 - y0) / 6.6)), seg = (y1 - y0) / n;
   const at = t => [lerp(x0, x1, t * t), lerp(y0, y1, t)], wid = t => lerp(w0, w0 * .7, t);
@@ -747,12 +796,22 @@ function hairPieces(a, X, age, hc0, L, ctx) {
   // ── back: 묶음(정수리·반묶음·똥머리·꼬리), 뒷머리
   if (st.tie === 'high') back += `<circle cx="60" cy="${f1(top - 11)}" r="10.5" fill="${shade(hc, .92)}" ${OUT}/><path d="M52,${f1(top - 13.5)} Q57,${f1(top - 20)} 64.6,${f1(top - 17)} M51.4,${f1(top - 8.5)} Q56,${f1(top - 4)} 64,${f1(top - 6)} Q68.6,${f1(top - 8)} 68.4,${f1(top - 13)}" fill="none" stroke="${edge}" stroke-width="1" stroke-linecap="round" opacity=".45"/><path d="M53.6,${f1(top - 16)} Q58,${f1(top - 19.6)} 62.6,${f1(top - 18.6)}" fill="none" stroke="${shade(hc, 1.18)}" stroke-width="1.8" stroke-linecap="round"/>`;
   if (st.tie === 'half') back += `<circle cx="60" cy="${f1(top - 4)}" r="6.2" fill="${shade(hc, .9)}" ${OUT}/>`;
+  if (st.tie === 'puff') {   // 하이 퍼프: 정수리 위 동그란 코일리 덩어리 (가장자리가 오돌토돌)
+    const cy = top - 12, R = 13, n = 16;
+    const pts = Array.from({ length: n }, (_, i) => { const a = i / n * 6.283; return [60 + Math.cos(a) * R, cy + Math.sin(a) * R * .86]; });
+    back += `<path d="M${P(...pts[0])}${pts.slice(1).concat([pts[0]]).map(q => ` A2.9,2.9 0 0 1 ${P(...q)}`).join('')} Z" fill="${shade(hc, .95)}" ${OUT}/>` +
+      `<path d="${Array.from({ length: 12 }, (_, i) => { const a = i * 2.39, rr = R * (.25 + (i % 4) * .17); return `M${f1(60 + Math.cos(a) * rr)},${f1(cy + Math.sin(a) * rr * .8)} a1.3,1.3 0 1 1 1.8,.8`; }).join(' ')}" fill="none" stroke="${shade(hc, .6)}" stroke-width=".8" opacity=".4"/>`;
+  }
   if (st.tie === 'pony') back += `<path d="M77,36 C97,35 106,58 101,88 C99,98 96,104 92,100 L94,95 L90,96 C95,74 93,54 80,46 Z" fill="${dark}" ${OUT}/><path d="M86,42 Q99,58 96,90" fill="none" stroke="${shade(hc, 1.18)}" stroke-width="1.4" opacity=".7"/>`;
   if (st.tie === 'pigtail') for (const s of [-1, 1]) { const X0 = dx => f1(60 + s * dx); back += `<path d="M${X0(30)},70 C${X0(42)},74 ${X0(44)},92 ${X0(40)},106 C${X0(39)},110 ${X0(35)},110 ${X0(35)},106 C${X0(37)},94 ${X0(35)},82 ${X0(28)},76 Z" fill="${dark}" ${OUT}/>`; }
   if (st.tie === 'nape') back += `<path d="M80,84 C88,92 89,104 86,114 C85,117 82,117 82,114 C84,104 82,95 77,89 Z" fill="${dark}" ${OUT}/>`;   // 장발 묶음: 목덜미 꼬리가 옆으로 살짝
   if (st.tie === 'stub') back += `<path d="M82,86 C88,90 89,96 87,100 L84,99 C85,95 83,91 79,89 Z" fill="${dark}" ${OUT}/>`;   // 묶은 단발: 짧은 꽁지
   if (st.tie === 'lowbun') back += `<ellipse cx="${f1(60 + w * .78)}" cy="88" rx="5.6" ry="5" fill="${dark}" ${OUT}/>`;   // 로우번: 목덜미 번이 옆으로 살짝 보임
-  if (st.back) back += `<path d="${backHair(st.back, w, L)}" fill="${dark}" ${OUT}/>`;
+  if (st.back) {
+    const bd = backHair(st.back, w, L);
+    back += `<path d="${bd}" fill="${dark}" ${OUT}/>`;
+    if (st.braids) { const bid = `av${UID}bb`; back += `<clipPath id="${bid}"><path d="${bd}"/></clipPath><g clip-path="url(#${bid})">${braidRows(60 - w - 6, 60 + w + 6, 56, L.sy + 46, hc)}</g>`; }   // 박스 브레이드: 가는 땋은 가닥이 나란히
+  }
   else {   // 짧은 머리·묶은 머리: 귀 뒤로 내려가는 뒤통수 (옆이 수평으로 잘린 헬멧처럼 보이지 않게)
     const bw = w - .6, nb = st.buzz ? 88 : 94;
     back += `<path d="M${f1(60 - bw)},${f1(ys - 6)} C${f1(60 - bw - .4)},${f1(ys + 10)} ${f1(60 - bw * .8)},${f1(nb - 6)} ${f1(60 - bw * .56)},${nb} L${f1(60 + bw * .56)},${nb} C${f1(60 + bw * .8)},${f1(nb - 6)} ${f1(60 + bw + .4)},${f1(ys + 10)} ${f1(60 + bw)},${f1(ys - 6)} Z" fill="${st.buzz ? shade(hc, .9) : dark}"${st.buzz ? ' opacity=".55"' : ` ${OUT}`}/>`;
@@ -765,8 +824,9 @@ function hairPieces(a, X, age, hc0, L, ctx) {
   let domeD = `M${f1(60 - w)},${ys} C${f1(60 - w - 1.5 - pf)},${f1(top + 22)} ${f1(60 - w * .62)},${f1(top)} 60,${f1(top)} C${f1(60 + w * .62)},${f1(top)} ${f1(60 + w + 1.5 + pf)},${f1(top + 22)} ${f1(60 + w)},${ys}`;
   if (st.curly) {   // 곱슬: 윤곽이 동글동글
     const dl = [60 - w, ys], dc1 = [60 - w - 1.5 - pf, top + 22], dc2 = [60 - w * .62, top], dt = [60, top], pts = [];
-    for (let i = 0; i <= 6; i++) pts.push(cAt(dl, dc1, dc2, dt, i / 6));
-    for (let i = 5; i >= 0; i--) { const q = cAt(dl, dc1, dc2, dt, i / 6); pts.push([120 - q[0], q[1]]); }
+    const ns = st.coily ? 10 : 6;   // 코일리: 더 잘고 촘촘하게
+    for (let i = 0; i <= ns; i++) pts.push(cAt(dl, dc1, dc2, dt, i / ns));
+    for (let i = ns - 1; i >= 0; i--) { const q = cAt(dl, dc1, dc2, dt, i / ns); pts.push([120 - q[0], q[1]]); }
     domeD = `M${P(...pts[0])}` + pts.slice(1).map((q, i) => { const p0 = pts[i], r = Math.hypot(q[0] - p0[0], q[1] - p0[1]) * .6; return ` A${f1(r)},${f1(r)} 0 0 1 ${P(...q)}`; }).join('');
   }
   const frontEdge = (FRONTS[front === 'up' && st.gloss ? 'slick' : front] || FRONTS.up)(ys);
@@ -783,7 +843,17 @@ function hairPieces(a, X, age, hc0, L, ctx) {
     F += `<path d="M${f1(60 - w * .7)},${f1(T0 + 15)} Q${f1(60 - w * .58)},${f1(T0 + 7.4)} ${f1(60 - w * .36)},${f1(T0 + 3.6)} M${f1(60 - w * .24)},${f1(T0 + 2.2)} Q${f1(60 - w * .1)},${f1(T0 + 1.2)} ${f1(60 + w * .06)},${f1(T0 + 1.4)}` +
       (st.gloss || v >= 1.05 ? ` M${f1(60 - w * .82)},${f1(T0 + 24)} Q${f1(60 - w * .8)},${f1(T0 + 20)} ${f1(60 - w * .74)},${f1(T0 + 17.6)}` : '') + `" fill="none" stroke="${hl}" stroke-width="${st.gloss ? 2.4 : 1.9}" stroke-linecap="round" opacity="${st.gloss ? 1 : .9}"/>`;
     // 곱슬 질감
-    if (st.curly) F += `<path d="${[[44, 36], [54, 31.5], [66, 32], [76, 37], [40, 46], [50, 41.6], [62, 40.6], [72, 43.6], [81, 49]].map(([x, y]) => `M${x},${f1(y + top - 27)} a2.4,2.4 0 1 1 3.4,1.4`).join(' ')}" fill="none" stroke="${shade(hc, .6)}" stroke-width="1" stroke-linecap="round" opacity=".35"/>`;
+    if (st.curly && !st.coily) F += `<path d="${[[44, 36], [54, 31.5], [66, 32], [76, 37], [40, 46], [50, 41.6], [62, 40.6], [72, 43.6], [81, 49]].map(([x, y]) => `M${x},${f1(y + top - 27)} a2.4,2.4 0 1 1 3.4,1.4`).join(' ')}" fill="none" stroke="${shade(hc, .6)}" stroke-width="1" stroke-linecap="round" opacity=".35"/>`;
+    if (st.coily) {   // 코일리 질감: 작은 고리가 촘촘히 (가장자리 쪽은 옅게)
+      const cr = rng('coil' + plan.roll.wisp);
+      F += `<path d="${Array.from({ length: 34 }, () => { const x = 60 + (cr() * 2 - 1) * w * .92, y = top + 2 + cr() * (ys - top - 4); return `M${f1(x)},${f1(y)} a1.25,1.25 0 1 1 1.7,.7`; }).join(' ')}" fill="none" stroke="${shade(hc, .55)}" stroke-width=".75" stroke-linecap="round" opacity=".4"/>` +
+        `<path d="${Array.from({ length: 14 }, () => { const x = 60 + (cr() * 2 - 1) * w * .8, y = top + 2 + cr() * (ys - top - 8); return `M${f1(x)},${f1(y)} a1,1 0 1 1 1.4,.6`; }).join(' ')}" fill="none" stroke="${shade(hc, 1.35)}" stroke-width=".55" stroke-linecap="round" opacity=".35"/>`;
+    }
+    if (st.rows) {   // 콘로우: 이마선에서 정수리로 나란히 땋은 줄 + 줄 사이 두피
+      const rw = [-15, -9, -3, 3, 9, 15];
+      F += `<path d="${rw.map(dx => `M${f1(60 + dx * .62)},${f1(ys - 9)} Q${f1(60 + dx * .95)},${f1(top + 10)} ${f1(60 + dx * 1.1)},${f1(top - 2)}`).join(' ')}" fill="none" stroke="${skin}" stroke-width=".9" opacity=".55"/>` +
+        `<path d="${rw.slice(0, 5).map(dx => `M${f1(60 + (dx + 3) * .62)},${f1(ys - 9)} Q${f1(60 + (dx + 3) * .95)},${f1(top + 10)} ${f1(60 + (dx + 3) * 1.1)},${f1(top - 2)}`).join(' ')}" fill="none" stroke="${shade(hc, 1.3)}" stroke-width="1.6" stroke-dasharray="1.4 1.1" opacity=".55"/>`;
+    }
     // 뿌리 염색 (2-5): 염색한 사람은 가르마·정수리 둘레가 원래 머리색. 시간이 지나면 넓어짐
     const nat = a.hcN != null ? HAIR[a.hcN] : null;
     if (nat && DYED.has(a.hc) && age >= 15 && gl < .3) {
@@ -810,7 +880,8 @@ function hairPieces(a, X, age, hc0, L, ctx) {
   }
   if (st.side) {
     const ld = `${lock(st.side, -1, L)} ${lock(st.side, 1, L)}`;
-    F += `<path d="${ld}" fill="${hc}" ${OUT}/>` + (['pixie', 'short'].includes(st.side) ? '' : `<path d="M29.4,68 Q27.4,84 29.8,98 M90.6,68 Q92.6,84 90.2,98" fill="none" stroke="${shade(hc, 1.18)}" stroke-width="1.2" opacity=".6"/>`);
+    F += `<path d="${ld}" fill="${hc}" ${OUT}/>` + (st.braids ? (() => { const sid = `av${UID}sb`; return `<clipPath id="${sid}"><path d="${ld}"/></clipPath><g clip-path="url(#${sid})">${braidRows(18, 102, 60, L.sy + 40, hc)}</g>`; })()
+      : ['pixie', 'short'].includes(st.side) ? '' : `<path d="M29.4,68 Q27.4,84 29.8,98 M90.6,68 Q92.6,84 90.2,98" fill="none" stroke="${shade(hc, 1.18)}" stroke-width="1.2" opacity=".6"/>`);
     shadow += ' ' + ld;
   }
   // 잔머리 (이마선·귀 옆, 묶은 머리일수록 많이)
@@ -2341,9 +2412,10 @@ function univLogo(u, size = 40) {
 const PARTS = {
   hair: { m: HSTYLES.m.map(x => x.label), f: HSTYLES.f.map(x => x.label) },
   front: FRONT_IDS.map(id => ({ id, label: FRONT_LABEL[id] })),
-  hc: ['흑발', '짙은 갈색', '밝은 갈색', '회색', '와인', '애쉬 금발', '애쉬브라운', '구릿빛', '밀크티 베이지', '핑크 브라운', '흑갈색', '밀크브라운', '다크초코', '탈색 금발', '애쉬그레이', '핑크', '블루블랙', '레드']
+  hc: ['흑발', '짙은 갈색', '밝은 갈색', '회색', '와인', '애쉬 금발', '애쉬브라운', '구릿빛', '밀크티 베이지', '핑크 브라운', '흑갈색', '밀크브라운', '다크초코', '탈색 금발', '애쉬그레이', '핑크', '블루블랙', '레드', '골든 금발', '밝은 금발', '스트로베리 블론드', '진저 레드', '적갈색', '더티 블론드']
     .map((label, id) => ({ id, label, color: HAIR[id] })).filter(x => x.id !== GRAY),
-  skin: ['밝은', '보통', '어두운', '진한'].map((label, id) => ({ id, label, color: SKIN[id] })),
+  skin: ['밝은', '보통', '어두운', '진한', '아주 밝은', '밝은 올리브', '올리브', '따뜻한 갈색', '짙은 갈색', '아주 짙은'].map((label, id) => ({ id, label, color: SKIN[id] })),
+  iris: ['검정', '갈색', '밝은 갈색', '헤이즐', '짙은 회색', '파랑', '하늘색', '초록', '초록 헤이즐', '회색'].map((label, id) => ({ id, label, color: IRIS[id] })),
   eyes: Face.EYES.map((e, id) => ({ id, label: e.name })),
   shape: Face.SHAPE_LABEL.map((label, id) => ({ id, label })),
   brow: Face.BROW_LABEL.map((label, id) => ({ id, label })),
