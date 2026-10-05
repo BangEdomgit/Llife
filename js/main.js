@@ -319,7 +319,7 @@ function playScene(sc) {
   // 서서 다가감 → 그날 밤 → (콘돔 없이면) 자궁 그림 → 다음 날 아침 → (임신이면) 몇 주 뒤
   const S = G.state(), inside = sc.contra === 'none' || sc.contra === 'pill';
   const tops = [Avatar.topColor(S.gender === 'm' ? G.myLook() : G.look(p)), Avatar.topColor(S.gender === 'm' ? G.look(p) : G.myLook())];
-  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`]).concat([`<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}<div class="nt-bar"><span class="nt-clock">⏱ 0:00</span><span class="nt-pose"></span><span class="nt-cnt"></span></div><div class="nt-btns"><button type="button" class="nt-skip" data-nt-skip>⏩ 건너뛰기</button><button type="button" class="nt-end" data-nt-end>종료</button></div></div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
+  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [`<div class="sc-card sc-fp">${Night.foreplay(tops)}</div>`]).concat([`<div class="sc-night"><p class="sc-t">그날 밤</p>${Night.html(sc.spot)}<div class="nt-bar"><span class="nt-clock">⏱ 0:00</span><span class="nt-pose"></span><span class="nt-cnt"></span></div><div class="nt-btns"><span class="nt-rate" role="group" aria-label="배속">${[1, 2, 4, 8].map(r => `<button type="button" data-nt-rate="${r}"${Night.rate() === r ? ' class="on"' : ''}>×${r}</button>`).join('')}</span><button type="button" class="nt-skip" data-nt-skip>⏩ 건너뛰기</button><button type="button" class="nt-end" data-nt-end>종료</button></div></div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
     .concat(inside ? [`<div class="sc-card sc-ut">${Night.uterus(!!sc.preg)}</div>`] : []);
   sceneQueue = nightQ.concat(morningQ, pregQ);
   nextScene();
@@ -348,6 +348,8 @@ sceneEl.addEventListener('click', e => {
   if (e.target.closest('[data-sc-next]')) { nextScene(); return; }
   // 그날 밤은 종료 버튼을 누를 때까지 계속 (누르면 마무리, 마무리 중에 또 누르면 바로 넘김)
   if (e.target.closest('[data-nt-skip]')) { if (window.Night) Night.skip(); return; }   // 다음 일(절정·체위 바꾸기·마무리) 직전까지 빨리 감기
+  const rb = e.target.closest('[data-nt-rate]');   // 배속 ×1 / ×2 / ×4 / ×8
+  if (rb) { const r = Night.setRate(+rb.dataset.ntRate); rb.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.ntRate === r)); return; }
   const end = e.target.closest('[data-nt-end]');
   if (end) { if (window.Night && Night.finish()) end.textContent = '넘기기'; else nextScene(); return; }
   if (sceneBox.querySelector('.sc-fp, .sc-ut')) nextScene();

@@ -1700,15 +1700,26 @@ function bareTorso(a, A, skin, id) {
   o += ln(`M${f1(60 - 1.5 * k)},${f1(cy0 - .2 * k)} Q60,${f1(cy0 + 2.4 * k)} ${f1(60 + 1.5 * k)},${f1(cy0 - .2 * k)}`, sk(.6), 1.1, .5);
   if (female && A.adult) {
     o += BUST_MARK;
-    // 가슴: 위쪽 바깥 둥근 선 + 안쪽에서 가슴골로 모이는 선 + 아래 윤곽 — 모두 가슴 자리 안에서만
-    const bx = w.bust * .5, r = w.bust * (.42 + A.ci * .022), cy = y.bust, gap = Math.max(.5 * k, bx - r * .9);
+    // 가슴 (어른 여자, 맨몸): 둥근 덩어리 둘 — 윗면은 가슴과 이어지고(경계 없음) 아래로 갈수록 음영, 밑가슴 주름, 바깥 그림자, 가슴골 그림자, 윗면 은은한 빛
+    //   크기는 컵(A.ci), 체형: 탄탄하면 높고 둥글게, 통통하면 크고 부드럽게 / 나이: 36살부터 조금씩 아래로. 문장처럼 그림도 암시까지만 (세부 묘사 없음)
+    const age = A.age || 25, sag = Math.max(0, Math.min(1, (age - 35) / 25)), fitB = A.build === 'fit', chub = A.build === 'chubby';
+    const bx = w.bust * .5, r = w.bust * (.42 + A.ci * .022) * (chub ? 1.06 : 1), cy = y.bust + r * (sag * .22 + (chub ? .06 : 0) - (fitB ? .05 : 0)), gap = Math.max(.5 * k, bx - r * .9);
+    const ry = (fitB ? .92 : 1) + sag * .12, gid = id + 'bf';
+    o += `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${skin}"/><stop offset=".5" stop-color="${skin}"/><stop offset=".82" stop-color="${sk(.94)}"/><stop offset="1" stop-color="${sk(.84)}"/></linearGradient>` +
+      `<radialGradient id="${gid}s" cx=".5" cy=".5" r=".5"><stop offset=".55" stop-color="${sk(.5)}" stop-opacity="0"/><stop offset="1" stop-color="${sk(.5)}" stop-opacity=".28"/></radialGradient>` +
+      `<radialGradient id="${gid}h" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".26"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>` +
+      `<radialGradient id="${gid}v" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="${sk(.5)}" stop-opacity=".42"/><stop offset="1" stop-color="${sk(.5)}" stop-opacity="0"/></radialGradient></defs>`;
     o += [-1, 1].map(s => {
-      const X = v => f1(60 + s * v);
-      return ln(`M${X(bx + r * .05)},${f1(cy - r * .98)} Q${X(bx + r * .78)},${f1(cy - r * .9)} ${X(bx + r * .98)},${f1(cy - r * .12)}`, sk(.72), 1, .24) +
-        ln(`M${X(bx - r * .45)},${f1(cy - r * .86)} Q${X(gap + 1.4 * k)},${f1(cy - r * .45)} ${X(gap)},${f1(cy + r * .08)}`, sk(.64), 1.2, .42) +
-        ln(`M${X(bx + r * .97)},${f1(cy + r * .1)} Q${X(bx + r * .62)},${f1(cy + r * 1.06)} ${X(Math.max(gap, bx - r * .45))},${f1(cy + r * .96)}`, sk(.6), 1.2, .45);
+      const X = v => f1(60 + s * (bx + v * r)), Y = v => f1(cy + v * r * (v > 0 ? ry : 1));
+      const body = `M${X(-.92)},${Y(-.05)} C${X(-.95)},${Y(.72)} ${X(-.45)},${Y(1.04)} ${X(0)},${Y(1.02)} C${X(.55)},${Y(1)} ${X(.98)},${Y(.62)} ${X(1)},${Y(.05)} C${X(1)},${Y(-.6)} ${X(.55)},${Y(-1.15)} ${X(-.05)},${Y(-1.22)} C${X(-.5)},${Y(-1.12)} ${X(-.9)},${Y(-.62)} ${X(-.92)},${Y(-.05)} Z`;
+      return `<path d="${body}" fill="url(#${gid})"/>` +   // 덩어리 (윗면은 몸통과 같은 색)
+        `<ellipse cx="${X(.18)}" cy="${Y(.12)}" rx="${f1(r * 1.02)}" ry="${f1(r * ry)}" fill="url(#${gid}s)"/>` +   // 바깥·아래 그림자
+        ln(`M${X(-.7)},${Y(.62)} C${X(-.4)},${Y(1.04)} ${X(.5)},${Y(1.04)} ${X(.95)},${Y(.4)}`, sk(.6), 1.25, .42) +   // 밑가슴 주름
+        ln(`M${X(.12)},${Y(-1.12)} C${X(.6)},${Y(-1.02)} ${X(.95)},${Y(-.55)} ${X(.99)},${Y(-.02)}`, sk(.74), .9, .18) +   // 바깥 윤곽 (옅게)
+        `<ellipse cx="${X(-.12)}" cy="${Y(-.42)}" rx="${f1(r * .46)}" ry="${f1(r * .26)}" fill="url(#${gid}h)"/>`;   // 윗면 빛
     }).join('');
-    o += bustVolume(id + 'b', bx, cy, r, sk(.5), .34, true, k);
+    o += `<ellipse cx="60" cy="${f1(cy - r * .08)}" rx="${f1(1.6 * k + Math.max(0, gap) * .7)}" ry="${f1(r * .7)}" fill="url(#${gid}v)"/>` +   // 가슴골
+      ln(`M${f1(60 - gap * .4)},${f1(cy - r * .6)} Q60,${f1(cy - r * .2)} ${f1(60 + gap * .4)},${f1(cy - r * .6)}`, sk(.62), .8, gap > 2 * k ? 0 : .25);
     o = o.replace(BUST_MARK, `<g class="av-bust" data-cy="${f1(cy)}" data-r="${f1(r)}" data-k="${k.toFixed(4)}">`) + '</g>';   // 가슴 (함께 밤을 보내는 중엔 js/night.js가 출렁이게 함)
   } else if (A.adult) {
     // 가슴 근육 아랫선 + 아래 그림자 + 가운데 오목한 선
@@ -2177,7 +2188,9 @@ function renderPortrait(a, size, st, crop) {
   const hp = st.mask ? { back: '', front: '', shadow: '' } : hairPieces(a, X, age, hc, { sy: toHead(A.y.sh), chest: toHead(A.y.bust) }, af || du ? { noHat: true } : hatCtx(st, OF));
   const nh = A.w.nh / hs, neckBot = toHead(A.y.neck + 4 * hs);
   const neck = c => `<path d="M${f1(60 - nh)},94 L${f1(60 + nh)},94 L${f1(60 + nh)},${f1(neckBot)} L${f1(60 - nh)},${f1(neckBot)} Z" fill="${c}"/>`;
+  // 함께 밤을 보내는 중(du): 조금 더 넓게 잡아(3:4 유지) 가슴까지 들어오게
   let o = crop ? `<svg class="av" width="${w}" height="${h}" viewBox="18 14 84 112" aria-hidden="true"><rect class="av-bg" x="18.4" y="14.4" width="83.2" height="111.2" rx="7"/>`
+    : du ? `<svg class="av" width="${w}" height="${h}" viewBox="-7 12 134 178.7" aria-hidden="true"><rect class="av-bg" x="-6.5" y="12.5" width="133" height="177.7" rx="10"/>`
     : `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/>`;
   // 함께 밤을 보내는 중: 칸은 그대로 두고 인물(av-fig)·머리(av-hb·av-head)·가슴(av-bust)을 js/night.js가 따로 움직임
   const mv = !!du;

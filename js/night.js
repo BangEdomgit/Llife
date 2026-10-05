@@ -10,6 +10,9 @@
 // - 주소에 ?dummy 를 붙이면 이불을 반투명하게 하고 더미를 색으로 보여줌 (실험용)
 (function () {
 'use strict';
+// 재생 배속 (×1 / ×2 / ×4 / ×8) — 화면에서 고름, 이 기기에 기억
+let RATE = 1;
+try { RATE = +localStorage.getItem('llife.ntRate') || 1; } catch (e) { /* 저장 못 하는 환경 */ }
 const HEART = 'M0,5 C-7,0 -6,-6 -2.5,-6 C-1,-6 0,-5 0,-4 C0,-5 1,-6 2.5,-6 C6,-6 7,0 0,5 Z';
 const CX = Array.from({ length: 44 }, (_, i) => 68 + 216 * i / 43);   // 이불 윗선 점들의 x
 const FOLDS = [[112, -4, .8], [146, 3, 1], [176, -3, .7], [212, 4, 1], [250, -2, .8]];
@@ -455,11 +458,16 @@ const BURY = { doggy: 1, prone: 1 };
 // 초상화 속 인물: 상대가 받는 쪽이면 부딪힐 때마다 밀렸다 돌아오고(방향은 체위마다), 움직이는 쪽(기승위·역기승위·좌위·뒤로 앉기)이면 박자를 따라 오르내림
 //   칸(초상화 테두리)은 그대로, 인물·머리·가슴이 따로 움직임 — 머리는 살짝 늦게, 가슴은 관성으로 출렁임
 const PUSH = { missionary: [0, -1], legsUp: [0, -1], doggy: [.55, -.6], prone: [.35, -.65], cowgirl: [0, .6], reverse: [0, .6], lotus: [0, .5], seated: [0, .6] };
+// 섹스 기술 등급(F~SSS)에 따라 받는 쪽 더미가 반응하는 모양 — 같은 체위라도 천차만별
+//   [마중(깊이 들어올 때 골반을 맞춰 밀어붙임, −면 살짝 피함), 휨(가슴을 내밀고 허리가 휨), 골반 굴림, 다리 떨림, 고개 젖힘]
+//   F·E: 뻣뻣하게 버티다 살짝 피함 / D·C: 약하게 휨 / B·A: 마중하며 허리가 휨 / S 이상: 크게 휘고 골반을 굴리며 다리가 떨리고 고개를 젖힘
+const REACT = [[-1.2, 0, 0, 0, .1], [-.6, .3, 0, 0, .2], [.3, .8, .2, 0, .4], [.8, 1.4, .4, .1, .6], [1.4, 2.2, .7, .25, .9],
+  [2, 3, 1, .45, 1.2], [2.6, 3.8, 1.4, .7, 1.5], [3, 4.4, 1.7, .9, 1.8], [3.4, 5, 2, 1.1, 2.1]];
 // 초상화 배경과 시점 (체위마다): pillow 위에서 내려다봄(베개·시트) / side 베개에 볼을 묻음 / board 앞에서 봄(헤드보드) / ceil 아래에서 올려다봄(천장·조명) / close 마주 보고 가까이(창·달빛)
 //   r 기울기, k 확대, x·y 옮김 (초상화 단위)
-const VIEW = { missionary: { v: 'pillow', r: -7, k: 1.05, x: 0, y: 3 }, legsUp: { v: 'pillow', r: 6, k: 1.05, x: 0, y: 3 }, prone: { v: 'side', r: 15, k: 1.08, x: 5, y: 8 },
-  doggy: { v: 'board', r: -5, k: 1.06, x: -2, y: 9 }, cowgirl: { v: 'ceil', r: 0, k: 1.12, x: 0, y: -2 }, reverse: { v: 'ceil', r: 4, k: 1.1, x: 2, y: -1 },
-  seated: { v: 'ceil', r: -3, k: 1.1, x: -1, y: 0 }, lotus: { v: 'close', r: 0, k: 1.2, x: 0, y: 6 } };
+const VIEW = { missionary: { v: 'pillow', r: -6, k: 1, x: 0, y: 0 }, legsUp: { v: 'pillow', r: 5, k: 1, x: 0, y: 0 }, prone: { v: 'side', r: 14, k: 1.02, x: 4, y: 4 },
+  doggy: { v: 'board', r: -4, k: 1.02, x: -2, y: 4 }, cowgirl: { v: 'ceil', r: 0, k: 1.04, x: 0, y: -3 }, reverse: { v: 'ceil', r: 4, k: 1.02, x: 2, y: -2 },
+  seated: { v: 'ceil', r: -3, k: 1.02, x: -1, y: -1 }, lotus: { v: 'close', r: 0, k: 1.08, x: 0, y: 2 } };
 // 성격별로 고를 확률
 const POSE_W = { shy: { missionary: 4, prone: 1, doggy: 1, cowgirl: .5, lotus: 2, legsUp: .6, reverse: .3, seated: .8 },
   bold: { cowgirl: 3, doggy: 2.5, missionary: 1, prone: 1.5, reverse: 2.5, legsUp: 2, lotus: 1, seated: 1.5 },
@@ -656,7 +664,34 @@ function run(stage, job, done) {
     setTimeout(() => el.remove(), 1300);
     lastPop = t;
   }
+  // 쾌락 게이지: 달아오른 정도(ar)를 만족감 근처까지 따라가고, 절정엔 꽉 참. 끝나면 이번 밤 만족감으로
+  const plEl = stage.querySelector('.nt-pl'), plBar = plEl && plEl.querySelector('i'), plNum = plEl && plEl.querySelector('b');
+  const satV = (sc.sat ?? 50) / 100, satCap = Math.min(1, satV + .12);
+  let pv = 0, pvShown = -1;
+  // 말풍선: 소리(신음)와 말 — 만족감 단계·달아오른 정도·성격마다 (data/social.js nightSay)
+  const SAYD = ((window.GAME_DATA || {}).nightSay) || null, SY = SAYD && (her === 'm' ? SAYD.m : SAYD), sayEl = stage.querySelector('.nt-say');
+  let lastSay = -9, sayUntil = 0;
+  const pickOf = a => a && a.length ? a[Math.floor(Math.random() * a.length)] : '';
+  function say(txt, cls, dur = 1.5) {
+    if (!sayEl || !txt) return;
+    sayEl.textContent = txt; sayEl.className = 'nt-say on' + (cls ? ' ' + cls : '');
+    sayUntil = t + dur; lastSay = t;
+  }
   const hearts = [];
+  // 받는 쪽 더미의 반응 (섹스 기술 등급 × 달아오른 정도). mine: 상대가 움직이는 쪽(기승위 등)이면 마중 대신 골반을 더 굴림
+  function herMotion(J, mine, dir) {
+    const R = REACT[Math.max(0, Math.min(8, gi))], e = (good ? .35 + .65 * ar : .3) * (t < end ? 1 : Math.max(0, 1 - (t - end) / SLUMP));
+    if (e <= 0 || !J || !J.front) return;
+    const deep = Math.max(0, 1 - Math.max(0, ms.d) / 10), toHim = [-dir[0], -dir[1]];
+    const meetA = R[0] * e * deep * (mine ? .3 : 1);
+    for (const [k, w] of [['hip', 1], ['butt', 1], ['waist', .6], ['chest', .3], ['breast', .3], ['sh', .25], ['knee', .3]]) if (J[k]) J[k] = add(J[k], toHim, meetA * w);
+    const arch = R[1] * e * (.55 + .45 * Math.sin(t * (2 + gi * .25)));   // 물결처럼 휘었다 풀림
+    for (const [k, w] of [['chest', .7], ['breast', .8], ['sh', 1], ['neck', 1], ['head', 1], ['elbow', .5], ['hand', .2]]) if (J[k]) J[k] = add(J[k], J.front, arch * w);
+    if (J.head) J.head = add(J.head, J.front, -R[4] * e * (.6 + .4 * Math.sin(t * 3.7)) * 1.6);   // 고개를 젖힘
+    const rw = 3.2 + gi * .2, rl = R[2] * e * (mine ? 1.5 : 1);   // 골반을 둥글게 굴림
+    for (const k of ['hip', 'butt']) if (J[k]) J[k] = add(add(J[k], dir, Math.sin(t * rw) * rl), J.front, Math.cos(t * rw) * rl * .6);
+    if (ar > .35) { const sh2 = R[3] * e * (ar - .35) * 2; for (const [k, ph] of [['knee', 0], ['ankle', 1.3], ['toe', 2.1]]) if (J[k]) J[k] = add(J[k], [Math.sin(t * 47 + ph), Math.cos(t * 53 + ph)], sh2); }   // 다리가 떨림
+  }
   function poseNow() {
     pi = Math.min(pi, plan.poses.length - 1);
     while (pi < plan.poses.length - 1 && t >= plan.poses[pi + 1].at) { pi++; poseName = plan.poses[pi].name; stage.dataset.pose = poseName; showPose(); if (face) face.dataset.view = (VIEW[poseName] || VIEW.missionary).v; }
@@ -728,6 +763,8 @@ function run(stage, job, done) {
   // 상대 절정 (소·중·대): 초상화·고개·떨림·♀ 고리·물·하트가 크기마다 다름
   function climax(s) {
     const ty = s.her, big = ty === 'major', mid = ty === 'mid', amp = .65 + .045 * gi;   // 등급이 높을수록 반응이 큼
+    if (SY) say(pickOf(SY.climax[ty]), 'peak', big ? 2.2 : 1.5);
+    ar = Math.max(.35, ar * (big ? .7 : .85));   // 절정 뒤엔 잠깐 가라앉았다 다시
     react = { t0: t, hold: s.t0 + s.T + (big ? .9 : mid ? .4 : 0), k: (big ? 1 : mid ? .62 : .3) * amp };
     peakUntil = Math.max(peakUntil, s.t0 + s.T + (big ? 1.6 : mid ? 1.1 : .5));
     peakKind = ty;
@@ -745,14 +782,15 @@ function run(stage, job, done) {
     sinkV += 40 * str; bsV -= 24 * str; symEV += 17 * str; symXV += 55 * str; beatKV += 9 * str;
     impT = t; impS = Math.min(1.4, str); impExit = GX0 + ht > 106 + RX0 + 1;   // 탁: 부딪힘 선·물결, 촉이 고리 밖으로 나가면 반짝
     const force = str * (.55 + .1 * grade);
-    if (force > limit) { ouchAt = t; symXV += 60 * str; symEV -= 8; }   // 움찔
+    const lim = limit * (1 + gi * .03);   // 섹스 기술이 높을수록 상대가 받아들일 수 있게 맞춰 줌
+    if (force > lim) { ouchAt = t; symXV += 60 * str; symEV -= 8; }   // 움찔
     else if (good) for (let j = Math.round(force / 1.2 * [0, 0, 1, 1.6, 2.3][tier]); j > 0; j--) symHeart();
     // 평소 반응: 크기가 체형에 맞을수록(받아들일 수 있는 세기의 80~100%) 빨리 달아오르고 가끔 헉, 넘치면 움찔(질끈 감은 눈), 작으면 잘 못 느낌. 섹스 기술이 높을수록 빨리
     if (!s.her) {
-      const fr = force / limit, sizeK = fr > 1 ? .45 : fr > .8 ? 1.3 : fr > .45 ? 1 : .55;
+      const fr = force / lim, sizeK = fr > 1 ? .45 : fr > .8 ? 1.3 : fr > .45 ? 1 : .55;
       ar = Math.min(1, ar + .04 * (.35 + gi * .13) * sizeK * (good ? 1 : .35) * (s.kind === 'n' ? 1 : 1.6));
-      if (fr > 1) { figVY -= 45 * str; jolt -= .5; if (t - lastPop > .5) pop('!', 'ow'); }
-      else if (good && fr > .8 && (s.kind !== 'n' || Math.random() < .1 + gi * .03)) { gaspAt = t; jolt += .4; if (t - lastPop > .6) pop(ar > .5 ? '♡' : '!?', 'gasp'); }
+      if (fr > 1) { figVY -= 45 * str; jolt -= .5; if (t - lastPop > .5) pop('!', 'ow'); if (SY && t - lastSay > 1.2 && Math.random() < .6) say(pickOf(SY.ouch), 'ow', 1.1); }
+      else if (good && fr > .8 && (s.kind !== 'n' || Math.random() < .1 + gi * .03)) { gaspAt = t; jolt += .4; if (t - lastPop > .6) pop(ar > .5 ? '♡' : '!?', 'gasp'); if (SY && t - lastSay > 1 && Math.random() < .5) say(pickOf(SY.gasp), 'gasp', .9); }
     }
     jyV += (s.kind === 'n' ? 7 : 22) * str; jxV -= (s.kind === 'n' ? 2.5 : 9) * str;
     const pu = PUSH[poseName] || [0, -1], mine = P.act === her;   // 초상화 인물: 받는 쪽이면 크게 밀리고, 움직이는 쪽이면 내려앉으며 쿵
@@ -785,6 +823,7 @@ function run(stage, job, done) {
     jxV += (-700 * jx - 20 * jxV) * DT; jx += jxV * DT;
     Object.assign(ms, { d, tr, slump });
     P = poseNow();
+    if (!settle) herMotion(P[her], P.act === her, P.dir);
     if (react && !settle) {   // 상대 절정: 고개를 젖히거나 베개에 파묻고 부들부들
       const a = t - react.t0, env = Math.min(1, a / .15) * (t < react.hold ? 1 : Math.max(0, 1 - (t - react.hold) / .7));
       if (env <= 0 && t > react.hold) react = null;
@@ -812,6 +851,13 @@ function run(stage, job, done) {
       }
       const tv = VIEW[poseName] || VIEW.missionary, e = Math.min(1, DT * 3);
       for (const k of ['r', 'k', 'x', 'y']) vw[k] += (tv[k] - vw[k]) * e;
+      const pt = t >= end ? satV : t < peakUntil ? (peakKind === 'major' ? 1 : peakKind === 'mid' ? .96 : .9) : Math.min(satCap, ar);
+      pv += (pt - pv) * Math.min(1, DT * 3);
+      // 말풍선: 달아오를수록 자주. 소리 65% / 말 35% (만족감 단계별, tier 3 이상이면 가끔 성격별 말)
+      if (SY && t < end && t > 1.2 && t - lastSay > (good ? 3.4 - ar * 1.7 : 4.6) && t >= peakUntil) {
+        if (Math.random() < .65) say(pickOf(SY.moan[!good ? 'bad' : ar < .3 ? 'low' : ar < .65 ? 'mid' : 'high']), 'moan', 1.2);
+        else say(tier >= 3 && SY.pers[p.personality] && Math.random() < .3 ? SY.pers[p.personality] : pickOf(SY.line[tier]), '', 1.8);
+      }
     }
     for (const b of blobs) {
       const pj = P[b.w][b.at];
@@ -851,6 +897,7 @@ function run(stage, job, done) {
       finale = true;
       if (good) heart(actHip()[0], at(y, actHip()[0]) - 14, { big: true, s: 1.4 + .3 * tier, life: 1.8, dy: -24 });
       else letdown();
+      if (SY) say(pickOf(SY.end[good ? 'good' : 'bad']), good ? 'peak' : '', 2.4);
     }
   }
   // 상대 표정 (관계 중 초상화)
@@ -900,6 +947,9 @@ function run(stage, job, done) {
     cam.setAttribute('transform', sk > .02 ? `translate(${f(cx)},${f(cy)})` : '');
     bed.setAttribute('transform', `translate(${jx.toFixed(2)},${jy.toFixed(2)})`);
     warm.setAttribute('opacity', Math.min(1, Math.max(heat * .9, flashK)).toFixed(3));
+    // 쾌락 게이지·말풍선
+    if (plBar) { const v = Math.round(pv * 100); if (v !== pvShown) { pvShown = v; plBar.style.width = v + '%'; plNum.textContent = v; plEl.classList.toggle('hot', v >= 80); } }
+    if (sayEl && t > sayUntil && sayEl.classList.contains('on')) sayEl.classList.remove('on');
     // 시계 (화면 1초 = 6초)
     if (clockEl) { const gs = Math.floor(Math.min(t, end) * SPEED), txt = `⏱ ${Math.floor(gs / 60)}:${String(gs % 60).padStart(2, '0')}${warpTo > t ? ' ⏩' : ''}`; if (txt !== clockTxt) { clockTxt = txt; clockEl.textContent = txt; } }
     for (let i = hearts.length - 1; i >= 0; i--) {
@@ -990,7 +1040,7 @@ function run(stage, job, done) {
   }
   function frame(now) {
     if (warpTo && t >= warpTo) warpTo = 0;
-    acc += (last ? Math.min(.05, (now - last) / 1000) : 0) * (warpTo ? 8 : 1); last = now;   // ⏩ 건너뛰는 중엔 8배
+    acc += (last ? Math.min(.05, (now - last) / 1000) : 0) * (warpTo ? Math.max(8, RATE) : RATE); last = now;   // ⏩ 건너뛰는 중엔 8배, 아니면 고른 배속
     while (acc >= DT) { step(); acc -= DT; }
     draw();
     if (t < END) raf = requestAnimationFrame(frame);
@@ -1012,7 +1062,8 @@ function run(stage, job, done) {
 }
 
 window.Night = {
-  html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div><div class="nt-pops"></div>${SYM}</div>`,
+  html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div><div class="nt-pops"></div><div class="nt-say"></div><div class="nt-pl" title="쾌락"><span>💗 쾌락</span><em><i></i></em><b>0</b></div>${SYM}</div>`,
+  rate: () => RATE, setRate: r => { RATE = [1, 2, 4, 8].includes(+r) ? +r : 1; try { localStorage.setItem('llife.ntRate', RATE); } catch (e) { /* 무시 */ } return RATE; },
   foreplay, uterus, alley,
   run, stop: () => { cancelAnimationFrame(raf); ender = skipper = null; }, finish: () => !!ender && ender(), skip: () => !!skipper && skipper(),
   poseLabel: POSE_LABEL,
