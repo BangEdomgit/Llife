@@ -198,35 +198,34 @@ function room(kind) {
 </g></svg>`;
 }
 
-// 오른쪽 위 ♂♀ 패널: 오른쪽은 평평한 살색 벽(♀ 기호가 겉면에 돋을새김으로 묻힘), 가운데 높이에 안쪽 깊숙이까지 뚫린 구불구불한 일자 틈 — 틈 안쪽은 분홍.
+// 오른쪽 위 ♂♀ 패널: 오른쪽은 벽 — 입구 쪽 겉면(띠)만 살색이고 그 안쪽은 전부 분홍(♀ 기호가 돋을새김으로 묻힘). 가운데 높이에 구불구불한 일자 틈이 끝이 안 보이게(패널 밖까지) 깊숙이 뚫려 있음.
 //   왼쪽의 ♂ 화살(길고 굵게)이 틈으로 탄력 있게 파고듦 — 들어간 만큼 틈이 펴지며 대 굵기로 벌어지고, 겉면은 틈 둘레만 살짝 눌렸다 출렁이며 돌아옴, 화살은 용수철처럼 튕김
 //   좌표는 벽이 왼쪽인 채로 계산하고 통째로 좌우 반전(sy-mir)해서 그림 — 박자 아이콘(글자)만 반전 밖
-//   그리는 순서: 빛 → 틈 속 어둠 → 잔상 → ♂ 화살 → 분홍 안쪽(틈 둘레) → 살색 벽 → 달아오름 → 묻힌 ♀ → 틈 가장자리 빛 → 겉면 하이라이트 → 부딪힘 선·반짝 → 하트
-const SY_Y = 32, SY_WE = 56, SY_IN = 5;   // 틈의 높이, 벽 겉면 x, 틈 안쪽 끝 x (반전 전 좌표)
+//   그리는 순서: 빛 → 틈 속 어둠(깊을수록 까맣게) → 잔상 → ♂ 화살 → 틈 둘레 그늘 → 분홍 벽 → 달아오름 → 묻힌 ♀ → 살색 겉면 띠 → 틈 가장자리 빛 → 겉면 하이라이트 → 부딪힘 선·반짝 → 하트
+const SY_Y = 32, SY_WE = 56, SY_IN = -8;   // 틈의 높이, 벽 겉면 x, 틈 안쪽 끝 x (반전 전 좌표 — 0보다 작아 패널 밖: 끝이 안 보임)
 const SYM = `<div class="nt-sym"><svg viewBox="0 0 150 64" aria-hidden="true"><defs>
   <radialGradient id="ntSG"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".6"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient>
-  <linearGradient id="syWall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9a07c"/><stop offset=".75" stop-color="#efc29f"/><stop offset="1" stop-color="#f6d2b4"/></linearGradient>
-  <linearGradient id="syIn" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a8265a"/><stop offset=".55" stop-color="#e2557f"/><stop offset="1" stop-color="#ff9dbb"/></linearGradient>
-  <linearGradient id="syCrack" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1c030c"/><stop offset=".7" stop-color="#4a0d26"/><stop offset="1" stop-color="#7a1a40"/></linearGradient>
+  <linearGradient id="syWall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b23466"/><stop offset=".55" stop-color="#e0507d"/><stop offset="1" stop-color="#ff86ab"/></linearGradient>
+  <linearGradient id="syCrack" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000"/><stop offset=".35" stop-color="#14020a"/><stop offset=".8" stop-color="#3e0b21"/><stop offset="1" stop-color="#6a1638"/></linearGradient>
   <linearGradient id="syMg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9dcff"/><stop offset=".55" stop-color="#5aa8ff"/><stop offset="1" stop-color="#2f6bd0"/></linearGradient>
   <linearGradient id="syShaft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4ebff"/><stop offset=".45" stop-color="#5aa8ff"/><stop offset="1" stop-color="#2a60c4"/></linearGradient>
   <linearGradient id="syHead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9e5ff"/><stop offset=".5" stop-color="#4f9cf3"/><stop offset="1" stop-color="#2455b4"/></linearGradient>
   <radialGradient id="syDrop" cx=".65" cy=".35" r=".8"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#c8ecff"/><stop offset="1" stop-color="#5fb8f0"/></radialGradient>
   <filter id="sySh" x="-20%" y="-30%" width="140%" height="160%"><feDropShadow dx="0" dy="1.1" stdDeviation=".9" flood-color="#000" flood-opacity=".5"/></filter>
-  <clipPath id="syWC"><path class="sy-wclip"/></clipPath>
+  <clipPath id="syWC"><path class="sy-wclip" clip-rule="evenodd"/></clipPath>
 </defs><g class="sy-mir" transform="translate(150,0) scale(-1,1)">
   <circle class="sy-glow" cx="${SY_WE}" cy="${SY_Y}" r="26" fill="url(#ntSG)" opacity="0"/>
   <path class="sy-crack" fill="url(#syCrack)"/>
   <g class="sy-trail" fill="none" stroke="#5aa8ff" stroke-width="4.6"><circle class="sy-g1" r="13.5" opacity="0"/><circle class="sy-g2" r="13.5" opacity="0"/></g>
   <g class="sy-m" transform="translate(130,${SY_Y}) scale(-1,1)" filter="url(#sySh)"><circle r="13.5" fill="none" stroke="url(#syMg)" stroke-width="6.6"/><path d="M-10.2,-6.4 A12,12 0 0 1 -1.4,-12" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" opacity=".55"/>
     <rect class="sy-shaft" x="13.5" y="-5" height="10" rx="5" fill="url(#syShaft)"/><path class="sy-head" fill="url(#syHead)" stroke="#2457b5" stroke-width=".8" stroke-linejoin="round"/><path class="sy-hh" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".55"/></g>
-  <path class="sy-inner" fill="url(#syIn)" fill-rule="evenodd"/>
+  <path class="sy-inner" fill="#7d1a45" fill-rule="evenodd" opacity=".5"/>
   <path class="sy-wall" fill="url(#syWall)" fill-rule="evenodd"/>
   <path class="sy-flush" fill="#ff6f96" fill-rule="evenodd" opacity="0"/>
   <g class="sy-fem" clip-path="url(#syWC)" fill="none" stroke-linecap="round"><g class="sy-femg">
-    <circle cx="24" cy="13" r="8" stroke="#fff0e4" stroke-width="3.2" opacity=".6" transform="translate(.8,.9)"/><circle cx="24" cy="13" r="8" stroke="#bf7b5c" stroke-width="3.2" opacity=".75"/>
-    <path d="M24,21 V25 M20,23 H28" stroke="#fff0e4" stroke-width="2.8" opacity=".55" transform="translate(.8,.9)"/><path d="M24,21 V25 M20,23 H28" stroke="#bf7b5c" stroke-width="2.8" opacity=".7"/></g></g>
-  <path class="sy-rim" fill="none" stroke="#c8708a" stroke-width=".7" opacity=".75"/>
+    <circle cx="24" cy="13" r="8" stroke="#ffd0de" stroke-width="3.2" opacity=".55" transform="translate(.8,.9)"/><circle cx="24" cy="13" r="8" stroke="#a02658" stroke-width="3.2" opacity=".75"/>
+    <path d="M24,21 V25 M20,23 H28" stroke="#ffd0de" stroke-width="2.8" opacity=".5" transform="translate(.8,.9)"/><path d="M24,21 V25 M20,23 H28" stroke="#a02658" stroke-width="2.8" opacity=".7"/></g></g>
+  <g clip-path="url(#syWC)"><path class="sy-face" fill="none" stroke="#efc3a0" stroke-width="10"/><path class="sy-rim" fill="none" stroke="#d98c8f" stroke-width=".8" opacity=".8"/></g>
   <path class="sy-crackhl" fill="none" stroke="#ffc6d8" stroke-width=".8" stroke-linecap="round" opacity=".8"/>
   <path class="sy-edge" fill="none" stroke="#fff3e8" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
   <path class="sy-tak" fill="none" stroke="#ffe08a" stroke-width="1.6" stroke-linecap="round" opacity="0"/>
@@ -844,7 +843,7 @@ function run(stage, job, done) {
   sq('.sy-hh').setAttribute('d', `M${f(hb)},-9 L${f(ht - 4.2)},-1.6`);
   // 다 들어갔을 때의 깊이 (크기에 비례, 틈 안쪽 끝은 넘지 않음) → d = 0일 때 ♂ 원 중심 GX0
   const DEPTH = Math.min(SY_WE - SY_IN - 4, Math.max(8, shaft * .62)), GX0 = SY_WE - DEPTH + ht;
-  const E = Object.fromEntries(['wall', 'inner', 'flush', 'crack', 'crackhl', 'rim', 'edge', 'femg', 'tak', 'spark', 'g1', 'g2', 'ouch'].map(k => [k, sq('.sy-' + k)])), WCL = sq('.sy-wclip');
+  const E = Object.fromEntries(['wall', 'inner', 'flush', 'crack', 'crackhl', 'face', 'rim', 'edge', 'femg', 'tak', 'spark', 'g1', 'g2', 'ouch'].map(k => [k, sq('.sy-' + k)])), WCL = sq('.sy-wclip');
   let ax = null, av = 0, lastTip = null;   // 화살은 용수철처럼 목표 자리를 따라감 (살짝 넘었다 돌아와서 탄력 있게)
   // 받아들일 수 있는 세기: 체형이 가늘수록 낮음. 크기 × 세기가 넘으면 움찔, 아니면 하트
   const limit = { slim: 1.85, avg: 2.15, fit: 2.25, chubby: 2.35 }[sc.build] || 2.15, symHearts = [], symHS = sq('.sy-hs');
@@ -1399,22 +1398,23 @@ function run(stage, job, done) {
     const pts = [];
     for (let yy = -2; yy <= 66; yy += 4) { const near = Math.exp(-(((yy - cy0) / 9) ** 2)); pts.push([SY_WE - push * near + symE * 1.1 * near * Math.sin(t * 26 + yy * .2), yy]); }
     const mx = Math.min(SY_WE - push, ...pts.filter(p => Math.abs(p[1] - cy0) < 14).map(p => p[0])) - .3, lenC = Math.max(1, mx - SY_IN);
-    // 틈: 안쪽 깊숙이까지 구불구불한 일자 (안쪽 끝은 실금, 입구로 갈수록 벌어짐). 화살이 들어간 만큼은 펴지고 대 굵기로 벌어짐
+    // 틈: 패널 밖까지 깊숙이 구불구불한 일자 (깊을수록 가늘고 까매짐, 입구로 갈수록 벌어짐). 화살이 들어간 만큼은 펴지고 대 굵기로 벌어짐
     const SH = 5.4 + Math.max(0, symE) * .5;
     const stra = x => depth > 0 ? Math.max(0, Math.min(1, (x - (tip - 8)) / 8)) : 0;
     const cyAt = x => cy0 + 2.8 * Math.sin((x - SY_IN) * .36 + 1.2) * Math.min(1, (1 - (x - SY_IN) / lenC) * 1.7) * (1 - stra(x));   // 입구는 가운데로 모임
-    const hAt = x => { let h = .45 + (open - .45) * Math.pow(Math.max(0, (x - SY_IN) / lenC), .8); if (depth > 0 && x >= tip - 2) h = Math.max(h, SH); return h; };
-    const pbAt = x => 1 + 2.6 * (x - SY_IN) / lenC + .8 * inK;   // 틈 둘레로 보이는 분홍 안쪽 (입구 쪽이 넓음)
+    const hAt = x => { let h = 1 + (open - 1) * Math.pow(Math.max(0, (x - SY_IN) / lenC), .8); if (depth > 0 && x >= tip - 2) h = Math.max(h, SH); return h; };
+    const pbAt = x => .6 + 1.4 * (x - SY_IN) / lenC + .6 * inK;   // 틈 둘레 그늘 (입구 쪽이 넓음)
     const xs = Array.from({ length: 22 }, (_, k) => SY_IN + lenC * k / 21);
     const lane = k => { const top = xs.map(x => [x, cyAt(x) - hAt(x) - k * pbAt(x)]), bot = xs.map(x => [x, cyAt(x) + hAt(x) + k * pbAt(x)]).reverse(); return { top, bot }; };
     const laneD = ({ top, bot }) => `M${f(top[0][0])},${f(top[0][1])}${curve(top)} L${f(bot[0][0])},${f(bot[0][1])}${curve(bot)} Z`;
     const H = lane(0), B = lane(1), hollowD = laneD(H), innerD = laneD(B);
     const wallD = `M-2,-2 L${f(pts[0][0])},${f(pts[0][1])}${curve(pts)} L-2,66 Z`;
     E.crack.setAttribute('d', hollowD); E.inner.setAttribute('d', innerD + hollowD);
-    E.wall.setAttribute('d', wallD + innerD); E.flush.setAttribute('d', wallD + innerD); WCL.setAttribute('d', wallD);
-    E.rim.setAttribute('d', `M${f(B.top[2][0])},${f(B.top[2][1])}${curve(B.top.slice(2))} M${f(B.bot[0][0])},${f(B.bot[0][1])}${curve(B.bot.slice(0, -2))}`);
-    E.crackhl.setAttribute('d', `M${H.top.slice(4).map(p => f(p[0]) + ',' + f(p[1] - .4)).join(' L')} M${H.bot.slice(0, -4).map(p => f(p[0]) + ',' + f(p[1] + .4)).join(' L')}`);
-    const hm = hAt(mx), mTop = B.top[B.top.length - 1][1], mBot = B.bot[0][1];
+    E.wall.setAttribute('d', wallD + hollowD); E.flush.setAttribute('d', wallD + hollowD); WCL.setAttribute('d', wallD + hollowD);   // 분홍 벽 (틈만 뚫림)
+    const edgeD = sh => `M${f(pts[0][0] + sh)},${f(pts[0][1])}${curve(pts.map(p => [p[0] + sh, p[1]]))}`;
+    E.face.setAttribute('d', edgeD(0)); E.rim.setAttribute('d', edgeD(-5));   // 입구 쪽 겉면만 살색 띠 (벽 안으로 5) — 틈 자리는 잘려 나감
+    E.crackhl.setAttribute('d', `M${H.top.slice(6).map(p => f(p[0]) + ',' + f(p[1] - .4)).join(' L')} M${H.bot.slice(0, -6).map(p => f(p[0]) + ',' + f(p[1] + .4)).join(' L')}`);
+    const hm = hAt(mx), mTop = H.top[H.top.length - 1][1], mBot = H.bot[0][1];
     const up = pts.filter(p => p[1] < mTop - 1.5), dn = pts.filter(p => p[1] > mBot + 1.5);
     E.edge.setAttribute('d', (up.length > 1 ? `M${f(up[0][0])},${f(up[0][1])}${curve(up)}` : '') + (dn.length > 1 ? ` M${f(dn[0][0])},${f(dn[0][1])}${curve(dn)}` : ''));
     E.femg.setAttribute('transform', `translate(${f(-push * .2 + jit * .3)},${f(Math.max(0, symE) * .5)})`);   // 벽에 묻힌 ♀도 같이 들썩

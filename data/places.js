@@ -205,20 +205,19 @@ GAME_DATA.places = [
     arrive: ['학생회관 1층 게시판이 포스터로 뒤덮여 있었다.', '복사기 돌아가는 소리가 났다.', '매점 앞에 사람이 북적였다.'],
     actions: ['coffee', 'snack'] },
 
-  /* ── 아이 시설 (data/map.js kids) — 집에서 가장 가까운 유치원·초등학교. 그 나이 아이가 있거나 거기서 일하면 ── */
-  // 등원·하원 시간엔 아이 데리러 온 엄마·아빠(대부분 기혼)가 모임 (data/encounter.js crowds)
-  { id: 'kinder', label: '유치원', icon: '🧸', minAge: 20, crowd: 'adult', crowdN: [3, 7], kind: 'friend',
-    open: (s, a) => s.job === 'kinder' || a.find(p => p.kind === 'child' && a.npcAge(p) >= 3 && a.npcAge(p) <= 6).length > 0, closed: '아이가 있어야',
+  /* ── 아이 시설 앞 (data/map.js kids) — 집에서 가장 가까운 유치원·초등학교의 '앞'(교문·담장 밖). 안으로는 안 들어감, 어른이면 누구나 ── */
+  // 등원·하원 시간엔 아이 데리러 온 엄마들(대부분 기혼 주부)이 모이고 아이들이 뛰어다님 — 아이들은 배경(숫자만, 말 걸 수 없음: js/game.js kidsAround)
+  //   아이 데리러 가기는 그 나이 아이가 있을 때만. 이 앞에선 섹드립·스킨십·잠자리 제안·골목이 안 뜸 (data/social.js KIDZONE)
+  { id: 'kinder', label: '유치원 앞', icon: '🧸', minAge: 20, crowd: 'adult', crowdN: [5, 10], kind: 'friend',
     regulars: (s, a) => a.find(p => p.kind === 'child' && a.npcAge(p) >= 3 && a.npcAge(p) <= 6), regularsN: [1, 3],
     doing: (s, p, a) => a.npcAge(p) < 8 ? ['선생님 손을 잡고 나온다', '가방을 질질 끌고 온다', '친구랑 손잡고 뛰어온다'] : ['아이를 기다리고 있다', '다른 엄마들과 이야기하고 있다', '휴대폰을 보며 서 있다', '아이 가방을 받아 들고 있다', '유치원 버스를 기다리고 있다', '알림장을 확인하고 있다'],
-    arrive: ['유치원 앞에 노란 버스가 서 있었다.', '하원 시간, 아이들 웃음소리가 담장 너머로 들렸다.', '엄마들이 삼삼오오 모여 수다를 떨고 있었다.'],
-    actions: ['pickup'] },
-  { id: 'elem', label: '초등학교', icon: '🏫', minAge: 20, crowd: 'adult', crowdN: [3, 7], kind: 'friend',
-    open: (s, a) => s.job === 'teacher' || a.find(p => p.kind === 'child' && a.npcAge(p) >= 7 && a.npcAge(p) <= 12).length > 0, closed: '아이가 있어야',
+    arrive: ['유치원 앞에 노란 버스가 서 있었다.', '하원 시간, 아이들 웃음소리가 담장 너머로 들렸다.', '엄마들이 삼삼오오 모여 수다를 떨고 있었다.', '유모차 몇 대가 담장 앞에 나란히 서 있었다.'],
+    actions: ['pickup', 'walk'] },
+  { id: 'elem', label: '초등학교 앞', icon: '🏫', minAge: 20, crowd: 'adult', crowdN: [6, 12], kind: 'friend',
     regulars: (s, a) => a.find(p => p.kind === 'child' && a.npcAge(p) >= 7 && a.npcAge(p) <= 12), regularsN: [1, 3],
     doing: (s, p, a) => a.npcAge(p) < 13 ? ['실내화 가방을 흔들며 나온다', '친구들과 떡볶이 사러 간다', '운동장에서 공을 차고 있다'] : ['교문 앞에서 아이를 기다리고 있다', '학부모 단톡방을 보고 있다', '다른 학부모와 학원 이야기를 하고 있다', '녹색 어머니 깃발을 들고 있다', '우산을 들고 서 있다'],
-    arrive: ['교문 앞에 학부모들이 줄지어 서 있었다.', '수업 끝 종이 울렸다.', '운동장에서 아이들이 쏟아져 나왔다.'],
-    actions: ['pickup'] },
+    arrive: ['교문 앞에 학부모들이 줄지어 서 있었다.', '수업 끝 종이 울렸다.', '운동장에서 아이들이 쏟아져 나왔다.', '교문 앞 문구점에 아이들이 몰려 있었다.'],
+    actions: ['pickup', 'walk'] },
 
   /* ── 집·부동산 (data/housing.js) ── */
   // 우리 집 앞 — 사는 집에 따라 이름이 바뀜 (원룸 건물 앞·아파트 단지·고시원 복도 …). 같은 건물·단지 이웃이 오감

@@ -248,7 +248,9 @@ function teaseOk(s, p, a, need) {
 // 나를 향한 성욕을 얼마나 올릴지 (같은 날 또 하면 절반)
 const heatRoll = (p, a, lo, hi) => Math.round(a.rand(lo, hi) * (p.teaseDay === a.today() ? .5 : 1));
 // 골목: 짧은 시간(이틀 안)에 섹드립·스킨십으로 25 넘게 끌어올려 70을 넘겼고, 외모·매력이 받쳐주면(꼬심 보너스 24+) 밖에서 상대가 먼저 골목으로 이끔
-const ALLEY_NO = ['home', 'office', 'campus', 'school', 'academy', 'hospital', 'church', 'library', 'center'];
+const ALLEY_NO = ['home', 'office', 'campus', 'school', 'academy', 'hospital', 'church', 'library', 'center', 'kinder', 'elem'];
+// 아이들이 많은 곳 (유치원·초등학교 앞): 섹드립·스킨십·잠자리 제안·즉석(골목·화장실·수풀)이 안 뜸
+const KIDZONE = ['kinder', 'elem', 'playground'];
 function alleyReady(s, p, a, gain) {
   if (!a.canSex(p) || !s.place || ALLEY_NO.includes(s.place) || a.casualBonus() < 24) return false;
   if (p.alleyDay != null && a.today() - p.alleyDay < 7) return false;
@@ -300,7 +302,7 @@ const QUICK_ON = ['급하게, 소리를 삼키며.', '누가 올까 봐 숨을 �
 // 지금 여기서 (골목·화장실·수풀): 함께 밤을 보내는 것과 같지만 짧고, 들킬 수 있음 (sp_caught)
 function quickIt(id, kind, label, icon) {
   return { id, label, icon, noFree: true,
-    if: (s, p, a) => a.canSex(p) && a.companion() === p && !!spotHere(s, kind) && !a.jailed(),
+    if: (s, p, a) => a.canSex(p) && a.companion() === p && !!spotHere(s, kind) && !a.jailed() && !KIDZONE.includes(s.place),
     run: (s, p, a) => {
       const sp = spotHere(s, kind), night = s.time === 2, cp = (sp.caught ?? .15) * (kind !== 'toilet' ? (night ? .6 : 1.5) : 1);
       return { intimate: true, fling: true, direct: true, quick: true, spot: sp.scene || kind, mood: 10, p: { heart: [5, 9], close: [2, 5] }, effect: { happy: [3, 6] },
@@ -456,7 +458,7 @@ GAME_DATA.social = [
     } },
 
   { id: 'dirtyTalk', label: '섹드립', icon: '😏',
-    if: (s, p, a) => a.canSex(p) && p.close >= 15 && !a.jailed(),
+    if: (s, p, a) => a.canSex(p) && p.close >= 15 && !a.jailed() && !KIDZONE.includes(s.place),
     run: (s, p, a, ch) => {
       if (ch) return dirtyChoice(s, p, a, ch);
       const T = GAME_DATA.teaseLines, say = a.pick(T.say[s.gender === 'f' ? 'f' : 'm']) + ' ';
@@ -471,7 +473,7 @@ GAME_DATA.social = [
     } },
 
   { id: 'touch', label: '스킨십', icon: '🤝',
-    if: (s, p, a) => a.canSex(p) && (lover(p) || p.fwb || p.close >= 30) && !a.jailed(),
+    if: (s, p, a) => a.canSex(p) && (lover(p) || p.fwb || p.close >= 30) && !a.jailed() && !KIDZONE.includes(s.place),
     run: (s, p, a, ch) => {
       if (ch) return touchChoice(s, p, a, ch);
       const T = GAME_DATA.teaseLines, lv = lover(p) || p.fwb || p.nights ? 'close' : p.heart >= 40 ? 'mid' : 'light';
@@ -489,7 +491,7 @@ GAME_DATA.social = [
   // 잠자리 제안 — 언제 어디서든. 사귀는 사이·섹파는 거절(피곤·싸움·생리)만, 그 외엔 꼬심 점수(외모·매력·성욕) + 상대 상태 문턱
   //   집·모텔이면 바로 그날 밤, 밖이면 동행이 되어 같이 감 (밖이면 골목 키스 카드)
   { id: 'sexAsk', label: '잠자리 제안', icon: '🛏',
-    if: (s, p, a) => a.canSex(p) && a.companion() !== p && !a.jailed(),
+    if: (s, p, a) => a.canSex(p) && a.companion() !== p && !a.jailed() && !KIDZONE.includes(s.place),
     run: (s, p, a) => {
       if (lover(p) || p.fwb) { const no = a.refusal(p); if (no) return { ok: false, do: () => { s.vars.why = no; }, then: 'nightRefused' }; }
       else if (!a.charmed(p, 'bed', a.need('bed') + statusNeed(p, a) + (p.close < 20 ? 12 : 0)))

@@ -2256,7 +2256,7 @@ function actionList() {
   if (jailed()) return D.jailActions;
   const pl = PLACES[S.place];
   if (!pl) return [];
-  return pl.actions.map(id => ACTIONS[id]).filter(a => a && S.age >= a.minAge && (a.maxAge == null || S.age <= a.maxAge) && meets(a.req) && (!a.if || a.if(S)) && !(a.id === 'parttime' && S.flags.inArmy));
+  return pl.actions.map(id => ACTIONS[id]).filter(a => a && S.age >= a.minAge && (a.maxAge == null || S.age <= a.maxAge) && meets(a.req) && (!a.if || a.if(S)) && !(a.id === 'parttime' && S.flags.inArmy) && !(a.id === 'pickup' && !kidAt(S.place)));   // 아이 데리러 가기는 그 나이 아이가 있을 때만
 }
 function canDo(a) { return !busy() && S.ap >= apOf(a) && !dutyPending() && (!costOf(a) || S.money >= costOf(a)); }
 const needsSubject = a => a.id === 'houseHunt' || (a.id === 'study' && inSchool()) || (a.id === 'shop' && S.age >= 13 && !!window.Outfit && !!S.look);
@@ -2483,7 +2483,17 @@ function mapPos(id) {
   return ((M.pos || {})[REGION] || (M.pos || {}).kr || {})[id] || null;
 }
 // 아이 시설 장소 이름: 가까운 유치원·초등학교 이름으로
-const kidPlaceName = id => { if (!KID_PLACE[id]) return null; const k = nearestKid(id, homePos()); return k && k.d < 150 ? k.name : null; };
+const kidPlaceName = id => { if (!KID_PLACE[id]) return null; const k = nearestKid(id, homePos()); return k && k.d < 150 ? k.name + ' 앞' : null; };
+// 유치원·초등학교 앞의 아이들 (배경 — 사람 목록엔 안 들어가고 말 걸 수 없음): 등·하원 시간에 붐비고, 주말·밤엔 거의 없음. 같은 날·같은 시간엔 같은 수
+const kidAt = id => alive().some(p => p.kind === 'child' && (id === 'kinder' ? npcAge(p) >= 3 && npcAge(p) <= 6 : npcAge(p) >= 7 && npcAge(p) <= 12));
+function kidsAround() {
+  if (!KID_PLACE[S.place] || phase() !== 'adult') return 0;
+  const h = clockHour(), d = dow(), r = (hashStr(`${S.dayN || 0}:${S.place}:${h}`) % 1000) / 1000, el = S.place === 'elem';
+  if (d === 0 || d === 6) return h >= 10 && h < 18 ? Math.round(2 + r * 6) : 0;   // 주말: 운동장에서 노는 아이 몇
+  const peak = el ? (h >= 8 && h < 9.5) || (h >= 13 && h < 16) : (h >= 8 && h < 10) || (h >= 15 && h < 18);
+  if (peak) return Math.round((el ? 35 : 15) + r * (el ? 30 : 12));
+  return h >= 9 && h < 17 ? Math.round((el ? 6 : 3) + r * 8) : 0;   // 수업 중엔 운동장·담장 너머로 조금
+}
 /* 교통 */
 const RIDE_IC = { walk: '🚶', bike: '🚲', bus: '🚌', subway: '🚇', car: '🚗', taxi: '🚕' };
 const RIDE_LB = { walk: '걷기', bike: '자전거', bus: '버스', subway: '지하철', car: '내 차', taxi: '택시' };
@@ -2746,6 +2756,7 @@ function fillHere(pl, bring, night) {
     const cands = pl.regulars(S, api).filter(p => p !== bring && ageFits(pl, npcAge(p)));
     const [lo, hi] = pl.regularsN || [1, 2];
     for (const p of shuffle(cands).slice(0, rand(lo, hi))) add(p);
+    if (KID_PLACE[pl.id] && pl.crowd) for (const { lead, grp } of spawnCrowd(pl, night, E.maxHere - here.length)) add(lead, true, grp.length ? grp : null);   // 유치원·초등학교 앞: 내 아이 + 아이 데리러 온 엄마들
     return here;
   }
   const [kn] = E.count[countKey(pl)] || [[1, 2]], m = crowdMult(pl), P = crowdProfile(pl, night), open = P && P.open != null ? P.open : 1;
@@ -3024,6 +3035,10 @@ function crowdMult(pl) {
   let m = h < 9 ? .5 : h < 18 ? 1 : h < 21 ? (id === 'bar' || id === 'mall' ? 1.5 : .8) : h < 24 ? (id === 'bar' ? 2 : id === 'conveni' ? 1.3 : .3) : (id === 'conveni' ? .8 : .1);
   if (d === 0 || d === 6) { if (['park', 'mall', 'cafe'].includes(id)) m *= 1.5; if (['school', 'campus', 'office'].includes(id)) m = 0; }   // 주말: 학교·직장은 쉼
   if (d === 5 && h >= 18 && id === 'bar') m *= 2.5;   // 불금
+  if (KID_PLACE[id]) {   // 유치원·초등학교 앞: 등·하원 시간에 엄마들이 몰리고, 수업 중엔 조금, 밤·주말엔 거의 없음
+    const el = id === 'elem', peak = el ? (h >= 8 && h < 9.5) || (h >= 13 && h < 16) : (h >= 8 && h < 10) || (h >= 15 && h < 18);
+    m = d === 0 || d === 6 ? (h >= 10 && h < 18 ? .3 : 0) : peak ? 1.4 : h >= 9 && h < 18 ? .5 : h >= 18 && h < 20 ? .2 : 0;
+  }
   return m;
 }
 const weatherMult = () => ({ rain: .6, storm: .6, snow: .4, sleet: .4 })[S.weather] || 1;
@@ -4683,7 +4698,7 @@ window.Game = {
     toParents, home: homeInfo, why: realtyWhy, actWhy: () => realtyWhy() || realtyActWhy(), app: () => (RT() || {}).app || '방구하기', visitPt: VISIT_PT, regPt: REG_PT, agentToday: () => !!(S.realty && S.realty.agentDay === S.dayN), moves: () => RT().move },
   // 🍽 먹을 것 (data/food.js): 여기 메뉴·사기·가방·집밥·해 먹기·배달
   food: { here: foodHere, eat: eatMenu, buy: buyFood, bag: bagList, eatBag, drop: dropBag, home: homeEat, delivery: deliveryInfo, order: orderFood, price: fmtPrice, max: BAG_MAX, used: bagUsed, spent: () => { foodState(); payFood(0); return S.food; } },
-  budget, here: hereList, hereNote: () => S.hereNote && S.hereNote.pl === S.place ? S.hereNote : null, talkTo, passBy, browseMore, browseLeft, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
+  budget, here: hereList, hereNote: () => S.hereNote && S.hereNote.pl === S.place ? S.hereNote : null, talkTo, passBy, browseMore, browseLeft, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] ? Object.assign({}, PLACES[S.place], kidPlaceName(S.place) ? { label: kidPlaceName(S.place) } : {}) : null, kidsAround, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
   intimacy: p => canSex(p) && (p.nights || lover(p) || p.teased) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
   // 이 사람을 향한 내 성욕 (내 마음이라 늘 보임) / 지금 가장 높은 대상

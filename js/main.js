@@ -440,6 +440,7 @@ function renderWhere(S) {
     ${pl.campus ? classCard(G.timeInfo().cls) : ''}
     <p class="sec-t">👥 여기 있는 사람 ${nStaff + nKnown + nNew}명 <span class="dim">· ${nStaff ? `일하는 사람 ${nStaff} · ` : ''}아는 사람 ${nKnown} · 처음 보는 사람 ${nNew} · 말 걸기는 행동력 안 씀</span>${pl.crowd ? ' <button type="button" class="br-open" data-browse>👀 둘러보기</button>' : ''}</p>
     ${crowdLine(here)}
+    ${(n => n ? `<p class="hint kids-line">🧒 아이들 ${n}명이 ${n >= 15 ? '쏟아져 나와 뛰어다닌다 — 엄마들이 지켜보고 있다' : '담장 너머에서 뛰어논다'} <span class="dim">(말 걸 수 없음)</span></p>` : '')(G.kidsAround())}
     <div class="here">${here.length ? [['🧑‍💼 여기서 일하는 사람', here.filter(h => h.staff)], ['아는 사람', here.filter(h => !h.stranger && !h.staff)], ['처음 보는 사람', here.filter(h => h.stranger)]].filter(g => g[1].length).map(([t, L]) => `<p class="here-g">${t} <small>${L.length}</small></p>${L.map(hereRow).join('')}`).join('') : '<p class="empty">아무도 없다.</p>'}</div>
     ${foodBar(G.food.here())}
     <p class="sec-t">여기서 할 수 있는 것 <span class="dim">· ⚡ = 드는 행동력</span></p>
