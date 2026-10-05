@@ -198,38 +198,42 @@ function room(kind) {
 </g></svg>`;
 }
 
-// 오른쪽 위 ♂♀ 패널: 왼쪽은 구불구불한 분홍 벽(♀ 기호가 벽 속에 묻혀 도드라짐), 가운데 높이에 일자로 갈라진 틈.
-//   오른쪽의 ♂ 화살이 틈으로 탄력 있게 파고듦 — 들어가면 틈이 벌어지고 벽 가장자리가 눌렸다 출렁이며 돌아옴, 화살은 용수철처럼 튕김
-//   그리는 순서: 빛 → 벽 → 벽 달아오름 → 묻힌 ♀ → 틈 → 잔상 → ♂ 화살 → 벽 가장자리 하이라이트(화살 위로 덮임) → 부딪힘 선·반짝 → 하트
-const SY_Y = 32, SY_WE = 56, SY_IN = 14;   // 틈의 높이, 벽 가장자리 x, 틈 안쪽 끝 x
+// 오른쪽 위 ♂♀ 패널: 오른쪽은 평평한 살색 벽(♀ 기호가 겉면에 돋을새김으로 묻힘), 가운데 높이에 안쪽 깊숙이까지 뚫린 구불구불한 일자 틈 — 틈 안쪽은 분홍.
+//   왼쪽의 ♂ 화살(길고 굵게)이 틈으로 탄력 있게 파고듦 — 들어간 만큼 틈이 펴지며 대 굵기로 벌어지고, 겉면은 틈 둘레만 살짝 눌렸다 출렁이며 돌아옴, 화살은 용수철처럼 튕김
+//   좌표는 벽이 왼쪽인 채로 계산하고 통째로 좌우 반전(sy-mir)해서 그림 — 박자 아이콘(글자)만 반전 밖
+//   그리는 순서: 빛 → 틈 속 어둠 → 잔상 → ♂ 화살 → 분홍 안쪽(틈 둘레) → 살색 벽 → 달아오름 → 묻힌 ♀ → 틈 가장자리 빛 → 겉면 하이라이트 → 부딪힘 선·반짝 → 하트
+const SY_Y = 32, SY_WE = 56, SY_IN = 5;   // 틈의 높이, 벽 겉면 x, 틈 안쪽 끝 x (반전 전 좌표)
 const SYM = `<div class="nt-sym"><svg viewBox="0 0 150 64" aria-hidden="true"><defs>
   <radialGradient id="ntSG"><stop offset="0" stop-color="#ff7aa2" stop-opacity=".6"/><stop offset="1" stop-color="#ff7aa2" stop-opacity="0"/></radialGradient>
-  <linearGradient id="syWall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e5588a"/><stop offset=".6" stop-color="#ff86ab"/><stop offset="1" stop-color="#ffb3ca"/></linearGradient>
-  <linearGradient id="syCrack" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4a0f27"/><stop offset="1" stop-color="#8e2450"/></linearGradient>
+  <linearGradient id="syWall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9a07c"/><stop offset=".75" stop-color="#efc29f"/><stop offset="1" stop-color="#f6d2b4"/></linearGradient>
+  <linearGradient id="syIn" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a8265a"/><stop offset=".55" stop-color="#e2557f"/><stop offset="1" stop-color="#ff9dbb"/></linearGradient>
+  <linearGradient id="syCrack" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1c030c"/><stop offset=".7" stop-color="#4a0d26"/><stop offset="1" stop-color="#7a1a40"/></linearGradient>
   <linearGradient id="syMg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9dcff"/><stop offset=".55" stop-color="#5aa8ff"/><stop offset="1" stop-color="#2f6bd0"/></linearGradient>
   <linearGradient id="syShaft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4ebff"/><stop offset=".45" stop-color="#5aa8ff"/><stop offset="1" stop-color="#2a60c4"/></linearGradient>
   <linearGradient id="syHead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9e5ff"/><stop offset=".5" stop-color="#4f9cf3"/><stop offset="1" stop-color="#2455b4"/></linearGradient>
   <radialGradient id="syDrop" cx=".65" cy=".35" r=".8"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#c8ecff"/><stop offset="1" stop-color="#5fb8f0"/></radialGradient>
   <filter id="sySh" x="-20%" y="-30%" width="140%" height="160%"><feDropShadow dx="0" dy="1.1" stdDeviation=".9" flood-color="#000" flood-opacity=".5"/></filter>
   <clipPath id="syWC"><path class="sy-wclip"/></clipPath>
-</defs>
+</defs><g class="sy-mir" transform="translate(150,0) scale(-1,1)">
   <circle class="sy-glow" cx="${SY_WE}" cy="${SY_Y}" r="26" fill="url(#ntSG)" opacity="0"/>
   <path class="sy-crack" fill="url(#syCrack)"/>
-  <g class="sy-trail" fill="none" stroke="#5aa8ff" stroke-width="3.6"><circle class="sy-g1" r="13.5" opacity="0"/><circle class="sy-g2" r="13.5" opacity="0"/></g>
-  <g class="sy-m" transform="translate(130,${SY_Y}) scale(-1,1)" filter="url(#sySh)"><circle r="13.5" fill="none" stroke="url(#syMg)" stroke-width="5.2"/><path d="M-10.4,-6 A12.1,12.1 0 0 1 -1.3,-12.1" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".55"/>
-    <rect class="sy-shaft" x="13.5" y="-3.5" height="7" rx="3.5" fill="url(#syShaft)"/><path class="sy-head" fill="url(#syHead)" stroke="#2457b5" stroke-width=".7" stroke-linejoin="round"/><path class="sy-hh" fill="none" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity=".55"/></g>
+  <g class="sy-trail" fill="none" stroke="#5aa8ff" stroke-width="4.6"><circle class="sy-g1" r="13.5" opacity="0"/><circle class="sy-g2" r="13.5" opacity="0"/></g>
+  <g class="sy-m" transform="translate(130,${SY_Y}) scale(-1,1)" filter="url(#sySh)"><circle r="13.5" fill="none" stroke="url(#syMg)" stroke-width="6.6"/><path d="M-10.2,-6.4 A12,12 0 0 1 -1.4,-12" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" opacity=".55"/>
+    <rect class="sy-shaft" x="13.5" y="-5" height="10" rx="5" fill="url(#syShaft)"/><path class="sy-head" fill="url(#syHead)" stroke="#2457b5" stroke-width=".8" stroke-linejoin="round"/><path class="sy-hh" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".55"/></g>
+  <path class="sy-inner" fill="url(#syIn)" fill-rule="evenodd"/>
   <path class="sy-wall" fill="url(#syWall)" fill-rule="evenodd"/>
-  <path class="sy-flush" fill="#ff2d6f" fill-rule="evenodd" opacity="0"/>
+  <path class="sy-flush" fill="#ff6f96" fill-rule="evenodd" opacity="0"/>
   <g class="sy-fem" clip-path="url(#syWC)" fill="none" stroke-linecap="round"><g class="sy-femg">
-    <circle cx="25" cy="15" r="8.5" stroke="#ffd0de" stroke-width="3.4" opacity=".55" transform="translate(.8,.9)"/><circle cx="25" cy="15" r="8.5" stroke="#b8336a" stroke-width="3.4" opacity=".75"/>
-    <path d="M25,23.5 V27.5 M21,25.6 H29" stroke="#ffd0de" stroke-width="3" opacity=".5" transform="translate(.8,.9)"/><path d="M25,23.5 V27.5 M21,25.6 H29" stroke="#b8336a" stroke-width="3" opacity=".7"/></g></g>
-  <path class="sy-crackhl" fill="none" stroke="#ffd9e6" stroke-width=".8" stroke-linecap="round" opacity=".75"/>
-  <path class="sy-edge" fill="none" stroke="#ffd6e4" stroke-width="1.3" stroke-linecap="round" opacity=".8"/>
+    <circle cx="24" cy="13" r="8" stroke="#fff0e4" stroke-width="3.2" opacity=".6" transform="translate(.8,.9)"/><circle cx="24" cy="13" r="8" stroke="#bf7b5c" stroke-width="3.2" opacity=".75"/>
+    <path d="M24,21 V25 M20,23 H28" stroke="#fff0e4" stroke-width="2.8" opacity=".55" transform="translate(.8,.9)"/><path d="M24,21 V25 M20,23 H28" stroke="#bf7b5c" stroke-width="2.8" opacity=".7"/></g></g>
+  <path class="sy-rim" fill="none" stroke="#c8708a" stroke-width=".7" opacity=".75"/>
+  <path class="sy-crackhl" fill="none" stroke="#ffc6d8" stroke-width=".8" stroke-linecap="round" opacity=".8"/>
+  <path class="sy-edge" fill="none" stroke="#fff3e8" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
   <path class="sy-tak" fill="none" stroke="#ffe08a" stroke-width="1.6" stroke-linecap="round" opacity="0"/>
   <path class="sy-spark" fill="#fff6c8" opacity="0"/>
   <g class="sy-ouch" opacity="0"><path d="M72,6 Q69,11 72,13 Q75,11 72,6 Z" fill="#cfeeff" stroke="#86bfdc" stroke-width=".7"/><path d="M80,4 V12 M80,15.5 V16" stroke="#ffd36b" stroke-width="2.4" stroke-linecap="round"/></g>
-  <g class="sy-sq"></g><g class="sy-hs"></g><g transform="translate(28,52)"><path class="sy-h" d="${HEART}" fill="#ff4f86"/></g>
-  <text class="sy-beat" x="0" y="0" font-size="13" text-anchor="middle" dominant-baseline="central" transform="translate(140,55)"></text></svg></div>`;
+  <g class="sy-sq"></g><g class="sy-hs"></g><g transform="translate(28,52)"><path class="sy-h" d="${HEART}" fill="#ff4f86"/></g></g>
+  <text class="sy-beat" x="0" y="0" font-size="13" text-anchor="middle" dominant-baseline="central" transform="translate(11,55)"></text></svg></div>`;
 // 크기(cm) → 등급 1~6 (단소·소형·보통·큰 편·대물·흉기)
 const sizeGrade = cm => cm < 10 ? 1 : cm < 13 ? 2 : cm < 16 ? 3 : cm < 18 ? 4 : cm < 20 ? 5 : 6;
 
@@ -832,15 +836,15 @@ function run(stage, job, done) {
   // 오른쪽 위 ♂♀: 분홍 벽(♀ 기호가 묻혀 있음)의 틈으로 ♂ 화살이 파고듦 — 틈이 벌어지고 출렁임(symE), 벽 가장자리가 눌렸다 돌아옴(symX)
   const sym = stage.querySelector('.nt-sym'), sq = c => sym.querySelector(c), symM = sq('.sy-m'), symG = sq('.sy-glow'), symH = sq('.sy-h');
   // 화살 길이는 남자 크기(cm)에 비례
-  const cm = sc.cm || { small: 11, avg: 14, large: 17, xlarge: 20 }[sc.size] || 14, grade = sizeGrade(cm), shaft = 10 + 1.7 * cm;
+  const cm = sc.cm || { small: 11, avg: 14, large: 17, xlarge: 20 }[sc.size] || 14, grade = sizeGrade(cm), shaft = 16 + 2.3 * cm;
   // ♂ 화살: 원(반지름 13.5, 굵기 5.2) → 굵은 대(7) → 큰 촉(높이 20) (촉 밑동 hb, 끝 ht). 길이는 크기(cm)에 비례 — 그림은 오른쪽을 보게 그리고 좌우로 뒤집어 왼쪽(벽)을 향함
-  const MR = 13.5, MO = MR + 2.6, hb = MR + shaft - 13, ht = MR + shaft;
+  const MR = 13.5, MO = MR + 3.3, hb = MR + shaft - 16, ht = MR + shaft;
   sq('.sy-shaft').setAttribute('width', f(hb - MR + .5));
-  sq('.sy-head').setAttribute('d', `M${f(hb - 2)},-10 L${f(ht)},0 L${f(hb - 2)},10 Q${f(hb + 2.6)},0 ${f(hb - 2)},-10 Z`);
-  sq('.sy-hh').setAttribute('d', `M${f(hb)},-7 L${f(ht - 3.4)},-1.3`);
+  sq('.sy-head').setAttribute('d', `M${f(hb - 2)},-13 L${f(ht)},0 L${f(hb - 2)},13 Q${f(hb + 3.4)},0 ${f(hb - 2)},-13 Z`);
+  sq('.sy-hh').setAttribute('d', `M${f(hb)},-9 L${f(ht - 4.2)},-1.6`);
   // 다 들어갔을 때의 깊이 (크기에 비례, 틈 안쪽 끝은 넘지 않음) → d = 0일 때 ♂ 원 중심 GX0
   const DEPTH = Math.min(SY_WE - SY_IN - 4, Math.max(8, shaft * .62)), GX0 = SY_WE - DEPTH + ht;
-  const E = Object.fromEntries(['wall', 'flush', 'crack', 'crackhl', 'edge', 'femg', 'tak', 'spark', 'g1', 'g2', 'ouch'].map(k => [k, sq('.sy-' + k)])), WCL = sq('.sy-wclip');
+  const E = Object.fromEntries(['wall', 'inner', 'flush', 'crack', 'crackhl', 'rim', 'edge', 'femg', 'tak', 'spark', 'g1', 'g2', 'ouch'].map(k => [k, sq('.sy-' + k)])), WCL = sq('.sy-wclip');
   let ax = null, av = 0, lastTip = null;   // 화살은 용수철처럼 목표 자리를 따라감 (살짝 넘었다 돌아와서 탄력 있게)
   // 받아들일 수 있는 세기: 체형이 가늘수록 낮음. 크기 × 세기가 넘으면 움찔, 아니면 하트
   const limit = { slim: 1.85, avg: 2.15, fit: 2.25, chubby: 2.35 }[sc.build] || 2.15, symHearts = [], symHS = sq('.sy-hs');
@@ -1381,7 +1385,7 @@ function run(stage, job, done) {
     // ♂ 화살은 d를 따라 틈으로 드나듦 — 용수철처럼 목표를 따라가 살짝 넘었다 돌아오고, 들어가면 틈이 벌어지며 벽 가장자리가 눌렸다 출렁임. 만족감이 낮으면 끝나고 빠지며 고개를 숙임
     const intro = ease(Math.min(1, t / .8)), u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0;
     // 애무 중: 화살은 벽 앞에서 머뭇거리며 가장자리를 톡톡 (서툴면 들쭉날쭉, 능숙하면 부드럽게) → 끝나면 용수철처럼 틈으로
-    const foreW = SY_WE + ht + 4 + 2.6 * ms.fs - 1.5 * ms.fk, fk2 = t < FP ? 1 : Math.max(0, 1 - (t - FP) / .5);
+    const foreW = Math.min(136, SY_WE + ht + 4 + 2.6 * ms.fs - 1.5 * ms.fk), fk2 = t < FP ? 1 : Math.max(0, 1 - (t - FP) / .5);
     const want = Math.min(136, (GX0 + 2.6 * Math.max(-2.5, ms.d + (good ? 0 : 14 * ease(u))) + symX * .3) * (1 - fk2) + foreW * fk2) + (1 - intro) * 60;
     if (ax == null) ax = want;
     const fdt = 1 / 60;
@@ -1389,23 +1393,31 @@ function run(stage, job, done) {
     const gx = ax, tip = gx - ht, ouch = t - ouchAt < .6 ? 1 - (t - ouchAt) / .6 : 0, jit = ouch * 1.6 * Math.sin((t - ouchAt) * 190);
     const qv = quiv && t < quiv.until ? quiv.amp * Math.sin(t * 82) : 0;   // 절정: 벽이 바르르 (대절정은 크게)
     const cy0 = SY_Y + ms.tr * .6, depth = Math.max(0, SY_WE - tip), inK = Math.min(1, depth / 10);
-    const push = Math.max(0, -ms.d) * .9 * inK + symX * .45 + jit + qv * 18;   // 벽 가장자리가 안쪽으로 눌린 정도
-    const open = .7 + 2.9 * inK + 1.4 * Math.max(0, symE) + ouch * .8 + Math.abs(qv) * 6 + (gi >= 4 ? ar * (gi - 3) * .22 : 0);   // 틈 입구가 벌어진 반높이 (능숙할수록 달아오르며 더 벌어짐)
-    // 벽 가장자리: 구불구불 + 틈 둘레만 눌리고 출렁임
+    const push = (Math.max(0, -ms.d) * .9 * inK + symX * .45 + jit + qv * 18) * .55;   // 평평한 겉면이 틈 둘레만 살짝 눌린 정도
+    const open = .8 + 3.6 * inK + 1.4 * Math.max(0, symE) + ouch * .8 + Math.abs(qv) * 6 + (gi >= 4 ? ar * (gi - 3) * .22 : 0);   // 틈 입구가 벌어진 반높이 (능숙할수록 달아오르며 더 벌어짐)
+    // 겉면: 평평한 살색 — 틈 둘레만 눌렸다 출렁임
     const pts = [];
-    for (let yy = -2; yy <= 66; yy += 4) { const near = Math.exp(-(((yy - cy0) / 11) ** 2)); pts.push([SY_WE + 2.4 * Math.sin(yy * .32 + 1) + 1.2 * Math.sin(yy * .71) - push * near + symE * 1.6 * near * Math.sin(t * 26 + yy * .2), yy]); }
-    const near0 = 1, mx = SY_WE + 2.4 * Math.sin(cy0 * .32 + 1) + 1.2 * Math.sin(cy0 * .71) - push * near0;
-    // 틈: 안쪽 끝은 실금, 입구로 갈수록 벌어짐. 화살이 들어간 만큼은 대 굵기만큼 벌어짐
-    const hAt = x => { let h = .35 + (open - .35) * Math.pow(Math.max(0, (x - SY_IN) / Math.max(1, mx - SY_IN)), .7); if (depth > 0 && x >= tip - 2) h = Math.max(h, 3.9 + Math.max(0, symE) * .5); return h; };
-    const xs = Array.from({ length: 10 }, (_, k) => SY_IN + (mx - SY_IN) * k / 9), topL = xs.map(x => [x, cy0 - hAt(x)]), botL = xs.map(x => [x, cy0 + hAt(x)]).reverse();
-    const hm = hAt(mx), crackD = `M${f(SY_IN)},${f(cy0)} L${topL.map(p => f(p[0]) + ',' + f(p[1])).join(' L')} L${f(mx + 2.5)},${f(cy0 - hm * .9)} L${f(mx + 2.5)},${f(cy0 + hm * .9)} L${botL.map(p => f(p[0]) + ',' + f(p[1])).join(' L')} Z`;
+    for (let yy = -2; yy <= 66; yy += 4) { const near = Math.exp(-(((yy - cy0) / 9) ** 2)); pts.push([SY_WE - push * near + symE * 1.1 * near * Math.sin(t * 26 + yy * .2), yy]); }
+    const mx = Math.min(SY_WE - push, ...pts.filter(p => Math.abs(p[1] - cy0) < 14).map(p => p[0])) - .3, lenC = Math.max(1, mx - SY_IN);
+    // 틈: 안쪽 깊숙이까지 구불구불한 일자 (안쪽 끝은 실금, 입구로 갈수록 벌어짐). 화살이 들어간 만큼은 펴지고 대 굵기로 벌어짐
+    const SH = 5.4 + Math.max(0, symE) * .5;
+    const stra = x => depth > 0 ? Math.max(0, Math.min(1, (x - (tip - 8)) / 8)) : 0;
+    const cyAt = x => cy0 + 2.8 * Math.sin((x - SY_IN) * .36 + 1.2) * Math.min(1, (1 - (x - SY_IN) / lenC) * 1.7) * (1 - stra(x));   // 입구는 가운데로 모임
+    const hAt = x => { let h = .45 + (open - .45) * Math.pow(Math.max(0, (x - SY_IN) / lenC), .8); if (depth > 0 && x >= tip - 2) h = Math.max(h, SH); return h; };
+    const pbAt = x => 1 + 2.6 * (x - SY_IN) / lenC + .8 * inK;   // 틈 둘레로 보이는 분홍 안쪽 (입구 쪽이 넓음)
+    const xs = Array.from({ length: 22 }, (_, k) => SY_IN + lenC * k / 21);
+    const lane = k => { const top = xs.map(x => [x, cyAt(x) - hAt(x) - k * pbAt(x)]), bot = xs.map(x => [x, cyAt(x) + hAt(x) + k * pbAt(x)]).reverse(); return { top, bot }; };
+    const laneD = ({ top, bot }) => `M${f(top[0][0])},${f(top[0][1])}${curve(top)} L${f(bot[0][0])},${f(bot[0][1])}${curve(bot)} Z`;
+    const H = lane(0), B = lane(1), hollowD = laneD(H), innerD = laneD(B);
     const wallD = `M-2,-2 L${f(pts[0][0])},${f(pts[0][1])}${curve(pts)} L-2,66 Z`;
-    E.wall.setAttribute('d', wallD + crackD); E.flush.setAttribute('d', wallD + crackD); WCL.setAttribute('d', wallD);
-    E.crack.setAttribute('d', crackD);
-    E.crackhl.setAttribute('d', `M${topL.slice(2).map(p => f(p[0]) + ',' + f(p[1] - .5)).join(' L')} M${botL.slice(0, -2).map(p => f(p[0]) + ',' + f(p[1] + .5)).join(' L')}`);
-    const up = pts.filter(p => p[1] < cy0 - hm - 2), dn = pts.filter(p => p[1] > cy0 + hm + 2);
+    E.crack.setAttribute('d', hollowD); E.inner.setAttribute('d', innerD + hollowD);
+    E.wall.setAttribute('d', wallD + innerD); E.flush.setAttribute('d', wallD + innerD); WCL.setAttribute('d', wallD);
+    E.rim.setAttribute('d', `M${f(B.top[2][0])},${f(B.top[2][1])}${curve(B.top.slice(2))} M${f(B.bot[0][0])},${f(B.bot[0][1])}${curve(B.bot.slice(0, -2))}`);
+    E.crackhl.setAttribute('d', `M${H.top.slice(4).map(p => f(p[0]) + ',' + f(p[1] - .4)).join(' L')} M${H.bot.slice(0, -4).map(p => f(p[0]) + ',' + f(p[1] + .4)).join(' L')}`);
+    const hm = hAt(mx), mTop = B.top[B.top.length - 1][1], mBot = B.bot[0][1];
+    const up = pts.filter(p => p[1] < mTop - 1.5), dn = pts.filter(p => p[1] > mBot + 1.5);
     E.edge.setAttribute('d', (up.length > 1 ? `M${f(up[0][0])},${f(up[0][1])}${curve(up)}` : '') + (dn.length > 1 ? ` M${f(dn[0][0])},${f(dn[0][1])}${curve(dn)}` : ''));
-    E.femg.setAttribute('transform', `translate(${f(-push * .12 + jit * .3)},${f(Math.max(0, symE) * .5)})`);   // 벽에 묻힌 ♀도 같이 들썩
+    E.femg.setAttribute('transform', `translate(${f(-push * .2 + jit * .3)},${f(Math.max(0, symE) * .5)})`);   // 벽에 묻힌 ♀도 같이 들썩
     // 화살 속도(잔상) · 촉이 입구를 지날 때 틈이 꿀렁 · 들어가 있으면 미는 만큼 벽이 눌림
     gv = lastGx == null ? 0 : gv * .6 + .4 * (gx - lastGx) / fdt;
     if (lastTip != null && (lastTip - mx) * (tip - mx) < 0) symEV += 6;
@@ -1435,7 +1447,7 @@ function run(stage, job, done) {
     // 박자 아이콘: 💓 → 💓💓 → 🔥 → (끝나면) ✨. 부딪힐 때마다 통통
     const bc = S[si], bt = t >= end + .3 ? (good ? '✨' : '') : t < peakUntil ? '💦' : !bc || t < bc.t0 ? '💋' : bc.kind !== 'n' ? '🔥' : bc.T > .44 ? '💓' : bc.T > .3 ? '💓💓' : '🔥';
     if (bt !== beatTxt) { beatTxt = bt; beatEl.textContent = bt; }
-    beatEl.setAttribute('transform', `translate(140,55) scale(${(1 + .35 * Math.max(-.5, beatK)).toFixed(3)})`);
+    beatEl.setAttribute('transform', `translate(11,55) scale(${(1 + .35 * Math.max(-.5, beatK)).toFixed(3)})`);
     for (let i = symHearts.length - 1; i >= 0; i--) {
       const h = symHearts[i], k = (t - h.t0) / .9;
       if (k >= 1) { h.el.remove(); symHearts.splice(i, 1); continue; }
