@@ -4272,7 +4272,7 @@ function quickLook(q) {
   if (g === 'f') { const ci = QD().cups.indexOf(q.cup); a.body.chest = ci <= 1 ? 'small' : ci >= 4 ? 'large' : 'avg'; }
   else a.body.shoulder = +q.shoulder < 41 ? 'narrow' : +q.shoulder > 46 ? 'wide' : 'avg';
   if (q.st && q.st.face != null && Avatar.fitGrade) Avatar.fitGrade(a, faceLetter(qsStat(+q.st.face)));   // 미리보기·랜덤 얼굴도 고른 생김새 등급으로 (포인트 → 능력치로 바꿔서 — 샌드박스로 높게 깔면 높은 얼굴만)
-  if (q.gray && q.diff === 'sandbox') a.gray = true;   // 샌드박스: 외모를 정하지 않음 → 회색 아바타 (얼굴 유전자는 그대로 두고 그리기만 회색)
+  if (q.gray && q.diff === 'sandbox') a.blank = true;   // 샌드박스: 외모를 정하지 않음 → 회색 아바타 (얼굴 유전자는 그대로 두고 그리기만 회색. look.gray는 흰머리 나는 정도라 blank로 따로)
   return a;
 }
 const QS_TRACK = { cs: 'tech', medicine: 'life', nursing: 'life', biology: 'life', physics: 'science', chemistry: 'science', engineering: 'science', architecture: 'science', arts: 'arts', music: 'arts', design: 'arts', culinary: 'arts', beauty: 'arts' };
@@ -4628,6 +4628,7 @@ function migrate(s) {
 // 예전 저장: 내 얼굴을 생김새 등급에 맞추고(한 번), NPC 생김새 등급은 얼굴 점수로 (FACE_UPGRADE)
 function migrateFaces() {
   if (!S || !window.Avatar || !Avatar.faceInfo) return;
+  if (S.look && typeof S.look.gray === 'boolean') { if (S.look.gray) S.look.blank = true; S.look.gray = .5; }   // 예전 저장: 회색 아바타를 gray(흰머리 정도)에 넣었던 것 → blank로 옮김
   if (S.look && (S.look.gfit || 0) < FACE_V) { const inf = Avatar.faceInfo(S.look); if (inf && inf.grade === gradeOf(S.stats.face)) S.look.gfit = FACE_V; else fitMyFace(); }   // 등급이 그대로면 얼굴도 그대로
   for (const p of S.people) if (p.appearance && (p.faceG || 0) < FACE_V) faceFromLook(p);
 }
@@ -4674,7 +4675,7 @@ window.Game = {
     jobs: () => D.quick.jobs.map(job), tierUnis: tiers => D.universities.filter(u => tiers.includes(u.tier)),
   },
   // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
-  actPreview, lastAct: () => LAST_ACT, ride: { info: rideInfo, set: setRide, buyCar, sellCar, choices: routeChoices, options: id => { const pl = PLACES[id], a = mapPos(standAt()), b = pl && mapPos(id); return a && b ? routeOptions(a, b, id) : []; } }, mapInfo: () => ({ home: D.map ? homePos() : null, dong: D.map ? homeDong() : '', at: D.map ? mapPos(standAt()) : null }), phase, timeInfo, storyNext, nextTurn, doDuty: () => { doDuty(false); after(); }, attend: i => attendLecture(i), classInfo, cert: { info: certInfo, study: certStudy, apply: certApply, list: () => CERTS().map(c => ({ id: c.id, name: certName(c), score: !!c.score })) }, setGray: on => { if (S && S.look) { S.look.gray = !!on; save(); emit(); } }, sleep: () => skip('today'), skip,
+  actPreview, lastAct: () => LAST_ACT, ride: { info: rideInfo, set: setRide, buyCar, sellCar, choices: routeChoices, options: id => { const pl = PLACES[id], a = mapPos(standAt()), b = pl && mapPos(id); return a && b ? routeOptions(a, b, id) : []; } }, mapInfo: () => ({ home: D.map ? homePos() : null, dong: D.map ? homeDong() : '', at: D.map ? mapPos(standAt()) : null }), phase, timeInfo, storyNext, nextTurn, doDuty: () => { doDuty(false); after(); }, attend: i => attendLecture(i), classInfo, cert: { info: certInfo, study: certStudy, apply: certApply, list: () => CERTS().map(c => ({ id: c.id, name: certName(c), score: !!c.score })) }, setGray: on => { if (S && S.look) { S.look.blank = !!on; save(); emit(); } }, sleep: () => skip('today'), skip,
   actionList, canDo, costOf, apOf, doAction, needsSubject, shopToday, outfitCtx: (p, evId) => outfitCtx(p || null, evId), dateOutfits, setDateOutfit: ix => { S.vars.dateOutfit = ix; },
   places: placeList, onCampus: () => onCampus(standAt()) && !!S.flags.student, teenPt: TEEN_PT, goPlace, leavePlace, hasNumber, askNumber, askStranger, mateWord, numberOdds, homeNow: () => homeNow(),
   // 📱 부동산 앱 (data/realty.js)

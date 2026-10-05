@@ -2347,7 +2347,7 @@ function render(a, size = 48, state = 25) {
   const age = st.age ?? 25, full = !!st.full, adult = age >= 20;
   const w = Math.round(size), h = Math.round(size * (full ? 7 / 3 : 4 / 3));
   if (!a) return `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 ${full ? 280 : 160}" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="${full ? 279 : 159}" rx="10"/></svg>`;
-  if (a.gray) return graySVG(w, h, full);   // 샌드박스 '외모 정하지 않음' — 회색 실루엣
+  if (a.blank === true) return graySVG(w, h, full);   // 샌드박스 '외모 정하지 않음' — 회색 실루엣 (나만. gray는 흰머리 나는 정도라 따로)
   if (adult && st.preIntimate) return renderPreIntimate(a, size, st);
   if (full) { LOD = size < 200 ? 1 : 2; LW = LOD < 2 ? 1.2 : 1; try { return renderFull(a, size, st); } finally { LOD = 2; LW = 1; } }
   // 작은 화면 (FACE_UPGRADE 1절): 96px 이하는 얼굴만 크롭 + 선 ×1.3 + 작은 디테일 끔. 함께 밤·아침 장면은 그대로

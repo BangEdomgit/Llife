@@ -21,6 +21,7 @@ const bar = v => meter(v);
 const CD_ICON = { happy: '😊', health: '❤️', libido: '🔥' };
 const mini = v => meter(v, ' sm');
 const wxIcon = k => (WX[k] && WX[k].icon) || '';
+const ME_GRAY = `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><clipPath id="meAvClip"><circle cx="32" cy="32" r="32"/></clipPath></defs><g clip-path="url(#meAvClip)"><rect width="64" height="64" fill="#dfe2e8"/><circle cx="32" cy="25" r="11.5" fill="#9aa1ac"/><path d="M7 68c0-15 11-25.5 25-25.5S57 53 57 68z" fill="#9aa1ac"/></g></svg>`;
 const genderKo = g => g === 'm' ? '남' : '여';
 const isMoney = k => k === 'money';
 const pbar = p => meter(p * 100, ' sm');
@@ -106,6 +107,9 @@ function render(S) {
   $('#crimeBtn').hidden = G.crimes().length === 0 && S.jail === 0;
   $('#mapBtn').disabled = !G.places().length;
   $('#phoneBtn').disabled = S.age < 10;   // 폰은 열 살부터
+  // 프로필 원: 내 얼굴 (샌드박스 '외모 정하지 않음'이면 회색 사람 모양)
+  const meAv = $('#meAv'), meHTML = window.Avatar && S.look && !S.look.blank ? Avatar.render(G.myLook(), 64, { age: S.age }) : ME_GRAY;
+  if (meAv.dataset.k !== meHTML) { meAv.dataset.k = meHTML; meAv.innerHTML = meHTML; meAv.classList.toggle('real', meHTML !== ME_GRAY); }
 
   renderWhere(S);
 
@@ -119,7 +123,8 @@ function render(S) {
     const d = ti.duty;
     flow.hidden = false;
     const c = ti.cls, cn = c && c.next;   // 대학생: 대학 밖이면 '학교 가기'(지도에서 교통수단), 캠퍼스면 다음 강의 듣기
-    flow.innerHTML = (d ? `<button type="button" data-flow="duty"${wait ? ' disabled' : ''}>${d.id === 'work' ? '💼' : '🪖'} ${d.label} <small>⚡${d.ap}</small></button>` : '') +
+    const ofr = S.age >= 19 ? G.jobsite.apps().find(a => a.stage === 'offer') : null;   // 최종 합격: 바로 잡 앱에서 입사 정하기
+    flow.innerHTML = (ofr ? `<button type="button" class="hot" data-flow="offer"${wait ? ' disabled' : ''}>🎉 ${esc(ofr.co)} 합격 — 입사 정하기</button>` : '') + (d ? `<button type="button" data-flow="duty"${wait ? ' disabled' : ''}>${d.id === 'work' ? '💼' : '🪖'} ${d.label} <small>⚡${d.ap}</small></button>` : '') +
       (cn ? (c.onCampus ? `<button type="button" data-flow="attend"${wait || c.why ? ' disabled' : ''}>📖 ${cn.time} ${esc(cn.name)} <small>⚡${c.need}</small></button>`
         : `<button type="button" data-flow="toschool"${wait ? ' disabled' : ''}>🎓 학교 가기 <small>${cn.time} ${esc(cn.name)}</small></button>`) : '') +
       `<button type="button" data-flow="week"${wait ? ' disabled' : ''}>⏭ 이번 주 넘기기</button><button type="button" data-flow="month"${wait ? ' disabled' : ''}>⏩ 이번 달 넘기기</button><button type="button" data-flow="event"${wait ? ' disabled' : ''}>⏬ 다음 일까지</button>`;
@@ -914,9 +919,11 @@ const JB_STAGE = { doc: ['📄 서류 검토 중', ''], iv: ['🗣 면접 예정
 const jbCard = P => `<button type="button" class="jb-card" data-post="${P.id}"><span class="jb-co">${esc(P.co)} <small>★ ${P.star}</small></span><b class="jb-t">${esc(P.title)}</b>
   <span class="jb-m">${esc(P.salaryT)} · ${esc(P.type)} · ${esc(P.career)}</span><span class="dim jb-m">📍 ${esc(P.dong)} · 통근 ${P.commute}분 · ${P.dday > 0 ? `D-${P.dday}` : P.dday === 0 ? '오늘 마감' : '마감'}</span>
   <span class="rt-tags">${P.app ? `<i class="rt-tag ${(JB_STAGE[P.app] || [])[1]}">${(JB_STAGE[P.app] || [''])[0]}</i>` : ''}${P.ok ? '<i class="rt-tag ok">✓ 자격 충족</i>' : ''}${P.perks.slice(0, 3).map(x => `<i class="rt-tag">${esc(x)}</i>`).join('')}</span></button>`;
+// 최종 합격 → 입사하기·거절 버튼 (지금 이벤트가 떠 있으면 그것부터)
+const jbOffer = (a, S) => `<div class="jb-ofr"><button type="button" class="hot" data-jacc="${a.ix}"${S.pending.length ? ' disabled' : ''}>입사하기</button><button type="button" data-jdec="${a.ix}">거절</button></div>`;
 function openJobs(tab) {
-  jbTab = tab || jbTab;
-  const S = G.state(), J = G.jobsite, apps = J.apps(), live = apps.filter(a => ['doc', 'iv', 'wait', 'offer'].includes(a.stage)).length;
+  const S = G.state(), J = G.jobsite, apps = J.apps(), live = apps.filter(a => ['doc', 'iv', 'wait', 'offer'].includes(a.stage)).length, offers = apps.filter(a => a.stage === 'offer');
+  jbTab = tab || (offers.length && modalMode !== 'jobs' ? 'apps' : jbTab);   // 합격 소식이 있으면 앱을 열 때 지원 현황부터
   const tabs = `<div class="rt-tabs" role="tablist">${[['list', '채용공고'], ['apps', `지원 현황${live ? ' ' + live : ''}`], ['cv', '이력서'], ...(S.job ? [['me', '내 직장']] : [])].map(([id, l]) => `<button type="button" role="tab" data-jtab="${id}" aria-selected="${jbTab === id}">${l}</button>`).join('')}</div>`;
   let body = '';
   if (S.age < 19) body = '<p class="empty">19살부터 일자리를 구할 수 있다. 그 전엔 알바로 용돈을 벌 수 있다.</p>';
@@ -937,7 +944,7 @@ function openJobs(tab) {
   } else if (jbTab === 'apps') {
     body = apps.length ? `<div class="jb-apps">${apps.map(a => { const st = JB_STAGE[a.stage] || ['', ''];
       return `<div class="jb-app"><div><span class="jb-co">${esc(a.co)}</span><b>${esc(a.title)}</b><span class="rt-tags"><i class="rt-tag ${st[1]}">${st[0]}${a.dday != null && a.dday >= 0 ? ` · D-${a.dday}` : ''}</i></span></div>
-        ${a.stage === 'offer' ? `<div class="jb-ofr"><button type="button" class="hot" data-jacc="${a.ix}">입사하기</button><button type="button" data-jdec="${a.ix}">거절</button></div>` : ''}</div>`; }).join('')}</div>` : '<p class="empty">아직 지원한 곳이 없다.</p>';
+        ${a.stage === 'offer' ? jbOffer(a, S) : ''}</div>`; }).join('')}</div>` : '<p class="empty">아직 지원한 곳이 없다.</p>';
     body += `<p class="hint">서류 결과는 며칠 뒤 메일로 온다. 면접 날 아침에 면접이 열리고, 며칠 뒤 최종 결과가 온다. 합격하면 5일 안에 입사를 정한다${S.job ? ' — 입사하면 지금 직장은 그만둔다' : ''}.</p>`;
   } else {
     const cats = J.cats(), all = J.list();
@@ -946,7 +953,10 @@ function openJobs(tab) {
       <div class="rt-bar"><span><b>${L.length}</b>개 공고 · 매주 새로</span><span class="rt-vw"><button type="button" data-jok aria-pressed="${jbOk}">✓ 자격 충족만</button></span></div>
       <div class="jb-list">${L.map(jbCard).join('') || '<p class="empty">조건에 맞는 공고가 없다.</p>'}</div>`;
   }
-  showModal('jobs', `💼 ${J.app()}`, tabs + body);
+  // 최종 합격: 어느 탭에서든 맨 위에서 바로 입사
+  const ofr = S.age >= 19 && offers.length && jbTab !== 'apps' ? `<div class="jb-banner">${offers.map(a => `<div class="jb-app"><div><span class="jb-co">🎉 ${esc(a.co)} 최종 합격</span><b>${esc(a.title)}</b><span class="dim">${a.dday > 0 ? `${a.dday}일 안에` : '오늘까지'} 답해야 함</span></div>${jbOffer(a, S)}</div>`).join('')}</div>` : '';
+  const why = offers.length && S.pending.length ? '<p class="hint">지금 떠 있는 일을 먼저 마무리하면 입사를 정할 수 있다.</p>' : '';
+  showModal('jobs', `💼 ${J.app()}`, ofr + tabs + why + body);
 }
 function openPosting(id) {
   const J = G.jobsite, P = J.list().find(x => x.id === id), S = G.state();
@@ -1105,7 +1115,7 @@ function openMe() {
   const me = G.myLook() && window.Avatar ? avBtn('me', Avatar.render(G.myLook(), 60, { age: S.age, fig: G.figure(null), ctx: G.outfitCtx(null) })) : '';
   showModal('me', `👤 ${S.name}`, `
     <div class="me-top">${me}<dl class="prof">${prof}</dl></div>
-    ${S.sandbox && G.myLook() ? `<div class="chips"><button type="button" data-gray="${G.myLook().gray ? 0 : 1}">${G.myLook().gray ? '🙂 내 얼굴 보이기' : '🩶 회색 아바타로'}</button></div>` : ''}
+    ${S.sandbox && G.myLook() ? `<div class="chips"><button type="button" data-gray="${G.myLook().blank ? 0 : 1}">${G.myLook().blank ? '🙂 내 얼굴 보이기' : '🩶 회색 아바타로'}</button></div>` : ''}
     ${fullView === 'me' && G.myLook() ? fullAv(G.myLook(), S.age, G.figure(null), S.personality, false, G.outfitCtx(null)) : ''}
     ${S.preg && S.preg.mode ? `<p class="dim" style="font-size:13px">${S.gender === 'f' ? '임신 중' : '곧 아이가 태어난다'} — ${S.preg.due > S.age ? '내년' : '올해'} 출산 예정</p>` : ''}
     <p class="sec-t">상태</p>
@@ -1891,8 +1901,8 @@ function phoneClick(b, d) {
   if (d.post) { openPosting(d.post); return true; }
   if (d.japply) { G.jobsite.apply(d.japply); return true; }
   if ('jpolish' in d) { G.jobsite.polish(); return true; }
-  if (d.jacc) { G.jobsite.accept(+d.jacc); openJobs('me'); return true; }
-  if (d.jdec) { G.jobsite.decline(+d.jdec); return true; }
+  if (d.jacc) { G.jobsite.accept(+d.jacc); openJobs(G.state().job ? 'me' : 'apps'); return true; }
+  if (d.jdec) { G.jobsite.decline(+d.jdec); openJobs('apps'); return true; }
   if (d.store) { openStore(d.store); return true; }
   if (d.order) { const [id, ix] = d.order.split(':'); G.food.order(id, +ix); closeModal(); return true; }
   if (d.rtab) { openRealty(d.rtab); return true; }
@@ -1981,6 +1991,7 @@ $('#flow').addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   const f = b.dataset.flow;
+  if (f === 'offer') { jbTab = 'apps'; openPhone('jobs'); return; }
   if (f === 'duty') G.doDuty(); else if (f === 'attend') G.attend(); else if (f === 'toschool') routeTo('campus'); else G.skip(f);
 });
 $('#phoneBtn').addEventListener('click', () => openPhone('home'));

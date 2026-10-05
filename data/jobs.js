@@ -85,7 +85,7 @@ GAME_DATA.jobSite = {
       it: ['(주)누리소프트', '데이터웨이브', '픽셀게임즈', '코드랩'], medical: ['{d} 온누리내과', '한빛대학병원', '{d} 온누리약국', '{d} 요양원', '바디핏 {d}점'],
       edu: ['{d} 한빛초등학교', '대치 수학학원', '{d} 해님유치원'], public: ['{d}구청', '{d}경찰서', '{d}소방서'], art: ['스튜디오 블랭크', '한빛일보', 'HBC 방송국', '건축사사무소 공간', '프리랜서 플랫폼', '레이블 소리'] },
     perks: ['4대보험', '주5일', '식대 지원', '교통비', '퇴직금', '인센티브', '재택 가능', '유연근무', '경조사 지원', '사내 식당', '야근 수당', '주휴수당'],
-    say: { doc: ['서류 전형 결과 안내', '지원해 주셔서 감사합니다'], pass: '📧 [{co}] 서류 합격 — {d}에 면접이 잡혔다.', fail: '📧 [{co}] "아쉽게도 이번에는 함께하지 못하게 되었습니다."', offer: '📧 [{co}] 최종 합격! 입사 의사를 알려 달라고 한다.' } },
+    say: { doc: ['서류 전형 결과 안내', '지원해 주셔서 감사합니다'], pass: '📧 [{co}] 서류 합격 — {d}에 면접이 잡혔다.', fail: '📧 [{co}] "아쉽게도 이번에는 함께하지 못하게 되었습니다."', offer: '📧 [{co}] 최종 합격! 입사 의사를 알려 달라고 한다. (📱 잡 앱에서 바로 입사)' } },
   ny: { app: '잡보드', minWage: 16.5,
     by: { cvs: ['Corner Deli', 'QuickStop {d}'], barista: ['Bean & Co. {d}', 'Second Pour Coffee'], server: ['{d} 비스트로', 'Joe’s Diner'], mart: ['FreshMart {d}'], shop: ['Stitch & Row {d}'], call: ['CallPoint Center'],
       flight: ['Skyline Airways'], rider: ['DashRun Delivery'], parcel: ['Metro Parcel'], driver: ['City Transit B{n} 노선'], security: ['{d} 콘도 관리실', 'Liberty Security'], caregiver: ['{d} 홈케어', 'Golden Oak Senior Living'],
