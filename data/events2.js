@@ -196,7 +196,7 @@ E.push(
       { label: '바로 집에 간다', effect: { health: 1 }, text: '버스 창에 머리를 기대고 졸았다.' },
     ] },
   // 직장
-  { id: 'pl_officeElevator', type: 'random', on: ['office', 'work'], age: [20, 62], once: false, cooldown: 1,
+  { id: 'pl_officeElevator', type: 'random', on: ['office'], age: [20, 62], once: false, cooldown: 1,
     text: '엘리베이터에 사장님과 단둘이 탔다. 사장님이 먼저 물었다. "요즘 일은 할 만해요?"',
     choices: [
       { label: '아이디어를 하나 꺼낸다', check: { stat: 'smart', diff: 70 }, success: { do: (s, a) => a.perf(4), effect: { happy: 3 }, text: '"오, 그거 다음 회의 때 얘기해 봐요." 내 이름을 기억하는 눈치였다.' }, fail: { effect: { happy: -1 }, text: '말이 꼬였다. 사장님이 "아, 네네" 하며 휴대폰을 봤다.' } },
@@ -471,6 +471,224 @@ E.push(
       { label: '"또 볼 수 있어?"', check: { stat: 'charm', diff: 70 },
         success: { p: { heart: [3, 6] }, text: '한참 뒤에 답이 왔다. "…다음 주 수요일. 내가 장소 보낼게."' },
         fail: { p: { trust: [-4, -2] }, text: '"안 돼. 이번이 마지막이야." 그 뒤로 번호가 바뀌었다.' } },
+    ] },
+);
+
+/* ═════ 먼저 다가오는 사람 — 내 매력·외모(a.myAllure)가 높을수록 자주. 어른끼리, 이성. 결혼한 사람도 (문장은 암시까지만) ═════ */
+const apNpcG = s => s.gender === 'm' ? 'f' : 'm';
+const apW = (min = 50, k = 1) => (s, a) => Math.max(0, (a.myAllure() - min) / 22) * k;
+const apReady = (s, a) => s.age >= 20 && (s.dayN || 0) - (s.vars.apDay ?? -9) >= 2 && !a.companion();   // 이틀에 한 번까지, 동행 중엔 안 옴
+const apMeet = (o = {}) => (s, a) => {
+  s.vars.apDay = s.dayN || 0;
+  const p = a.meet(Object.assign({ kind: 'friend', gender: apNpcG(s), ageRange: [Math.max(20, s.age - 8), Math.min(56, s.age + 8)], close: 16, trust: 10, heart: 28, libido: 55,
+    personality: a.pick(['bold', 'playful', 'sunny', 'cool', 'warm']), hangout: s.place, married: false, taken: false }, o));
+  if (p.married) { p.marriedKnown = true; p.taken = true; }
+  p.phone = false;
+  a.focus(p);
+};
+const byG = (f, m) => (s, a) => ((a.focused() || {}).gender === 'm' ? m : f);
+const apNightLine = (a, set) => { const p = a.focused(), L = p && GAME_DATA.nightLines[set][p.personality]; return (L ? a.pick(L) : GAME_DATA.nightLines[set]._).replace(/\{p([|}])/g, '{fp$1'); };
+const firstNight = (s, a) => (a.focused() || {}).nights === 1;
+const apNight = (pre, set = 'fling') => (s, a) => pre + apNightLine(a, set);
+const canHome = (s, a) => a.home().guest !== false;
+E.push(
+  // 술집: 옆자리에 앉아 먼저 말을 걸어옴 → 같이 마시면 "조용한 데 갈래요?"
+  { id: 'ap_bar', type: 'random', on: ['bar'], age: [20, 60], once: false, weight: apW(48, 1.4), when: apReady, onStart: apMeet(),
+    text: byG('{fp|이} 빈 옆자리에 앉더니 내 잔을 턱으로 가리켰다. "그거 맛있어요? …저도 같은 걸로요." 잔을 부딪치며 웃었다. "혼자 왔죠? 아까부터 봤어요."',
+      '{fp|이} 옆자리에 앉아 바텐더에게 손짓했다. "이분 잔 하나 더요." 그리고 나를 봤다. "혼자 오셨죠? 아까부터 눈에 띄어서요."'),
+    choices: [
+      { label: '"그럼 같이 마셔요."', drunk: 1, p: { heart: [5, 8], close: [4, 7] }, effect: { happy: 2 }, then: 'ap_bar_more', text: '잔이 몇 번 비었다. 이야기가 끊기지 않았다.' },
+      { label: '번호만 받는다', do: (s, a) => { const p = a.focused(); if (p) p.phone = true; }, p: { close: [3, 5] }, text: '{fp|이} 내 휴대폰에 번호를 찍어 줬다. "연락 안 하면 서운할 거예요."' },
+      { label: '정중히 거절한다', p: { heart: [-4, -2] }, text: '"아, 그래요." {fp|이} 어깨를 으쓱하고 자리로 돌아갔다.' },
+    ] },
+  { id: 'ap_bar_more', type: 'trigger', once: false, age: [20, 60],
+    text: byG('{fp|이} 내 손목을 가볍게 잡았다. "여기 너무 시끄럽다. …우리 조용한 데 갈래요?"', '{fp|이} 계산서를 먼저 집으며 말했다. "여기 시끄럽죠. …둘이 조용히 더 얘기할래요?"'),
+    choices: [
+      { label: '근처 모텔로 간다', intimate: true, fling: true, moveTo: 'motel', bring: true, mood: 10, p: { heart: [6, 10] }, effect: { happy: [3, 6], money: -5 }, memory: firstNight, pregnant: .05,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .2 : 0, text: apNight('{fp|이} 엘리베이터 버튼을 먼저 눌렀다. ') },
+      { label: '우리 집으로 간다', if: canHome, intimate: true, fling: true, moveTo: 'home', bring: true, mood: 8, p: { heart: [6, 10] }, effect: { happy: [3, 6] }, memory: firstNight, pregnant: .05,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .25 : 0, text: apNight('택시 뒷좌석에서 아무 말도 하지 않았다. 현관문이 닫히자마자였다. ') },
+      { label: '오늘은 여기까지', do: (s, a) => { const p = a.focused(); if (p) p.phone = true; }, p: { heart: [2, 4] }, text: '"아쉽다." {fp|이} 번호를 찍어 주고 택시에 올랐다.' },
+    ] },
+  // 결혼한 사람이 먼저 — 반지를 낀 채 / 빼면서
+  { id: 'ap_married', type: 'random', on: ['bar', 'mall', 'concert', 'cafe'], age: [22, 60], once: false, weight: apW(55, 1), when: apReady,
+    onStart: apMeet({ married: true, ageRange: [25, 58], personality: undefined, persW: { bold: 3, playful: 2, cool: 2, sensitive: 1 } }),
+    text: byG('{fp|이} 옆자리에 앉으며 왼손의 반지를 돌렸다. "…신경 쓰여요? 남편은 출장 갔어요. 오늘은 그냥, 누구랑 얘기가 하고 싶어서."',
+      '{fp|이} 잔을 들고 다가왔다. 약지의 반지가 반짝였다. "아내랑 애들은 처가에 갔어요. …한 잔만 같이 해 줄래요?"'),
+    choices: [
+      { label: '같이 마신다', drunk: 1, p: { heart: [5, 8], close: [3, 6] }, then: 'ap_married_more', text: '이야기는 금방 깊어졌다. {fp|은} 집 얘기는 꺼내지 않았다.' },
+      { label: '반지를 보고 일어선다', karma: 1, p: { trust: [2, 4], heart: [-3, -1] }, text: '"…그래요, 그게 맞죠." {fp|이} 쓸쓸하게 웃었다.' },
+    ] },
+  { id: 'ap_married_more', type: 'trigger', once: false, age: [22, 60],
+    text: byG('{fp|이} 반지를 빼서 핸드백 안쪽 주머니에 넣었다. "…아무도 모르는 데 갈래요? 오늘만."', '{fp|이} 반지를 빼서 주머니에 넣었다. "…아무도 모르는 데로 가요. 오늘 하루만."'),
+    choices: [
+      { label: '모텔로 간다', intimate: true, fling: true, moveTo: 'motel', bring: true, mood: 12, p: { heart: [5, 9] }, effect: { happy: [2, 5], money: -5 }, memory: firstNight, pregnant: .04,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .2 : 0, riskTaken: .1, text: apNight('{fp|은} 체크인하는 동안 모자를 깊이 눌러썼다. ') },
+      { label: '번호만 주고받는다', do: (s, a) => { const p = a.focused(); if (p) p.phone = true; }, p: { heart: [2, 4] }, text: '{fp|이} 내 번호를 다른 이름으로 저장했다. "내가 먼저 연락할게요."' },
+      { label: '"집에 들어가세요."', karma: 1, p: { trust: [3, 6] }, text: '{fp|이} 반지를 다시 끼었다. "…고마워요. 진심으로."' },
+    ] },
+  // 헬스장: 운동 끝나고 (몸이 좋을수록)
+  { id: 'ap_gym', type: 'random', on: ['gym', 'exercise'], age: [20, 55], once: false, weight: (s, a) => apW(46, 1)(s, a) * (s.stats.fit >= 100 ? 1.6 : 1), when: apReady, onStart: apMeet({ hobby: 'sport' }),
+    text: byG('{fp|이} 물병을 들고 다가왔다. "아까 자세 좋던데요. …운동 끝나고 뭐 해요? 단백질 쉐이크 한 잔?"', '"자세 좀 봐 드릴까요?" {fp|이} 다가와 한참 자세를 잡아 주더니 웃었다. "끝나고 밥 같이 먹을래요?"'),
+    choices: [
+      { label: '같이 간다', do: (s, a) => { const p = a.focused(); if (p) { p.phone = true; a.setCompanion(p); } }, p: { heart: [5, 8], close: [4, 6] }, effect: { happy: 2 }, text: '샤워를 마치고 나오니 {fp|이} 입구에서 기다리고 있었다. (동행 — 같이 다닐 수 있다)' },
+      { label: '번호만 교환한다', do: (s, a) => { const p = a.focused(); if (p) p.phone = true; }, p: { close: [3, 5], heart: [2, 3] }, text: '"내일도 이 시간에 와요?" {fp|이} 번호를 주며 물었다.' },
+      { label: '운동에 집중한다', p: { heart: [-2, -1] }, text: '이어폰을 다시 꼈다. {fp|은} 고개를 끄덕이고 돌아갔다.' },
+    ] },
+  // 카페·도서관: 쪽지
+  { id: 'ap_note', type: 'random', on: ['cafe', 'library', 'ulib'], age: [20, 45], once: false, weight: apW(52, .9), when: apReady, onStart: apMeet({ personality: undefined, persW: { shy: 3, sensitive: 2, warm: 1 }, libido: 30 }),
+    text: s => `나가려는데 {fp|이} 쪽지를 내밀고 얼굴이 빨개져서 가 버렸다. 「아까부터 계속 봤어요. 커피 한 잔 해요 — ${s.region === 'ny' ? '(917) 5○○-○○○○' : '010-○○○○-○○○○'}」`,
+    choices: [
+      { label: '연락한다', do: (s, a) => { const p = a.focused(); if (p) p.phone = true; }, p: { heart: [6, 10], close: [3, 5] }, effect: { happy: 3 }, text: '"진짜 연락 올 줄 몰랐어요." 답장에 이모티콘이 세 개 붙어 있었다.' },
+      { label: '쪽지를 주머니에 넣어 둔다', p: { heart: [-2, 0] }, text: '쪽지는 며칠 동안 주머니 안에 있었다.' },
+    ] },
+  // 번화가 밤 골목
+  { id: 'ap_street', type: 'random', on: ['mall'], age: [20, 50], once: false, weight: (s, a) => s.time === 2 || (s.used || 0) >= 70 ? apW(50, 1)(s, a) : 0, when: apReady, onStart: apMeet({ personality: undefined, persW: { bold: 3, playful: 3, sunny: 1 }, libido: 65 }),
+    text: byG('{fp|이} 길을 묻는 척 다가와 휴대폰 지도를 보여 줬다. 그러다 화면을 끄고 웃었다. "사실 길 아는데. …한 잔 할래요?"', '{fp|이} 길을 묻더니, 대답을 다 듣고도 가지 않았다. "…사실 말 걸 핑계였어요. 한 잔 할래요?"'),
+    choices: [
+      { label: '근처 술집으로 간다', drunk: 1, p: { heart: [5, 8], close: [3, 5] }, then: 'ap_bar_more', text: '골목 안쪽 작은 술집에 마주 앉았다.' },
+      { label: '번호만 준다', do: (s, a) => { const p = a.focused(); if (p) p.phone = true; }, p: { close: [2, 4] }, text: '"꼭 연락해요." {fp|이} 손을 흔들며 인파 속으로 사라졌다.' },
+      { label: '웃으며 지나간다', text: '"아쉽네." 등 뒤에서 웃음소리가 들렸다.' },
+    ] },
+  // 결혼한 이웃이 먼저 — "오늘 남편(아내)이 늦어요"
+  { id: 'ap_neighbor', type: 'random', on: ['block', 'home'], age: [22, 60], once: false, weight: apW(55, 1.1),
+    when: (s, a) => apReady(s, a) && nbAdult(a, (p, a) => p.married && p.gender !== s.gender && a.npcAge(p) <= 58 && a.canSex(p)).length > 0,
+    onStart: (s, a) => { s.vars.apDay = s.dayN || 0; focusNb((p, a) => p.married && p.gender !== s.gender && a.npcAge(p) <= 58 && a.canSex(p))(s, a); const p = a.focused(); if (p) p.marriedKnown = true; },
+    text: byG('현관 앞에서 {nbUnit} {fp|이} 나를 불러 세웠다. "남편이 오늘 야근이래요. …와인 한 병 땄는데 혼자 마시기 좀 그래서요."',
+      '"아내가 애들 데리고 친정 갔어요." {nbUnit} {fp|이} 문을 반쯤 연 채 말했다. "…맥주 한 캔 할래요?"'),
+    choices: [
+      { label: '들어간다', intimate: true, fling: true, mood: 12, p: { heart: [6, 10], close: [3, 6] }, effect: { happy: [2, 5] }, memory: firstNight, pregnant: .04,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .2 : 0, riskTaken: .15, text: apNight('잔이 반쯤 비었을 때 {fp|이} 소파 옆자리를 손으로 두드렸다. ') },
+      { label: '한 잔만 하고 나온다', drunk: 1, p: { close: [4, 7], heart: [2, 4] }, text: '와인 한 잔을 비우고 일어섰다. 현관에서 {fp|이} 한참 손을 흔들었다.' },
+      { label: '정중히 사양한다', karma: 1, p: { trust: [2, 4] }, text: '"다음에 부부 동반으로 해요." {fp|이} 멋쩍게 웃었다.' },
+    ] },
+  // 짝과 같이 있는 사람에게 번호를 물었는데, 그 사람도 마음이 있을 때 — 짝 몰래 번호 교환 (js/game.js askNumber)
+  { id: 'cp_secret_num', type: 'trigger', once: false, age: [20, 70],
+    text: '{fp}에게 번호를 묻자 옆의 {mateWord} {mateName|이} 고개를 돌렸다. {fp|은} 대답 대신 짧게 눈짓을 했다. "…화장실 좀."',
+    choices: [
+      { label: '화장실 앞 복도에서 기다린다', chance: .8,
+        success: { do: (s, a) => { const p = a.focused(); if (p) { p.phone = true; p.secretNum = true; } }, p: { heart: [5, 9], close: [2, 4] }, text: '{fp|이} 복도에서 빠르게 내 휴대폰에 번호를 찍었다. "연락은 내가 먼저 할게. 저장은 다른 이름으로."' },
+        fail: { do: (s, a) => { const m = a.person(s.vars.mateId); if (m) a.changeP(m, { grudge: [6, 10] }); }, p: { close: [-3, -1] }, text: '복도에서 마주친 건 {mateName}였다. "…여기서 뭐 해요?" 서늘한 눈빛이었다.' } },
+      { label: '영수증 뒷면에 번호를 적어 슬쩍 건넨다', chance: .65,
+        success: { do: (s, a) => { const p = a.focused(); if (p) { p.phone = true; p.secretNum = true; } }, p: { heart: [4, 7] }, text: '{fp|이} 영수증을 지갑 깊숙이 넣었다. 그날 밤 모르는 번호로 메시지가 왔다. "나야."' },
+        fail: { do: (s, a) => { const m = a.person(s.vars.mateId); if (m) a.changeP(m, { grudge: [8, 12] }); }, p: { trust: [-2, -1] }, text: '{mateName|이} 영수증을 먼저 봤다. 공기가 얼어붙었다.' } },
+      { label: '모르는 척 물러난다', text: '고개를 숙이고 돌아섰다. 등 뒤로 {fp}의 시선이 느껴졌다.' },
+    ] },
+);
+
+/* ═════ 💼 면접 (js/game.js jobDaily → interview) · 직업 고충 (출근한 날 — 업종 cat · 직업 id 태그) ═════ */
+const ivRes = (good, bad) => s => s.vars.ivGood ? good : bad;
+const jobIs = (...ids) => s => !!s.job && ids.includes(s.job);
+E.push(
+  { id: 'job_interview', type: 'trigger', once: false, age: [19, 70],
+    text: s => s.vars.ivPart ? '{ivCo} {ivJob} 면접 날. 앞치마를 두른 사장님이 이력서를 훑더니 물었다. "언제부터 일할 수 있어요? 주말도 돼요?"'
+      : '{ivCo} {ivJob} 면접 날. 면접관 셋이 서류를 넘기며 나를 봤다. "1분 자기소개 부탁드립니다."',
+    choices: [
+      { label: '준비한 대로 또박또박 말한다', do: (s, a) => { a.interview('smart'); }, text: ivRes('질문마다 막힘없이 답했다. 면접관이 펜을 내려놓고 고개를 끄덕였다.', '외운 문장이 중간에 끊겼다. 면접관의 표정이 읽히지 않았다.') },
+      { label: '웃으면서 자신 있게', do: (s, a) => { a.interview('charm'); }, text: ivRes('"재밌는 분이네요." 면접장 분위기가 한결 풀렸다.', '농담이 허공에서 떨어졌다. 면접관이 시계를 봤다.') },
+      { label: '경험과 실력을 강조한다', do: (s, a) => { a.interview('skill'); }, text: ivRes('"그럼 바로 해 보실 수 있겠네요." 실무 질문에 구체적인 예를 들어 답했다.', '"그건 다들 하는 거고요…" 꼬리 질문에 말문이 막혔다.') },
+      { label: '부족한 점도 솔직하게 말한다', do: (s, a) => { a.interview('honest'); }, text: ivRes('"솔직해서 좋네요." 면접관이 처음으로 웃었다.', '"그럼 왜 지원하셨어요?" 날카로운 질문이 돌아왔다.') },
+    ] },
+  // 서비스·판매: 진상 손님
+  { id: 'jb_customer', type: 'random', on: ['service', 'trainer'], age: [19, 70], once: false, cooldown: 0, when: s => !!s.job,
+    text: s => ({ barista: '주문한 거랑 다르다며 손님이 컵을 카운터에 내려쳤다. "아메리카노에 시럽 넣지 말라고 했잖아요!" 시럽은 넣지 않았다.', call: '헤드셋 너머로 고함이 쏟아졌다. "너 이름 뭐야? 너 같은 게 무슨 상담이야!" 통화는 20분째였다.',
+      flight: '이륙 직전, 승객이 짐칸이 없다며 소리를 질렀다. 뒤로 줄이 길게 늘어섰다.',
+      trainer: '회원이 PT를 10회 남기고 환불을 요구했다. "살이 하나도 안 빠졌잖아요. 식단 지켰다니까요?" 어젯밤 치킨 사진이 회원 SNS에 올라와 있었다.' }[s.job] || '계산대 앞에서 손님이 반말로 소리를 질렀다. "사장 나오라고 해!" 뒤에 선 사람들이 휴대폰을 들었다.'),
+    choices: [
+      { label: '고개를 숙이고 끝까지 참는다', effect: { happy: -3 }, do: (s, a) => a.perf(2), text: '"죄송합니다"를 몇 번이나 했는지 모르겠다. 퇴근길에 한참 멍하니 걸었다.' },
+      { label: '매니저를 부른다', effect: { happy: -1 }, text: '매니저가 대신 나섰다. "괜찮아? 저런 사람 꼭 있어." 등을 두드려 줬다.' },
+      { label: '정중하지만 단호하게 선을 긋는다', check: { stat: 'charm', diff: 105 },
+        success: { effect: { happy: 2 }, do: (s, a) => a.perf(1), text: '"그렇게 말씀하시면 응대해 드릴 수 없습니다." 손님이 머쓱하게 물러났다. 동료가 엄지를 들었다.' },
+        fail: { effect: { happy: -2 }, do: (s, a) => a.perf(-4), text: '본사 고객센터에 불만이 접수됐다. 경위서를 썼다.' } },
+    ] },
+  // 운전·배달: 폭우·사고·별점
+  { id: 'jb_rain', type: 'random', on: ['drive'], age: [19, 70], once: false, cooldown: 0, when: s => !!s.job,
+    text: s => s.job === 'driver' ? '퇴근 시간 버스가 꽉 찼다. 정류장마다 "안 타요?" 하는 고함과 함께 문을 두드리는 손이 이어졌다.' : '폭우 경보가 떴다. 콜은 평소의 두 배, 할증도 붙었다. 앞이 잘 안 보였다.',
+    choices: [
+      { label: '할증 붙을 때 최대한 달린다', chance: .75,
+        success: { effect: { money: [8, 20], health: -1, happy: 1 }, text: '하루 만에 평소 이틀 치를 벌었다. 신발 속까지 젖었다.' },
+        fail: { effect: { health: -8, happy: -4, money: -20 }, text: '빗길에 미끄러졌다. 크게 다치진 않았지만 수리비와 병원비가 나갔다.' } },
+      { label: '안전하게 천천히', effect: { money: [2, 6] }, text: '늦었다는 별점 1점이 두 개 붙었다. 그래도 무사히 들어왔다.' },
+      { label: '오늘은 일찍 접는다', effect: { happy: 1 }, do: (s, a) => a.perf(-1), text: '창밖 빗소리를 들으며 라면을 끓였다.' },
+    ] },
+  // 사무: 상사 갑질·야근·회식
+  { id: 'jb_boss', type: 'random', on: ['office'], age: [20, 70], once: false, cooldown: 0, when: s => !!s.job && ['office', 'bigco', 'bank', 'sales', 'marketer', 'hr', 'pm', 'accountant'].includes(s.job),
+    text: () => ['오후 6시 5분, 팀장이 자료를 내밀었다. "이거 내일 아침 회의 때 필요한데. 오늘 안에 되지?"', '보고서가 세 번째로 돌아왔다. 빨간 펜으로 "다시"라고만 적혀 있었다.', '"오늘 회식 다 오는 거지?" 팀장의 말에 아무도 대답하지 않았다. 금요일 저녁이었다.'][Math.floor(Math.random() * 3)],
+    choices: [
+      { label: '군말 없이 한다', effect: { happy: -3, health: -1 }, do: (s, a) => a.perf(3), text: '사무실 불이 꺼질 때까지 남았다. 막차 안에서 졸았다.' },
+      { label: '"내일 오전까지 드릴게요" 협상한다', check: { stat: 'charm', diff: 100 },
+        success: { effect: { happy: 1 }, do: (s, a) => a.perf(1), text: '"…그래, 오전까지." 의외로 쉽게 넘어갔다.' },
+        fail: { effect: { happy: -2 }, do: (s, a) => a.perf(-2), text: '"요즘 애들은…" 팀장의 한숨이 들렸다.' } },
+      { label: '퇴사각을 재며 이직 사이트를 연다', effect: { happy: 1 }, text: '구인 앱을 열어 공고를 저장했다. 숨이 조금 쉬어졌다.' },
+    ] },
+  // IT: 새벽 장애·크런치
+  { id: 'jb_outage', type: 'random', on: ['it'], age: [20, 70], once: false, cooldown: 0, when: s => !!s.job,
+    text: s => s.job === 'gamedev' ? '출시 2주 전. "이번 주는 다들 주말에도 나와야 할 것 같아요." 디렉터가 말했다.' : '새벽 2시, 휴대폰이 울렸다. "서버가 죽었어요. 결제가 안 된대요."',
+    choices: [
+      { label: '노트북을 켜고 바로 붙는다', check: { stat: 'smart', diff: 115 },
+        success: { effect: { health: -2, happy: 2 }, do: (s, a) => a.perf(5), text: '원인을 40분 만에 찾았다. 아침 회의에서 이름이 불렸다.' },
+        fail: { effect: { health: -4, happy: -3 }, do: (s, a) => a.perf(-2), text: '해가 뜰 때까지 로그를 뒤졌다. 결국 선배가 고쳤다.' } },
+      { label: '"오늘 당직 아닌데요"', effect: { happy: 1 }, do: (s, a) => a.perf(-3), text: '다시 잠들었지만 꿈에서도 에러 로그가 보였다.' },
+    ] },
+  // 의료: 밤샘 근무·보호자 폭언
+  { id: 'jb_night', type: 'random', on: ['medical'], age: [20, 70], once: false, cooldown: 0, when: s => !!s.job && s.job !== 'trainer',
+    text: s => s.job === 'caregiver' ? '어르신이 밤새 집에 가겠다며 문을 두드렸다. 한 시간마다 같은 이야기를 반복했다.' : s.job === 'pharma' ? '처방전과 다른 약을 왜 주냐며 보호자가 약국이 떠나가라 소리쳤다. 처방은 맞았다.'
+      : '나이트 근무. 응급실 침대는 다 찼고, 보호자 한 명이 멱살을 잡을 듯 다가왔다. "왜 우리 엄마 먼저 안 봐요!"',
+    choices: [
+      { label: '차분하게 설명한다', check: { stat: 'charm', diff: 100 },
+        success: { effect: { happy: 1 }, do: (s, a) => a.perf(3), text: '보호자의 목소리가 조금씩 낮아졌다. "…미안해요. 너무 무서워서."' },
+        fail: { effect: { happy: -4 }, do: (s, a) => a.perf(-1), text: '보안 요원이 올 때까지 고성이 이어졌다. 손이 떨렸다.' } },
+      { label: '일단 묵묵히 할 일을 한다', effect: { health: -2, happy: -2 }, do: (s, a) => a.perf(2), text: '해가 뜨고 교대할 때까지 물 한 잔 못 마셨다.' },
+    ] },
+  // 교육: 학부모 민원
+  { id: 'jb_parent', type: 'random', on: ['edu'], age: [20, 70], once: false, cooldown: 0, when: s => !!s.job,
+    text: s => s.job === 'kinder' ? '하원 시간, 학부모가 아이 팔의 작은 멍을 보이며 따졌다. "선생님은 하루 종일 뭐 하셨어요?"' : s.job === 'tutor' ? '"성적이 안 오르면 환불해 주셔야죠." 학부모가 원장실 앞에서 기다리고 있었다.'
+      : '밤 11시, 학부모에게서 문자가 왔다. "우리 애가 왜 반장 선거에서 떨어졌는지 설명해 주세요."',
+    choices: [
+      { label: '정중하게 상황을 설명한다', check: { stat: 'charm', diff: 95 },
+        success: { effect: { happy: 1 }, do: (s, a) => a.perf(2), text: '"…제가 오해했네요." 학부모가 먼저 사과했다.' },
+        fail: { effect: { happy: -4 }, do: (s, a) => a.perf(-2), text: '민원이 교육청까지 올라갔다. 경위서를 세 장 썼다.' } },
+      { label: '다음 날 아침에 답한다', effect: { happy: -1 }, text: '밤새 문자 알림이 신경 쓰였다.' },
+    ] },
+  // 공공: 위험 출동·민원
+  { id: 'jb_public', type: 'random', on: ['public'], age: [20, 70], once: false, cooldown: 0, when: s => !!s.job,
+    text: s => s.job === 'firefighter' ? '새벽 출동. 연기 가득한 계단 위층에서 아이 울음소리가 들렸다.' : s.job === 'police' ? '취객이 파출소 바닥에 드러누워 욕을 했다. 같은 사람, 이번 달 네 번째였다.'
+      : '민원인이 창구를 내리쳤다. "세금 받아먹으면서 이것도 못 해?" 규정상 안 되는 일이었다.',
+    choices: [
+      { label: '원칙대로 끝까지 한다', check: { stat: 'fit', diff: 95 },
+        success: { effect: { happy: 3 }, do: (s, a) => a.perf(4), memory: s => s.job === 'firefighter', text: s => s.job === 'firefighter' ? '아이를 품에 안고 계단을 내려왔다. 아이 엄마가 무릎을 꿇고 울었다.' : '흔들리지 않고 처리했다. 선배가 말없이 커피를 사 줬다.' },
+        fail: { effect: { health: -4, happy: -2 }, text: '몸도 마음도 녹초가 됐다. 휴게실 소파에서 그대로 잠들었다.' } },
+      { label: '동료에게 도움을 청한다', effect: { happy: -1 }, text: '둘이 붙으니 조금 나았다. 혼자였으면 못 버텼다.' },
+    ] },
+  // 미디어·예술: 무한 수정·악플·마감
+  { id: 'jb_client', type: 'random', on: ['art'], age: [20, 70], once: false, cooldown: 0, when: s => !!s.job,
+    text: s => s.job === 'creator' ? '새 영상에 악플이 달렸다. "얼굴 보기 싫다", "구독 취소". 조회수는 그래도 올랐다.' : s.job === 'reporter' || s.job === 'pd' ? '마감 30분 전, 데스크가 원고를 통째로 돌려보냈다. "방향이 틀렸어. 다시."'
+      : '클라이언트에게서 메일이 왔다. "처음 안이 제일 나은 것 같아요. 근데 로고는 더 크게, 색은 좀 더 고급스럽게…" 수정 17차였다.',
+    choices: [
+      { label: '밤을 새서 다시 한다', effect: { health: -3, happy: -1, art: [0, 1] }, do: (s, a) => a.perf(3), text: '새벽 5시에 파일을 보냈다. 답은 "괜찮네요"가 전부였다.' },
+      { label: '추가 비용·마감 연장을 말한다', check: { stat: 'charm', diff: 100 },
+        success: { effect: { money: [5, 15], happy: 2 }, text: '"…알겠어요, 추가로 드릴게요." 처음으로 선을 그어 봤다.' },
+        fail: { effect: { happy: -3 }, do: (s, a) => a.perf(-3), text: '다음 일감은 다른 사람에게 갔다.' } },
+    ] },
+  // 기술·요리: 손 다침·주말 없음
+  { id: 'jb_injury', type: 'random', on: ['craft', 'labor'], age: [19, 70], once: false, cooldown: 0, when: s => !!s.job,
+    text: s => ({ cook: '피크 타임, 기름이 튀어 손등에 물집이 잡혔다. 주문서는 계속 쌓였다.', baker: '새벽 4시 출근 3주째. 오븐 앞에서 졸다가 팔이 철판에 닿았다.', hair: '손님이 거울을 보더니 울기 시작했다. "이게 뭐예요? 사진이랑 완전 다르잖아요."',
+      mechanic: '리프트 아래서 볼트를 풀다 손을 베였다. 피가 장갑 사이로 배어 나왔다.', security: '주민 한 명이 택배가 없어졌다며 경비실 유리를 두드렸다. "CCTV 당장 보여 줘요!"' }[s.job] || '현장 일정이 밀려 주말에도 나와야 했다. 허리가 뻐근했다.'),
+    choices: [
+      { label: '참고 마무리한다', effect: { health: -3, happy: -1 }, do: (s, a) => a.perf(3), text: '끝나고 보니 손이 떨렸다. 그래도 일은 끝냈다.' },
+      { label: '잠깐 쉬고 치료부터', effect: { health: 1, happy: 1 }, do: (s, a) => a.perf(-1), text: '응급처치를 하고 10분 쉬었다. 사장님 눈치가 보였지만 몸이 먼저다.' },
+      { label: s => s.job === 'hair' ? '무료로 다시 해 드린다' : '동료와 일을 나눈다', effect: { happy: -1 }, do: (s, a) => a.perf(1), text: s => s.job === 'hair' ? '두 시간 걸려 다시 했다. 손님이 마지막엔 웃었다.' : '서로 한마디씩 거들며 버텼다.' },
+    ] },
+  // 영업·보험·중개: 실적 압박
+  { id: 'jb_quota', type: 'random', on: ['office'], age: [20, 70], once: false, cooldown: 0, when: jobIs('sales', 'insurance', 'realtor'),
+    text: '월말 실적 회의. 화이트보드의 내 이름 옆에만 숫자가 비어 있었다. "이번 달 안에 한 건은 해야지?"',
+    choices: [
+      { label: '지인 명단을 뒤진다', effect: { happy: -2 }, chance: .5,
+        success: { effect: { money: [20, 60] }, do: (s, a) => a.perf(5), text: '대학 동기가 계약서에 사인했다. 고맙고 미안했다.' },
+        fail: { do: (s, a) => a.perf(-2), text: '연락한 친구 몇 명이 답장을 안 했다. 단톡방이 조용해졌다.' } },
+      { label: '발로 뛴다', check: { stat: 'charm', diff: 105 },
+        success: { effect: { money: [30, 80], happy: 3 }, do: (s, a) => a.perf(6), text: '하루에 열 군데를 돌았다. 마지막 집에서 계약이 됐다.' },
+        fail: { effect: { health: -2, happy: -2 }, text: '구두 밑창만 닳았다.' } },
     ] },
 );
 })();

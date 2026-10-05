@@ -28,6 +28,11 @@ GAME_DATA.realty = {
       { name: '상계동', zone: 'out', k: .78, tag: '조용한 동네', prefer: ['apt', 'villa'] },
       { name: '화곡동', zone: 'out', k: .82, prefer: ['villa', 'oneroom'] },
       { name: '평창동', zone: 'out', k: 1.4, tag: '주택가', prefer: ['house'] },
+      { name: '대치동', zone: 'out', k: 1.75, tag: '학원가', prefer: ['apt'] },
+      { name: '반포동', zone: 'out', k: 1.85, tag: '한강 뷰', prefer: ['apt'] },
+      { name: '공덕동', zone: 'work', k: 1.3, tag: '역세권', prefer: ['officetel', 'apt'] },
+      { name: '불광동', zone: 'home', k: .86, tag: '북한산 아래', prefer: ['villa', 'apt'] },
+      { name: '여의도동', zone: 'work', k: 1.55, tag: '직장 가까움', prefer: ['officetel', 'apt'] },
     ],
     types: [
       { id: 'goshiwon', w: 2, area: [6, 10], floors: [3, 6], deals: { 월세: 1 }, deps: [0, 0, 30, 50], rentR: [32, 58], mgmt: [0, 0],
@@ -103,6 +108,10 @@ GAME_DATA.realty = {
       { name: '아스토리아', zone: 'out', k: .85, tag: '퀸스', prefer: ['oneroom', 'villa'] },
       { name: '롱아일랜드시티', zone: 'out', k: 1.2, tag: '강 건너 뷰', prefer: ['officetel', 'apt'] },
       { name: '플러싱', zone: 'out', k: .8, tag: '퀸스', prefer: ['goshiwon', 'villa'] },
+      { name: '어퍼이스트사이드', zone: 'school', k: 1.45, tag: '박물관 거리', prefer: ['apt', 'officetel'] },
+      { name: '저지시티', zone: 'out', k: .95, tag: '강 건너 — 열차로 통근', prefer: ['officetel', 'apt'] },
+      { name: '잭슨 하이츠', zone: 'out', k: .8, tag: '다국적 동네', prefer: ['villa', 'oneroom'] },
+      { name: '브루클린 하이츠', zone: 'home', k: 1.5, tag: '강변 산책로', prefer: ['house', 'apt'] },
     ],
     // 뉴욕: 전세가 없음 — 렌트(보증금 한 달 치) 또는 매매. rentR: 한 달 렌트(만원) 범위
     types: [

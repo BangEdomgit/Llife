@@ -23,7 +23,7 @@ const EVENTS = Object.fromEntries(D.events.concat(D.classEvents || []).map(e => 
 const PLACES = Object.fromEntries(D.places.map(p => [p.id, p]));
 const ACTIONS = Object.fromEntries(D.actions.map(a => [a.id, a]));
 const TIMES = ['아침', '낮', '저녁'];
-const TRANSIENT = ['classSubj', 'fp', 'sev', 'late', 'mainId', 'mainName', 'loverId', 'lover', 'debt', 'new', 'newId', 'attempt', 'uniScore', 'signal', 'fline', 'myValue', 'theirValue', 'satText', 'placeLabel', 'nbUnit', 'mateName', 'mateId', 'mateWord'];
+const TRANSIENT = ['classSubj', 'fp', 'sev', 'late', 'mainId', 'mainName', 'loverId', 'lover', 'debt', 'new', 'newId', 'attempt', 'uniScore', 'signal', 'fline', 'myValue', 'theirValue', 'satText', 'placeLabel', 'nbUnit', 'mateName', 'mateId', 'mateWord', 'ivApp', 'ivCo', 'ivJob', 'ivPart', 'ivGood'];
 
 const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -1365,6 +1365,7 @@ function startDay(first) {
   S.wake = 0; S.used = pen; S.dayStart = pen; S.ap = DAY_AP + LATE_AP - pen; S.meals = 0; S.worked = false;
   spoilBag();   // 🎒 가방 속 상한 음식
   afterTexts();   // 함께 밤을 보낸 사람에게서 온 메시지
+  jobDaily();   // 💼 지원 결과·면접·합격
   S.place = null; S.here = []; S.zone = 'home'; S.at = 'home'; S.drunk = 0;
   if (!first) S.weather = rollWeather();
   if (isWeekend() && (S.fatigue || 0) > 0) S.fatigue--;
@@ -1375,7 +1376,7 @@ function dutyOf() {
   if (phase() !== 'adult' || jailed() || isWeekend()) return null;
   if (S.flags.inArmy) return { id: 'army', ap: 45, label: '훈련', zone: 'home', at: 'home' };
   const cm = homeCommute();   // 통근 (사는 동네 → 직장·학교, 왕복)
-  if (S.job) return { id: 'work', ap: 45 + cm, label: '출근', zone: 'work', at: 'office' };
+  if (S.job) return { id: 'work', ap: ((job(S.job) || {}).ap || 45) + cm, label: '출근', zone: 'work', at: 'office' };
   if (S.flags.student && (S.school.start ?? 0) <= S.age) return { id: 'class', ap: 25 + cm, label: '수업', zone: 'school', at: 'campus' };
   return null;
 }
@@ -1394,7 +1395,12 @@ function doDuty(auto) {
     S.perf = clamp(S.perf + probRound((.12 + gIdx(S.stats.smart) * .02) * tired), 0, 100);
     const lunch = workLunch();   // 점심은 회사 근처에서
     if (!auto) log(`${pick(['출근했다. 하루가 길었다.', '회의, 메일, 회의. 퇴근길 하늘이 벌써 어두웠다.', '일을 마치고 퇴근했다.', '점심시간만 기다리며 오전을 버텼다.'])} 점심은 ${pick(FD().lunchSpots || ['회사 근처 백반집', '구내식당'])}에서 먹었다. (${fmtPrice(lunch)})`, { t: 'info' });
-    maybeRandom(['work', 'office', S.job], auto ? .01 : C.randomEventChance * .5);
+    const jc = (job(S.job) || {}).cat;
+    if (!auto && !S.pending.length && Math.random() < .12) {   // 직업·업종별 고충 이벤트 (data/events2.js jb_*) — 출근한 날 열에 한 번쯤
+      const hard = D.events.filter(e => /^jb_/.test(e.id) && e.type === 'random' && e.on && e.on.some(t => t === S.job || t === jc) && eligible(e));
+      if (hard.length) fire(pick(hard));
+    }
+    maybeRandom(['work', ['office', 'it'].includes(jc) && 'office', S.job, jc], auto ? .01 : C.randomEventChance * .5);   // 사무실 이벤트는 사무·IT 직군만
   } else if (d.id === 'class') {
     S.school.studyYear += .02 * tired;
     if (!auto) log(pick(['강의실 맨 뒷자리에서 수업을 들었다.', '전공 수업 두 개를 듣고 나왔다.', '조별 과제 회의가 길어졌다.']), { t: 'info' });
@@ -1472,7 +1478,7 @@ const fPrice = x => REGION === 'kr' ? (x.won || 0) / 10000 : (x.usd || 0) / ((RE
 // 메뉴 값 (내부 단위 → 원·달러 그대로)
 function fmtPrice(v) {
   if (REGION !== 'kr') { const d = Math.round(v * ((REG[REGION] || {}).money || 15) * 100) / 100; return `${d % 1 ? d.toFixed(2) : d}달러`; }
-  const w = Math.round(v * 100) * 100;
+  const w = Math.round(v * 1000) * 10;
   if (!w) return '0원';
   const man = Math.floor(w / 10000), rest = w % 10000;
   return man ? `${man}만${rest ? ' ' + rest.toLocaleString() : ''}원` : `${rest.toLocaleString()}원`;
@@ -1633,6 +1639,7 @@ function monthly() {
     S.money -= Math.round((C.livingCost + (S.flags.married ? 600 : 0) + kids * 400) / 12);   // 가족이 늘면 생활비도 늘어남
   }
   if (S.flags.onPill) S.money -= rand(3, 5);   // 피임약값 (한 달 3~5만원)
+  if (S.car) S.money -= rideCfg().carMonth || 15;   // 차 유지비 (보험·세금·주차)
   if (S.age >= 19 && !S.flags.inArmy && !jailed()) {   // 월세·관리비·대출 이자 (data/realty.js) + 집 하자·갱신
     const H = S.home || {};
     S.money -= (H.rent ?? homeNow().rent ?? 0) + (H.mgmt || 0) + Math.round((H.loan || 0) * (H.rate || 0) / 12);
@@ -1663,7 +1670,7 @@ function maybeRandom(tags, chance = C.randomEventChance) {
   tags = asList(tags).filter(Boolean);
   const sid = (SEASONS[S.date ? SEASON_OF(S.date.m) : Math.max(0, S.seasonIdx)] || SEASONS[0]).id;   // 지금 계절 — season이 있는 이벤트는 그 계절에만
   const pool = D.events.filter(e => e.type === 'random' && (!e.season || e.season.includes(sid)) && (!e.on || e.on.some(t => tags.includes(t))) && eligible(e));
-  if (pool.length) fire(weighted(pool, e => (e.weight ?? 1) * (e.on ? 2 : 1)));
+  if (pool.length) fire(weighted(pool, e => (typeof e.weight === 'function' ? e.weight(S, api) : e.weight ?? 1) * (e.on ? 2 : 1)));   // weight가 함수면 그때그때 (매력·외모 등)
 }
 
 
@@ -2125,21 +2132,49 @@ function canDo(a) { return !busy() && S.ap >= apOf(a) && !dutyPending() && (!cos
 const needsSubject = a => a.id === 'houseHunt' || (a.id === 'study' && inSchool()) || (a.id === 'shop' && S.age >= 13 && !!window.Outfit && !!S.look);
 // 공부할 과목 고르기 화면용: 지금 과목들의 예상 점수
 const studyInfo = () => subjectsNow().map(id => ({ id, label: SUB(id).label, exp: Math.round(expScore(id)), prep: Math.round((S.school.prep || {})[id] || 0) }));
+// 🎲 행동 창 (data/acts.js): 주사위 1~6 + 보정 → 등급. 등급 배수만큼 오르는 값이 달라짐
+const ACT = () => D.acts || { dice: [], grades: {}, lines: {}, mods: {} };
+const isDiceAct = a => !!a && !jailed() && ACT().dice.includes(a.id);
+const OUTDOOR = ['park', 'playground', 'block', 'quad', 'campus'];
+function actMods(a) {
+  const M = ACT().mods, m = [], h = hourOf(S.used);
+  if ((S.fatigue || 0) >= 3) m.push([M.tired, -1]);
+  if (S.drunk) m.push([M.drunk, -1]);
+  if (S.stats.health < 30) m.push([M.sick, -1]);
+  if (S.stats.happy >= 80) m.push([M.mood, 1]);
+  if (['study', 'read'].includes(a.id) && ['library', 'ulib'].includes(S.place) && (h >= 19 || h < 6)) m.push([M.nightLib, 1]);
+  if (a.id === 'exercise' && S.place === 'gym') m.push([M.gym, 1]);
+  const wet = ['rain', 'storm', 'snow', 'sleet', 'dust'].includes(S.weather);
+  if (OUTDOOR.includes(S.place) && ['walk', 'exercise', 'play', 'rest'].includes(a.id)) m.push(wet ? [M.weather, -1] : a.id === 'walk' && ['park', 'quad'].includes(S.place) ? [M.park, 1] : null);
+  return m.filter(Boolean);
+}
+function rollAct(a) {
+  const mods = actMods(a), mod = clamp(mods.reduce((t, x) => t + x[1], 0), -2, 2), die = rand(1, 6), fin = clamp(die + mod, 1, 6);
+  return Object.assign({ id: a.id, die, mod, mods, fin }, ACT().grades[fin] || { label: '', mult: 1 });
+}
+let LAST_ACT = null;
+const actPreview = id => { const a = actionList().find(x => x.id === id); return a ? { id, label: a.label, icon: a.icon, dice: isDiceAct(a), mods: isDiceAct(a) ? actMods(a) : [], ap: apOf(a), cost: costOf(a), ok: canDo(a), place: S.place, placeLabel: (PLACES[S.place] || {}).label || '', hour: phase() === 'adult' ? hourOf(S.used) % 24 : 6 + (S.sky ?? 1) * 6, clock: phase() === 'adult' ? clockOf(S.used || 0) : '' } : null; };
 function doAction(id, subj) {
+  LAST_ACT = null;
   const a = actionList().find(x => x.id === id);
   if (!a || !canDo(a)) return;
   spend(apOf(a));
   if (a.meal) S.meals = (S.meals || 0) + 1;   // 학식: 끼니로 침
-  const gk = gainK();
+  const R = isDiceAct(a) ? rollAct(a) : null;
+  LAST_ACT = R;
+  const gk = gainK() * (R ? R.mult : 1);
+  // 등급 한 줄 + 대성공·망함 보너스를 기록에 붙임
+  const gradeTxt = t => { if (!R) return t; const L = (ACT().lines[a.id] || {})[R.fin]; return L ? `${t} ${pick(L)}` : t; };
+  const actLog = (t, o) => { if (R) { if (R.bonus) o.deltas.push(...applyEffect(R.bonus)); R.text = t; R.deltas = o.deltas; } log(t, o); };
   if (a.id === 'study') {
     const deltas = applyEffect(a.effect, gk);
     if (inSchool()) {   // 다음 시험 보정: 골고루면 과목마다 3~5, 한 과목이면 8~10. 고등학교 공부 횟수는 수능에도
       const L = subjectsNow(), list = subj && L.includes(subj) ? [subj] : L;
-      list.forEach(k => { const g = list.length > 1 ? rand(3, 5) : rand(8, 10); addPrep(k, g); deltas.push([SUB(k).label, g]); });
+      list.forEach(k => { const g = Math.max(1, probRound((list.length > 1 ? rand(3, 5) : rand(8, 10)) * (R ? R.mult : 1))); addPrep(k, g); deltas.push([SUB(k).label, g]); });
       if (phase() === 'hs') S.school.studyN = (S.school.studyN || 0) + 1;
     }
     if (S.flags.student) S.school.studyYear += gk;
-    log(fill(textOf(a.text)), { deltas });
+    actLog(gradeTxt(fill(textOf(a.text))), { deltas });
     maybeRandom([a.id, S.place]); after(); return;
   }
   if (a.work) S.perf = clamp(S.perf + probRound((val(a.perf || [6, 12]) + gIdx(S.stats.smart)) * gk), 0, 100);
@@ -2166,10 +2201,11 @@ function doAction(id, subj) {
   const deltas = libidoDelta(a.libido, null).concat(applyEffect(a.effect, gk));
   const c = costOf(a);
   if (c) deltas.push(...applyEffect({ money: -c }));
-  if (a.subjAll && inSchool()) { const g = val(a.subjAll); subjectsNow().forEach(k => addPrep(k, g)); deltas.push(['모든 과목', g]); if (phase() === 'hs') S.school.studyN = (S.school.studyN || 0) + .5; }
+  if (a.subjAll && inSchool()) { const g = Math.max(1, probRound(val(a.subjAll) * (R ? R.mult : 1))); subjectsNow().forEach(k => addPrep(k, g)); deltas.push(['모든 과목', g]); if (phase() === 'hs') S.school.studyN = (S.school.studyN || 0) + .5; }
   if (a.extra && inSchool()) S.school.extra = (S.school.extra || 0) + val(a.extra);   // 비교과: 동아리·봉사·독서 (수시 종합)
   addKarma(a.karma);
-  log(fill(textOf(a.text)), { deltas, memory: a.memoryChance ? Math.random() < a.memoryChance : false });
+  if (a.id === 'pickup') { const [lo, hi] = S.place === 'kinder' ? [3, 6] : [7, 12]; for (const c of alive().filter(p => p.kind === 'child' && npcAge(p) >= lo && npcAge(p) <= hi)) deltas.push(...applyP(c, { close: [2, 4] })); }
+  actLog(gradeTxt(fill(textOf(a.text))), { deltas, memory: a.memoryChance ? Math.random() < a.memoryChance : false });
   maybeRandom([a.id, S.place]);
   after();
 }
@@ -2234,20 +2270,161 @@ const ZONE = { home: 'home', conveni: 'home', playground: 'home', school: 'schoo
   office: 'work', park: 'out', market: 'out', church: 'out', hospital: 'out', center: 'out', station: 'travel' };
 const ZONE_LABEL = { home: '집 근처', school: '학교 쪽', downtown: '번화가', work: '직장', out: '외곽', travel: '여행지' };
 // 지도 위치 (data/map.js — 나라별 덮어쓰기) / 지금 서 있는 곳: 장소 안이면 그 장소, 아니면 마지막에 있던 곳(출근·수업 뒤엔 직장·대학)
-const mapPos = id => { const M = D.map; if (!M) return null; if (PLACES[id] && PLACES[id].campus && id !== 'campus') id = 'campus'; const o = M.posBy && M.posBy[REGION]; return (o && o[id]) || M.pos[id] || null; };
+/* ═════════ 지도·교통 (data/map.js) ═════════
+   지도 720×920 (나라별 실제 지리를 줄여 옮김). 집·편의점·집 앞·놀이터·학교·유치원 등은 사는 동네를 따라다님
+   이동: 걷기·자전거·버스·지하철·내 차·택시 — 행동력(1 ≈ 11분)과 요금이 다름. 지하철은 가까운 역까지 걷기 + 역 사이, 서울은 자정 넘으면 막차 끊김(N버스만) */
+const MAPD = () => D.map || {};
+const MK = () => MAPD().k || 1;
+const regMap = key => { const o = MAPD()[key] || {}; return o[REGION] || o.kr; };
+function riverY(x) {
+  const R = (regMap('water') || {}).river;
+  if (!R) return null;
+  for (let i = 0; i < R.length - 1; i++) if (x >= R[i][0] && x <= R[i + 1][0]) return R[i][1] + (R[i + 1][1] - R[i][1]) * (x - R[i][0]) / (R[i + 1][0] - R[i][0]);
+  return R[R.length - 1][1];
+}
+const inPoly = (P, x, y) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) if ((P[i][1] > y) !== (P[j][1] > y) && x < (P[j][0] - P[i][0]) * (y - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0]) c = !c; return c; };
+function inWater(x, y) {
+  const Wt = regMap('water') || {};
+  if (Wt.river) { const ry = riverY(x); if (ry != null && Math.abs(y - ry) < Wt.hw + 8 && !(Wt.islands || []).some(([ix, iy, rx, ry2]) => ((x - ix) / rx) ** 2 + ((y - iy) / ry2) ** 2 < 1)) return true; }
+  return (Wt.polys || []).some(P => inPoly(P, x, y));
+}
+const dongPos = name => (regMap('dongs') || {})[name] || null;
+// 본가(부모님 집) 동네: 집안 형편으로 한 번 정함
+function parentsDong() {
+  if (!S.vars.pDong || !dongPos(S.vars.pDong)) {
+    const P = regMap('parents') || {}, L = P[S.wealth] || P.normal || Object.keys(regMap('dongs') || {});
+    S.vars.pDong = L.length ? withSeed(`pd:${S.id}`, () => pick(L)) : null;
+  }
+  return S.vars.pDong;
+}
+const homeDong = () => { const H = S.home || {}; return H.id === 'parents' || !H.dong || !dongPos(H.dong) ? parentsDong() : H.dong; };
+function homePos() {
+  const H = S.home || {};
+  if (H.pos && H.id !== 'parents') return H.pos;
+  const p = dongPos(homeDong());
+  return p ? [p[0] + 10, p[1] + 12] : [360, 460];
+}
+// 집을 따라다니는 장소: 집 + 오프셋, 물이면 반대쪽으로
+// 같은 땅인지 (강 건너·섬 건너면 '집 근처'가 아님): 서울은 한강 북·남, 뉴욕은 맨해튼 / 뉴저지 / 브루클린·퀸스
+function sideOf(x, y) {
+  const Wt = regMap('water') || {};
+  if (Wt.river) { const ry = riverY(x); return ry == null ? 'n' : y < ry ? 'n' : 's'; }
+  if (Wt.manhattan && inPoly(Wt.manhattan, x, y)) return 'm';
+  return x < 240 && y < 640 ? 'nj' : 'e';
+}
+function localPos(id, base = homePos()) {
+  const off = (MAPD().local || {})[id];
+  if (!off) return null;
+  const [hx, hy] = base, W = MAPD().w || 720, H = MAPD().h || 920, side = sideOf(hx, hy);
+  const r0 = Math.hypot(off[0], off[1]), a0 = Math.atan2(off[1], off[0]);
+  for (const k of [1, .7, .45]) for (let t = 0; t < 8; t++) {   // 정한 방향부터 45°씩 돌려 가며, 안 되면 더 가까이
+    const a = a0 + (t % 2 ? -1 : 1) * Math.ceil(t / 2) * Math.PI / 4, x = Math.round(clamp(hx + Math.cos(a) * r0 * k, 22, W - 22)), y = Math.round(clamp(hy + Math.sin(a) * r0 * k, 22, H - 22));
+    if (!inWater(x, y) && sideOf(x, y) === side) return [x, y];
+  }
+  return [hx, hy];
+}
+// 아이 시설 (유치원·초·중·고): 가장 가까운 곳 / 집 근처 점수 (근처 집은 아이 있는 부부가 많음)
+const kidsList = () => regMap('kids') || [];
+function nearestKid(type, [x, y]) {
+  let best = null, bd = 1e9;
+  for (const k of kidsList()) if (k[0] === type) { const d = Math.hypot(k[2] - x, k[3] - y); if (d < bd) { bd = d; best = k; } }
+  return best ? { name: best[1], pos: [best[2], best[3]], d: bd } : null;
+}
+const KID_W = { kinder: 1, elem: 1.2, mid: .5, high: .3 };
+function kidsNear([x, y]) {
+  let score = 0;
+  for (const [t, , kx, ky] of kidsList()) { const d = Math.hypot(kx - x, ky - y); if (d < 90) score += (KID_W[t] || .5) * (d < 45 ? 1 : .5); }
+  const e = nearestKid('elem', [x, y]), kd = nearestKid('kinder', [x, y]);
+  return { score: Math.round(score * 10) / 10, elem: e && e.d < 90 ? { name: e.name, min: Math.max(1, Math.round(e.d / 4)) } : null, kinder: kd && kd.d < 90 ? { name: kd.name, min: Math.max(1, Math.round(kd.d / 4)) } : null, cho: !!(e && e.d < 50) };
+}
+// 직장: 다니는 회사 동네 (구인 사이트로 들어간 곳) — 예전 저장은 구역 대표 위치
+const ZONE_POS = { kr: { school: [228, 352], downtown: [398, 346], work: [362, 300], out: [520, 700] }, ny: { school: [300, 500], downtown: [352, 372], work: [278, 590], out: [500, 360] } };
+const zonePos = z => z === 'home' ? homePos() : (ZONE_POS[REGION] || ZONE_POS.kr)[z] || null;
+const jobPos = () => { const p = S.jobDong && dongPos(S.jobDong); return p ? [p[0] + 16, p[1] - 12] : zonePos(S.jobZone) || null; };
+const KID_PLACE = { kinder: 'kinder', elem: 'elem' };
+function mapPos(id) {
+  const M = D.map;
+  if (!M) return null;
+  if (PLACES[id] && PLACES[id].campus && id !== 'campus') id = 'campus';
+  if (id === 'home') return homePos();
+  if (KID_PLACE[id] || id === 'school') { const k = nearestKid(KID_PLACE[id] || (phase() === 'hs' ? 'high' : 'mid'), homePos()); if (k && k.d < 150) return k.pos; }
+  if ((M.local || {})[id]) return localPos(id);
+  if (id === 'office' && (S.jobDong || S.jobZone)) { const j = jobPos(); if (j) return j; }
+  return ((M.pos || {})[REGION] || (M.pos || {}).kr || {})[id] || null;
+}
+// 아이 시설 장소 이름: 가까운 유치원·초등학교 이름으로
+const kidPlaceName = id => { if (!KID_PLACE[id]) return null; const k = nearestKid(id, homePos()); return k && k.d < 150 ? k.name : null; };
+/* 교통 */
+const RIDE_IC = { walk: '🚶', bike: '🚲', bus: '🚌', subway: '🚇', car: '🚗', taxi: '🚕' };
+const RIDE_LB = { walk: '걷기', bike: '자전거', bus: '버스', subway: '지하철', car: '내 차', taxi: '택시' };
+const rideCfg = () => regMap('ride') || { hours: [0, 99] };
+function stationList() { const out = []; for (const l of regMap('subway') || []) for (const s of l.st) out.push({ name: s[0], x: s[1], y: s[2], line: l.name }); return out; }
+function nearestStation([x, y]) { let b = null, bd = 1e9; for (const s of stationList()) { const d = Math.hypot(s.x - x, s.y - y); if (d < bd) { bd = d; b = s; } } return b ? Object.assign({ d: bd }, b) : null; }
+const fare = v => REGION === 'kr' ? fPrice({ won: v }) : fPrice({ usd: v });
+// a → b 가는 방법들 (dest: 도착 장소 id — 주차비). o.h: 시각을 정해서 (통근은 아침 8시)
+function routeOptions(a, b, dest, o = {}) {
+  const R = rideCfg(), k = MK(), d = Math.hypot(a[0] - b[0], a[1] - b[1]) / k, h = o.h ?? hourOf(S.used || 0);
+  const transit = h >= R.hours[0] && h < R.hours[1], wet = ['rain', 'storm', 'snow', 'sleet'].includes(S.weather), drunk = !o.h && !!S.drunk;
+  const out = [{ mode: 'walk', ap: Math.max(1, Math.round(d / 28)), money: 0 }];
+  if (R.bike) out.push({ mode: 'bike', ap: Math.max(1, Math.round(d / 40 + .3)), money: fare(R.bike), why: wet && !o.h ? '비·눈 오는 날은 무리' : drunk ? '술 마시고는 못 탐' : '' });
+  if (R.bus) out.push({ mode: 'bus', ap: 1 + Math.round(d / 60) + (transit ? 0 : 1), money: fare(transit ? R.bus : R.nbus), nbus: !transit });
+  const sa = nearestStation(a), sb = nearestStation(b);
+  if (sa && sb) {
+    const wa = sa.d / k, wb = sb.d / k, dn = Math.hypot(sa.x - sb.x, sa.y - sb.y) / k * 1.2;
+    out.push({ mode: 'subway', ap: Math.max(1, Math.round((wa + wb) / 28 + dn / 160 + .8)), money: fare(R.subway + (R.subwayPer ? R.subwayPer * Math.floor(Math.max(0, dn - 60) / 40) : 0)), from: sa.name, to: sb.name,
+      why: !transit ? '막차 끊김' : sa.name === sb.name || wa > 70 || wb > 70 ? '역이 멀다' : '' });
+  }
+  if (S.car) out.push({ mode: 'car', ap: Math.max(1, Math.round(d / 100 + .6)), money: fare(R.fuelPer * d) + ((MAPD().paidParking || []).includes(dest) ? fare(R.parking) : 0), why: drunk ? '음주운전은 안 된다' : '' });
+  if (R.taxi) out.push({ mode: 'taxi', ap: Math.max(1, Math.round(d / 95 + .3)), money: fare((R.taxi + R.taxiPer * d) * (h >= 22 || h < 4 ? R.night : 1)) });
+  out.forEach(x => { x.money = Math.round(x.money * 1000) / 1000; if (!x.why && x.money && S.money < x.money) x.why = '돈이 모자람'; x.min = x.ap * 11; x.why = x.why || ''; });
+  return out;
+}
+// 교통 설정 (지도 위 칩): 자동 / 걷기 / 자전거 / 버스 / 지하철 / 내 차 / 택시
+function setRide(m) { if (!RIDE_LB[m] && m !== 'auto') return; S.ride = m; emit(); }
+const carPrice = () => rideCfg().car || 1500;
+function buyCar() {
+  if (S.car || S.age < 20 || busy() || S.money < carPrice()) return;
+  S.money -= carPrice(); S.car = { since: S.dayN || 0, price: carPrice() };
+  log(`🚗 ${REGION === 'kr' ? '중고차' : '중고 세단'}을 한 대 샀다. 처음 시동을 걸 때 괜히 손이 떨렸다. (한 달 유지비 ${fmtMoney(rideCfg().carMonth || 15)})`, { memory: true, deltas: applyEffect({ happy: 3 }) });
+  if (S.ride === 'auto' || !S.ride) S.ride = 'car';
+  after();
+}
+function sellCar() {
+  if (!S.car || busy()) return;
+  const v = Math.round((S.car.price || carPrice()) * .6);
+  S.money += v; S.car = null; if (S.ride === 'car') S.ride = 'auto';
+  log(`🚗 차를 팔았다. ${fmtMoney(v)}를 받았다.`, { t: 'info' });
+  after();
+}
+function rideInfo() {
+  const R = rideCfg(), h = hourOf(S.used || 0);
+  return { pref: S.ride || 'auto', car: !!S.car, carPrice: carPrice(), carMonth: R.carMonth || 15, canCar: S.age >= 20, bikeName: R.bikeName || '자전거', late: !(h >= R.hours[0] && h < R.hours[1]),
+    modes: ['auto', 'walk', 'bike', 'bus', 'subway', ...(S.car ? ['car'] : []), 'taxi'].map(m => ({ id: m, ic: m === 'auto' ? '✨' : RIDE_IC[m], label: m === 'auto' ? '자동' : m === 'bike' ? (R.bikeName || '자전거') : RIDE_LB[m] })) };
+}
+// 고르기: 정해 둔 교통수단(S.ride)이 되면 그걸로, 아니면 자동 — 행동력 + 요금(만원 × 4) 이 가장 적은 것
+function pickRoute(opts, pref) {
+  const ok = opts.filter(o => !o.why);
+  if (pref && pref !== 'auto') { const p = ok.find(o => o.mode === pref); if (p) return p; }
+  return ok.slice().sort((x, y) => (x.ap + x.money * 4) - (y.ap + y.money * 4) || x.ap - y.ap)[0] || opts[0];
+}
 const campusPos = id => (D.map && D.map.campus && D.map.campus.pos[id]) || null;   // 캠퍼스 지도 위치
 const onCampus = id => !!(PLACES[id] && PLACES[id].campus);
 const standAt = () => S.place || S.at || 'home';
 // 이동 비용: 학교 다닐 땐 어디든 50. 어른은 지도 거리 — 바로 옆 1, 가까우면 2, 멀면 3~10 (1 ≈ 11분)
+function travelRoute(pl) {
+  if (phase() !== 'adult') return null;
+  const from = standAt();
+  if (from === pl.id) return null;
+  if (onCampus(from) && onCampus(pl.id)) return { mode: 'walk', ap: 1, money: 0, min: 11 };   // 캠퍼스 안은 걸어서 금방
+  const a = mapPos(from), b = mapPos(pl.id);
+  if (!a || !b) return { mode: 'walk', ap: 3, money: 0, min: 33 };
+  const r = pickRoute(routeOptions(a, b, pl.id), S.ride || 'auto');
+  return Object.assign({}, r, { ap: clamp(r.ap, 1, 10) + (onCampus(pl.id) && pl.id !== 'campus' ? 1 : 0) });
+}
 function travelCost(pl) {
   if (phase() !== 'adult') return TEEN_PT;
-  const from = standAt();
-  if (from === pl.id) return 0;
-  if (onCampus(from) && onCampus(pl.id)) return 1;   // 캠퍼스 안은 걸어서 금방
-  const a = mapPos(from), b = mapPos(pl.id);
-  if (!a || !b) return 3;
-  const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-  return (d < 45 ? 1 : d < 80 ? 2 : clamp(Math.round(2 + d / 55), 3, 10)) + (onCampus(pl.id) && pl.id !== 'campus' ? 1 : 0);
+  const r = travelRoute(pl);
+  return r ? r.ap : 0;
 }
 const ageFits = (pl, age) => !!pl && age >= (pl.minAge || 0) && (pl.maxAge == null || age <= pl.maxAge);
 function pickHangout(hobby, age) {
@@ -2272,7 +2449,9 @@ function placeList() {
   if (jailed() || phase() === 'story') return [];
   return D.places.filter(pl => ageFits(pl, S.age) && phaseFits(pl)).map(pl => {
     const cost = travelCost(pl);
-    return { id: pl.id, label: pl.label, icon: pl.icon, why: closedWhy(pl), regular: !!S.regular[pl.id], cost, zone: ZONE_LABEL[ZONE[pl.id] || 'out'], pos: pl.campus && pl.id !== 'campus' ? null : mapPos(pl.id),
+    const rt = phase() === 'adult' ? travelRoute(pl) : null;
+    return { id: pl.id, label: kidPlaceName(pl.id) || pl.label, icon: pl.icon, why: closedWhy(pl), regular: !!S.regular[pl.id], cost, zone: ZONE_LABEL[ZONE[pl.id] || 'out'], pos: pl.campus && pl.id !== 'campus' ? null : mapPos(pl.id),
+      ride: rt ? { mode: rt.mode, ic: RIDE_IC[rt.mode], money: rt.money, moneyT: rt.money ? fmtPrice(rt.money) : '', min: rt.min } : null,
       campus: !!pl.campus, cpos: pl.campus ? campusPos(pl.id) : null, clabel: pl.campusLabel || pl.label,
       here: S.place === pl.id, at: !S.place && standAt() === pl.id,
       ok: S.place !== pl.id && !busy() && S.ap >= cost && (cost || S.ap > 0) && !dutyPending() && placeOpen(pl) };
@@ -2436,10 +2615,14 @@ const companion = () => { const p = S.companion && person(S.companion); return p
 function setCompanion(p) { S.companion = p ? p.id : null; }
 function goPlace(id) {
   const pl = PLACES[id];
-  const cost = pl ? travelCost(pl) : 0;
+  const cost = pl ? travelCost(pl) : 0, rt = pl ? travelRoute(pl) : null;
   if (!pl || S.place === id || busy() || S.ap < cost || S.ap <= 0 || dutyPending() || !placeOpen(pl)) return;
   const night = S.time === 2;   // 사람은 도착한 때(행동 쓰기 전) 기준으로 채움
   if (S.drunk && ZONE[pl.id] !== ZONE[S.place]) soberUp();
+  if (rt && (rt.mode !== 'walk' || rt.ap >= 3)) {   // 교통: 요금 내고 한 줄 (가까운 걸음은 생략)
+    if (rt.money) S.money -= rt.money;
+    log(`${RIDE_IC[rt.mode]} ${rt.nbus ? '심야 N버스' : rt.mode === 'bike' ? rideCfg().bikeName || '자전거' : RIDE_LB[rt.mode]}로 ${rt.min}분${rt.from && rt.to ? ` — ${rt.from}역 → ${rt.to}역` : ''}${rt.money ? ` (${fmtPrice(rt.money)})` : ''}`, { t: 'info' });
+  }
   if (cost) spend(cost);
   S.zone = ZONE[pl.id] || 'out'; S.at = pl.id;
   enterPlace(pl, companion(), night);   // 동행은 같이 옴
@@ -2554,7 +2737,12 @@ function askNumber(pid) {
   p.askDay = S.dayN || 0;
   const m = mateHere(p) ? person(p.mateId) : null;
   // 짝이 옆에 있으면 끼어듦 (data/events2.js cp_number)
-  if (m && p.gender !== S.gender && npcAge(p) >= 20 && EVENTS.cp_number && eligible(EVENTS.cp_number)) { setMateVars(p, m); fire(EVENTS.cp_number); after(); return; }
+  //   그 사람도 마음이 있으면(설렘·첫인상·성격) 짝 몰래 번호를 주고받을 기회 (cp_secret_num), 아니면 짝이 끼어듦 (cp_number)
+  if (m && p.gender !== S.gender && npcAge(p) >= 20 && S.age >= 20) {
+    const willing = (p.heart || 0) >= 30 || allure(p, 'first') + (['bold', 'playful'].includes(p.personality) ? 15 : 0) + (p.married ? -5 : 0) >= 72 || Math.random() < .12;
+    const ev = willing && EVENTS.cp_secret_num ? EVENTS.cp_secret_num : EVENTS.cp_number;
+    if (ev && eligible(ev)) { setMateVars(p, m); fire(ev); after(); return; }
+  }
   S.vars.fp = p.id;
   if (Math.random() < numberOdds(p)) {
     p.phone = true;
@@ -2700,7 +2888,6 @@ function syncSpot() {
    계약: 보증금(또는 매매가) − 대출 + 중개수수료 + 이사비(용달·포장이사) + 보증보험, 지금 집 보증금은 돌려받음. 2년(뉴욕 1년)마다 갱신(5% 인상)
    S.home = { id(집 종류 — 이웃 구성), dong, sub, area, floor, deal, dep, rent, mgmt, owned, price, loan, rate, insured, risk, flaws, commute, until, n, since } */
 const RT = () => (D.realty || {})[REGION] || (D.realty || {}).kr;
-const ZONE_XY = { home: [48, 396], school: [90, 120], downtown: [230, 170], work: [306, 52], out: [240, 360] };
 const VISIT_PT = 8, REG_PT = 2;
 const r100 = v => Math.max(0, Math.round(v / 100) * 100), r500 = v => Math.max(0, Math.round(v / 500) * 500);
 const realtyState = () => { if (!S.realty) S.realty = { fav: [], seen: {}, reg: {}, gone: {} }; const R = S.realty; R.recent = R.recent || []; R.asked = R.asked || {}; R.reported = R.reported || {}; return R; };
@@ -2711,11 +2898,17 @@ function makeListing(R, id, opt = {}) {
   const sub = pick(t.subs), ar = sub.area || t.area, area = rand(ar[0], ar[1]);
   const fresh = !!sub.fresh || Math.random() < .15, age = fresh ? rand(0, 3) : rand(4, 38);
   const floors = rand(t.floors[0], t.floors[1]), floor = sub.basement ? 0 : sub.rooftop ? floors : rand(1, floors);
-  const L = { id, type: t.id, sub: sub.n, dong: dong.name, zone: dong.zone, dongTag: dong.tag || '', area, floor, floors, basement: !!sub.basement, rooftop: !!sub.rooftop, duplex: !!sub.duplex,
-    age, built: (S.date ? S.date.y : 2026) - age, station: rand(2, 18), south: Math.random() < .4, elevator: !!t.elevator || floors >= 7, parking: !!t.parking || Math.random() < .25, pets: Math.random() < .35,
+  // 지도 위 자리: 동네 둘레 (물 위면 다시) → 가까운 역(도보 분) · 근처 유치원·초등학교
+  const dp = dongPos(dong.name);
+  let pos = dp ? [dp[0], dp[1]] : null;
+  if (dp) for (let i = 0; i < 8; i++) { const a = Math.random() * Math.PI * 2, r = 8 + Math.random() * 34, x = Math.round(dp[0] + Math.cos(a) * r), y = Math.round(dp[1] + Math.sin(a) * r * .8); if (!inWater(x, y)) { pos = [x, y]; break; } }
+  const ns = pos && nearestStation(pos), kn = pos ? kidsNear(pos) : null;
+  const L = { id, type: t.id, sub: sub.n, dong: dong.name, zone: dong.zone, dongTag: dong.tag || '', area, floor, floors, basement: !!sub.basement, rooftop: !!sub.rooftop, duplex: !!sub.duplex, pos, kids: kn,
+    age, built: (S.date ? S.date.y : 2026) - age, station: ns ? clamp(Math.round(ns.d / 4), 1, 25) : rand(2, 18), south: Math.random() < .4, elevator: !!t.elevator || floors >= 7, parking: !!t.parking || Math.random() < .25, pets: Math.random() < .35,
     win: sub.win !== false, deal: pickKey(t.deals), mgmt: rand(t.mgmt[0], t.mgmt[1]), agent: !!opt.agent };
   L.opts = shuffle(t.opts.slice()).slice(0, rand(2, Math.min(6, t.opts.length)));
-  const k = dong.k * (age <= 3 ? 1.12 : age >= 25 ? .85 : 1) * (L.station <= 5 ? 1.07 : L.station >= 13 ? .92 : 1) * (L.basement ? .65 : L.rooftop ? .78 : floor === 1 ? .95 : 1) * (L.south ? 1.03 : 1);
+  const k = dong.k * (age <= 3 ? 1.12 : age >= 25 ? .85 : 1) * (L.station <= 5 ? 1.07 : L.station >= 13 ? .92 : 1) * (L.basement ? .65 : L.rooftop ? .78 : floor === 1 ? .95 : 1) * (L.south ? 1.03 : 1)
+    * (kn && ['apt', 'villa', 'house'].includes(t.id) ? 1 + Math.min(.12, kn.score * .03) + (kn.cho && t.id === 'apt' ? .04 : 0) : 1);   // 학교 가까운 집 (초품아) 은 더 비쌈
   const market = t.ppm ? rand(t.ppm[0], t.ppm[1]) * area * k : 0;   // 매매 시세
   L.market = Math.round(market);
   if (t.rentR) {   // 한 달 값이 기준 (고시원·뉴욕 렌트)
@@ -2764,15 +2957,16 @@ function appInfo(L, R, t, dong) {
   L.mgmtIn = mi[0]; L.mgmtOut = mi[1];
   L.secu = shuffle((R.secu || []).slice()).slice(0, rand(2, 5));
   L.near = shuffle((R.near || []).slice()).slice(0, 5).map(n => [n, rand(1, 12)]).sort((a, b) => a[1] - b[1]);
-  L.stName = (R.stations || {})[dong.name] || '';
+  const ns = L.pos && D.map ? nearestStation(L.pos) : null;
+  L.stName = ns ? (kr ? `${ns.name}역 (${ns.line})` : `${ns.line} · ${ns.name}`) : (R.stations || {})[dong.name] || '';
   const O = R.office || {};
-  if (O.words) L.office = { name: kr ? `${dong.name.replace(/동$/, '')} ${pick(O.words)}${O.suffix}` : `${pick(O.words)}${O.suffix}`, boss: `${pick(O.surnames)}${kr ? '○○' : ''}`, deals: rand(2, 46), tel: `${O.tel}-${rand(200, 999)}-${rand(1000, 9999)}`, years: rand(2, 25) };
+  if (O.words) L.office = { name: kr ? `${dongShort(dong.name)} ${pick(O.words)}${O.suffix}` : `${pick(O.words)}${O.suffix}`, boss: `${pick(O.surnames)}${kr ? '○○' : ''}`, deals: rand(2, 46), tel: `${O.tel}-${rand(200, 999)}-${rand(1000, 9999)}`, years: rand(2, 25) };
   // 중개사가 적은 융자금: 근저당이 있어도 '없음'이라 적기도 함 → 등기부로 확인
   if (kr && (L.deal === '전세' || L.deal === '매매')) L.claim = !L.lien ? '없음' : Math.random() < .45 ? '없음' : L.lien < (L.market || 1) * .3 ? '시세 대비 30% 미만' : '있음 (협의)';
   // 단지 (아파트·오피스텔) + 실거래가 (최근 거래 4건)
   if (['apt', 'officetel'].includes(t.id) && R.cx) {
     const nm = pick(R.cx.names);
-    L.cx = { name: kr ? `${dong.name.replace(/동$/, '')} ${nm}${t.id === 'apt' ? R.cx.suffix : ' 오피스텔'}` : nm, units: t.id === 'apt' ? (kr ? rand(3, 30) * 100 + rand(0, 99) : rand(40, 400)) : rand(120, 600), dongs: t.id === 'apt' && kr ? rand(4, 28) : 1,
+    L.cx = { name: kr ? `${dongShort(dong.name)} ${nm}${t.id === 'apt' ? R.cx.suffix : ' 오피스텔'}` : nm, units: t.id === 'apt' ? (kr ? rand(3, 30) * 100 + rand(0, 99) : rand(40, 400)) : rand(120, 600), dongs: t.id === 'apt' && kr ? rand(4, 28) : 1,
       top: L.floors, built: L.built, park: (rand(t.id === 'apt' ? 9 : 4, t.id === 'apt' ? 16 : 9) / 10).toFixed(1), builder: pick(R.cx.builders) };
   }
   if (['apt', 'officetel', 'villa'].includes(t.id) && L.market) {
@@ -2819,18 +3013,19 @@ function priceLine(L) {
 const areaText = L => REGION === 'kr' ? `전용 ${L.area}㎡ (${Math.round(L.area / 3.3058)}평)` : `${Math.round(L.area * 10.764).toLocaleString('en-US')} sqft (${L.area}㎡)`;
 const floorText = L => L.basement ? (REGION === 'kr' ? '반지하' : '가든 레벨') : L.rooftop ? (REGION === 'kr' ? '옥탑' : `${L.floor}층 (꼭대기)`) : `${L.floor}층 / ${L.floors}층`;
 // 통근: 직장(또는 대학)까지 — 편도 분 · 출근·수업에 더해지는 행동력(왕복)
+// 통근: 아침 8시 기준 가장 나은 방법 (택시 빼고). pt = 출근·수업에 더해지는 행동력(왕복)
 function commuteOf(L) {
   const to = S.job ? 'office' : S.flags.student ? 'campus' : null;
   if (!to) return null;
-  const a = ZONE_XY[L.zone] || ZONE_XY.home, b = mapPos(to) || [180, 200], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-  const pt = clamp(Math.round(d / 90) + (L.station >= 12 ? 1 : 0), 0, 4);
-  return { to: to === 'office' ? '직장' : '학교', min: Math.round(10 + d / 9 + L.station / 2), pt: pt * 2 };
+  const a = L.pos || dongPos(L.dong) || zonePos(L.zone) || homePos(), b = mapPos(to) || [360, 460];
+  const r = pickRoute(routeOptions(a, b, to, { h: 8 }).filter(o => o.mode !== 'taxi'), S.ride && S.ride !== 'taxi' ? S.ride : 'auto');
+  return { to: to === 'office' ? '직장' : '학교', min: Math.round(6 + r.ap * 11), pt: clamp(r.ap - 1, 0, 4) * 2, mode: r.mode, ic: RIDE_IC[r.mode], label: RIDE_LB[r.mode], via: r.from && r.to ? `${r.from}역 → ${r.to}역` : '', money: r.money };
 }
 const seenOf = id => realtyState().seen[id];
 // 괄호 뒤 조사: '아파트 59㎡ (25평형)' + 을 → 괄호 앞 낱말 기준
 const subJ = (t, j) => { const base = String(t).replace(/\s*\([^)]*\)\s*$/, ''); return t + josa(base, j).slice(base.length); };
 // 지금 집의 통근 행동력 (직장·학교가 바뀌어도 그때그때) — 본가·예전 저장(동네 모름)은 0
-const homeCommute = () => { const H = S.home; if (!H || !H.zone || H.id === 'parents') return 0; const c = commuteOf({ zone: H.zone, station: H.station || 8 }); return c ? c.pt : 0; };
+const homeCommute = () => { if (!S.home || !D.map) return 0; const c = commuteOf({ pos: homePos() }); return c ? c.pt : 0; };
 function listingView(L) {
   const R = RT(), RS = realtyState(), seen = RS.seen[L.id], reg = RS.reg[L.id];
   const flawT = id => (R.flaws.find(f => f.id === id) || {});
@@ -2951,7 +3146,7 @@ function signContract(id, o = {}) {
   const lo = R.loan[L.deal];
   S.home = { id: L.type, n: ((S.home && S.home.n) || 0) + 1, since: S.dayN || 0, dong: L.dong, sub: L.sub, area: L.area, floor: floorText(L), deal: L.deal,
     dep: L.deal === '매매' ? 0 : L.dep || 0, rent: L.rent || 0, mgmt: L.mgmt || 0, owned: L.deal === '매매', price: L.deal === '매매' ? L.price : 0, loan: q.loan, rate: q.loan && lo ? lo.rate : 0,
-    insured: !!q.insure, risk: L.risk || 0, flaws: L.hidden.slice(), zone: L.zone, until: L.deal === '매매' ? null : (S.dayN || 0) + R.contract, station: L.station };
+    insured: !!q.insure, risk: L.risk || 0, flaws: L.hidden.slice(), zone: L.zone, until: L.deal === '매매' ? null : (S.dayN || 0) + R.contract, station: L.station, pos: L.pos, kids: L.kids ? L.kids.score : 0 };
   S.flags.ownPlace = true;
   RS.gone[id] = true;
   const surprise = !RS.seen[id] && !L.agent ? L.hidden.map(f => R.flaws.find(x => x.id === f)).filter(f => f && f.bad) : [];
@@ -2976,7 +3171,7 @@ function homeInfo() {
   return { type: h.id, label: H.sub || h.label, icon: h.icon, dong: H.dong || '', deal: H.deal || (h.id === 'parents' ? '' : '월세'), dep: H.dep || 0, rent: H.rent ?? h.rent ?? 0, mgmt: H.mgmt || 0,
     owned: !!H.owned, price: H.price || 0, loan: H.loan || 0, interest: Math.round((H.loan || 0) * (H.rate || 0) / 12), insured: !!H.insured, area: H.area || 0, floor: H.floor || '',
     flaws: (H.flaws || []).map(id => (R.flaws.find(f => f.id === id) || {})).filter(f => f.t).map(f => ({ t: f.t, bad: !!f.bad })), commute: homeCommute(), daysLeft: H.until ? H.until - (S.dayN || 0) : null,
-    since: H.since || 0, hh: h.nb ? h.nb.hh : {}, canParents: h.id !== 'parents' && !S.flags.married && householdN() === 1 && alive().some(p => p.kind === 'family' && !p.sibling) && !realtyWhy() };
+    since: H.since || 0, hh: h.nb ? hhNear(h.nb.hh, homeKids()) : {}, kids: D.map ? kidsNear(homePos()) : null, dongName: homeDong(), station: D.map ? (s2 => s2 ? { name: s2.name, line: s2.line, min: Math.max(1, Math.round(s2.d / 4)) } : null)(nearestStation(homePos())) : null, canParents: h.id !== 'parents' && !S.flags.married && householdN() === 1 && alive().some(p => p.kind === 'family' && !p.sibling) && !realtyWhy() };
 }
 // 한 달 돈 흐름 (📱 은행)
 function budget() {
@@ -2990,6 +3185,7 @@ function budget() {
     if (H.loan) out.push([`🏦 대출 이자 (연 ${((H.rate || 0) * 100).toFixed(1)}%)`, -Math.round(H.loan * (H.rate || 0) / 12)]);
   }
   if (S.flags.onPill) out.push(['💊 피임약', -4]);
+  if (S.car) out.push(['🚗 차 유지비 (보험·세금·주차)', -(rideCfg().carMonth || 15)]);
   if (S.age >= 19 && S.food && (S.food.last || S.food.spent)) out.push([S.food.last ? '🍚 식비 (지난달)' : '🍚 식비 (이번 달 지금까지)', -Math.round((S.food.last || S.food.spent) * 10) / 10]);
   return { lines: out, net: out.reduce((t, l) => t + l[1], 0), money: S.money, dep: H.dep || 0, loan: H.loan || 0, owned: H.owned ? H.price || 0 : 0 };
 }
@@ -2999,7 +3195,7 @@ function homeFrom(type, dep) {
   if (!R || !R.types.some(t => t.id === type)) return { id: type, dep: 0, n: (S.home && S.home.n || 0) + 1, since: S.dayN || 0 };
   const L = withSeed(`home:${S.id}:${type}:${S.dayN || 0}`, () => { let x; for (let i = 0; i < 6; i++) { x = makeListing(R, 'h', { type, agent: true }); if (x.deal !== '매매') break; } if (x.deal === '매매') { x.deal = '월세'; x.dep = 0; x.rent = Math.round(x.market * .004); } return x; });
   return { id: type, n: (S.home && S.home.n || 0) + 1, since: S.dayN || 0, dong: L.dong, sub: L.sub, area: L.area, floor: floorText(L), deal: L.deal, dep: dep ? L.dep || 0 : 0, rent: L.rent || 0, mgmt: L.mgmt || 0,
-    owned: false, price: 0, loan: 0, rate: 0, insured: false, risk: 0, flaws: L.hidden.slice(), zone: L.zone, until: (S.dayN || 0) + R.contract, station: L.station };
+    owned: false, price: 0, loan: 0, rate: 0, insured: false, risk: 0, flaws: L.hidden.slice(), zone: L.zone, until: (S.dayN || 0) + R.contract, station: L.station, pos: L.pos, kids: L.kids ? L.kids.score : 0 };
 }
 // 한 달마다: 집 하자·좋은 점이 생활에 · 계약 갱신(5% 인상) · 깡통전세 사고
 function homeMonthly() {
@@ -3040,8 +3236,18 @@ function unitName(h, i, used) {
   }
   return `${i + 1}번째 집`;
 }
+// 유치원·초등학교 가까운 집: 아이 있는 가족·부부가 많이 삶 (k = 근처 아이 시설 점수, 최대 3)
+function hhNear(hh, k) {
+  k = Math.min(3, k || 0);
+  if (!k || !hh) return hh;
+  const out = Object.assign({}, hh);
+  for (const key of Object.keys(out)) out[key] *= key === 'family' ? 1 + .4 * k : key === 'married' ? 1 + .2 * k : key === 'elder' ? 1 : Math.max(.35, 1 - .15 * k);
+  if (!out.family && !out.student) out.family = 3 * k;   // 오피스텔·원룸도 학교 옆이면 아이 키우는 집이 조금
+  return out;
+}
+const homeKids = () => { const H = S.home || {}; return H.id !== 'parents' && H.kids != null ? H.kids : (D.map ? kidsNear(homePos()).score : 0); };
 function neighborsFor(h, org) {
-  const NB = h.nb || { n: [6, 10], hh: { single: 1 } }, total = rand(NB.n[0], NB.n[1]), spots = ['block', ...D.encounter.neighborSpots];
+  const NB0 = h.nb || { n: [6, 10], hh: { single: 1 } }, NB = Object.assign({}, NB0, { hh: hhNear(NB0.hh, homeKids()) }), total = rand(NB.n[0], NB.n[1]), spots = ['block', ...D.encounter.neighborSpots];
   let made = 0, hhN = 0;
   const used = new Set();
   while (made < total && hhN < 24) {
@@ -3318,9 +3524,10 @@ function jobOdds(j) {
   if ((S.closet || []).some(x => ['blazer', 'slacks', 'pencil', 'suitdress', 'longcoat'].includes(x.k)) || gIdx(S.stats.style) >= 4) o += .05;   // 면접에 입고 갈 단정한 옷
   return clamp(o, .05, .95);
 }
-function hire(j) {
-  S.job = j.id; S.rank = 0; S.perf = 30; S.salary = j.salary;
-  log(`${j.label} 자리에 합격했다!`, { memory: !S.flags.firstJob, deltas: applyEffect({ happy: 6 }) });
+function hire(j, o = {}) {
+  S.job = j.id; S.rank = 0; S.perf = 30; S.salary = o.salary || j.salary; S.jobZone = o.zone || null; S.jobCo = o.co || null; S.jobDong = o.dong || null;
+  const JB = jobState(); JB.career.push({ id: j.id, label: j.label, co: o.co || '', from: S.age, day: S.dayN || 0 });
+  log(`${o.co ? `${o.co} — ` : ''}${j.label} 자리에 합격했다!`, { memory: !S.flags.firstJob, deltas: applyEffect({ happy: 6 }) });
   S.flags.firstJob = true;
   const dr = D.dreams.find(d => d.id === S.dream);
   if (dr && dr.job === j.id && !S.flags.dreamDone) { S.flags.dreamDone = true; log(`어릴 적 꿈이 이뤄졌다. ${dr.label}.`, { memory: true, deltas: applyEffect({ happy: 10 }) }); }
@@ -3339,7 +3546,7 @@ function tryJob() {
   for (const j of ok) if (Math.random() < jobOdds(j)) { hire(j); return true; }
   return false;
 }
-function loseJob() { S.job = null; S.salary = 0; S.rank = 0; S.perf = 0; delete S.flags.owner; }
+function loseJob() { const c = S.job && jobState().career.slice(-1)[0]; if (c && c.id === S.job && c.to == null) c.to = S.age; S.job = null; S.salary = 0; S.rank = 0; S.perf = 0; S.jobZone = null; S.jobCo = null; S.jobDong = null; delete S.flags.owner; }
 function quitJob() {
   if (!S.job || busy()) return;
   const j = job(S.job);
@@ -3347,6 +3554,128 @@ function quitJob() {
   log(`${j.label} 일을 그만뒀다.`, { deltas: applyEffect({ happy: 2 }) });
   after();
 }
+/* ═════════ 구인 (📱 💼 잡서치 / 잡보드 — data/jobs.js jobSite) ═════════
+   공고: 주마다 16개 (씨앗 = 인생·주) — 회사·동네·근무 형태·급여(알바는 시급)·마감·복리후생·지원자 수·평점
+   이력서: 학력·경력·어학·자격증·자기소개서(다듬기 ⚡6, 0~3) → 서류 점수
+   지원(⚡2, 온라인) → 1~4일 뒤 서류 결과(메일) → 면접 날 이벤트(job_interview — 고른 답 + 능력치) → 1~3일 뒤 합격·불합격 → 입사 (5일 안에)
+   S.jobs = { apps: [{ pid, job, co, title, salary, zone, type, stage: doc|iv|wait|offer|fail|done|expired, res, iv, at }], intro, career: [{ id, label, co, from, to }] } */
+const JS = () => (D.jobSite || {})[REGION] || (D.jobSite || {}).kr;
+const jobState = () => { if (!S.jobs) S.jobs = { apps: [], intro: 0, career: S.job ? [{ id: S.job, label: job(S.job).label, co: S.jobCo || '', from: S.age, day: S.dayN || 0 }] : [] }; return S.jobs; };
+// 상호·지점 이름용 동 이름: 신림동 → 신림, 목동 → 목동
+const dongShort = n => n.length > 2 ? n.replace(/동$/, '') : n;
+const APPLY_PT = 2, POLISH_PT = 6;
+let JCACHE = null;
+function postings() {
+  const W = JS();
+  if (!W || !S.date) return [];
+  const wk = Math.floor((S.dayN || 0) / 7), key = `${S.id}:${REGION}:${wk}`;
+  if (JCACHE && JCACHE.key === key) return JCACHE.list;
+  const list = withSeed(`jobs:${key}`, () => Array.from({ length: 16 }, (_, i) => {
+    const j = weighted(D.jobs, x => (x.type === '알바' || x.type === '계약직' ? 3 : x.type === '프리랜서' ? 1.4 : 2) * (x.odds < .4 ? .6 : 1));
+    return makePosting(W, j, `${wk}-${i}`);
+  }));
+  JCACHE = { key, list };
+  return list;
+}
+function makePosting(W, j, id) {
+  const dongs = ((RT() || {}).dongs || []).filter(d => ['office', 'it'].includes(j.cat) ? ['work', 'downtown'].includes(d.zone) : true);
+  const dong = dongs.length ? pick(dongs) : { name: '시내', zone: 'downtown' };
+  const co = pick((W.by || {})[j.id] || W.co[j.cat] || ['(주)한빛']).replace('{d}', dongShort(dong.name)).replace('{n}', rand(2, 99));
+  const career = j.type === '알바' ? '경력 무관' : Math.random() < .72 ? '신입' : `경력 ${rand(1, 5)}년↑`;
+  const salary = Math.round(j.salary * (.9 + Math.random() * .25) / 10) * 10;
+  const hourly = j.type === '알바' ? Math.round(W.minWage * (1 + rand(0, 22) / 100) * (REGION === 'kr' ? .1 : 100)) / (REGION === 'kr' ? .1 : 100) : null;
+  const title = j.type === '알바' ? `${j.label} 구해요 · 주 ${rand(3, 6)}일` : `[${career}] ${j.label} ${pick(['채용', '모집', '구인', '정규직 채용'])}`;
+  return { id: 'j' + id, job: j.id, label: j.label, cat: j.cat, co, dong: dong.name, zone: dong.zone, type: j.type, career, salary, hourly, title,
+    deadline: (S.dayN || 0) + rand(3, 20), perks: shuffle(W.perks.slice()).slice(0, rand(2, 5)), applicants: rand(3, 240), star: Math.round((2.9 + Math.random() * 1.9) * 10) / 10, volatile: !!j.volatile };
+}
+// 이력서 (자동으로 채워짐 + 자기소개서 수준)
+function resume() {
+  const sc = S.school || {}, R = jobState(), kr = REGION === 'kr', yrs = c => Math.max(0, (c.to ?? S.age) - c.from);
+  const edu = sc.degree ? `${univLabel() || '대학'} ${majorLabel() || ''} 졸업${sc.gpaN ? ` · 학점 ${sc.gpa.toFixed(2)}` : ''}` : sc.univ && S.flags.student ? `${univLabel()} ${majorLabel() || ''} 재학` : S.age >= 19 ? '고등학교 졸업' : '재학 중';
+  const career = R.career.map(c => `${c.co ? c.co + ' · ' : ''}${c.label} ${yrs(c) ? yrs(c) + '년' : '1년 미만'}${c.to == null ? ' (재직 중)' : ''}`);
+  const certs = [];
+  if (S.age >= 20 && (S.flags.car || S.flags.license || S.age >= 21)) certs.push(kr ? '운전면허 2종 보통' : "Driver's License");
+  if (gIdx(S.stats.smart) >= 3) certs.push(kr ? '컴퓨터활용능력 1급' : 'MS Office 자격');
+  const dept = sc.degree ? sc.dept : null;
+  const C2 = { cs: ['정보처리기사'], engineering: ['전기기사'], culinary: ['조리기능사'], beauty: ['미용사 면허'], nursing: ['간호사 면허'], medicine: ['의사 면허'], education: ['교원자격증'], architecture: ['건축기사'], business: ['전산회계 1급'], economics: ['투자자산운용사'] }[dept];
+  if (C2) certs.push(...C2);
+  if (!dept && gIdx(S.stats.craft) >= 3) certs.push(kr ? '조리기능사' : 'Food Handler 자격');
+  const lang = kr ? `TOEIC ${Math.min(990, Math.round((320 + g100(S.stats.smart) * 6.2) / 5) * 5)}` : (S.eth && S.eth !== 'white' ? '영어 · 제2외국어 가능' : '영어 (원어민)');
+  return { edu, career, certs, lang, intro: R.intro || 0, introT: ['안 씀', '기본', '괜찮음', '공들임'][R.intro || 0], years: R.career.reduce((t, c) => t + yrs(c), 0) };
+}
+function polishResume() {
+  const R = jobState();
+  if (busy() || S.ap < POLISH_PT || (R.intro || 0) >= 3 || phase() !== 'adult') return;
+  spend(POLISH_PT); R.intro = (R.intro || 0) + 1;
+  log(pick(['카페 구석에서 자기소개서를 처음부터 다시 썼다.', '이력서 사진을 새로 찍고 경력 기술서를 다듬었다.', '자기소개서를 소리 내어 읽어 보며 어색한 문장을 고쳤다.']) + ` (자기소개서: ${resume().introT})`, { t: 'info' });
+  after();
+}
+// 서류 점수: 조건 충족 여부 + 합격률 + 자기소개서 + 같은 업종 경력 (경력직 공고는 경력이 없으면 크게 깎임)
+function docOdds(P) {
+  const j = job(P.job), R = jobState(), rs = resume();
+  let o = meetsJob(j) ? jobOdds(j) : (j.type === '알바' ? jobOdds(j) * .7 : jobOdds(j) * .15);
+  o += (R.intro || 0) * .05 + Math.min(.15, R.career.filter(c => (job(c.id) || {}).cat === j.cat).length * .08);
+  if (/경력/.test(P.career) && !R.career.some(c => (job(c.id) || {}).cat === j.cat)) o *= .3;
+  if (S.record) o *= .6;
+  return clamp(o + (j.type === '알바' ? .1 : 0), .03, .97);
+}
+const jobAppWhy = P => phase() !== 'adult' ? '어른이 되면' : S.age < 19 ? '19살부터' : jailed() ? '수감 중' : S.flags.inArmy ? '군 복무 중' : busy() ? '지금은 못 함' : S.ap < APPLY_PT ? `행동력 ⚡${APPLY_PT} 필요` : P && (S.dayN || 0) > P.deadline ? '마감' : P && jobState().apps.some(a => a.pid === P.id) ? '지원함' : P && S.job === P.job && S.jobCo === P.co ? '지금 다니는 곳' : '';
+function postingView(P) {
+  const j = job(P.job), checks = jobChecks(j), a = jobState().apps.find(x => x.pid === P.id);
+  return Object.assign({}, P, { checks, ok: checks.every(c => c[0]), why: jobAppWhy(P), app: a ? a.stage : null, chance: (o => o >= .6 ? ['높음', 'hi'] : o >= .3 ? ['보통', 'mid'] : ['낮음', 'lo'])(docOdds(P)), dday: P.deadline - (S.dayN || 0), commute: jobCommuteMin(P), salaryT: P.hourly ? `시급 ${REGION === 'kr' ? P.hourly.toLocaleString() + '원' : '$' + P.hourly}` : `${P.volatile ? '평균 ' : ''}연봉 ${fmtMoney(P.salary)}`, catT: (D.jobCats || {})[P.cat] || '' });
+}
+const jobCommuteMin = P => { const b = dongPos(P.dong) || zonePos(P.zone) || [360, 460]; const r = pickRoute(routeOptions(homePos(), b, 'office', { h: 8 }).filter(o => o.mode !== 'taxi'), 'auto'); return Math.round(6 + r.ap * 11); };
+function applyPosting(id) {
+  const P = postings().find(x => x.id === id);
+  if (!P || jobAppWhy(P)) return;
+  spend(APPLY_PT);
+  const fast = P.type === '알바';
+  jobState().apps.unshift({ pid: P.id, job: P.job, label: P.label, co: P.co, title: P.title, salary: P.salary, hourly: P.hourly, zone: P.zone, dong: P.dong, type: P.type, stage: 'doc', at: S.dayN || 0, res: (S.dayN || 0) + (fast ? 1 : rand(2, 4)), pass: Math.random() < docOdds(P) });
+  jobState().apps = jobState().apps.slice(0, 20);
+  log(`📨 ${P.co}에 지원했다. (${P.label}) ${fast ? '내일쯤 연락이 온다고 했다.' : '서류 결과는 며칠 뒤에 나온다.'}`, { t: 'info' });
+  after();
+}
+// 아침마다: 서류 결과 · 면접 날 · 최종 결과 · 오퍼 만료
+function jobDaily() {
+  if (!S.jobs || phase() !== 'adult') return;
+  const W = JS(), day = S.dayN || 0;
+  S.jobs.apps.forEach((a, i) => {
+    if (a.stage === 'doc' && day >= a.res) {
+      if (a.pass) { a.stage = 'iv'; a.iv = day + (a.type === '알바' ? rand(0, 1) : rand(1, 4)); log(W.say.pass.replace('{co}', a.co).replace('{d}', a.iv === day ? '오늘' : `${a.iv - day}일 뒤`), { t: 'info' }); }
+      else { a.stage = 'fail'; log(W.say.fail.replace('{co}', a.co), { t: 'info', deltas: applyEffect({ happy: -1 }) }); }
+    } else if (a.stage === 'iv' && day >= a.iv && !S.pending.length && EVENTS.job_interview) {
+      S.vars.ivApp = i; S.vars.ivCo = a.co; S.vars.ivJob = a.label; S.vars.ivPart = a.type === '알바' ? 1 : 0;
+      fire(EVENTS.job_interview);
+    } else if (a.stage === 'wait' && day >= a.res) {
+      if (a.ok) { a.stage = 'offer'; a.exp = day + 5; log(W.say.offer.replace('{co}', a.co), { t: 'info', memory: false }); }
+      else { a.stage = 'fail'; log(W.say.fail.replace('{co}', a.co), { t: 'info', deltas: applyEffect({ happy: -2 }) }); }
+    } else if (a.stage === 'offer' && day > a.exp) a.stage = 'expired';
+  });
+}
+// 면접 (data/events2.js job_interview 선택지): smart 또박또박 / charm 웃으며 자신 있게 / skill 경험·실력 / honest 솔직하게
+function interview(kind) {
+  const a = jobState().apps[S.vars.ivApp];
+  if (!a) return false;
+  const j = job(a.job), stat = { smart: 'smart', charm: 'charm', skill: ['craft', 'medical', 'labor', 'drive'].includes(j.cat) ? 'craft' : j.cat === 'art' ? 'art' : 'smart', honest: 'charm' }[kind] || 'charm';
+  let o = (meetsJob(j) ? jobOdds(j) : .15) + (gIdx(S.stats[stat]) - 3) * .07 + (jobState().intro || 0) * .03 - (S.drunk ? .2 : 0) - ((S.fatigue || 0) >= 3 ? .08 : 0);
+  if (kind === 'honest') o += .04;
+  if (kind === 'skill' && jobState().career.some(c => (job(c.id) || {}).cat === j.cat)) o += .12;
+  if ((S.closet || []).some(x => ['blazer', 'slacks', 'pencil', 'suitdress', 'longcoat'].includes(x.k)) || gIdx(S.stats.style) >= 4) o += .05;
+  a.ok = Math.random() < clamp(o + (a.type === '알바' ? .15 : 0), .05, .95);
+  a.stage = 'wait'; a.res = (S.dayN || 0) + (a.type === '알바' ? 1 : rand(1, 3));
+  S.vars.ivGood = a.ok ? 1 : 0;
+  return a.ok;
+}
+function acceptOffer(i) {
+  const a = jobState().apps[i], j = a && job(a.job);
+  if (!j || a.stage !== 'offer' || busy()) return;
+  if (S.job) { const old = job(S.job); loseJob(); log(`${old.label} 일을 정리하고 사직서를 냈다.`, { t: 'info' }); }
+  a.stage = 'done';
+  hire(j, { salary: a.hourly ? j.salary : a.salary, zone: a.zone, co: a.co, dong: a.dong });
+  after();
+}
+function declineOffer(i) { const a = jobState().apps[i]; if (a && a.stage === 'offer') { a.stage = 'declined'; log(`${a.co}의 제안을 정중히 거절했다.`, { t: 'info' }); after(); } }
+function jobApps() { return jobState().apps.map((a, i) => Object.assign({ ix: i }, a, { dday: a.stage === 'iv' ? a.iv - (S.dayN || 0) : a.stage === 'offer' ? a.exp - (S.dayN || 0) : null })); }
 function jobTitle() {
   if (!S.job) return null;
   const j = job(S.job), r = j.ranks[S.rank];
@@ -3529,6 +3858,8 @@ const api = {
   find: fn => alive().filter(p => !p.acq && p.kind !== undefined && fn(p)),   // 얼굴만 아는 사이(acq)는 빠짐 — 장소에서 마주치면 a.here()로
   main: mainPartner,
   focus: p => { S.vars.fp = p ? p.id : null; },
+  // 내 매력·외모 (처음 보는 이성 기준 0~100+): 생김새·매력이 크고 꾸밈·몸, 취기가 조금
+  myAllure: () => g100(S.stats.face) * .42 + g100(S.stats.charm) * .32 + g100(S.stats.style) * .14 + g100(S.stats.fit) * .12 + [0, 3, 5, -4][S.drunk || 0],
   // 집·이웃 (data/housing.js): 지금 집, 집 앞 풍경, 지금 동네 이웃들
   home: () => homeNow(), homeSpot: () => homeNow().spot || { label: '집 앞', doing: ['지나가고 있다'] },
   neighbors: () => alive().filter(p => p.kind === 'neighbor' && p.org === S.vars.nbOrg && p.hh),
@@ -3541,6 +3872,7 @@ const api = {
   canSex, onPill, fertile, refusal, known, dlgBonus: () => DLGB, myLook, theirLook, mateHere, sexIdx: () => sIdx(S.sexSkill), charmIdx: () => gIdx(S.stats.charm), lookIdx: () => firstLook(), sss: () => SSS(), sexGrade: () => sexGrade(S.sexSkill), turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
+  interview, jobLabel: () => S.job ? job(S.job).label : '',
   personality, sharedHobby, valueClash, valueLabel,
   subjAvg, subjAll, subjAdd, takeCSAT, admit, graduate, admitP, univ: UNIV, dept: DEPT, naesinAvg, mockAvg,
   chooseTrack: id => { const t = D.tracks.find(x => x.id === id); if (t) { S.school.track = t.id; S.school.electives = t.electives.slice(); } },
@@ -4018,7 +4350,7 @@ window.Game = {
     jobs: () => D.quick.jobs.map(job), tierUnis: tiers => D.universities.filter(u => tiers.includes(u.tier)),
   },
   // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
-  phase, timeInfo, storyNext, nextTurn, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
+  actPreview, lastAct: () => LAST_ACT, ride: { info: rideInfo, set: setRide, buyCar, sellCar, options: id => { const pl = PLACES[id], a = mapPos(standAt()), b = pl && mapPos(id); return a && b ? routeOptions(a, b, id) : []; } }, mapInfo: () => ({ home: D.map ? homePos() : null, dong: D.map ? homeDong() : '', at: D.map ? mapPos(standAt()) : null }), phase, timeInfo, storyNext, nextTurn, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
   actionList, canDo, costOf, apOf, doAction, needsSubject, shopToday, outfitCtx: (p, evId) => outfitCtx(p || null, evId), dateOutfits, setDateOutfit: ix => { S.vars.dateOutfit = ix; },
   places: placeList, onCampus: () => onCampus(standAt()) && !!S.flags.student, teenPt: TEEN_PT, goPlace, leavePlace, hasNumber, askNumber, askStranger, mateWord, numberOdds, homeNow: () => homeNow(),
   // 📱 부동산 앱 (data/realty.js)
@@ -4036,6 +4368,7 @@ window.Game = {
   marker, ringVisible, acquaintance: p => !!p.acq, faded: p => faded(p), companion, endCompany: () => { S.companion = null; save(); emit(); }, interact, canSex, clearScene: () => { if (S.scene) { S.scene = null; save(); } }, look: lookOf, myLook: () => S.look, figure, relLabel, npcAge, canRomance, heartOk, pname, profile, myProfile, myRecords,
   crimes: () => D.crimes.filter(c => S.age >= c.minAge && meets(c.req)), canCrime, crimeOdds, commitCrime,
   jobInfo, canJobHunt, applyJob, quitJob, jobTitle,
+  jobsite: { list: () => postings().map(postingView), apply: applyPosting, resume, polish: polishResume, apps: jobApps, accept: acceptOffer, decline: declineOffer, app: () => (JS() || {}).app || '구인', applyPt: APPLY_PT, polishPt: POLISH_PT, cats: () => D.jobCats || {} },
   roleText, karmaLabel, trait, job, mainPartner, season, fmtMoney, josa,
   gradeInfo, sexInfo: () => sexInfo(S.sexSkill), sexGrades: SG.map(g => g[0]), abilities: ABIL, conds: COND, subjects: D.subjects, naesinAvg, mockAvg, univLabel, majorLabel, studyInfo, subjectsNow: () => subjectsNow().map(SUB),
   // 학교 화면: 성적표 확인, 원서 (대학·학과 목록, 합격 확률, 내기)
