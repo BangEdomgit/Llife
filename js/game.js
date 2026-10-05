@@ -961,17 +961,32 @@ const choicesOf = ev => ev.choices.filter(c => !c.if || c.if(S, api));
 function currentEvent() {
   const p = S.pending[0];
   if (!p) return null;
+  if (p.dlg) {   // 대화 이벤트
+    const wp = person(p.pid);
+    if (!wp || !dlgById(p.dlg)) { S.pending.shift(); return currentEvent(); }
+    Object.assign(S.vars, p.tv);
+    const kind = dlgById(p.dlg).kind;
+    return { text: p.text, who: whoView(wp, p.id), choices: p.labels, dlg: kind };
+  }
   const ev = EVENTS[p.id];
   if (!ev) { S.pending.shift(); return currentEvent(); }
   Object.assign(S.vars, p.tv);
   const wp = p.who && person(p.who);
-  const who = wp ? { look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp), fig: figure(wp), libido: canSex(wp) ? wp.libido || 0 : 0, ctx: outfitCtx(wp, p.id) } : null;   // 나를 향한 성욕 → 표정
-  return { text: p.text, who, choices: choicesOf(ev).map(c => fill(resolve(c.label))) };
+  return { text: p.text, who: wp ? whoView(wp, p.id) : null, choices: choicesOf(ev).map(c => fill(resolve(c.label))) };
 }
+// 이벤트 창 위에 보이는 사람 (나를 향한 성욕 → 표정)
+const whoView = (wp, evId) => ({ look: lookOf(wp), age: npcAge(wp), name: pname(wp), rel: relLabel(wp), fig: figure(wp), libido: canSex(wp) ? wp.libido || 0 : 0, ctx: outfitCtx(wp, evId) });
 function choose(i) {
   const p = S.pending[0];
   if (!p || S.ended) return;
   Object.assign(S.vars, p.tv);
+  if (p.dlg) {
+    if (!p.labels[i]) return;
+    S.pending.shift();
+    dlgChoose(p, i);
+    after();
+    return;
+  }
   const ch = choicesOf(EVENTS[p.id])[i];
   if (!ch) return;
   S.pending.shift();
@@ -2288,22 +2303,97 @@ function interact(pid, iid) {
   const cost = socialCost(it, p);
   const ap = socialAp(it), h = hereEntry(pid), free = !!h && !h.used && !it.noFree && ap === 1;
   if (busy() || dutyPending() || (!free && S.ap < ap) || (cost && S.money < cost)) return;
+  const dlg = !cost && dlgFor(p, iid);
   if (!free) spend(ap);
   if (h) h.used = true;
-  const o = it.run(S, p, api) || {};
-  const pm = personality(p).mod[iid] || 1, mm = personality(S).mod[iid] || 1;
-  const hm = sharedHobby(p) && (iid === 'hang' || iid === 'gift') ? 1.3 : 1;
-  const vm = p.value === S.value ? 1.2 : valueClash(p) ? .8 : 1;
-  const fm = 1 + ((p.face ?? 2) - 3) * .05;   // 상대 생김새가 좋으면 설렘이 빨리 오름
-  o.mult = { close: pm * mm * hm, trust: pm * mm * vm, heart: pm * mm * vm * fm, grudge: (personality(p).mod.argue || 1) * (valueClash(p) ? 1.3 : 1) };
   if (['talk', 'hang', 'date', 'flirt', 'gift', 'listen', 'drinkWith'].includes(iid)) nearby(p);
   // 친밀 20~39인 기혼자: 이야기하다 보면 결혼한 티가 새어 나옴 (40이면 확실히 앎)
   if (['talk', 'hang', 'listen', 'drinkWith', 'date'].includes(iid) && p.married && !p.marriedKnown && p.close >= 20 && p.close < 40 && Math.random() < .35) { S.vars.fp = p.id; marriedHint(p); }
+  if (dlg) { openDialogue(p, iid, dlg); return; }   // 대화 이벤트: 장면을 띄우고, 고른 말로 결과 (dlgChoose)
+  const o = it.run(S, p, api) || {};
+  o.mult = interactMult(p, iid);
   if (cost) { const eff = Object.assign({}, resolve(o.effect)); eff.money = val(eff.money) - cost; o.effect = eff; }
   S.vars.fp = p.id;
   if (!o.intimate) o.gk = gainK();
   applyOutcome(o, p);
   after();
+}
+
+// 호감도 배율: 성격 궁합(mod), 같은 취미(같이 놀기·선물), 가치관, 상대 생김새(설렘)
+function interactMult(p, iid) {
+  const pm = personality(p).mod[iid] || 1, mm = personality(S).mod[iid] || 1;
+  const hm = sharedHobby(p) && (iid === 'hang' || iid === 'gift') ? 1.3 : 1;
+  const vm = p.value === S.value ? 1.2 : valueClash(p) ? .8 : 1;
+  const fm = 1 + ((p.face ?? 2) - 3) * .05;   // 상대 생김새가 좋으면 설렘이 빨리 오름
+  return { close: pm * mm * hm, trust: pm * mm * vm, heart: pm * mm * vm * fm, grudge: (personality(p).mod.argue || 1) * (valueClash(p) ? 1.3 : 1) };
+}
+
+/* ═════════ 대화 이벤트 (data/dialogues.js) ═════════ */
+// 대화하기·플러팅·섹드립 → 지금 상황·상대 성격에 맞는 장면 하나 → 고른 말의 말투(상대 성격과 궁합)·과감함에 따라 결과 (data/social.js run의 ch)
+//   같은 사람에게 최근 본 장면(8개)·전체 최근 장면(12개)은 다른 게 있으면 피함. 조건이 구체적인 장면일수록 더 잘 뽑힘
+//   대화 이벤트로 얻는 호감도는 그냥 행동보다 1.6배 (고르는 데 신경을 쓴 만큼)
+const DLG_KIND = { talk: 'talk', flirt: 'flirt', dirtyTalk: 'dirty' };
+const DLG_COND = ['pers', 'place', 'weather', 'season', 'drunk', 'taken', 'married', 'gender', 'if', 'night', 'heart'];
+let DLG = null;
+const dlgById = id => { if (!DLG) { DLG = {}; for (const d of D.dialogues || []) DLG[d.id] = d; } return DLG[id]; };
+const dlgStage = p => lover(p) ? 'lover' : p.fwb ? 'fwb' : p.close >= 60 ? 'close' : p.close >= 30 ? 'friend' : p.close >= 15 ? 'acq' : 'new';
+const nightNow = () => phase() === 'adult' ? clockHour() >= 19 || clockHour() < 5 : S.time === 2;
+const inRange = (v, r) => !r || (v >= r[0] && v <= r[1]);
+function dlgFits(d, p) {
+  const w = d.when || {}, age = npcAge(p);
+  if (!!w.kin !== (p.kind === 'family')) return false;
+  if (w.pers && !w.pers.includes(p.personality)) return false;
+  if (w.stage && !w.stage.includes(dlgStage(p))) return false;
+  if (w.place && !w.place.includes(S.place)) return false;
+  if (w.notPlace && w.notPlace.includes(S.place)) return false;
+  if (w.night != null && w.night !== nightNow()) return false;
+  if (w.weather && !w.weather.includes(S.weather)) return false;
+  if (w.season && !w.season.includes(season().id)) return false;
+  if (w.drunk && (S.drunk || 0) < w.drunk) return false;
+  if (!inRange(p.close, w.close) || !inRange(p.heart || 0, w.heart) || !inRange(age, w.age) || !inRange(S.age, w.myAge)) return false;
+  if (w.taken != null && w.taken !== !!(p.taken && !lover(p))) return false;
+  if (w.married != null && w.married !== !!(p.married && !p.spouse)) return false;
+  if (w.gender && p.gender !== w.gender) return false;
+  if (w.me && S.gender !== w.me) return false;
+  if (w.adult && (S.age < 19 || age < 19)) return false;
+  return !w.if || !!w.if(S, p, api);
+}
+// 이 상호작용이 대화 이벤트가 되는지: 13살부터, 내 아이(어린 자녀)와는 예전처럼 한 줄
+function dlgFor(p, iid) {
+  const kind = DLG_KIND[iid];
+  if (!kind || !D.dialogues || S.age < 13 || p.kind === 'child' || npcAge(p) < 13) return null;
+  const all = D.dialogues.filter(d => d.kind === kind && dlgFits(d, p));
+  if (!all.length) return null;
+  const recent = new Set((p.dlg || []).concat(S.dlgR || [])), fresh = all.filter(d => !recent.has(d.id));
+  return weighted(fresh.length ? fresh : all, d => (d.weight || 1) * (1 + DLG_COND.filter(k => (d.when || {})[k] != null).length));
+}
+const dlgText = (v, p) => fill(typeof v === 'function' ? v(S, p, api) : v, { p: pname(p) });
+// 선택지 한 줄: 말투 아이콘 + 말 (+ 플러팅·섹드립은 살짝 / 과감하게)
+function dlgLabel(d, c, p) {
+  const r = d.kind === 'talk' || c.tone === 'back' ? '' : c.risk === 0 ? ' · 살짝' : c.risk === 2 ? ' · 과감하게' : '';
+  return `${(D.toneIcon || {})[c.tone] || '💬'} ${dlgText(c.t, p)}${r}`;
+}
+function openDialogue(p, iid, d) {
+  S.vars.fp = p.id;
+  const text = dlgText(d.text, p), cs = d.choices.map((c, i) => i).filter(i => !d.choices[i].if || d.choices[i].if(S, p, api));
+  const tv = {}; TRANSIENT.forEach(k => { tv[k] = S.vars[k]; });
+  p.dlg = (p.dlg || []).concat(d.id).slice(-8);
+  S.dlgR = (S.dlgR || []).concat(d.id).slice(-12);
+  S.pending.push({ id: '@dlg', dlg: d.id, pid: p.id, iid, text, cs, labels: cs.map(i => dlgLabel(d, d.choices[i], p)), tv, who: p.id });
+  log(text, { t: 'ask' });
+  after();
+}
+function dlgChoose(pd, i) {
+  const d = dlgById(pd.dlg), p = person(pd.pid), it = D.social.find(x => x.id === pd.iid), c = d && d.choices[pd.cs[i]];
+  if (!d || !p || !it || !c) return;
+  log('▸ ' + pd.labels[i], { t: 'pick' });
+  if (!it.if(S, p, api)) { log('타이밍을 놓쳤다. 이야기가 흐지부지 끝났다.', { t: 'info' }); return; }
+  S.vars.fp = p.id;
+  const fit = ((D.toneFit || {})[p.personality] || {})[c.tone] || 0;
+  const o = it.run(S, p, api, { tone: c.tone, risk: c.risk ?? 1, fit, ok: c.ok, ng: c.ng, scene: d.id }) || {};
+  o.mult = interactMult(p, pd.iid);
+  o.gk = Math.min(1, gainK() * 1.6);
+  applyOutcome(o, p);
 }
 
 /* ═════════ 직업 ═════════ */
@@ -2522,7 +2612,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, onPill, fertile, refusal, sss: () => SSS(), sexGrade: () => sexGrade(S.sexSkill), turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, refusal, known, sss: () => SSS(), sexGrade: () => sexGrade(S.sexSkill), turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,

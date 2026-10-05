@@ -146,6 +146,7 @@ function render(S) {
   else if (S.report) openReport();
   else if (S.apply) openApply();
   else if (S.ended && endingFor !== S.id) { endingFor = S.id; openEnding(); }
+  else if (modalMode === 'event' && dlgBack && G.person(dlgBack)) { const id = dlgBack; dlgBack = null; openPerson(id); }
   else if (['event', 'report', 'apply', 'intro'].includes(modalMode)) closeModal();   // 상태가 사라진 창(확인한 성적표·낸 원서·20년 요약)은 닫음
   else if (modalMode === 'people') openPeople();
   else if (modalMode === 'person') openPerson(modalArg);
@@ -375,13 +376,23 @@ function closeModal() {
   if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
 }
 
+const DLG_TITLE = { talk: '💬 대화', flirt: '😉 플러팅', dirty: '😏 섹드립' };
+const DLG_HINT = {
+  talk: '말투가 상대 성격과 맞으면 훨씬 가까워지고, 안 맞으면 오히려 멀어진다.',
+  flirt: '과감할수록 크게 설레게 하지만 실패하면 크게 잃는다. 말투가 성격과 맞으면 잘 통한다.',
+  dirty: '과감할수록 크게 달아오르지만 선을 넘으면 신뢰를 잃는다. ✋ 물러서기는 늘 안전하다.',
+};
+let dlgBack = null;
+// 플러팅·섹드립 선택지 끝의 ' · 살짝' / ' · 과감하게'를 작은 표시로
+const riskTag = c => { const m = /^(.*) · (살짝|과감하게)$/.exec(c); return m ? `${esc(m[1])} <small class="risk${m[2] === '과감하게' ? ' hi' : ''}">${m[2]}</small>` : esc(c); };   // 사람 창에서 대화 이벤트를 열었으면, 고른 뒤 그 사람 창으로 돌아감
 function openEvent() {
   const ev = G.currentEvent();
   if (!ev) { if (modalMode === 'event') closeModal(); return; }   // 사라진 이벤트 창이 남지 않게
   const S = G.state(), se = G.season();
   const who = ev.who && window.Avatar ? `<div class="ev-who">${Avatar.render(ev.who.look, 60, { age: ev.who.age, fig: ev.who.fig, libido: ev.who.libido || 0, ctx: ev.who.ctx })}<span><b>${esc(ev.who.name)}</b><br><span class="dim">${ev.who.age}살, ${esc(ev.who.rel)}</span></span></div>` : '';
-  showModal('event', `${S.age}살 ${se.icon} ${se.id} ${wxIcon(S.weather)}`,
-    `${who}<p>${esc(ev.text)}</p><div class="choices">${ev.choices.map((c, i) => `<button type="button" data-c="${i}">[${i + 1}] ${esc(c)}</button>`).join('')}</div>`, false, ev.text);
+  const dk = ev.dlg && DLG_TITLE[ev.dlg];   // 대화 이벤트: 제목 + 아래 도움말
+  showModal('event', dk ? `${dk} · ${S.age}살 ${se.icon} ${wxIcon(S.weather)}` : `${S.age}살 ${se.icon} ${se.id} ${wxIcon(S.weather)}`,
+    `${who}<p>${esc(ev.text)}</p><div class="choices${dk ? ' dlg' : ''}">${ev.choices.map((c, i) => `<button type="button" data-c="${i}">[${i + 1}] ${dk ? riskTag(c) : esc(c)}</button>`).join('')}</div>${dk ? `<p class="dlg-hint">${DLG_HINT[ev.dlg]}</p>` : ''}`, false, ev.text);
 }
 
 /* 성적표 (중간·기말·모의고사·수능) / 합격 — SCHOOL.md */
@@ -1116,7 +1127,7 @@ mBody.addEventListener('click', e => {
   else if ('acq' in d) { showAcq = !showAcq; openPeople(); }
   else if (d.pf) { peopleFilter = d.pf; openPeople(); }
   else if (d.i === 'date' && G.dateOutfits().length) openDateDress(modalArg);
-  else if (d.i) G.interact(modalArg, d.i);
+  else if (d.i) { const pid = modalArg; G.interact(pid, d.i); dlgBack = G.state().pending.some(x => x.dlg) ? pid : null; }
   else if (d.talk) { const id = G.talkTo(d.talk); if (id && !G.state().pending.length) { personFrom = 'here'; openPerson(id); } }
   else if ('back' in d) { if (modalMode === 'browse' || personFrom === 'here') closeModal(); else openPeople(); }
   else if (d.j) G.applyJob(d.j);
