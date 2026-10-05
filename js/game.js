@@ -1350,8 +1350,9 @@ function startDay(first) {
 function dutyOf() {
   if (phase() !== 'adult' || jailed() || isWeekend()) return null;
   if (S.flags.inArmy) return { id: 'army', ap: 45, label: '훈련', zone: 'home', at: 'home' };
-  if (S.job) return { id: 'work', ap: 45, label: '출근', zone: 'work', at: 'office' };
-  if (S.flags.student && (S.school.start ?? 0) <= S.age) return { id: 'class', ap: 25, label: '수업', zone: 'school', at: 'campus' };
+  const cm = homeCommute();   // 통근 (사는 동네 → 직장·학교, 왕복)
+  if (S.job) return { id: 'work', ap: 45 + cm, label: '출근', zone: 'work', at: 'office' };
+  if (S.flags.student && (S.school.start ?? 0) <= S.age) return { id: 'class', ap: 25 + cm, label: '수업', zone: 'school', at: 'campus' };
   return null;
 }
 const dutyPending = () => !!dutyOf() && !S.worked;
@@ -1455,7 +1456,11 @@ function monthly() {
     S.money -= Math.round((C.livingCost + (S.flags.married ? 600 : 0) + kids * 400) / 12);   // 가족이 늘면 생활비도 늘어남
   }
   if (S.flags.onPill) S.money -= rand(3, 5);   // 피임약값 (한 달 3~5만원)
-  if (S.age >= 19 && !S.flags.inArmy && !jailed()) S.money -= homeNow().rent || 0;   // 월세·관리비 (data/housing.js)
+  if (S.age >= 19 && !S.flags.inArmy && !jailed()) {   // 월세·관리비·대출 이자 (data/realty.js) + 집 하자·갱신
+    const H = S.home || {};
+    S.money -= (H.rent ?? homeNow().rent ?? 0) + (H.mgmt || 0) + Math.round((H.loan || 0) * (H.rate || 0) / 12);
+    homeMonthly();
+  }
 }
 // 화면용 시간 정보
 function timeInfo() {
@@ -2266,6 +2271,7 @@ function goPlace(id) {
     S.visits[id] = (S.visits[id] || 0) + 1;
     if (S.visits[id] >= D.regularVisits && !S.regular[id]) { S.regular[id] = true; log(`이제 ${pl.label} 단골이다. 얼굴을 알아보는 사람이 생겼다.`, { t: 'info' }); }
   }
+  if (id === 'realty' && phase() === 'adult') { realtyState().agentDay = S.dayN || 0; log('중개사가 오늘 들어온 매물 몇 개를 따로 보여 줬다. 📱 방구하기에 "중개사 추천"으로 올라왔다.', { t: 'info' }); }
   coupleSpot();
   maybeRandom(pl.campus ? [id, 'campus'] : [id], cost ? C.placeEventChance : C.placeEventChance / 2);
   after();
@@ -2502,7 +2508,7 @@ function syncHome() {
   let want = null;
   if (S.flags.married && HOUSE_CAP[h.id] < 4) want = 'villa';
   else if (S.flags.ownPlace && h.id === 'parents') want = householdN() > 1 ? 'villa' : 'oneroom';
-  if (want) { S.home = { id: want, dep: 0, n: (S.home.n || 0) + 1, since: S.dayN || 0 }; log(`${housingOf(want).icon} 새 집은 ${housingOf(want).label}. 이웃도 새 얼굴들이다.`, { t: 'info' }); }
+  if (want) { S.home = homeFrom(want, false); log(`${housingOf(want).icon} 새 집은 ${S.home.dong ? S.home.dong + ' ' : ''}${S.home.sub || housingOf(want).label}. 이웃도 새 얼굴들이다.`, { t: 'info' }); }
   syncSpot();
 }
 // 우리 집 앞 (지도의 이웃 장소): 집 종류마다 이름·아이콘·풍경
@@ -2510,33 +2516,254 @@ function syncSpot() {
   const pl = PLACES.block, sp = homeNow().spot;
   if (pl && sp) { pl.label = sp.label; pl.icon = sp.icon; }
 }
-const MOVE_PT = 30;   // 이삿날 (행동력 30 ≈ 5시간 반)
-function moveWhy(h) {
-  const cur = homeNow();
-  if (h.id === cur.id) return '지금 사는 곳';
-  if (S.age < (h.minAge || 0)) return `${h.minAge}살부터`;
-  if (h.id === 'parents' && (S.flags.married || alive().some(p => p.livesWith))) return '식구가 있어서';
-  if (householdN() > (HOUSE_CAP[h.id] || 9)) return '식구가 살기엔 좁다';
-  if (S.money + (S.home.dep || 0) < (h.deposit || 0)) return '보증금이 모자람';
-  return '';
+/* ═════════ 부동산 매물 (data/realty.js) — 📱 폰 → 🏠 방구하기 ═════════
+   매물은 주마다 새로 올라옴 (씨앗 = 인생·나라·주). 동네·세부 종류·면적·층·준공·역 거리·옵션·관리비, 월세(보증금/월세)·전세·매매
+   값: ㎡당 시세 × 동네 × 신축·역세권·층(반지하·옥탑 싸게). 월세는 전세가에서 전월세 전환율로. 뉴욕은 렌트(보증금 한 달 치)·매매
+   보러 가야 드러나는 하자·좋은 점, 허위매물(보러 가면 '방금 나갔어요', 안 보고 계약하면 계약금을 날림), 등기부(전세 근저당 — 깡통전세 위험)
+   계약: 보증금(또는 매매가) − 대출 + 중개수수료 + 이사비(용달·포장이사) + 보증보험, 지금 집 보증금은 돌려받음. 2년(뉴욕 1년)마다 갱신(5% 인상)
+   S.home = { id(집 종류 — 이웃 구성), dong, sub, area, floor, deal, dep, rent, mgmt, owned, price, loan, rate, insured, risk, flaws, commute, until, n, since } */
+const RT = () => (D.realty || {})[REGION] || (D.realty || {}).kr;
+const ZONE_XY = { home: [48, 396], school: [90, 120], downtown: [230, 170], work: [306, 52], out: [240, 360] };
+const VISIT_PT = 8, REG_PT = 2;
+const r100 = v => Math.max(0, Math.round(v / 100) * 100), r500 = v => Math.max(0, Math.round(v / 500) * 500);
+const realtyState = () => { if (!S.realty) S.realty = { fav: [], seen: {}, reg: {}, gone: {} }; return S.realty; };
+// 매물 한 개 (opt.type: 그 종류로, opt.agent: 중개사 추천 — 허위매물 없음)
+function makeListing(R, id, opt = {}) {
+  const t = opt.type ? R.types.find(x => x.id === opt.type) || R.types[0] : weighted(R.types, x => x.w);
+  const dong = weighted(R.dongs, d => (d.prefer || []).includes(t.id) ? 3 : 1);
+  const sub = pick(t.subs), ar = sub.area || t.area, area = rand(ar[0], ar[1]);
+  const fresh = !!sub.fresh || Math.random() < .15, age = fresh ? rand(0, 3) : rand(4, 38);
+  const floors = rand(t.floors[0], t.floors[1]), floor = sub.basement ? 0 : sub.rooftop ? floors : rand(1, floors);
+  const L = { id, type: t.id, sub: sub.n, dong: dong.name, zone: dong.zone, dongTag: dong.tag || '', area, floor, floors, basement: !!sub.basement, rooftop: !!sub.rooftop, duplex: !!sub.duplex,
+    age, built: (S.date ? S.date.y : 2026) - age, station: rand(2, 18), south: Math.random() < .4, elevator: !!t.elevator || floors >= 7, parking: !!t.parking || Math.random() < .25, pets: Math.random() < .35,
+    win: sub.win !== false, deal: pickKey(t.deals), mgmt: rand(t.mgmt[0], t.mgmt[1]), agent: !!opt.agent };
+  L.opts = shuffle(t.opts.slice()).slice(0, rand(2, Math.min(6, t.opts.length)));
+  const k = dong.k * (age <= 3 ? 1.12 : age >= 25 ? .85 : 1) * (L.station <= 5 ? 1.07 : L.station >= 13 ? .92 : 1) * (L.basement ? .65 : L.rooftop ? .78 : floor === 1 ? .95 : 1) * (L.south ? 1.03 : 1);
+  const market = t.ppm ? rand(t.ppm[0], t.ppm[1]) * area * k : 0;   // 매매 시세
+  L.market = Math.round(market);
+  if (t.rentR) {   // 한 달 값이 기준 (고시원·뉴욕 렌트)
+    const rent = Math.round(rand(t.rentR[0], t.rentR[1]) * (t.id === 'goshiwon' ? Math.sqrt(dong.k) : k));
+    if (L.deal === '매매' && market) L.price = r500(market);
+    else { L.deal = '월세'; L.rent = rent; L.dep = t.depMonths ? rent * t.depMonths : pick(t.deps || [0]); }
+  } else if (L.deal === '매매') L.price = r500(market);
+  else {
+    const J = market * t.jr;
+    if (L.deal === '전세') L.dep = r500(J);
+    else { L.dep = Math.min(pick(t.deps), r100(J * .5)); L.rent = Math.max(t.minRent || 30, Math.round((J - L.dep) * t.conv / 12)); }
+  }
+  // 등기부: 선순위 근저당 (빌라가 많음) — 전세가율이 80%를 넘으면 깡통전세 위험
+  if (L.deal === '전세' && REGION === 'kr') {
+    L.lien = Math.random() < (t.id === 'villa' ? .4 : t.id === 'officetel' ? .25 : .12) ? r500(market * rand(15, 45) / 100) : 0;
+    L.risk = market ? Math.round((L.dep + L.lien) / market * 100) / 100 : 0;
+  }
+  // 보러 가야 드러나는 것 (하자 · 좋은 점)
+  L.hidden = R.flaws.filter(f => !f.when || f.when(L)).filter(f => Math.random() < (f.bad ? .32 : .22)).map(f => f.id).slice(0, 3);
+  // 허위매물 (앱에만): 시세보다 싸게 올려 미끼로
+  if (!opt.agent && !opt.type && Math.random() < R.fake) { L.fake = true; if (L.rent) { L.rent = Math.round(L.rent * .82); if (t.depMonths) L.dep = L.rent * t.depMonths; } if (L.dep && L.deal === '전세') L.dep = r500(L.dep * .85); if (L.price) L.price = r500(L.price * .85); }
+  L.urgent = !!L.fake || Math.random() < .07;   // '급매' — 허위매물도 다 급매로 올라옴 (진짜 급매도 가끔)
+  L.nofee = REGION !== 'kr' && Math.random() < .3;
+  L.instant = Math.random() < .4;
+  L.say = pick(R.agent);
+  return L;
 }
-const canMove = h => !busy() && S.place === 'realty' && !dutyPending() && S.ap >= MOVE_PT && !moveWhy(h);
-function housingList() {
-  const cur = homeNow();
-  return (D.housing || []).map(h => ({ id: h.id, label: h.label, icon: h.icon, desc: h.desc, deposit: h.deposit || 0, rent: h.rent || 0, cur: h.id === cur.id, why: moveWhy(h), ok: canMove(h),
-    hh: h.nb ? h.nb.hh : {}, guest: h.guest !== false, need: Math.max(0, (h.deposit || 0) - (S.home.dep || 0)) }));
+let LCACHE = null;
+function listings() {
+  const R = RT();
+  if (!R || !S.date) return [];
+  const wk = Math.floor((S.dayN || 0) / 7), key = `${S.id}:${REGION}:${wk}:${S.realty && S.realty.agentDay === S.dayN ? 'a' : ''}`;
+  if (LCACHE && LCACHE.key === key) return LCACHE.list;
+  const list = withSeed(`realty:${S.id}:${REGION}:${wk}`, () => Array.from({ length: 16 }, (_, i) => makeListing(R, `w${wk}-${i}`)));
+  // 부동산 사무실에 가면 그날 중개사 추천 매물 3개 (현장 확인 — 허위매물 없음)
+  if (S.realty && S.realty.agentDay === S.dayN) list.unshift(...withSeed(`agent:${S.id}:${S.dayN}`, () => Array.from({ length: 3 }, (_, i) => makeListing(R, `a${S.dayN}-${i}`, { agent: true }))));
+  LCACHE = { key, list };
+  return list;
 }
-function moveHome(id) {
-  const h = housingOf(id);
-  if (!h || h.id !== id || !canMove(h)) return;
-  spend(MOVE_PT);
-  S.money += (S.home.dep || 0) - (h.deposit || 0);
-  S.home = { id, dep: h.deposit || 0, n: (S.home.n || 0) + 1, since: S.dayN || 0 };
-  S.flags.ownPlace = id !== 'parents';
-  log(`${h.icon} ${josa(h.label, '으로')} 이사했다. ${pick(['상자를 다 풀고 나니 밤이었다.', '낯선 천장을 한참 올려다봤다.', '현관 비밀번호를 세 번 틀렸다.', '새 동네 냄새가 났다.'])}`, { memory: true, deltas: applyEffect({ happy: 3 }) });
+const listingById = id => listings().find(l => l.id === id) || (realtyState().fav.find(l => l.id === id)) || null;
+// 화면용: 값·면적·층·통근
+const eok = v => v >= 10000 ? `${Math.floor(v / 10000)}억${v % 10000 ? ' ' + (v % 10000).toLocaleString('en-US') : ''}` : v.toLocaleString('en-US');
+function priceLine(L) {
+  if (REGION === 'kr') return L.deal === '월세' ? `월세 ${L.dep.toLocaleString('en-US')}/${L.rent}` : L.deal === '전세' ? `전세 ${eok(L.dep)}` : `매매 ${eok(L.price)}`;
+  return L.deal === '월세' ? `렌트 ${fmtMoney(L.rent)}/월` : `매매 ${fmtMoney(L.price)}`;
+}
+const areaText = L => REGION === 'kr' ? `전용 ${L.area}㎡ (${Math.round(L.area / 3.3058)}평)` : `${Math.round(L.area * 10.764).toLocaleString('en-US')} sqft (${L.area}㎡)`;
+const floorText = L => L.basement ? (REGION === 'kr' ? '반지하' : '가든 레벨') : L.rooftop ? (REGION === 'kr' ? '옥탑' : `${L.floor}층 (꼭대기)`) : `${L.floor}층 / ${L.floors}층`;
+// 통근: 직장(또는 대학)까지 — 편도 분 · 출근·수업에 더해지는 행동력(왕복)
+function commuteOf(L) {
+  const to = S.job ? 'office' : S.flags.student ? 'campus' : null;
+  if (!to) return null;
+  const a = ZONE_XY[L.zone] || ZONE_XY.home, b = mapPos(to) || [180, 200], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const pt = clamp(Math.round(d / 90) + (L.station >= 12 ? 1 : 0), 0, 4);
+  return { to: to === 'office' ? '직장' : '학교', min: Math.round(10 + d / 9 + L.station / 2), pt: pt * 2 };
+}
+const seenOf = id => realtyState().seen[id];
+// 괄호 뒤 조사: '아파트 59㎡ (25평형)' + 을 → 괄호 앞 낱말 기준
+const subJ = (t, j) => { const base = String(t).replace(/\s*\([^)]*\)\s*$/, ''); return t + josa(base, j).slice(base.length); };
+// 지금 집의 통근 행동력 (직장·학교가 바뀌어도 그때그때) — 본가·예전 저장(동네 모름)은 0
+const homeCommute = () => { const H = S.home; if (!H || !H.zone || H.id === 'parents') return 0; const c = commuteOf({ zone: H.zone, station: H.station || 8 }); return c ? c.pt : 0; };
+function listingView(L) {
+  const R = RT(), RS = realtyState(), seen = RS.seen[L.id], reg = RS.reg[L.id];
+  const flawT = id => (R.flaws.find(f => f.id === id) || {});
+  return Object.assign({}, L, { priceN: L.price || 0, depN: L.dep || 0, price: priceLine(L), areaT: areaText(L), floorT: floorText(L), commute: commuteOf(L), fav: RS.fav.some(x => x.id === L.id), gone: !!RS.gone[L.id],
+    seen: !!seen || L.agent, notes: (seen || L.agent) ? L.hidden.map(id => ({ t: flawT(id).t, bad: !!flawT(id).bad })) : null,
+    reg: reg ? { lien: L.lien || 0, risk: L.risk || 0 } : null, canReg: REGION === 'kr' && (L.deal === '전세' || L.deal === '매매'),
+    fake: undefined, hidden: undefined, market: undefined, lien: undefined, risk: undefined });
+}
+function realtyList() { return listings().map(listingView); }
+const realtyWhy = () => phase() !== 'adult' ? '스무 살이 되면' : jailed() ? '수감 중' : '';
+// 보러 가기·등기부·계약을 지금 못 하는 까닭 (평일 출근·수업 전, 이벤트 중)
+const realtyActWhy = () => { if (dutyPending()) { const d = dutyOf(); return `평일 — 먼저 ${d.id === 'work' ? '출근' : d.id === 'class' ? '수업' : '훈련'}부터`; } return busy() ? '지금은 못 함' : ''; };
+function favListing(id) {
+  const RS = realtyState(), L = listingById(id);
+  if (!L) return;
+  const i = RS.fav.findIndex(x => x.id === id);
+  if (i >= 0) RS.fav.splice(i, 1); else RS.fav.unshift(JSON.parse(JSON.stringify(L)));
+  RS.fav = RS.fav.slice(0, 12);
+  save(); emit();
+}
+// 집 보러 가기 (행동력 8): 하자·좋은 점이 드러남. 허위매물이면 '방금 나갔어요'
+function visitListing(id) {
+  const L = listingById(id), RS = realtyState();
+  if (!L || RS.gone[id] || RS.seen[id] || realtyWhy() || busy() || dutyPending() || S.ap < VISIT_PT) return;
+  spend(VISIT_PT);
+  if (L.fake) {
+    RS.gone[id] = true;
+    log(pick(['현장에 가 보니 중개사가 말했다. "아, 그 방은 방금 나갔어요. 대신 이 방은 어때요?" 보여 준 방은 훨씬 비쌌다.', '사진 속 방은 없었다. "그건 광고용이고요…" 허위매물이었다.']), { t: 'info', deltas: applyEffect({ happy: -2 }) });
+  } else {
+    RS.seen[id] = { day: S.dayN || 0 };
+    const R = RT(), bad = L.hidden.map(f => R.flaws.find(x => x.id === f)).filter(f => f && f.bad), good = L.hidden.map(f => R.flaws.find(x => x.id === f)).filter(f => f && f.good);
+    log(`🏠 ${subJ(`${L.dong} ${L.sub}`, '을')} 보고 왔다.${bad.length ? ' ' + bad.map(f => f.t.split(' — ')[0]).join(', ') + '.' : ''}${good.length ? ' ' + good.map(f => f.t).join(', ') + '.' : ''}${!bad.length && !good.length ? ' 사진 그대로였다.' : ''}`, { t: 'info' });
+  }
+  after();
+}
+// 등기부등본 떼 보기 (서울 전세·매매, 행동력 2): 선순위 근저당 · 전세가율
+function checkRegistry(id) {
+  const L = listingById(id), RS = realtyState();
+  if (!L || REGION !== 'kr' || RS.reg[id] || busy() || S.ap < REG_PT || phase() !== 'adult') return;
+  spend(REG_PT);
+  RS.reg[id] = true;
+  const danger = (L.risk || 0) >= .8;
+  log(L.lien ? `📄 등기부를 떼 보니 근저당이 ${eok(L.lien)} 잡혀 있었다.${danger ? ' 보증금까지 더하면 집값의 ' + Math.round(L.risk * 100) + '%. 깡통전세가 될 수 있다.' : ''}` : '📄 등기부는 깨끗했다.', { t: 'info' });
+  after();
+}
+// 계약 견적: 지금 내야 할 돈 · 한 달 고정비 · 행동력 · 안 되는 까닭
+function quote(id, o = {}) {
+  const R = RT(), L = listingById(id);
+  if (!L) return null;
+  const mv = R.move[o.move === 'full' ? 'full' : 'truck'], lo = R.loan[L.deal];
+  const pay = L.deal === '매매' ? L.price : L.dep || 0;
+  const loan = o.loan && lo && (S.job || L.deal === '매매' && S.money >= pay * (1 - lo.ltv)) ? r100(pay * lo.ltv) : 0;
+  const fee = REGION === 'kr' ? Math.round((L.deal === '월세' ? (L.dep + L.rent * 100) : pay) * (R.fee[L.deal] || 0))
+    : L.deal === '월세' ? (L.nofee ? 0 : Math.round(L.rent * R.fee.월세)) : Math.round(pay * R.fee.매매);
+  const moveCost = Math.round(mv.cost[0] + (mv.cost[1] - mv.cost[0]) * clamp(L.area / 100, 0, 1));
+  const insure = o.insure && L.deal === '전세' && R.insure ? Math.max(1, Math.round(pay * R.insure)) : 0;
+  const H = S.home || {}, refund = (H.dep || 0) + (H.owned ? H.price || 0 : 0) - (H.loan || 0);
+  const now = pay - loan + fee + moveCost + insure;
+  const monthly = (L.rent || 0) + (L.mgmt || 0) + Math.round(loan * (lo ? lo.rate : 0) / 12);
+  const cm = commuteOf(L);
+  let why = realtyWhy();
+  if (!why && RS_gone(id)) why = '이미 나간 매물';
+  if (!why && S.age < (R.minAge || 19)) why = `${R.minAge}살부터`;
+  if (!why && householdN() > (HOUSE_CAP[L.type] || 9)) why = '식구가 살기엔 좁다';
+  if (!why && o.loan && lo && !loan) why = L.deal === '매매' ? '계약금(집값의 일부)이 모자라 대출이 안 나온다' : '대출은 직장이 있어야';
+  if (!why && S.money + refund < now) why = `돈이 ${fmtMoney(now - S.money - refund)} 모자람`;
+  if (!why) why = realtyActWhy();
+  if (!why && S.ap < mv.pt) why = `행동력 ⚡${mv.pt} 필요`;
+  return { id, pay, loan, loanLabel: lo ? lo.label : '', loanRate: lo ? lo.rate : 0, canLoan: !!lo, fee, moveCost, movePt: mv.pt, moveLabel: mv.label, insure, canInsure: L.deal === '전세' && !!R.insure, refund, now, after: S.money + refund - now,
+    monthly, rent: L.rent || 0, mgmt: L.mgmt || 0, interest: Math.round(loan * (lo ? lo.rate : 0) / 12), commute: cm, why, ok: !why, visited: !!realtyState().seen[id] || L.agent };
+}
+const RS_gone = id => !!realtyState().gone[id];
+// 계약하고 이사 — 안 보고 계약한 허위매물이면 계약금만 날림
+function signContract(id, o = {}) {
+  const R = RT(), L = listingById(id), q = quote(id, o), RS = realtyState();
+  if (!L || !q || !q.ok) return;
+  if (L.fake && !RS.seen[id]) {
+    const lost = Math.max(30, Math.round((L.deal === '월세' ? L.rent : (L.dep || L.price || 0) * .1)));
+    S.money -= lost; RS.gone[id] = true;
+    log(`📵 계약금 ${fmtMoney(lost)}를 보냈는데 중개사와 연락이 끊겼다. 허위매물이었다.`, { memory: true, deltas: applyEffect({ happy: -8 }) });
+    after();
+    return;
+  }
+  spend(q.movePt);
+  S.money += q.refund - q.now;
+  const lo = R.loan[L.deal];
+  S.home = { id: L.type, n: ((S.home && S.home.n) || 0) + 1, since: S.dayN || 0, dong: L.dong, sub: L.sub, area: L.area, floor: floorText(L), deal: L.deal,
+    dep: L.deal === '매매' ? 0 : L.dep || 0, rent: L.rent || 0, mgmt: L.mgmt || 0, owned: L.deal === '매매', price: L.deal === '매매' ? L.price : 0, loan: q.loan, rate: q.loan && lo ? lo.rate : 0,
+    insured: !!q.insure, risk: L.risk || 0, flaws: L.hidden.slice(), zone: L.zone, until: L.deal === '매매' ? null : (S.dayN || 0) + R.contract, station: L.station };
+  S.flags.ownPlace = true;
+  RS.gone[id] = true;
+  const surprise = !RS.seen[id] && !L.agent ? L.hidden.map(f => R.flaws.find(x => x.id === f)).filter(f => f && f.bad) : [];
+  log(`🏠 ${L.deal === '매매' ? subJ(`${L.dong} ${L.sub}`, '을') + ' 샀다' : subJ(`${L.dong} ${L.sub}`, '으로') + ' 이사했다'}. ${pick(['상자를 다 풀고 나니 밤이었다.', '낯선 천장을 한참 올려다봤다.', '현관 비밀번호를 세 번 틀렸다.', '새 동네 냄새가 났다.'])}${surprise.length ? ` 살아 보니 ${surprise.map(f => f.t.split(' — ')[0]).join(', ')}…` : ''}`, { memory: true, deltas: applyEffect({ happy: surprise.length ? 1 : 4 }) });
   syncSpot();
   ensurePools();
   after();
+}
+// 본가로 들어가기 (결혼·동거·아이가 없을 때, 부모님이 계시면) — 보증금은 돌려받고, 산 집은 팖
+function toParents() {
+  if (realtyWhy() || busy() || S.home.id === 'parents' || S.flags.married || householdN() > 1 || !alive().some(p => p.kind === 'family' && !p.sibling)) return;
+  const H = S.home;
+  S.money += (H.dep || 0) + (H.owned ? H.price || 0 : 0) - (H.loan || 0);
+  S.home = { id: 'parents', dep: 0, n: (H.n || 0) + 1, since: S.dayN || 0, rent: 0, mgmt: 0 };
+  S.flags.ownPlace = false;
+  log('🏡 짐을 싸서 본가로 들어갔다. 엄마가 말없이 내 방 이불을 갈아 두셨다.', { memory: true });
+  syncSpot(); ensurePools(); after();
+}
+// 지금 집 (📱 내 집 탭)
+function homeInfo() {
+  const h = homeNow(), H = S.home || {}, R = RT();
+  return { type: h.id, label: H.sub || h.label, icon: h.icon, dong: H.dong || '', deal: H.deal || (h.id === 'parents' ? '' : '월세'), dep: H.dep || 0, rent: H.rent ?? h.rent ?? 0, mgmt: H.mgmt || 0,
+    owned: !!H.owned, price: H.price || 0, loan: H.loan || 0, interest: Math.round((H.loan || 0) * (H.rate || 0) / 12), insured: !!H.insured, area: H.area || 0, floor: H.floor || '',
+    flaws: (H.flaws || []).map(id => (R.flaws.find(f => f.id === id) || {})).filter(f => f.t).map(f => ({ t: f.t, bad: !!f.bad })), commute: homeCommute(), daysLeft: H.until ? H.until - (S.dayN || 0) : null,
+    since: H.since || 0, hh: h.nb ? h.nb.hh : {}, canParents: h.id !== 'parents' && !S.flags.married && householdN() === 1 && alive().some(p => p.kind === 'family' && !p.sibling) && !realtyWhy() };
+}
+// 한 달 돈 흐름 (📱 은행)
+function budget() {
+  const out = [], H = S.home || {};
+  if (S.job && !jailed()) { const j = job(S.job); out.push([j.volatile ? '💼 수입 (들쭉날쭉, 평균)' : '💼 월급', Math.round(S.salary / 12)]); }
+  if (S.age >= 20 && !S.flags.student && !S.flags.inArmy && !jailed()) { const kids = alive().filter(p => p.kind === 'child').length; out.push(['🛒 생활비', -Math.round((C.livingCost + (S.flags.married ? 600 : 0) + kids * 400) / 12)]); }
+  if (S.age >= 19 && !S.flags.inArmy && !jailed()) {
+    const rent = H.rent ?? homeNow().rent ?? 0;
+    if (rent) out.push([REGION === 'kr' ? '🏠 월세' : '🏠 렌트', -rent]);
+    if (H.mgmt) out.push(['🧾 관리비', -H.mgmt]);
+    if (H.loan) out.push([`🏦 대출 이자 (연 ${((H.rate || 0) * 100).toFixed(1)}%)`, -Math.round(H.loan * (H.rate || 0) / 12)]);
+  }
+  if (S.flags.onPill) out.push(['💊 피임약', -4]);
+  return { lines: out, net: out.reduce((t, l) => t + l[1], 0), money: S.money, dep: H.dep || 0, loan: H.loan || 0, owned: H.owned ? H.price || 0 : 0 };
+}
+// 기본 집 채우기 (독립·동거·결혼 이벤트, 20세 시작) — 그 종류의 매물 하나로. dep: 이미 낸 보증금으로 칠지
+function homeFrom(type, dep) {
+  const R = RT();
+  if (!R || !R.types.some(t => t.id === type)) return { id: type, dep: 0, n: (S.home && S.home.n || 0) + 1, since: S.dayN || 0 };
+  const L = withSeed(`home:${S.id}:${type}:${S.dayN || 0}`, () => { let x; for (let i = 0; i < 6; i++) { x = makeListing(R, 'h', { type, agent: true }); if (x.deal !== '매매') break; } if (x.deal === '매매') { x.deal = '월세'; x.dep = 0; x.rent = Math.round(x.market * .004); } return x; });
+  return { id: type, n: (S.home && S.home.n || 0) + 1, since: S.dayN || 0, dong: L.dong, sub: L.sub, area: L.area, floor: floorText(L), deal: L.deal, dep: dep ? L.dep || 0 : 0, rent: L.rent || 0, mgmt: L.mgmt || 0,
+    owned: false, price: 0, loan: 0, rate: 0, insured: false, risk: 0, flaws: L.hidden.slice(), zone: L.zone, until: (S.dayN || 0) + R.contract, station: L.station };
+}
+// 한 달마다: 집 하자·좋은 점이 생활에 · 계약 갱신(5% 인상) · 깡통전세 사고
+function homeMonthly() {
+  const H = S.home, R = RT();
+  if (!H || H.id === 'parents' || !R) return;
+  const winter = [12, 1, 2].includes(S.date.m);
+  for (const id of H.flaws || []) {
+    const f = R.flaws.find(x => x.id === id);
+    if (!f || (f.winter && !winter) || Math.random() > .5) continue;
+    const eff = {}; if (f.health) eff.health = f.health; if (f.happy) eff.happy = f.happy;
+    if (Object.keys(eff).length) applyEffect(eff);
+  }
+  if (H.until && (S.dayN || 0) >= H.until && !H.owned) {
+    H.until += R.contract;
+    if (H.deal === '전세') { const add = r100(H.dep * .05); S.money -= add; H.dep += add; log(`📄 전세 계약을 연장했다. 보증금이 ${fmtMoney(add)} 올랐다.`, { t: 'info' }); }
+    else { H.rent = Math.round(H.rent * 1.05); log(`📄 ${REGION === 'kr' ? '월세' : '렌트'} 계약을 연장했다. ${fmtMoney(H.rent)}로 5% 올랐다.`, { t: 'info' }); }
+  }
+  if (H.deal === '전세' && (H.risk || 0) >= .8 && !H.insured && !S.pending.length && Math.random() < .02 && EVENTS.jeonseFraud) fire(EVENTS.jeonseFraud);
+}
+// 깡통전세 사고: 보증금의 일부(frac)만 건지고 고시원·본가로
+function loseHome(frac) {
+  const H = S.home;
+  if (!H) return;
+  S.money += Math.round((H.dep || 0) * (frac || 0)) - (H.loan || 0);
+  const back = !S.flags.married && householdN() === 1 && alive().some(p => p.kind === 'family' && !p.sibling);
+  S.home = back ? { id: 'parents', dep: 0, n: (H.n || 0) + 1, since: S.dayN || 0, rent: 0, mgmt: 0 } : homeFrom(householdN() > 1 ? 'villa' : 'goshiwon', false);
+  S.flags.ownPlace = !back;
+  syncSpot(); ensurePools();
 }
 // 이웃 가구 만들기: 비중(nb.hh)대로 가구를 골라 사람 수(nb.n)가 찰 때까지. 부부·커플은 서로 짝(mateId), 가족은 아이까지
 //   같은 집 사람끼리는 hh(가구 번호)·unit(호수)·hhRole(남편·아내·아이·혼자 산다 …)이 같음. 부부·커플은 서로 mateId. 부부인 건 처음부터 앎 (같이 사는 걸 봄)
@@ -3022,6 +3249,7 @@ const api = {
   home: () => homeNow(), homeSpot: () => homeNow().spot || { label: '집 앞', doing: ['지나가고 있다'] },
   neighbors: () => alive().filter(p => p.kind === 'neighbor' && p.org === S.vars.nbOrg && p.hh),
   clubMates: () => alive().filter(p => p.rtag === '동아리 사람' && p.org === 'club:' + S.vars.univOrg),
+  loseHome, homeDep: () => (S.home && S.home.dep) || 0,
   focused: () => person(S.vars.fp),
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
@@ -3206,7 +3434,9 @@ function newLife20(q = {}) {
   const mr = Q.money[S.wealth] || [50, 100];
   S.money = rand(mr[0], mr[1]);
   if (q.home && q.home !== 'parents') S.flags.ownPlace = true;
-  S.home = { id: q.home === 'own' ? 'oneroom' : housingOf(q.home).id === q.home ? q.home : 'parents', dep: 0, n: 0, since: 0 };   // 사는 집 (data/housing.js)
+  const ht = q.home === 'own' ? 'oneroom' : housingOf(q.home).id === q.home ? q.home : 'parents';
+  S.home = ht === 'parents' ? { id: 'parents', dep: 0, n: 0, since: 0, rent: 0, mgmt: 0 } : homeFrom(ht, false);   // 사는 집 (data/realty.js 매물 하나)
+  S.home.n = 0;
   if (REGION !== 'kr') S.flags.exempt = true;   // 뉴욕: 병역 없음
   else if (gender === 'm') { const ar = edu.id === 'retake' && q.army === 'now' ? 'next' : q.army; if (ar === 'exempt') S.flags.exempt = true; else S.vars.enlistAt = ar === 'now' ? 20 : 21; }
 
@@ -3506,7 +3736,11 @@ window.Game = {
   // 시간 (GAMEFLOW): 단계, 이야기 계속, 다음 주(턴), 하루(밥·출근·잠·넘기기)
   phase, timeInfo, storyNext, nextTurn, eat, doDuty: () => { doDuty(false); after(); }, sleep: () => skip('today'), skip,
   actionList, canDo, costOf, apOf, doAction, needsSubject, shopToday, outfitCtx: (p, evId) => outfitCtx(p || null, evId), dateOutfits, setDateOutfit: ix => { S.vars.dateOutfit = ix; },
-  places: placeList, onCampus: () => onCampus(standAt()) && !!S.flags.student, teenPt: TEEN_PT, goPlace, leavePlace, hasNumber, askNumber, askStranger, mateWord, numberOdds, housing: housingList, moveHome, movePt: MOVE_PT, homeNow: () => homeNow(), here: hereList, hereNote: () => S.hereNote && S.hereNote.pl === S.place ? S.hereNote : null, talkTo, passBy, browseMore, browseLeft, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
+  places: placeList, onCampus: () => onCampus(standAt()) && !!S.flags.student, teenPt: TEEN_PT, goPlace, leavePlace, hasNumber, askNumber, askStranger, mateWord, numberOdds, homeNow: () => homeNow(),
+  // 📱 부동산 앱 (data/realty.js)
+  realty: { list: realtyList, get: id => { const L = listingById(id); return L ? listingView(L) : null; }, fav: favListing, favs: () => realtyState().fav.map(listingView), visit: visitListing, registry: checkRegistry, quote, sign: signContract,
+    toParents, home: homeInfo, why: realtyWhy, actWhy: () => realtyWhy() || realtyActWhy(), app: () => (RT() || {}).app || '방구하기', visitPt: VISIT_PT, regPt: REG_PT, agentToday: () => !!(S.realty && S.realty.agentDay === S.dayN), moves: () => RT().move },
+  budget, here: hereList, hereNote: () => S.hereNote && S.hereNote.pl === S.place ? S.hereNote : null, talkTo, passBy, browseMore, browseLeft, drunkLabel: () => DRUNK[S.drunk || 0], place: () => PLACES[S.place] || null, timeLabel: () => TIMES[S.time] || '', jailed,
   // 함께 밤을 보낸 적 있거나 사귀는 사이에게만 보이는 것: 상대 성욕, 궁합, 마지막 만족감
   intimacy: p => canSex(p) && (p.nights || lover(p) || p.teased) ? { libido: p.libido || 0, compat: p.compat, sat: p.lastSat, nights: p.nights || 0 } : null,
   // 이 사람을 향한 내 성욕 (내 마음이라 늘 보임) / 지금 가장 높은 대상

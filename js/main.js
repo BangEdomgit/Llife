@@ -113,16 +113,19 @@ function render(S) {
   $('#season').textContent = timeText(ti);
   $('#ap').innerHTML = apDots(ti);
   $('#apNum').textContent = ti.phase === 'adult' ? `⚡ ${Math.max(0, ti.day - ti.used)}/${ti.day}${ti.late ? ' 새벽' : ''}${ti.fatigue >= 3 ? ` · 피로 ${ti.fatigue}` : ''}` : ti.apMax ? `⚡ ${S.ap}/${ti.apMax}` : '';
-  $("#peopleBtn").textContent = "👥 관계";
-  $('#jobBtn').hidden = S.age < 16;
   $('#crimeBtn').hidden = G.crimes().length === 0 && S.jail === 0;
+  $('#mapBtn').disabled = !G.places().length;
+  $('#phoneBtn').disabled = S.age < 10;   // 폰은 열 살부터
+  // 좁은 화면: 능력치는 접어 두고 한 줄 요약 (높은 순 네 개)
+  $('#abSum').textContent = G.abilities.map(k => [k, S.stats[k]]).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${G.LABEL[k]} ${G.gradeInfo(v).letter}`).join(' · ');
 
   renderWhere(S);
 
   // 아래 큰 버튼: 단계마다 다름 (이야기 계속 / 다음 주 / 잠자기) + 어른은 밥·출근·넘기기 줄
   const ageBtn = $('#ageUp'), flow = $('#flow');
   const wait = !S.ended && (S.pending.length > 0 || !!S.report);
-  ageBtn.textContent = S.ended ? '↻ 새 인생 시작' : ti.phase === 'story' ? '▶ 계속' : ti.phase === 'adult' ? `😴 잠자기 (오늘 끝내기)` : S.ap > 0 ? `⏭ 다음 주로 (남은 ⚡${S.ap}은 쉬기)` : '▶ 다음 주';
+  ageBtn.textContent = S.ended ? '↻ 새 인생' : ti.phase === 'story' ? '▶ 계속' : ti.phase === 'adult' ? '😴 잠자기' : S.ap > 0 ? `⏭ 다음 주 (⚡${S.ap} 쉬기)` : '▶ 다음 주';
+  ageBtn.title = ti.phase === 'adult' ? '오늘 끝내기' : '';
   ageBtn.disabled = wait;
   if (ti.phase === 'adult' && !S.ended) {
     const d = ti.duty;
@@ -155,7 +158,7 @@ function render(S) {
   else if (modalMode === 'crime') openCrime();
   else if (modalMode === 'me') openMe();
   else if (modalMode === 'study' || modalMode === 'shop' || modalMode === 'map') closeModal();
-  else if (modalMode === 'housing') openHousing();
+  else if (PHONE_RENDER[modalMode] && inPhone) PHONE_RENDER[modalMode]();   // 📱 폰 앱은 그 화면 그대로 다시
   else if (modalMode === 'dateDress') openPerson(modalArg);   // 데이트 옷을 고르고 나면 그 사람 창으로
 }
 
@@ -208,22 +211,11 @@ function mapHTML(list, mode) {
 // 지도 모드 고르기: 캠퍼스 안에 있으면 캠퍼스 지도부터 (버튼으로 바꿈)
 const mapModeNow = () => mapMode && (mapMode !== 'campus' || campusOK()) ? mapMode : G.onCampus() ? 'campus' : 'city';
 const mapToggle = mode => campusOK() ? `<button type="button" class="map-tog" data-mapmode="${mode === 'campus' ? 'city' : 'campus'}">${mode === 'campus' ? '🏙️ 시내 지도' : '🎓 캠퍼스 지도'}</button>` : '';
-/* 부동산: 집 종류 고르기 — 보증금·월세·이웃 구성(가구 비중)·지금 집. 이사는 행동력 30 + 보증금 차액 */
+// 이웃 구성 막대 (부동산 앱 내 집 탭)
 const HH_LABEL = { single: '혼자 사는 사람', student: '학생', roommates: '룸메이트', couple: '동거 커플', married: '부부', family: '아이 있는 가족', elder: '어르신' };
 const HH_COLOR = { single: '#8fb8e8', student: '#a7d8c8', roommates: '#c8b4e8', couple: '#f2a3b8', married: '#f4c26b', family: '#9ed48a', elder: '#c9b08f' };
-function openHousing() {
-  const S = G.state(), cur = G.homeNow(), list = G.housing();
-  const mix = hh => { const t = Object.values(hh).reduce((a, b) => a + b, 0) || 1; return `<div class="hh-bar">${Object.entries(hh).map(([k, v]) => `<i style="width:${v / t * 100}%;background:${HH_COLOR[k]}" title="${HH_LABEL[k]} ${Math.round(v / t * 100)}%"></i>`).join('')}</div>
+const hhMix = hh => { const t = Object.values(hh).reduce((a, b) => a + b, 0) || 1; return `<div class="hh-bar">${Object.entries(hh).map(([k, v]) => `<i style="width:${v / t * 100}%;background:${HH_COLOR[k]}" title="${HH_LABEL[k]} ${Math.round(v / t * 100)}%"></i>`).join('')}</div>
     <div class="hh-leg">${Object.entries(hh).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span><b style="background:${HH_COLOR[k]}"></b>${HH_LABEL[k]} ${Math.round(v / t * 100)}%</span>`).join('')}</div>`; };
-  const married = h => { const t = Object.values(h.hh).reduce((a, b) => a + b, 0) || 1; return Math.round(((h.hh.married || 0) + (h.hh.family || 0) + (h.hh.elder || 0) * .6) / t * 100); };
-  const rows = list.map(h => `<div class="house${h.cur ? ' cur' : ''}">
-      <div class="house-h"><span class="house-ic">${h.icon}</span><b>${esc(h.label)}</b>${h.cur ? ' <span class="tag">지금 집</span>' : ''}<span class="dim house-m">${h.deposit ? `보증금 ${G.fmtMoney(h.deposit)}` : '보증금 없음'} · 월 ${h.rent ? G.fmtMoney(h.rent) : '0'}</span></div>
-      <p class="house-d">${esc(h.desc)}${h.guest ? '' : ' <b>손님 불가.</b>'}</p>
-      <p class="dim house-nb">이웃 구성 · 기혼 비율 약 ${married(h)}%</p>${mix(h.hh)}
-      ${h.cur ? '' : `<button type="button" data-move="${h.id}"${h.ok ? '' : ' disabled'}>이사하기 <small>⚡${G.movePt}${h.need ? ` · 보증금 ${G.fmtMoney(h.need)} 더 냄` : (S.home && S.home.dep || 0) > h.deposit ? ' · 보증금 일부 돌려받음' : ''}</small></button>${h.why && !h.cur ? ` <span class="dim">${esc(h.why)}</span>` : ''}`}
-    </div>`).join('');
-  showModal('housing', '🔑 부동산', `<p class="hint">지금 사는 곳: ${cur.icon} <b>${esc(cur.label)}</b>. 집에 따라 월세와 이웃(혼자 사는 사람·커플·부부·가족)이 달라진다. 이사하면 새 이웃이 생긴다. 남은 행동력 ⚡${S.ap}</p>${rows}`);
-}
 function openMap() {
   const ti = G.timeInfo(), S = G.state(), mode = mapModeNow();
   showModal('map', mode === 'campus' ? '🎓 캠퍼스 지도' : '🗺️ 지도', `${mapToggle(mode)}${mapHTML(G.places(), mode)}<p class="hint">${ti.phase === 'adult' ? `가고 싶은 곳을 누르면 바로 이동한다. ⚡ = 이동에 드는 행동력 (1 ≈ 11분). 남은 행동력 ⚡${S.ap} · ⏰ ${ti.clock}` : `어디든 ⚡${G.teenPt}. 남은 행동력 ⚡${S.ap}`}</p>`);
@@ -428,6 +420,10 @@ function showModal(mode, title, html, closable = true, arg = null) {
   mBody.scrollTop = scroll;
   $('#mClose').hidden = !closable;
   modal.querySelector('.modal').classList.toggle('wide', mode === 'quick');   // 20세 시작: 오른쪽에 전신 미리보기
+  const phoneUI = inPhone && PHONE_MODES.has(mode);   // 📱 폰에서 연 창: 폰 모양 + 상태 표시줄 + ‹ 뒤로
+  modal.querySelector('.modal').classList.toggle('phone-ui', phoneUI);
+  $('#phStatus').innerHTML = phoneUI ? phoneStatus() : '';
+  $('#mBack').hidden = !phoneUI || mode === 'phone';
   modal.hidden = false;
   if (!same) {
     const first = mBody.querySelector('button:not(:disabled)') || (closable ? $('#mClose') : null);
@@ -436,6 +432,7 @@ function showModal(mode, title, html, closable = true, arg = null) {
 }
 function closeModal() {
   modal.hidden = true;
+  inPhone = false;
   if (modalMode === 'create' || modalMode === 'quick') G.syncRegion();   // 새 인생 화면에서 미리 본 나라 → 지금 인생의 나라로
   modalMode = null; modalArg = null;
   if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
@@ -533,7 +530,7 @@ const kin = p => p.kind === 'family' || p.kind === 'child';
 const mine = p => p.partner || p.spouse || p.secret || p.fwb || p.fling;
 // 상태: 유부녀·유부남(결혼한 걸 알 때) / 애인 있음 (내 연인이 아닌데)
 const statusTag = p => kin(p) || p.spouse ? '' : p.married && p.marriedKnown ? (p.gender === 'f' ? '유부녀' : '유부남') : p.taken && !p.married && !(p.partner || p.secret) ? '애인 있음' : '';
-const PFILTER = [['all', '전체', () => true], ['love', '연인·섹파', mine], ['friend', '친구·지인', p => !kin(p) && !mine(p)], ['family', '가족', kin],
+const PFILTER = [['all', '전체', () => true], ['phone', '📱 번호', p => G.hasNumber(p)], ['love', '연인·섹파', mine], ['friend', '친구·지인', p => !kin(p) && !mine(p)], ['family', '가족', kin],
   ['married', '유부녀·유부남', p => p.married && p.marriedKnown], ['taken', '애인 있음', p => p.taken && !p.married && !kin(p)]];
 function openPeople() {
   const S = G.state();
@@ -556,7 +553,7 @@ function openPeople() {
   const tabs = `<div class="pview" role="tablist"><button type="button" role="tab" data-pview="list" aria-selected="${peopleView === 'list'}">📋 목록</button><button type="button" role="tab" data-pview="web" aria-selected="${peopleView === 'web'}">🕸️ 관계망</button></div>`;
   const body = peopleView === 'web' ? webHTML(list)
     : `<div class="plist">${list.map(row).join('') || '<p class="hint">여기에 해당하는 사람이 없다.</p>'}</div>${peopleFilter === 'all' ? acqBox : ''}`;
-  showModal('people', `👥 관계 ${known.length}명`,
+  showModal('people', inPhone ? (peopleView === 'web' ? '🕸️ 관계망' : '📇 연락처') : `👥 관계 ${known.length}명`,
     `${tabs}${chips}${body}<p class="hint">사람을 누르면 할 수 있는 게 나와. 관계는 가만두면 조금씩 멀어져. (남은 행동력 ⚡${S.ap})</p>`);
 }
 /* 인간 관계망 — 나를 가운데 두고 실로 잇기 (가까운 사이일수록 안쪽 고리)
@@ -1248,12 +1245,234 @@ function confirmRestart() {
     <div class="choices"><button type="button" data-cancel>계속 살기</button><button type="button" data-new>새로 시작</button></div>`);
 }
 
+/* ═════════ 📱 게임 속 핸드폰 — 홈 화면 + 앱 (연락처·관계망·방구하기·구인·은행·지도·앨범·저장) ═════════
+   폰에서 연 창은 폰 모양(상태 표시줄 · ‹ 뒤로). 앱 안에서 연 사람 창·지도도 폰 안에서. 열 살부터 (그 전엔 폰이 없음) */
+let inPhone = false;
+const PHONE_MODES = new Set(['phone', 'people', 'person', 'jobs', 'map', 'realty', 'listing', 'contract', 'bank', 'album', 'slots']);
+const PHONE_APPS = [
+  { id: 'contacts', icon: '📇', label: '연락처', bg: '#3fae73' },
+  { id: 'web', icon: '🕸️', label: '관계망', bg: '#8a6cf0' },
+  { id: 'realty', icon: '🏠', label: () => G.realty.app(), bg: '#2f80ed', age: 19 },
+  { id: 'jobs', icon: '💼', label: '구인', bg: '#f2994a', age: 16 },
+  { id: 'bank', icon: '🏦', label: '은행', bg: '#1f9d6b', age: 16 },
+  { id: 'map', icon: '🗺️', label: '지도', bg: '#33a9d6' },
+  { id: 'album', icon: '📷', label: '앨범', bg: '#e0555f' },
+  { id: 'slots', icon: '💾', label: '저장', bg: '#7d8592' },
+];
+const phoneStatus = () => { const ti = G.timeInfo(), S = G.state(); return `<span>${ti.clock || `${ti.m}월`}</span><span class="ph-isl" aria-hidden="true"></span><span>📶 ⚡${Math.max(0, S.ap || 0)} 🔋</span>`; };
+function openPhone(app = 'home', arg) {
+  inPhone = true;
+  if (app === 'contacts') { peopleView = 'list'; peopleFilter = 'phone'; personFrom = 'people'; return openPeople(); }
+  if (app === 'web') { peopleView = 'web'; peopleFilter = 'all'; personFrom = 'people'; return openPeople(); }
+  if (app === 'realty') return openRealty(arg || rtTab);
+  if (app === 'jobs') return openJobs();
+  if (app === 'bank') return openBank();
+  if (app === 'map') return openMap();
+  if (app === 'album') return openAlbum();
+  if (app === 'slots') return openSlots();
+  phoneHome();
+}
+function phoneHome() {
+  inPhone = true;
+  const S = G.state(), ti = G.timeInfo(), pl = G.place(), age = S.age;
+  const date = `${ti.m}월 ${ti.d}일 ${ti.dow ? `(${ti.dow})` : ''}`;
+  const nNum = G.people().filter(p => !G.acquaintance(p) && G.hasNumber(p)).length;
+  const badge = { contacts: nNum || '', realty: G.realty.agentToday() ? 'N' : '' };
+  const apps = PHONE_APPS.map(a => { const lab = typeof a.label === 'function' ? a.label() : a.label, off = age < (a.age || 0) || (a.id === 'map' && !G.places().length);
+    return `<button type="button" class="ph-app" data-app="${a.id}"${off ? ' disabled' : ''}><span class="ai" style="--bg:${a.bg}">${a.icon}</span><span class="an">${esc(lab)}</span>${badge[a.id] ? `<b class="ph-badge">${badge[a.id]}</b>` : ''}</button>`; }).join('');
+  showModal('phone', '📱 내 폰', `<div class="ph-home">
+    <div class="ph-clock"><b>${ti.clock || date}</b><span>${ti.clock ? date + ' ' : ''}${wxIcon(S.weather)}</span></div>
+    <div class="ph-widget"><span>💰 ${G.fmtMoney(S.money)}</span><span>⚡ ${Math.max(0, S.ap || 0)}</span><span>📍 ${esc(pl ? pl.label : ti.zone || '집')}</span></div>
+    <div class="ph-apps">${apps}</div>
+    <p class="ph-tip">${age < 19 ? '방구하기는 스무 살부터.' : '앱을 눌러 열고, ‹ 로 돌아온다.'}</p></div>`);
+}
+function phoneBack() {
+  if (modalMode === 'person' && personFrom === 'people') return openPeople();
+  if (modalMode === 'contract') return openListing(modalArg);
+  if (modalMode === 'listing') return openRealty(rtTab);
+  phoneHome();
+}
+// 다시 그리기 (상태가 바뀌면 그 앱 화면 그대로)
+const PHONE_RENDER = { phone: () => phoneHome(), realty: () => openRealty(rtTab), listing: () => openListing(modalArg), contract: () => openContract(modalArg), bank: () => openBank(), album: () => openAlbum() };
+
+/* 🏠 방구하기 — 매물(필터·정렬) · ♡ 찜 · 내 집 */
+let rtTab = 'list', rtF = { deal: 'all', type: 'all', sort: 'rec' }, ctOpt = { move: 'truck', loan: false, insure: true };
+const RT_TYPE = { kr: [['all', '전체'], ['small', '원룸·고시원'], ['officetel', '오피스텔'], ['villa', '빌라·투룸'], ['apt', '아파트'], ['house', '주택']],
+  ny: [['all', '전체'], ['small', '셰어·스튜디오'], ['officetel', '도어맨'], ['villa', '워크업'], ['apt', '콘도'], ['house', '타운하우스']] };
+const RT_DEAL = { kr: [['all', '전체'], ['월세', '월세'], ['전세', '전세'], ['매매', '매매']], ny: [['all', '전체'], ['월세', '렌트'], ['매매', '매매']] };
+const RT_SORT = [['rec', '추천순'], ['cheap', '싼 순'], ['wide', '넓은 순'], ['near', '역 가까운 순']];
+const monthlyEq = L => (L.rent || 0) + (L.mgmt || 0) + Math.round(((L.deal === '매매' ? L.priceN : L.depN) || 0) * .004);
+function rtTags(L) {
+  const t = [];
+  if (L.agent) t.push(['중개사 추천', 'ag']);
+  if (L.gone) t.push(['거래 완료', 'gone']);
+  if (L.seen && !L.agent) t.push(['방문함', 'seen']);
+  if (L.urgent) t.push(['급매', 'hot']);
+  if (L.age <= 3) t.push(['신축']);
+  if (L.station <= 5) t.push(['역세권']);
+  if (L.south) t.push(['남향']);
+  if ((L.opts || []).length >= 5) t.push(['풀옵션']);
+  if (L.nofee) t.push(['NO FEE']);
+  if (L.pets) t.push(['반려동물']);
+  if (L.parking) t.push(['주차']);
+  if (L.instant) t.push(['즉시 입주']);
+  return t.slice(0, 5).map(([x, c]) => `<i class="rt-tag${c ? ' ' + c : ''}">${esc(x)}</i>`).join('');
+}
+const rtCard = L => `<button type="button" class="rt-card${L.gone ? ' gone' : ''}" data-lst="${L.id}"><span class="rt-ph">${roomArt(L, 112, 84)}</span>
+  <span class="rt-i"><b class="rt-p">${esc(L.price)}</b><span>${esc(L.sub)} · ${esc(L.areaT)}</span><span class="dim">${esc(L.floorT)} · ${L.mgmt ? '관리비 ' + G.fmtMoney(L.mgmt) : '관리비 없음'}</span>
+  <span class="dim">📍 ${esc(L.dong)} · 역 ${L.station}분${L.commute ? ` · ${L.commute.to} ${L.commute.min}분` : ''}</span><span class="rt-tags">${rtTags(L)}</span></span><span class="rt-fv" aria-label="찜">${L.fav ? '♥' : '♡'}</span></button>`;
+function openRealty(tab) {
+  rtTab = tab || rtTab;
+  const S = G.state(), reg = G.region() === 'ny' ? 'ny' : 'kr', why = G.realty.why();
+  const all = G.realty.list(), favs = G.realty.favs();
+  const tabs = `<div class="rt-tabs" role="tablist">${[['list', `매물 ${all.length}`], ['fav', `♡ 찜 ${favs.length}`], ['home', '내 집']].map(([id, l]) => `<button type="button" role="tab" data-rtab="${id}" aria-selected="${rtTab === id}">${l}</button>`).join('')}</div>`;
+  let body;
+  if (rtTab === 'home') body = rtHome();
+  else {
+    let L = (rtTab === 'fav' ? favs : all).slice();
+    if (rtTab === 'list') {
+      if (rtF.deal !== 'all') L = L.filter(x => x.deal === rtF.deal);
+      if (rtF.type !== 'all') L = L.filter(x => rtF.type === 'small' ? ['goshiwon', 'oneroom'].includes(x.type) : x.type === rtF.type);
+      if (rtF.sort === 'cheap') L.sort((a, b) => monthlyEq(a) - monthlyEq(b));
+      else if (rtF.sort === 'wide') L.sort((a, b) => b.area - a.area);
+      else if (rtF.sort === 'near') L.sort((a, b) => a.station - b.station);
+    }
+    const chips = (list, key) => `<div class="rt-chips">${list.map(([id, l]) => `<button type="button" data-rf="${key}:${id}" aria-pressed="${rtF[key] === id}">${l}</button>`).join('')}</div>`;
+    body = (rtTab === 'list' ? `${chips(RT_DEAL[reg], 'deal')}${chips(RT_TYPE[reg], 'type')}${chips(RT_SORT, 'sort')}<p class="hint rt-note">매주 새 매물이 올라온다${G.realty.agentToday() ? ' · 오늘은 중개사 추천 매물이 맨 위에' : ' · 지도의 🔑 부동산에 가면 중개사 추천 매물(허위매물 없음)'}. 너무 싼 매물은 의심해 볼 것.</p>` : '')
+      + (L.length ? `<div class="rt-list">${L.map(rtCard).join('')}</div>` : `<p class="empty">${rtTab === 'fav' ? '찜한 매물이 없다. 매물에서 ♡를 누르면 여기에.' : '조건에 맞는 매물이 없다.'}</p>`);
+  }
+  showModal('realty', `🏠 ${G.realty.app()}`, `${tabs}${why ? `<p class="hint">📵 ${esc(why)} 계약할 수 있다. 구경은 지금도 할 수 있다.</p>` : ''}${body}`);
+}
+function rtHome() {
+  const H = G.realty.home(), reg = G.region() === 'ny';
+  const rows = [['사는 곳', `${H.icon} ${H.dong ? H.dong + ' ' : ''}${H.label}`]];
+  if (H.area) rows.push(['면적 · 층', `${reg ? Math.round(H.area * 10.764) + ' sqft' : H.area + '㎡ (' + Math.round(H.area / 3.3058) + '평)'} · ${H.floor}`]);
+  if (H.type !== 'parents') {
+    rows.push(['계약', H.owned ? `매매 (내 집) · ${G.fmtMoney(H.price)}` : `${H.deal === '월세' && reg ? '렌트' : H.deal || '월세'} · 보증금 ${G.fmtMoney(H.dep)}${H.rent ? ` · 월 ${G.fmtMoney(H.rent)}` : ''}`]);
+    rows.push(['관리비', H.mgmt ? G.fmtMoney(H.mgmt) : '없음']);
+    if (H.loan) rows.push(['대출', `${G.fmtMoney(H.loan)} · 이자 월 ${G.fmtMoney(H.interest)}`]);
+    if (H.insured) rows.push(['보증보험', '가입 (보증금 보호)']);
+    if (H.daysLeft != null) rows.push(['계약 만료', H.daysLeft > 0 ? `${H.daysLeft}일 남음 (만료되면 5% 올려 연장)` : '곧 연장']);
+    if (H.commute) rows.push(['통근', `출근·수업에 ⚡+${H.commute} (왕복)`]);
+  }
+  const flaws = H.flaws.length ? `<p class="sec-t">살아 보니</p><ul class="rt-notes">${H.flaws.map(f => `<li class="${f.bad ? 'bad' : 'good'}">${f.bad ? '✖' : '✔'} ${esc(f.t)}</li>`).join('')}</ul>` : '';
+  return `<div class="rt-home"><table class="rt-table">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join('')}</table>${flaws}
+    <p class="sec-t">이웃 구성</p>${hhMix(H.hh)}
+    ${H.canParents ? '<button type="button" class="rt-parents" data-parents>🏡 본가로 들어가기 <small>보증금은 돌려받는다</small></button>' : ''}</div>`;
+}
+function openListing(id) {
+  const L = G.realty.get(id);
+  if (!L) { openRealty(rtTab); return; }
+  const S = G.state(), reg = G.region() === 'ny', why = G.realty.why();
+  const dirs = ['동향', '서향', '남동향', '북향'], dir = L.south ? '남향' : dirs[[...L.id].reduce((a, c) => a + c.charCodeAt(0), 0) % dirs.length];
+  const deal = L.deal === '매매' ? `매매가 ${G.fmtMoney(L.priceN)}` : L.deal === '전세' ? `전세금 ${G.fmtMoney(L.depN)}` : `보증금 ${G.fmtMoney(L.depN)} · ${reg ? '렌트' : '월세'} ${G.fmtMoney(L.rent)}`;
+  const rows = [['종류', L.sub], ['전용면적', L.areaT], ['층', L.floorT], ['준공', `${L.built}년${L.age <= 3 ? ' (신축)' : ` (${L.age}년 차)`}`], ['방향', dir], ['엘리베이터', L.elevator ? '있음' : '없음'],
+    ['주차', L.parking ? '가능' : '불가'], ['반려동물', L.pets ? '가능' : '불가'], ['입주', L.instant ? '즉시 입주' : '협의'], ['관리비', L.mgmt ? `월 ${G.fmtMoney(L.mgmt)}` : '없음'], ['역까지', `걸어서 ${L.station}분`]];
+  if (L.commute) rows.push([`${L.commute.to}까지`, `편도 약 ${L.commute.min}분 (출근·수업 ⚡+${L.commute.pt})`]);
+  const notes = L.notes ? `<p class="sec-t">${L.agent ? '중개사와 함께 확인함' : '직접 보고 온 것'}</p>${L.notes.length ? `<ul class="rt-notes">${L.notes.map(n => `<li class="${n.bad ? 'bad' : 'good'}">${n.bad ? '✖' : '✔'} ${esc(n.t)}</li>`).join('')}</ul>` : '<p class="dim">사진 그대로였다.</p>'}` : '';
+  const regR = L.reg ? `<p class="rt-reg${L.reg.risk >= .8 ? ' bad' : ''}">📄 등기부: ${L.reg.lien ? `근저당 ${G.fmtMoney(L.reg.lien)}` : '근저당 없음'}${L.deal === '전세' ? ` · 전세가율 ${Math.round(L.reg.risk * 100)}%${L.reg.risk >= .8 ? ' — 깡통전세 위험! 보증보험 없이는 피하는 게 좋다' : ' — 안전한 편'}` : ''}</p>` : '';
+  const off = !!why || L.gone, block = G.realty.actWhy();
+  showModal('listing', `${L.dong} · ${L.sub}`, `<div class="rt-hero">${roomArt(L, 360, 220)}${L.agent ? '<span class="rt-badge">중개사 추천</span>' : ''}${L.gone ? '<span class="rt-badge gone">거래 완료</span>' : ''}</div>
+    <div class="rt-pricebox"><b>${esc(L.price)}</b><span>${esc(deal)}${L.mgmt ? ` · 관리비 ${G.fmtMoney(L.mgmt)}` : ''}</span><span class="rt-tags">${rtTags(L)}</span></div>
+    <table class="rt-table">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join('')}</table>
+    <div class="rt-opts">${L.opts.map(o => `<span>${esc(o)}</span>`).join('')}</div>
+    <p class="rt-say">💬 중개사: "${esc(L.say)}"${L.dongTag ? ` <span class="dim">· ${esc(L.dong)}: ${esc(L.dongTag)}</span>` : ''}</p>
+    ${notes}${regR}
+    <div class="rt-acts">
+      <button type="button" data-rfav="${L.id}">${L.fav ? '♥ 찜함' : '♡ 찜'}</button>
+      ${L.canReg ? `<button type="button" data-rreg="${L.id}"${L.reg || off || S.ap < G.realty.regPt ? ' disabled' : ''}>📄 등기부 <small>⚡${G.realty.regPt}</small></button>` : ''}
+      <button type="button" data-rvisit="${L.id}"${L.seen || off || block || S.ap < G.realty.visitPt ? ' disabled' : ''}>🏃 보러 가기 <small>⚡${G.realty.visitPt}</small></button>
+      <button type="button" class="hot" data-rsign="${L.id}"${off ? ' disabled' : ''}>✍ 계약하기</button>
+    </div>
+    ${block && !L.gone ? `<p class="rt-warn">⏰ ${esc(block)}</p>` : ''}
+    <p class="hint">보러 가면 사진에 없는 하자(곰팡이·소음·외풍 …)나 좋은 점이 보인다. 허위매물은 가 보면 "방금 나갔어요". 안 보고 계약하면 계약금을 날릴 수도 있다.${L.canReg ? ' 전세는 등기부로 근저당을 꼭 확인할 것.' : ''}</p>`, true, id);
+}
+function openContract(id) {
+  const L = G.realty.get(id), q = L && G.realty.quote(id, ctOpt);
+  if (!q) { openRealty(rtTab); return; }
+  const mv = G.realty.moves(), reg = G.region() === 'ny', f = G.fmtMoney;
+  const payLabel = L.deal === '매매' ? '매매가' : L.deal === '전세' ? '전세 보증금' : reg ? '보증금 (한 달 치)' : '보증금';
+  const rows = [[payLabel, q.pay], ...(q.loan ? [[`${q.loanLabel} (연 ${(q.loanRate * 100).toFixed(1)}%)`, -q.loan]] : []), ['중개수수료', q.fee], [`이사비 · ${q.moveLabel}`, q.moveCost], ...(q.insure ? [['전세보증보험', q.insure]] : [])];
+  const opt = (key, val, label, on) => `<button type="button" data-copt="${key}:${val}" aria-pressed="${on}">${label}</button>`;
+  showModal('contract', '✍ 계약서', `<p class="rt-ct-h"><b>${esc(L.dong)} ${esc(L.sub)}</b><span>${esc(L.price)}</span></p>
+    <p class="sec-t">이사 방법</p><div class="rt-chips wrap">${Object.entries(mv).map(([k, m]) => opt('move', k, `${m.label} · ⚡${m.pt} · ${f(Math.round(m.cost[0] + (m.cost[1] - m.cost[0]) * Math.min(1, L.area / 100)))}`, ctOpt.move === k)).join('')}</div>
+    ${q.canLoan ? `<p class="sec-t">대출</p><div class="rt-chips wrap">${opt('loan', 1, `${q.loanLabel} 받기 (${L.deal === '매매' ? '집값의 ' : '보증금의 '}${L.deal === '매매' ? (reg ? 80 : 70) : 80}%)`, ctOpt.loan)}${opt('loan', 0, '대출 없이', !ctOpt.loan)}</div>` : ''}
+    ${q.canInsure ? `<p class="sec-t">전세보증보험</p><div class="rt-chips wrap">${opt('insure', 1, '가입 (보증금을 지켜 준다)', ctOpt.insure)}${opt('insure', 0, '가입 안 함', !ctOpt.insure)}</div>` : ''}
+    <table class="rt-table rt-bill">${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td class="${v < 0 ? 'p' : ''}">${v < 0 ? '−' : ''}${f(Math.abs(v))}</td></tr>`).join('')}
+      <tr class="sum"><th>지금 낼 돈</th><td>${f(q.now)}</td></tr>${q.refund ? `<tr><th>지금 집에서 돌려받는 돈</th><td class="p">+${f(q.refund)}</td></tr>` : ''}
+      <tr><th>계약 뒤 잔고</th><td class="${q.after < 0 ? 'm' : ''}">${f(q.after)}</td></tr>
+      <tr class="sum"><th>매달 나가는 돈</th><td>${f(q.monthly)}${q.interest ? ` <small>(이자 ${f(q.interest)} 포함)</small>` : ''}</td></tr>
+      ${q.commute ? `<tr><th>통근</th><td>${q.commute.to}까지 편도 ${q.commute.min}분 · ⚡+${q.commute.pt}</td></tr>` : ''}</table>
+    ${!q.visited ? '<p class="rt-warn">⚠ 아직 직접 보지 않았다. 허위매물이면 계약금을 날린다.</p>' : ''}
+    ${L.canReg && !L.reg && L.deal === '전세' ? '<p class="rt-warn">⚠ 등기부를 확인하지 않았다.</p>' : ''}
+    <div class="choices"><button type="button" class="hot" data-cgo="${id}"${q.ok ? '' : ' disabled'}>✍ 계약하고 이사 <small>⚡${q.movePt}</small></button>${q.why ? `<p class="hint">${esc(q.why)}</p>` : ''}</div>`, true, id);
+}
+/* 🏦 은행 · 📷 앨범 */
+function openBank() {
+  const b = G.budget(), f = G.fmtMoney;
+  showModal('bank', '🏦 은행', `<div class="bk-bal"><span>잔고</span><b class="${b.money < 0 ? 'neg' : ''}">${f(b.money)}</b></div>
+    <div class="bk-assets"><div><span>맡긴 보증금</span><b>${b.dep ? f(b.dep) : '—'}</b></div><div><span>내 집</span><b>${b.owned ? f(b.owned) : '—'}</b></div><div><span>대출</span><b class="${b.loan ? 'neg' : ''}">${b.loan ? f(b.loan) : '없음'}</b></div></div>
+    <p class="sec-t">한 달 돈 흐름</p>
+    <div class="bk-lines">${b.lines.length ? b.lines.map(([k, v]) => `<div><span>${esc(k)}</span><b class="${v < 0 ? 'neg' : 'pos'}">${v < 0 ? '−' : '+'}${f(Math.abs(v))}</b></div>`).join('') : '<p class="dim">고정으로 들어오고 나가는 돈이 없다.</p>'}</div>
+    <div class="bk-net"><span>한 달에</span><b class="${b.net < 0 ? 'neg' : 'pos'}">${b.net < 0 ? '−' : '+'}${f(Math.abs(b.net))}</b></div>
+    <p class="hint">매달 1일에 월급이 들어오고 월세·관리비·생활비·대출 이자가 빠져나간다. 쇼핑·술값 같은 그때그때 쓰는 돈은 빼고.</p>`);
+}
+function openAlbum() {
+  const M = G.state().memories.slice().reverse();
+  showModal('album', '📷 앨범', M.length ? `<p class="hint">추억 ${M.length}개 — 최근 것부터</p><div class="al">${M.map(m => `<div class="al-i"><span class="al-a">${m.age}살 · ${esc(m.season || '')} ${m.wx ? wxIcon(m.wx) : ''}</span><p>${esc(m.text)}</p></div>`).join('')}</div>` : '<p class="empty">아직 추억이 없다.</p>');
+}
+// 폰 안 클릭 (처리했으면 true)
+function phoneClick(b, d) {
+  if (d.app) { openPhone(d.app); return true; }
+  if (d.rtab) { openRealty(d.rtab); return true; }
+  if (d.rf) { const [k, v] = d.rf.split(':'); rtF[k] = v; openRealty('list'); return true; }
+  if (d.lst) { openListing(d.lst); return true; }
+  if (d.rfav) { G.realty.fav(d.rfav); return true; }
+  if (d.rvisit) { G.realty.visit(d.rvisit); return true; }
+  if (d.rreg) { G.realty.registry(d.rreg); return true; }
+  if (d.rsign) { ctOpt = { move: 'truck', loan: false, insure: true }; openContract(d.rsign); return true; }
+  if (d.copt) { const [k, v] = d.copt.split(':'); ctOpt[k] = k === 'move' ? v : v === '1'; openContract(modalArg); return true; }
+  if (d.cgo) { G.realty.sign(d.cgo); if (modalMode === 'contract') { rtTab = 'home'; openRealty('home'); } return true; }
+  if ('parents' in d) { G.realty.toParents(); openRealty('home'); return true; }
+  return false;
+}
+// 방 사진 (매물마다 다른 그림): 실내 — 벽·바닥·창(반지하는 위쪽 작은 창, 옥탑은 기운 천장)·가구(종류마다) / 주택은 바깥 모습
+function roomArt(L, w, h) {
+  const hs = [...String(L.id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const wall = L.basement ? '#a39b8a' : ['#efe7da', '#e6edf2', '#f3ece4', '#ebe6f2', '#f1efe8'][hs % 5], wall2 = L.basement ? '#8d8574' : '#d9d0c2';
+  const floor = L.basement ? '#776b5a' : ['#c9a27a', '#b88a5e', '#d8c3a5', '#a07850'][(hs >>> 3) % 4];
+  const sky = (L.floor || 0) >= 10 ? '#8ccaf0' : '#a9d8f2';
+  let g;
+  if (L.type === 'house') {
+    const roof = ['#a5523c', '#5b6b7a', '#7a4a3a'][hs % 3];
+    g = `<rect width="160" height="110" fill="${sky}"/><rect y="78" width="160" height="32" fill="#8cc06a"/><circle cx="138" cy="60" r="16" fill="#6aa354"/><rect x="135" y="66" width="5" height="16" fill="#7a5a3a"/>
+      <rect x="34" y="44" width="78" height="44" fill="${wall}" stroke="#8d7f6c"/><path d="M28,46 L73,18 L118,46 Z" fill="${roof}"/><rect x="66" y="62" width="14" height="26" fill="#6b4a32"/>
+      <rect x="42" y="54" width="16" height="13" fill="#bfe3f7" stroke="#8d7f6c"/><rect x="88" y="54" width="16" height="13" fill="#bfe3f7" stroke="#8d7f6c"/><rect x="0" y="86" width="160" height="4" fill="#c8b08a"/>`;
+  } else {
+    const winW = L.type === 'goshiwon' ? (L.win ? 20 : 0) : L.type === 'apt' ? 70 : L.type === 'officetel' ? 56 : L.south ? 46 : 36;
+    const win = L.basement ? `<rect x="58" y="6" width="44" height="12" fill="#c9d6dc"/><path d="M58,12 H102 M69,6 V18 M80,6 V18 M91,6 V18" stroke="#555" stroke-width="1"/><rect x="58" y="15" width="44" height="3" fill="#6d7f4f" opacity=".6"/>`
+      : winW ? `<rect x="${80 - winW / 2}" y="14" width="${winW}" height="34" fill="${sky}" stroke="#fff" stroke-width="2"/>${(L.floor || 0) >= 6 ? `<path d="M${80 - winW / 2 + 2},48 v-10 h6 v-6 h7 v9 h6 v-12 h8 v19 Z" fill="#7aa2bf" opacity=".7"/>` : `<circle cx="${80 + winW / 4}" cy="40" r="7" fill="#7fbf6a"/>`}<path d="M80,14 V48" stroke="#fff" stroke-width="1.5"/>` : '';
+    const roof = L.rooftop ? `<path d="M0,0 H160 V10 L0,30 Z" fill="${wall2}"/>` : '';
+    const light = L.south && !L.basement ? `<path d="M${80 - winW / 2},48 L${60 - winW / 2},110 L${120 + winW / 2},110 L${80 + winW / 2},48 Z" fill="#fff3c4" opacity=".35"/>` : '';
+    const F = {
+      goshiwon: `<rect x="96" y="60" width="52" height="22" rx="3" fill="#7d93b5"/><rect x="96" y="56" width="14" height="8" rx="2" fill="#eee"/><rect x="14" y="56" width="34" height="5" fill="#8a6a4a"/><rect x="16" y="61" width="3" height="20" fill="#6d5238"/><rect x="43" y="61" width="3" height="20" fill="#6d5238"/>`,
+      oneroom: `<rect x="96" y="62" width="58" height="22" rx="3" fill="#8fa7c8"/><rect x="98" y="57" width="16" height="8" rx="2" fill="#f4f4f4"/><rect x="8" y="50" width="40" height="30" fill="#d9d4cc"/><rect x="8" y="50" width="40" height="5" fill="#9aa4ad"/><circle cx="18" cy="52" r="2" fill="#555"/><circle cx="28" cy="52" r="2" fill="#555"/>${L.duplex ? '<rect x="0" y="28" width="60" height="5" fill="#8a6a4a"/><path d="M60,33 L70,80" stroke="#8a6a4a" stroke-width="3"/>' : ''}`,
+      officetel: `<rect x="100" y="62" width="54" height="22" rx="3" fill="#c9ccd6"/><rect x="102" y="57" width="16" height="8" rx="2" fill="#fff"/><rect x="6" y="54" width="46" height="26" fill="#f2f2f2"/><rect x="6" y="54" width="46" height="4" fill="#333"/><rect x="58" y="64" width="22" height="3" fill="#333"/><rect x="66" y="67" width="2" height="14" fill="#333"/>`,
+      villa: `<rect x="96" y="66" width="52" height="16" rx="4" fill="#a87b5a"/><rect x="96" y="60" width="52" height="8" rx="4" fill="#bf9070"/><rect x="10" y="30" width="26" height="52" fill="${wall2}"/><rect x="13" y="33" width="20" height="49" fill="#8a6a4a"/><circle cx="29" cy="58" r="1.5" fill="#e8d8a0"/>`,
+      apt: `<rect x="92" y="66" width="62" height="16" rx="4" fill="#7d8c9b"/><rect x="92" y="59" width="62" height="9" rx="4" fill="#8f9eac"/><rect x="10" y="50" width="38" height="22" fill="#222"/><rect x="12" y="52" width="34" height="18" fill="#3b4a5a"/><rect x="24" y="72" width="10" height="6" fill="#555"/>${winW >= 70 ? '<path d="M45,44 H115" stroke="#eee" stroke-width="2"/><path d="M50,36 V48 M60,36 V48 M70,36 V48 M80,36 V48 M90,36 V48 M100,36 V48 M110,36 V48" stroke="#eee" stroke-width="1"/>' : ''}`,
+    }[L.type] || '';
+    g = `<rect width="160" height="110" fill="${wall}"/>${roof}${win}${light}<path d="M0,82 H160 V110 H0 Z" fill="${floor}"/><path d="M0,82 L-20,110 M40,82 L28,110 M80,82 V110 M120,82 L132,110" stroke="rgba(0,0,0,.08)"/>${F}
+      ${L.basement ? '<rect width="160" height="110" fill="#2b2618" opacity=".18"/>' : ''}`;
+  }
+  return `<svg class="room" viewBox="0 0 160 110" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${g}</svg>`;
+}
+
 /* ---------- 입력 ---------- */
 $('#where').addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   const d = b.dataset;
-  if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) (a.id === 'shop' ? openShop() : a.id === 'houseHunt' ? openHousing() : openStudy()); else G.doAction(d.a); }
+  if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) (a.id === 'shop' ? openShop() : a.id === 'houseHunt' ? openPhone('realty') : openStudy()); else G.doAction(d.a); }
   else if (d.pl) { mapMode = null; G.goPlace(d.pl); }
   else if ('leave' in d) G.leavePlace();
   else if ('map' in d) openMap();
@@ -1280,8 +1499,10 @@ $('#flow').addEventListener('click', e => {
   const f = b.dataset.flow;
   if (f === 'eat') G.eat(); else if (f === 'duty') G.doDuty(); else G.skip(f);
 });
-$('#peopleBtn').addEventListener('click', () => { personFrom = 'people'; openPeople(); });
-$('#jobBtn').addEventListener('click', openJobs);
+$('#phoneBtn').addEventListener('click', () => openPhone('home'));
+$('#mBack').addEventListener('click', phoneBack);
+$('#mapBtn').addEventListener('click', openMap);
+$('#abTog').addEventListener('click', () => { const h = $('.hud'), on = !h.classList.contains('ab-open'); h.classList.toggle('ab-open', on); $('#abTog').setAttribute('aria-expanded', on); });
 $('#crimeBtn').addEventListener('click', openCrime);
 $('#restart').addEventListener('click', confirmRestart);
 $('#slotsBtn').addEventListener('click', openSlots);
@@ -1296,7 +1517,7 @@ mBody.addEventListener('click', e => {
   if (modalMode === 'ntest') { if ('ntgo' in d) runNightTest(); return; }
   if (modalMode === 'quick') { quickClick(b); return; }
   if (modalMode === 'map') { if (d.mapmode) { mapMode = d.mapmode; openMap(); } else if (d.pl) { G.goPlace(d.pl); mapMode = null; if (modalMode === 'map') closeModal(); } return; }   // 지도: 핀을 누르면 이동
-  if (modalMode === 'housing') { if (d.move) { G.moveHome(d.move); closeModal(); } return; }   // 부동산: 이사
+  if (inPhone && phoneClick(b, d)) return;   // 📱 폰 (홈 화면·앱)
   if ('intro' in d) { G.ackIntro(); return; }
   if ('rok' in d) { G.ackReport(); return; }
   if (modalMode === 'apply') {
@@ -1396,5 +1617,6 @@ new MutationObserver(ms => {
 }).observe(document.body, { childList: true, subtree: true, characterData: true });
 G.subscribe(S => { if (G.region() !== 'kr') locTree(document.body); });   // 나라가 바뀐 뒤 처음 그릴 때 이미 있던 글까지
 G.subscribe(render);
+window.LlifeUI = { roomArt };   // 개발용 (방 그림 미리보기)
 if (!G.init()) openCreate(false);
 })();

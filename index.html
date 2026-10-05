@@ -27,6 +27,7 @@
 <script defer src="data/region.js"></script>
 <script defer src="data/map.js"></script>
 <script defer src="data/housing.js"></script>
+<script defer src="data/realty.js"></script>
 <script defer src="js/weather.js"></script>
 <script defer src="js/scenes.js"></script>
 <script defer src="js/citymap.js"></script>
@@ -55,6 +56,7 @@
     <div class="sub"><span id="role"></span><span id="trait"></span><span id="money"></span></div>
     <div class="rule" aria-hidden="true">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
     <div class="conds" id="conds"></div>
+    <button type="button" class="ab-tog" id="abTog" aria-expanded="false">능력치 <span id="abSum"></span> <b>▾</b></button>
     <div class="abils" id="abils"></div>
   </header>
 
@@ -62,21 +64,24 @@
 
   <section class="controls panel" aria-label="행동">
     <div class="season-row"><span id="season"></span><span class="dots" id="ap" aria-hidden="true"></span><span class="dim" id="apNum"></span></div>
-    <div class="menu-row">
-      <button type="button" id="meBtn">📋 나</button>
-      <button type="button" id="peopleBtn">👥 관계</button>
-      <button type="button" id="jobBtn">💼 직업</button>
-      <button type="button" id="crimeBtn">🕶 범죄</button>
-    </div>
-    <div class="where" id="where"></div>
     <div class="flow" id="flow" hidden></div>
-    <button type="button" class="age-btn" id="ageUp">▶ 계속</button>
+    <div class="where" id="where"></div>
   </section>
 </main>
 
+<!-- 아래 탭바: 📱 폰(연락처·관계망·부동산·구인·은행·지도·앨범) · 🗺️ 지도 · 📋 나 · 🕶 범죄 · 큰 버튼(계속·다음 주·잠자기) -->
+<nav class="tabbar" id="tabbar" aria-label="메뉴">
+  <button type="button" id="phoneBtn"><span class="ti">📱</span><span>폰</span></button>
+  <button type="button" id="mapBtn"><span class="ti">🗺️</span><span>지도</span></button>
+  <button type="button" id="meBtn"><span class="ti">📋</span><span>나</span></button>
+  <button type="button" id="crimeBtn"><span class="ti">🕶</span><span>범죄</span></button>
+  <button type="button" class="age-btn" id="ageUp">▶ 계속</button>
+</nav>
+
 <div class="modal-wrap" id="modal" hidden>
   <div class="modal panel" role="dialog" aria-modal="true" aria-labelledby="mTitle">
-    <div class="m-head"><span id="mTitle"></span><button type="button" id="mClose" aria-label="닫기">✕</button></div>
+    <div class="ph-status" id="phStatus" aria-hidden="true"></div>
+    <div class="m-head"><button type="button" class="m-back" id="mBack" aria-label="뒤로" hidden>‹</button><span id="mTitle"></span><button type="button" id="mClose" aria-label="닫기">✕</button></div>
     <div class="m-body" id="mBody"></div>
   </div>
 </div>

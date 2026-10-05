@@ -294,6 +294,19 @@ DL.push(
     choices: [ { t: '"그러니까요. 같이 한숨 쉬어요."', tone: 'warm' }, { t: '"제 꿈은 원룸 탈출입니다."', tone: 'joke' }, { t: '"어떤 집 찾으세요?"', tone: 'ask' }, { t: '"대출 금리부터 보세요."', tone: 'smart' } ] },
 );
 
+/* ═════ 부동산 사고 (js/game.js homeMonthly — 전세가율 80%가 넘는 집에 보증보험 없이 살면 가끔) ═════ */
+E.push(
+  { id: 'jeonseFraud', type: 'trigger', once: false, age: [19, 90],
+    onStart: (s, a) => { s.vars.dep = a.money(a.homeDep()); },
+    text: '등기우편이 왔다. 살고 있는 집이 경매로 넘어간다고 한다. 집주인은 연락이 끊겼다. 전세 보증금 {dep}이 묶였다.',
+    choices: [
+      { label: '변호사를 사서 끝까지 싸운다', chance: .35,
+        success: { effect: { money: -150, happy: -6 }, do: (s, a) => a.loseHome(.6), memory: true, text: '1년을 싸운 끝에 보증금의 절반 남짓을 돌려받았다. 짐을 싸서 나왔다.' },
+        fail: { effect: { money: -150, happy: -12 }, do: (s, a) => a.loseHome(.1), memory: true, text: '변호사비만 나갔다. 경매 낙찰금에서 쥐꼬리만큼 돌려받았다.' } },
+      { label: '포기하고 짐을 싼다', effect: { happy: -10 }, do: (s, a) => a.loseHome(.2), memory: true, text: '몇 년 모은 돈이 사라졌다. 다음엔 등기부부터 떼 보기로 했다.' },
+    ] },
+);
+
 /* ═════ 대학 캠퍼스 (정문·강의실·학생식당·중앙도서관·동아리방·잔디밭·학생회관 — data/places.js campus) ═════ */
 const uni = s => !!s.flags.student;
 const peerU = s => [Math.max(19, s.age - 2), s.age + 3];

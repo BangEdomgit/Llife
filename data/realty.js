@@ -1,0 +1,125 @@
+// 부동산 매물 (📱 폰 → 🏠 방구하기) — 주마다 새 매물이 올라옴 (엔진: js/game.js '부동산 매물')
+//   돈 단위는 게임 안 단위(만원). 뉴욕은 화면에서 달러로 바뀜(1만원 = 15달러)
+//   dongs  동네: 이름 · zone(지도 구역 — 통근 거리) · k(시세 배율) · tag · prefer(잘 나오는 집 종류)
+//   types  집 종류(이웃 구성은 data/housing.js의 같은 id): subs(세부 종류 — area·basement·rooftop·duplex로 덮어씀) · area(㎡) · floors(건물 층수)
+//          deals {월세|전세|매매: 비중} · ppm(㎡당 매매 시세 범위) · jr(전세가율) · conv(전월세 전환율) · deps(월세 보증금 후보) · mgmt(관리비) · minRent
+//          opts(옵션 후보) · w(목록에 나오는 비중)
+//   flaws  보러 가야 드러나는 것: 하자(health·happy 매달) / 좋은 점. when: 그런 집에서만
+//   move   이사 방법: 용달(직접 — 행동력 많이) / 포장이사(돈)
+//   loan   대출: 전세자금(보증금의 80%) / 주택담보(매매가의 70%) — 연 이자
+//   fee    중개수수료(거래 금액 대비) / insure 전세보증보험(보증금 대비) / fake 허위매물 비율 / contract 계약 기간(일)
+window.GAME_DATA = window.GAME_DATA || {};
+
+GAME_DATA.realty = {
+  kr: {
+    app: '방구하기', unit: '㎡',
+    dongs: [
+      { name: '신림동', zone: 'school', k: .82, tag: '대학가·고시촌', prefer: ['goshiwon', 'oneroom'] },
+      { name: '회기동', zone: 'school', k: .88, tag: '대학가', prefer: ['oneroom', 'villa'] },
+      { name: '봉천동', zone: 'school', k: .85, prefer: ['oneroom', 'villa'] },
+      { name: '망원동', zone: 'home', k: 1.05, tag: '한강 가까움', prefer: ['villa', 'oneroom'] },
+      { name: '자양동', zone: 'home', k: 1.0, prefer: ['oneroom', 'villa', 'apt'] },
+      { name: '연남동', zone: 'downtown', k: 1.15, tag: '카페 거리', prefer: ['villa', 'house'] },
+      { name: '성수동', zone: 'downtown', k: 1.3, tag: '핫플', prefer: ['officetel', 'villa'] },
+      { name: '역삼동', zone: 'work', k: 1.6, tag: '직장 가까움', prefer: ['officetel', 'oneroom'] },
+      { name: '잠실동', zone: 'out', k: 1.5, tag: '대단지', prefer: ['apt'] },
+      { name: '목동', zone: 'out', k: 1.3, tag: '학군', prefer: ['apt'] },
+      { name: '상계동', zone: 'out', k: .78, tag: '조용한 동네', prefer: ['apt', 'villa'] },
+      { name: '화곡동', zone: 'out', k: .82, prefer: ['villa', 'oneroom'] },
+      { name: '평창동', zone: 'out', k: 1.4, tag: '주택가', prefer: ['house'] },
+    ],
+    types: [
+      { id: 'goshiwon', w: 2, area: [6, 10], floors: [3, 6], deals: { 월세: 1 }, deps: [0, 0, 30, 50], rentR: [32, 58], mgmt: [0, 0],
+        subs: [{ n: '고시원' }, { n: '고시텔 (창문 있음)', win: true }, { n: '원룸텔' }], opts: ['침대', '책상', '냉장고(소형)', '에어컨', '공용 주방', '세탁기(공용)'] },
+      { id: 'oneroom', w: 5, area: [14, 26], floors: [4, 6], deals: { 월세: 3, 전세: 1 }, ppm: [520, 760], jr: .85, conv: .065, deps: [300, 500, 500, 1000, 1000, 2000], mgmt: [5, 10], minRent: 35,
+        subs: [{ n: '오픈형 원룸' }, { n: '분리형 원룸', area: [18, 26] }, { n: '복층 원룸', area: [20, 28], duplex: true }, { n: '반지하 원룸', basement: true }, { n: '옥탑방', rooftop: true, area: [16, 24] }],
+        opts: ['에어컨', '세탁기', '냉장고', '인덕션', '침대', '책상', '옷장', '전자레인지', '신발장'] },
+      { id: 'officetel', w: 3, area: [20, 42], floors: [10, 25], deals: { 월세: 6, 전세: 2, 매매: 1 }, ppm: [560, 820], jr: .82, conv: .06, deps: [500, 1000, 1000, 2000, 3000], mgmt: [10, 22], minRent: 50, elevator: true,
+        subs: [{ n: '오피스텔 원룸' }, { n: '오피스텔 1.5룸', area: [28, 36] }, { n: '오피스텔 투룸', area: [36, 46] }],
+        opts: ['에어컨', '세탁기', '냉장고', '인덕션', '붙박이장', '전자레인지', '건조기', '비디오폰', '무인 택배함'] },
+      { id: 'villa', w: 4, area: [33, 62], floors: [4, 5], deals: { 월세: 5, 전세: 4, 매매: 1 }, ppm: [380, 600], jr: .78, conv: .055, deps: [1000, 2000, 3000, 5000], mgmt: [3, 8], minRent: 45,
+        subs: [{ n: '투룸 빌라' }, { n: '쓰리룸 빌라', area: [50, 70] }, { n: '신축 빌라 투룸', fresh: true }, { n: '반지하 투룸', basement: true }],
+        opts: ['에어컨', '세탁기', '냉장고', '가스레인지', '신발장', '베란다'] },
+      { id: 'apt', w: 3, area: [49, 115], floors: [15, 30], deals: { 전세: 5, 월세: 2, 매매: 3 }, ppm: [950, 1500], jr: .55, conv: .045, deps: [5000, 10000, 20000], mgmt: [15, 35], minRent: 80, elevator: true, parking: true,
+        subs: [{ n: '아파트 20평형', area: [49, 49] }, { n: '아파트 25평형', area: [59, 59] }, { n: '아파트 34평형', area: [84, 84] }, { n: '아파트 43평형', area: [114, 114] }],   // 평형 = 공급면적, area = 전용면적
+        opts: ['시스템 에어컨', '빌트인 냉장고', '식기세척기', '붙박이장', '확장형 거실', '베란다'] },
+      { id: 'house', w: 1, area: [70, 150], floors: [1, 2], deals: { 전세: 4, 매매: 4, 월세: 1 }, ppm: [480, 900], jr: .5, conv: .05, deps: [5000, 10000], mgmt: [5, 15], minRent: 90, parking: true,
+        subs: [{ n: '단독주택 (마당)' }, { n: '다가구 주택 2층 전체' }, { n: '한옥', area: [60, 110] }],
+        opts: ['마당', '옥상', '창고', '보일러 교체', '주차 1대'] },
+    ],
+    flaws: [
+      { id: 'mold', t: '곰팡이 — 벽지 뒤가 까맣다', bad: true, health: -1, when: l => l.basement || l.age >= 20 },
+      { id: 'water', t: '수압이 약하다', bad: true, happy: -1, when: l => l.age >= 15 },
+      { id: 'draft', t: '외풍이 심하다 — 겨울에 춥다', bad: true, health: -1, winter: true, when: l => l.rooftop || l.age >= 20 },
+      { id: 'noise', t: '층간소음 — 윗집 발소리가 다 들린다', bad: true, happy: -1, when: l => ['villa', 'apt', 'oneroom'].includes(l.type) },
+      { id: 'thin', t: '방음이 안 된다 — 옆방 통화가 들린다', bad: true, happy: -1, when: l => ['goshiwon', 'oneroom'].includes(l.type) },
+      { id: 'bugs', t: '바퀴벌레가 나온다', bad: true, happy: -1, when: l => l.basement || l.age >= 25 },
+      { id: 'wall', t: '창문 밖이 바로 옆 건물 벽이다', bad: true, happy: -1, when: l => ['oneroom', 'goshiwon', 'villa'].includes(l.type) && !l.rooftop },
+      { id: 'hot', t: '여름엔 찜통, 겨울엔 냉골', bad: true, health: -1, when: l => l.rooftop },
+      { id: 'landlord', t: '집주인이 같은 건물에 살며 깐깐하다', bad: true, happy: -1, when: l => ['oneroom', 'villa', 'house'].includes(l.type) },
+      { id: 'roomy', t: '사진보다 넓다', good: true, happy: 1 },
+      { id: 'view', t: '창밖 풍경이 좋다', good: true, happy: 1, when: l => !l.basement && l.floor >= 3 },
+      { id: 'kind', t: '집주인이 친절하다', good: true, happy: 1, when: l => ['oneroom', 'villa', 'house'].includes(l.type) },
+      { id: 'storage', t: '수납공간이 넉넉하다', good: true },
+      { id: 'quiet', t: '밤에 조용하다', good: true, happy: 1 },
+    ],
+    move: { truck: { label: '용달 이사 (짐은 직접)', cost: [30, 50], pt: 40 }, full: { label: '포장이사', cost: [90, 220], pt: 15 } },
+    loan: { 전세: { label: '전세자금대출', ltv: .8, rate: .042 }, 매매: { label: '주택담보대출', ltv: .7, rate: .045 } },
+    fee: { 월세: .005, 전세: .004, 매매: .005 }, insure: .0015, fake: .12, contract: 730, minAge: 19,
+    agent: ['역에서 가까워서 금방 나가요.', '이 가격에 이 컨디션 없어요.', '집주인분이 좋으세요.', '오늘 보고 결정하시는 게 좋아요.', '사진보다 실물이 나아요.', '조용한 동네예요.', '관리비 포함이라 실속 있어요.'],
+  },
+  ny: {
+    app: '집 구하기', unit: 'sqft',
+    dongs: [
+      { name: '부시윅', zone: 'home', k: .82, tag: '예술가 동네', prefer: ['goshiwon', 'oneroom', 'villa'] },
+      { name: '윌리엄스버그', zone: 'home', k: 1.25, tag: '힙한 동네', prefer: ['oneroom', 'officetel'] },
+      { name: '파크 슬로프', zone: 'home', k: 1.2, tag: '가족 동네', prefer: ['villa', 'house'] },
+      { name: '베드스타이', zone: 'home', k: .9, tag: '브라운스톤 거리', prefer: ['house', 'villa'] },
+      { name: '할렘', zone: 'school', k: .85, prefer: ['villa', 'oneroom'] },
+      { name: '워싱턴 하이츠', zone: 'school', k: .8, prefer: ['villa', 'oneroom'] },
+      { name: '어퍼웨스트사이드', zone: 'school', k: 1.35, tag: '센트럴 파크 옆', prefer: ['apt', 'officetel'] },
+      { name: '첼시', zone: 'downtown', k: 1.5, tag: '갤러리 거리', prefer: ['officetel', 'oneroom'] },
+      { name: '미드타운 이스트', zone: 'downtown', k: 1.4, prefer: ['officetel', 'apt'] },
+      { name: '파이낸셜 디스트릭트', zone: 'work', k: 1.4, tag: '직장 가까움', prefer: ['officetel', 'apt'] },
+      { name: '아스토리아', zone: 'out', k: .85, tag: '퀸스', prefer: ['oneroom', 'villa'] },
+      { name: '롱아일랜드시티', zone: 'out', k: 1.2, tag: '강 건너 뷰', prefer: ['officetel', 'apt'] },
+      { name: '플러싱', zone: 'out', k: .8, tag: '퀸스', prefer: ['goshiwon', 'villa'] },
+    ],
+    // 뉴욕: 전세가 없음 — 렌트(보증금 한 달 치) 또는 매매. rentR: 한 달 렌트(만원) 범위
+    types: [
+      { id: 'goshiwon', w: 2, area: [9, 14], floors: [3, 5], deals: { 월세: 1 }, rentR: [75, 115], mgmt: [0, 0], depMonths: 1,
+        subs: [{ n: '셰어하우스 방 (룸메이트 4명)' }, { n: '셰어하우스 방 (룸메이트 2명)' }], opts: ['침대', '책상', '공용 주방', '세탁기(지하)'] },
+      { id: 'oneroom', w: 5, area: [25, 45], floors: [4, 6], deals: { 월세: 1 }, rentR: [145, 230], mgmt: [0, 3], depMonths: 1,
+        subs: [{ n: '스튜디오' }, { n: '알코브 스튜디오', area: [35, 48] }, { n: '가든 레벨 스튜디오', basement: true }, { n: '꼭대기 층 스튜디오 (엘리베이터 없음)', rooftop: true }],
+        opts: ['에어컨(창문형)', '식기세척기', '세탁기(건물 지하)', '벽돌 벽', '난방 포함'] },
+      { id: 'officetel', w: 3, area: [45, 70], floors: [15, 40], deals: { 월세: 4, 매매: 1 }, rentR: [225, 335], ppm: [1000, 1500], mgmt: [0, 8], depMonths: 1, elevator: true,
+        subs: [{ n: '도어맨 빌딩 1베드' }, { n: '도어맨 빌딩 컨버터블 2베드', area: [60, 75] }],
+        opts: ['도어맨', '루프톱', '짐', '세탁기·건조기 (집 안)', '식기세척기', '센트럴 에어컨'] },
+      { id: 'villa', w: 4, area: [60, 85], floors: [4, 5], deals: { 월세: 1 }, rentR: [210, 320], mgmt: [0, 3], depMonths: 1,
+        subs: [{ n: '워크업 2베드' }, { n: '워크업 3베드', area: [80, 100] }, { n: '가든 레벨 2베드', basement: true }],
+        opts: ['식기세척기', '세탁기(건물 지하)', '벽난로(장식)', '뒷마당 공유', '난방 포함'] },
+      { id: 'apt', w: 3, area: [75, 115], floors: [12, 35], deals: { 월세: 2, 매매: 3 }, rentR: [330, 500], ppm: [1100, 1700], mgmt: [70, 130], depMonths: 1, elevator: true, parking: true,
+        subs: [{ n: '콘도 2베드' }, { n: '콘도 3베드', area: [100, 130] }],
+        opts: ['도어맨', '수영장', '짐', '세탁기·건조기 (집 안)', '발코니', '센트럴 에어컨'] },
+      { id: 'house', w: 1, area: [140, 230], floors: [3, 4], deals: { 월세: 1, 매매: 2 }, rentR: [465, 730], ppm: [1000, 1500], mgmt: [30, 70], depMonths: 1,
+        subs: [{ n: '브라운스톤 타운하우스' }, { n: '타운하우스 2층 듀플렉스', area: [110, 150] }],
+        opts: ['뒷마당', '현관 계단', '벽난로', '지하 창고', '원목 바닥'] },
+    ],
+    flaws: [
+      { id: 'mice', t: '쥐가 나온다', bad: true, happy: -1, when: l => l.age >= 30 },
+      { id: 'radiator', t: '라디에이터가 쉭쉭거리고 너무 뜨겁다', bad: true, happy: -1, when: l => l.age >= 30 },
+      { id: 'walkup', t: '5층까지 걸어 올라가야 한다', bad: true, health: 1, happy: -1, when: l => l.rooftop || (['oneroom', 'villa'].includes(l.type) && l.floor >= 4) },
+      { id: 'noise', t: '창밖 사이렌 소리가 끊이지 않는다', bad: true, happy: -1 },
+      { id: 'thin', t: '벽이 얇아 옆집 대화가 들린다', bad: true, happy: -1, when: l => ['goshiwon', 'oneroom', 'villa'].includes(l.type) },
+      { id: 'super', t: '관리인(슈퍼)이 연락이 잘 안 된다', bad: true, happy: -1 },
+      { id: 'roomy', t: '사진보다 넓다', good: true, happy: 1 },
+      { id: 'view', t: '창밖으로 맨해튼 스카이라인이 보인다', good: true, happy: 1, when: l => !l.basement && l.floor >= 5 },
+      { id: 'light', t: '햇빛이 잘 든다', good: true, happy: 1 },
+      { id: 'super2', t: '관리인이 친절하다', good: true },
+    ],
+    move: { truck: { label: '트럭 빌려 직접 이사', cost: [30, 55], pt: 40 }, full: { label: '이삿짐 업체', cost: [110, 240], pt: 15 } },
+    loan: { 매매: { label: '모기지', ltv: .8, rate: .065 } },
+    fee: { 월세: 1.8, 매매: .02 }, feeMonthly: true, insure: 0, fake: .1, contract: 365, minAge: 19,
+    agent: ['노 피(no fee) 아니면 이 가격 없어요.', '지하철역까지 5분이에요.', '오늘 오픈 하우스예요. 서두르세요.', '이 동네 요즘 뜨는 곳이에요.', '관리인이 상주해요.', '애완동물 가능해요.'],
+  },
+};
