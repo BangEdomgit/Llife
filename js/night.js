@@ -25,7 +25,15 @@ const FOLDS = [[112, -4, .8], [146, 3, 1], [176, -3, .7], [212, 4, 1], [250, -2,
 const MY = 129;                                                       // 매트리스 윗면
 // 장소별 방: home 집 침실 / hotel 호텔(도시 야경) / sea 여행지 숙소(바다) / park 공원(이불 대신 덤불, 침대 대신 풀밭)
 // motel 모텔(골목에서 이어짐): 블라인드 사이로 새는 분홍 네온, 누빔 헤드보드, 새틴 이불
-const KIND = spot => spot === 'hotel' ? 'hotel' : spot === 'travel' ? 'sea' : spot === 'park' ? 'park' : spot === 'motel' ? 'motel' : 'home';
+const KIND = spot => spot === 'hotel' ? 'hotel' : spot === 'travel' ? 'sea' : spot === 'park' ? 'park' : spot === 'motel' ? 'motel' : spot === 'alley' ? 'alley' : spot === 'toilet' ? 'toilet' : 'home';
+// 서서 하는 곳 (이불 없음): alley 골목(벽돌 벽에 기대어) / toilet 화장실 칸(칸막이·변기). 두 사람은 이불 대신 그대로 실루엣 (윤곽만 빛을 받음)
+//   바닥 FY, 왼쪽 벽 WALLX. 사람은 장면에 들어오게 0.74배 (서 있으면 키가 커서)
+const BEDWORD = /이불|침대|시트|베개|매트리스/;
+const STAND = { alley: 1, toilet: 1 }, FY = 172, WALLX = { alley: 78, toilet: 76 }, STAND_K = .74;
+const STAND_POSES = { alley: ['wall', 'standBack'], toilet: ['standBack', 'seatLap'] };
+let WX = 78, POOL = null;   // 지금 장면의 벽 위치 · 고를 수 있는 체위 (서서 하는 곳)
+const scaleBody = (B, k) => ({ head: B.head * k, neck: B.neck * k, torso: B.torso * k, thigh: B.thigh * k, shin: B.shin * k, foot: B.foot * k, uarm: B.uarm * k, farm: B.farm * k,
+  r: Object.fromEntries(Object.entries(B.r).map(([n, v]) => [n, Array.isArray(v) ? v.map(x => x * k) : v * k])) });
 const QSTYLE = {
   home: { g: ['#dcbde6', '#b48bc6', '#76548c'], st: '#efdcf5', stO: .45, fd: '#5c3f70', fl: '#f1e0f7', hem: '#5a3e6e', rim: '#f3e6f8', sil: .4 },
   hotel: { g: ['#fdfbf6', '#e7e1d6', '#b3a998'], st: '#fff', stO: 0, fd: '#8f8576', fl: '#fff', hem: '#a99f90', rim: '#fff', sil: .34 },
@@ -33,8 +41,9 @@ const QSTYLE = {
 };
 QSTYLE.sea = QSTYLE.hotel;
 QSTYLE.motel = { g: ['#d65b78', '#9c2c4b', '#561428'], st: '#ffb3c6', stO: .35, fd: '#3d0b1c', fl: '#ffc4d4', hem: '#4a1023', rim: '#ffd0dc', sil: .36 };
-const SKY = { home: ['#0d1533', '#27356c'], hotel: ['#0f1430', '#3d2f58'], sea: ['#0b1532', '#25386a'], park: ['#060b20', '#1d2a52'], motel: ['#1c0a26', '#46123f'] };
-const WALL = { home: ['#161c33', '#0d1120'], hotel: ['#2b211c', '#15100d'], sea: ['#2b211c', '#15100d'], park: ['#060b20', '#1d2a52'], motel: ['#2b1430', '#120816'] };
+const SKY = { home: ['#0d1533', '#27356c'], hotel: ['#0f1430', '#3d2f58'], sea: ['#0b1532', '#25386a'], park: ['#060b20', '#1d2a52'], motel: ['#1c0a26', '#46123f'], alley: ['#1a0c2a', '#3b1440'], toilet: ['#1d2a30', '#2d3d44'] };
+const WALL = { home: ['#161c33', '#0d1120'], hotel: ['#2b211c', '#15100d'], sea: ['#2b211c', '#15100d'], park: ['#060b20', '#1d2a52'], motel: ['#2b1430', '#120816'], alley: ['#24131f', '#0e070c'], toilet: ['#9fb3b8', '#6c7f86'] };
+QSTYLE.alley = QSTYLE.toilet = QSTYLE.hotel;
 const stars = (list, cls = 'nt-star', fill = '#fff') => list.map(([x, y, d]) => `<circle class="${cls}" cx="${x}" cy="${y}" r=".9" fill="${fill}" style="animation-delay:${d}s"/>`).join('');
 const crescent = (x, y) => `<circle cx="${x}" cy="${y}" r="19" fill="url(#ntMoon)"/><circle cx="${x}" cy="${y}" r="8" fill="#f6ebc4" mask="url(#ntCres)"/>`;
 // 호텔·바다 숙소 공통: 큰 창(안쪽 풍경은 따로), 얇은 커튼, 벽등, 룸서비스 쟁반이 놓인 협탁
@@ -115,8 +124,38 @@ BED.motel = `<ellipse cx="168" cy="171" rx="134" ry="4" fill="#000" opacity=".55
     <rect x="50" y="127" width="238" height="20" rx="5" fill="url(#ntSheet)"/>
     <path d="M66,128 C63,120 72,114 86,115 C100,114 107,119 105,127 C104,130 68,131 66,128 Z" fill="#ead8e0"/>
     <path d="M54,129 C51,122 60,116 73,117 C87,116 93,121 91,128 C90,131 56,132 54,129 Z" fill="#f8eef2"/>`;
+// 골목: 왼쪽은 바로 옆 벽돌 벽(두 사람이 기대는 면, 배수관·실외기), 안쪽으로 좁아지는 골목 끝에 네온 간판과 가로등, 젖은 바닥에 비친 불빛
+BACK.alley = `<rect width="320" height="190" fill="url(#ntSky)"/>
+  <path d="M120,0 L150,48 L150,150 L120,172 Z" fill="#170b16"/><path d="M262,0 L238,48 L238,150 L262,172 Z" fill="#140912"/>
+  <path d="M150,48 H238 V150 H150 Z" fill="#0c0610"/>
+  <g class="nt-neon"><circle cx="196" cy="86" r="34" fill="url(#ntPinkGlow)"/><rect x="184" y="66" width="24" height="44" rx="3" fill="#1a0a1c" stroke="#ff7ab6" stroke-width="1.4"/>
+    ${'BAR'.split('').map((ch, i) => `<text x="196" y="${80 + i * 11}" text-anchor="middle" font-size="9" font-weight="700" fill="#ff8cc0" font-family="sans-serif">${ch}</text>`).join('')}</g>
+  <rect x="160" y="96" width="14" height="20" fill="#3a2a10" opacity=".8"/><rect x="214" y="90" width="12" height="16" fill="#2a3a4a" opacity=".7"/>
+  <path d="M0,0 H${78} V172 H0 Z" fill="#2a1622"/>
+  <path d="${Array.from({ length: 16 }, (_, r) => { const yy = 6 + r * 10.5, o = r % 2 ? 10 : 0; return `M0,${yy.toFixed(1)} H78` + Array.from({ length: 5 }, (_, c) => ` M${o + c * 20},${yy.toFixed(1)} V${(yy + 10.5).toFixed(1)}`).join(''); }).join(' ')}" stroke="#170b12" stroke-width="1.1" fill="none"/>
+  <path d="M78,0 V172" stroke="#4a2638" stroke-width="2.4"/><path d="M80,0 V172" stroke="#000" stroke-width="2" opacity=".35"/>
+  <rect x="58" y="0" width="5" height="172" fill="#1a1016"/><rect x="56" y="60" width="9" height="4" fill="#120a10"/><rect x="56" y="120" width="9" height="4" fill="#120a10"/>
+  <rect x="12" y="92" width="34" height="24" rx="2" fill="#2e2a2c"/>${[0, 1, 2, 3, 4].map(i => `<path d="M16,${96 + i * 4} H42" stroke="#1a1718" stroke-width="1.4"/>`).join('')}
+  <path d="M262,0 H320 V172 H262 Z" fill="#1d1018"/><rect x="276" y="96" width="30" height="76" fill="#120a10"/><rect x="279" y="99" width="24" height="70" fill="#3a2a18" opacity=".55"/><circle cx="300" cy="134" r="1.6" fill="#d8b45a"/>
+  <path d="M290,40 v20 q0,6 -6,6 h-12" fill="none" stroke="#0c070e" stroke-width="3"/><path d="M266,66 h12 l-2,4 h-8 Z" fill="#2a1a1a"/>
+  <path d="M268,70 L222,172 H320 L282,70 Z" fill="url(#ntLampCone)"/>
+  <rect y="172" width="320" height="18" fill="url(#ntFloor)"/><path d="M80,172 L150,150 H238 L262,172" fill="#0e0710"/>
+  <ellipse class="nt-neon" cx="196" cy="180" rx="34" ry="3.5" fill="#ff6fae" opacity=".22"/><ellipse cx="282" cy="182" rx="22" ry="2.6" fill="#ffd9a0" opacity=".18"/>`;
+// 화장실 칸: 왼쪽 칸막이(휴지 걸이) 앞에 변기(물탱크·뚜껑 닫힌 변기), 오른쪽은 잠긴 문(고리에 가방), 위에 깜빡이는 형광등, 바닥 타일
+BACK.toilet = `<rect width="320" height="190" fill="url(#ntWall)"/>
+  <path d="${Array.from({ length: 12 }, (_, r) => `M0,${r * 15} H320`).join(' ')} ${Array.from({ length: 22 }, (_, c) => `M${c * 15},0 V172`).join(' ')}" stroke="#7d9096" stroke-width=".8" opacity=".55"/>
+  <rect x="96" y="2" width="128" height="6" rx="3" fill="#eef8ff" class="nt-flick"/><rect x="90" y="8" width="140" height="70" fill="url(#ntTube)" class="nt-flick"/>
+  <path d="M0,10 H76 V172 H0 Z" fill="#c9b79c"/><path d="M76,10 V172" stroke="#8d7d66" stroke-width="2.4"/><path d="M0,10 H76" stroke="#e2d4bc" stroke-width="2"/>
+  <rect x="44" y="104" width="22" height="16" rx="3" fill="#a9b6bd"/><path d="M48,104 v-3 h14 v3" fill="none" stroke="#8a979e" stroke-width="1.6"/><rect x="47" y="110" width="16" height="9" rx="4" fill="#f4f1ea"/>
+  <path d="M262,6 H320 V172 H262 Z" fill="#c9b79c"/><path d="M262,6 V172" stroke="#8d7d66" stroke-width="2.4"/><rect x="266" y="84" width="10" height="5" rx="1.5" fill="#8a979e"/><circle cx="270" cy="96" r="2.4" fill="#d24a4a"/>
+  <path d="M296,30 q0,8 -6,10" fill="none" stroke="#5a5a5a" stroke-width="2"/><path d="M280,40 h20 l3,24 h-26 Z" fill="#4a3a5a"/><path d="M284,40 q6,-8 12,0" fill="none" stroke="#3a2a4a" stroke-width="1.6"/>
+  <rect x="78" y="98" width="20" height="38" rx="3" fill="#eef1f2"/><rect x="76" y="94" width="24" height="6" rx="2" fill="#dfe4e6"/><circle cx="92" cy="97" r="1.6" fill="#b8c2c6"/>
+  <path d="M84,138 H124 Q130,138 130,144 Q130,156 116,162 L110,172 H90 L88,162 Q80,156 80,148 Z" fill="#f2f4f5"/><path d="M82,136 H126 Q131,136 131,140 H82 Z" fill="#e6eaec"/>
+  <rect y="172" width="320" height="18" fill="#56666c"/><path d="${Array.from({ length: 11 }, (_, c) => `M${c * 32},172 L${c * 32 - 12},190`).join(' ')} M0,181 H320" stroke="#46555a" stroke-width="1"/>`;
+BED.alley = '<ellipse cx="150" cy="173" rx="74" ry="3.4" fill="#000" opacity=".55"/>';
+BED.toilet = '<ellipse cx="130" cy="173" rx="70" ry="3.2" fill="#000" opacity=".3"/>';
 function room(kind) {
-  const q = QSTYLE[kind], [s0, s1] = SKY[kind], [w0, w1] = WALL[kind];
+  const q = QSTYLE[kind], [s0, s1] = SKY[kind], [w0, w1] = WALL[kind], st = !!STAND[kind], hide = st ? ' style="display:none"' : '';
   return `<svg class="bed" viewBox="0 0 320 190" aria-hidden="true"><defs>
   <linearGradient id="ntWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${w0}"/><stop offset="1" stop-color="${w1}"/></linearGradient>
   <linearGradient id="ntSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s0}"/><stop offset="1" stop-color="${s1}"/></linearGradient>
@@ -133,6 +172,12 @@ function room(kind) {
   <radialGradient id="ntHeart" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ffc6d4"/><stop offset=".55" stop-color="#ff6f94"/><stop offset="1" stop-color="#df3467"/></radialGradient>
   <filter id="ntBlur" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="1.15"/></filter>
   <clipPath id="ntQC"><path class="nt-qc"/></clipPath>
+  <radialGradient id="ntPinkGlow"><stop offset="0" stop-color="#ff6fae" stop-opacity=".55"/><stop offset="1" stop-color="#ff6fae" stop-opacity="0"/></radialGradient>
+  <linearGradient id="ntLampCone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd9a0" stop-opacity=".38"/><stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/></linearGradient>
+  <linearGradient id="ntFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1020"/><stop offset="1" stop-color="#07050a"/></linearGradient>
+  <linearGradient id="ntTube" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef8ff" stop-opacity=".35"/><stop offset="1" stop-color="#eef8ff" stop-opacity="0"/></linearGradient>
+  <filter id="ntRimF" x="-10%" y="-10%" width="120%" height="120%"><feMorphology in="SourceAlpha" operator="dilate" radius="1.1" result="d"/><feFlood flood-color="${kind === 'toilet' ? '#ffe2c8' : '#ff7ab6'}" flood-opacity=".75"/><feComposite in2="d" operator="in" result="rim"/><feMerge><feMergeNode in="rim"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="ntRimM" x="-10%" y="-10%" width="120%" height="120%"><feMorphology in="SourceAlpha" operator="dilate" radius="1.1" result="d"/><feFlood flood-color="${kind === 'toilet' ? '#cfe9ff' : '#7ab8ff'}" flood-opacity=".7"/><feComposite in2="d" operator="in" result="rim"/><feMerge><feMergeNode in="rim"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   <g id="ntH"><path d="${HEART}" fill="url(#ntHeart)"/><ellipse cx="-2.8" cy="-3.2" rx="1.7" ry="1" fill="#fff" opacity=".7" transform="rotate(-35 -2.8 -3.2)"/></g>
 </defs><g class="nt-cam">
   ${BACK[kind]}
@@ -140,14 +185,15 @@ function room(kind) {
   <g class="nt-bed">
     ${BED[kind]}
     <g class="nt-wr"></g>
-    <path class="nt-q" fill="url(#ntQuilt)"/>
-    <g class="nt-sil" clip-path="url(#ntQC)" filter="url(#ntBlur)"><path class="nt-sf" fill="#3b1b4a" opacity="${(q.sil * .9).toFixed(2)}"/><path class="nt-sm" fill="#1c0f2c" opacity="${(q.sil * 1.05).toFixed(2)}"/></g><path class="nt-st" fill="none" stroke="${q.st}" stroke-width=".9" stroke-dasharray="2.2 2.6" opacity="${q.stO}"/>
-    <g fill="none" stroke-linecap="round">${FOLDS.map(([, , o]) => `<path class="nt-f" stroke="${q.fd}" stroke-width="2.2" opacity="${.26 * o}"/><path class="nt-f" stroke="${q.fl}" stroke-width="1.1" opacity="${.18 * o}"/>`).join('')}</g>
-    <path class="nt-hem" fill="none" stroke="${q.hem}" stroke-width="2.2" opacity=".55"/><path class="nt-rim" fill="none" stroke="${q.rim}" ${q.leafy ? 'stroke-width="1.6" opacity=".7"' : 'stroke-width="1.3" opacity=".6"'} stroke-linecap="round"/>
+    <path class="nt-q" fill="url(#ntQuilt)"${hide}/>
+    ${st ? `<g class="nt-sil nt-open"><path class="nt-sf" fill="${kind === 'toilet' ? '#2a1c22' : '#2a1028'}" filter="url(#ntRimF)"/><path class="nt-sm" fill="${kind === 'toilet' ? '#11141c' : '#0a0a16'}" filter="url(#ntRimM)"/></g>`
+      : `<g class="nt-sil" clip-path="url(#ntQC)" filter="url(#ntBlur)"><path class="nt-sf" fill="#3b1b4a" opacity="${(q.sil * .9).toFixed(2)}"/><path class="nt-sm" fill="#1c0f2c" opacity="${(q.sil * 1.05).toFixed(2)}"/></g>`}<path class="nt-st" fill="none" stroke="${q.st}" stroke-width=".9" stroke-dasharray="2.2 2.6" opacity="${q.stO}"${hide}/>
+    <g fill="none" stroke-linecap="round"${hide}>${FOLDS.map(([, , o]) => `<path class="nt-f" stroke="${q.fd}" stroke-width="2.2" opacity="${.26 * o}"/><path class="nt-f" stroke="${q.fl}" stroke-width="1.1" opacity="${.18 * o}"/>`).join('')}</g>
+    <path class="nt-hem" fill="none" stroke="${q.hem}" stroke-width="2.2" opacity=".55"${hide}/><path class="nt-rim" fill="none" stroke="${q.rim}" ${q.leafy ? 'stroke-width="1.6" opacity=".7"' : 'stroke-width="1.3" opacity=".6"'} stroke-linecap="round"${hide}/>
     <g class="nt-dummy" hidden><path class="nt-df" fill="#ff9ec4" opacity=".8"/><path class="nt-dm" fill="#6bb5ff" opacity=".8"/><path class="nt-dj" fill="none" stroke="#222" stroke-width=".8"/></g>
   </g>
   <ellipse class="nt-warm" cx="182" cy="116" rx="122" ry="54" fill="url(#ntWarm)" opacity="0"/>
-  ${kind === 'home' ? '<path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>' : kind === 'park' ? '' : kind === 'motel' ? '<path class="nt-neon" d="M110,92 L180,92 L250,170 L120,170 Z" fill="url(#ntPinkBeam)"/>' : '<path d="M198,128 L304,128 L230,170 L120,170 Z" fill="url(#ntBeam)"/>'}
+  ${kind === 'home' ? '<path d="M216,92 L290,92 L224,170 L112,170 Z" fill="url(#ntBeam)"/>' : kind === 'park' || st ? '' : kind === 'motel' ? '<path class="nt-neon" d="M110,92 L180,92 L250,170 L120,170 Z" fill="url(#ntPinkBeam)"/>' : '<path d="M198,128 L304,128 L230,170 L120,170 Z" fill="url(#ntBeam)"/>'}
   <g class="nt-hearts"></g><g class="nt-fx"></g><g class="nt-dx"></g>
 </g></svg>`;
 }
@@ -296,6 +342,7 @@ function caps(B, J) {
   seg(J.sh, J.waist, B.r.chest, B.r.waist); seg(J.waist, J.hip, B.r.waist, B.r.hip); seg(J.butt, J.butt, B.r.butt);
   if (J.breast) seg(J.breast, J.breast, B.r.breast);
   seg(J.hip, J.knee, ...B.r.thigh); seg(J.knee, J.ankle, ...B.r.shin); seg(J.ankle, J.toe, ...B.r.foot);
+  if (J.knee2) { seg(J.hip, J.knee2, ...B.r.thigh); seg(J.knee2, J.ankle2, ...B.r.shin); seg(J.ankle2, J.toe2, ...B.r.foot); }   // 서 있을 땐 다른 쪽 다리도
   seg(J.sh, J.elbow, ...B.r.uarm); seg(J.elbow, J.hand, ...B.r.farm);
   return c;
 }
@@ -446,6 +493,50 @@ const POSES = {
     m.hand = add(f.waist, f.front, F.r.waist * .8); m.elbow = meet(msh, M.uarm, m.hand, M.farm, [0, 1]);
     return { m, f, act: 'f', dir: [0, 1] };
   },
+  /* ── 서서 하는 곳 (골목·화장실, 바닥 FY · 왼쪽 벽 WX) ── */
+  // 벽에 기대어: 여자는 벽에 등을 대고 한쪽 다리를 남자 허리에 감음(팔은 목을 감음), 남자는 마주 서서 여자 허벅지·골반을 받침
+  wall(s, M, F) {
+    const fhip = [WX + F.r.butt + 4 + s.bs * .25, FY - (F.shin + F.thigh) * .96 - 3 + s.tr * .3], fsh = polar(fhip, -1.67, F.torso);
+    const f = trunk(F, fsh, fhip, [1, 0], .12, s.jig.f);
+    const hip = [fhip[0] + F.r.hip * .8 + M.r.hip * .8 + Math.max(-3, s.d), fhip[1] + 3 + s.tr + 2 * s.slump], sh = polar(hip, -1.7 - .12 * s.slump, M.torso);
+    const m = trunk(M, sh, hip, [-1, 0], .15, s.jig.m);
+    const stand = (B, J, ax, pref, ax2) => {
+      J.ankle2 = [ax2, FY - B.r.foot[0]]; J.knee2 = meet(J.hip, B.thigh, J.ankle2, B.shin, pref); J.toe2 = [J.ankle2[0] + pref[0] * B.foot * .8, FY - 1.2];
+      if (ax != null) { J.ankle = [ax, FY - B.r.foot[0]]; J.knee = meet(J.hip, B.thigh, J.ankle, B.shin, pref); J.toe = [J.ankle[0] + pref[0] * B.foot * .8, FY - 1.2]; }
+    };
+    stand(M, m, hip[0] + 7, [-1, 0], hip[0] + 15);
+    stand(F, f, null, [1, 0], fhip[0] + 3);
+    f.ankle = add(m.butt, [M.r.butt * .9, 3]); f.knee = meet(fhip, F.thigh, f.ankle, F.shin, [.2, -1]); f.toe = polar(f.ankle, 2.2, F.foot * .7);   // 남자 허리를 감은 다리
+    f.hand = add(m.neck, [3, 1]); f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [0, -1]);
+    m.hand = add(f.knee, [-2, 4]); m.elbow = meet(sh, M.uarm, m.hand, M.farm, [.3, 1]);
+    return { m, f, act: 'm', dir: unit(sub(fhip, hip)) };
+  },
+  // 뒤에서 선 채로: 여자는 벽을 보고 두 손으로 벽을 짚고 허리를 숙임, 남자는 뒤에 서서 두 손으로 여자 골반을 잡음
+  standBack(s, M, F) {
+    const fhip = [WX + 62 + s.bs * .3, FY - (F.shin + F.thigh) * .93 + s.tr * .2], fsh = polar(fhip, -2.62 + .15 * s.slump, F.torso);
+    const f = trunk(F, fsh, fhip, perp(sub(fsh, fhip), [0, 1]), -.2, s.jig.f);
+    f.hand = [WX + 1.5, fsh[1] - 9]; f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [.2, 1]);   // 두 손을 뻗어 벽을 짚음
+    f.ankle = [fhip[0] - 3, FY - F.r.foot[0]]; f.knee = meet(fhip, F.thigh, f.ankle, F.shin, [-1, 0]); f.toe = [f.ankle[0] - F.foot * .8, FY - 1.2];
+    f.ankle2 = [fhip[0] + 6, FY - F.r.foot[0]]; f.knee2 = meet(fhip, F.thigh, f.ankle2, F.shin, [-1, 0]); f.toe2 = [f.ankle2[0] - F.foot * .8, FY - 1.2];
+    const hip = [fhip[0] + F.r.butt + M.r.hip * .55 + 1 + Math.max(-3, s.d), fhip[1] + 1.5 + s.tr + 2 * s.slump], sh = polar(hip, -1.82 - .35 * s.slump, M.torso);
+    const m = trunk(M, sh, hip, perp(sub(sh, hip), [-1, 0]), .2, s.jig.m);
+    m.ankle = [hip[0] + 5, FY - M.r.foot[0]]; m.knee = meet(hip, M.thigh, m.ankle, M.shin, [-1, 0]); m.toe = [m.ankle[0] - M.foot * .8, FY - 1.2];
+    m.ankle2 = [hip[0] + 14, FY - M.r.foot[0]]; m.knee2 = meet(hip, M.thigh, m.ankle2, M.shin, [-1, 0]); m.toe2 = [m.ankle2[0] - M.foot * .8, FY - 1.2];
+    m.hand = add(f.hip, [-1, -F.r.hip * .8]); m.elbow = meet(sh, M.uarm, m.hand, M.farm, [.4, 1]);
+    return { m, f, act: 'm', dir: unit(sub(fhip, hip)) };
+  },
+  // 변기에 앉아: 남자는 닫힌 변기 뚜껑에 앉아 물탱크 쪽으로 살짝 기댐, 여자는 마주 보고 무릎 위에 올라앉아 목을 감음. 여자가 오르내림
+  seatLap(s, M, F) {
+    const mhip = [WX + 32, FY - 36 - M.r.butt * .55 + s.sink * .3], msh = polar(mhip, -1.74 - .1 * s.slump, M.torso);
+    const m = trunk(M, msh, mhip, perp(sub(msh, mhip), [1, 0]), .2, s.jig.m);
+    m.knee = [mhip[0] + M.thigh * .97, mhip[1] - 2]; m.ankle = [m.knee[0] + 3, FY - M.r.foot[0]]; m.toe = [m.ankle[0] + M.foot * .8, FY - 1.2];
+    const lift = Math.max(0, s.d) * .55 + s.tr, fhip = [mhip[0] + 17, mhip[1] - 13 - lift + 3 * s.slump], fsh = polar(fhip, -1.72 - .08 * s.slump, F.torso);
+    const f = trunk(F, fsh, fhip, perp(sub(fsh, fhip), [-1, 0]), .22, s.jig.f);
+    f.hand = add(m.neck, [-5, 3]); f.elbow = meet(fsh, F.uarm, f.hand, F.farm, [0, -1]);
+    f.ankle = [fhip[0] + 12, FY - F.r.foot[0]]; f.knee = meet(fhip, F.thigh, f.ankle, F.shin, [-1, -.2]); f.toe = [f.ankle[0] + F.foot * .7, FY - 1.2];
+    m.hand = add(f.butt, [3, -1]); m.elbow = meet(msh, M.uarm, m.hand, M.farm, [0, 1]);
+    return { m, f, act: 'f', dir: [0, 1] };
+  },
 };
 // 체위 바꿀 때: 두 체위의 관절을 k만큼 섞음
 function blendPose(A, B, k) {
@@ -463,12 +554,12 @@ function headReact(J, k, bury, jx, jy) {
   if (!bury) J.waist = add(J.waist, J.front, 2.6 * k);
   if (J.breast) J.breast = add(J.breast, [jx * .5, jy * .5]);
 }
-const POSE_LABEL = { missionary: '정상위', doggy: '후배위', cowgirl: '기승위', prone: '엎드려서', reverse: '역기승위', lotus: '좌위', legsUp: '굴곡위', seated: '뒤로 앉기' };
+const POSE_LABEL = { missionary: '정상위', doggy: '후배위', cowgirl: '기승위', prone: '엎드려서', reverse: '역기승위', lotus: '좌위', legsUp: '굴곡위', seated: '뒤로 앉기', wall: '벽에 기대어', standBack: '뒤에서 선 채로', seatLap: '변기에 앉아' };
 // 절정 때 상대 고개: 엎드린 체위는 베개에 파묻고, 나머지는 뒤로 젖힘
-const BURY = { doggy: 1, prone: 1 };
+const BURY = { doggy: 1, prone: 1, standBack: 1 };
 // 초상화 속 인물: 상대가 받는 쪽이면 부딪힐 때마다 밀렸다 돌아오고(방향은 체위마다), 움직이는 쪽(기승위·역기승위·좌위·뒤로 앉기)이면 박자를 따라 오르내림
 //   칸(초상화 테두리)은 그대로, 인물·머리·가슴이 따로 움직임 — 머리는 살짝 늦게, 가슴은 관성으로 출렁임
-const PUSH = { missionary: [0, -1], legsUp: [0, -1], doggy: [.55, -.6], prone: [.35, -.65], cowgirl: [0, .6], reverse: [0, .6], lotus: [0, .5], seated: [0, .6] };
+const PUSH = { missionary: [0, -1], legsUp: [0, -1], doggy: [.55, -.6], prone: [.35, -.65], cowgirl: [0, .6], reverse: [0, .6], lotus: [0, .5], seated: [0, .6], wall: [-.2, -.9], standBack: [.55, -.6], seatLap: [0, .6] };
 // 섹스 기술 등급(F~SSS)에 따라 받는 쪽 더미가 반응하는 모양 — 같은 체위라도 천차만별
 //   [마중(깊이 들어올 때 골반을 맞춰 밀어붙임, −면 살짝 피함), 휨(가슴을 내밀고 허리가 휨), 골반 굴림, 다리 떨림, 고개 젖힘]
 //   F·E: 뻣뻣하게 버티다 살짝 피함 / D·C: 약하게 휨 / B·A: 마중하며 허리가 휨 / S 이상: 크게 휘고 골반을 굴리며 다리가 떨리고 고개를 젖힘
@@ -478,7 +569,10 @@ const REACT = [[-1.2, 0, 0, 0, .1], [-.6, .3, 0, 0, .2], [.3, .8, .2, 0, .4], [.
 //   r 기울기, k 확대, x·y 옮김 (초상화 단위)
 const VIEW = { missionary: { v: 'pillow', r: -6, k: 1, x: 0, y: 0 }, legsUp: { v: 'pillow', r: 5, k: 1, x: 0, y: 0 }, prone: { v: 'side', r: 14, k: 1.02, x: 4, y: 4 },
   doggy: { v: 'board', r: -4, k: 1.02, x: -2, y: 4 }, cowgirl: { v: 'ceil', r: 0, k: 1.04, x: 0, y: -3 }, reverse: { v: 'ceil', r: 4, k: 1.02, x: 2, y: -2 },
-  seated: { v: 'ceil', r: -3, k: 1.02, x: -1, y: -1 }, lotus: { v: 'close', r: 0, k: 1.08, x: 0, y: 2 } };
+  seated: { v: 'ceil', r: -3, k: 1.02, x: -1, y: -1 }, lotus: { v: 'close', r: 0, k: 1.08, x: 0, y: 2 },
+  wall: { v: 'close', r: 2, k: 1.06, x: 0, y: 1 }, standBack: { v: 'board', r: -6, k: 1.02, x: -2, y: 4 }, seatLap: { v: 'close', r: 0, k: 1.08, x: 0, y: 2 } };
+// 서서 하는 곳은 초상화 배경도 그 장소 (골목 벽돌 / 화장실 타일)
+const viewOf = (name, kind) => kind === 'alley' ? 'brick' : kind === 'toilet' ? 'tile' : (VIEW[name] || VIEW.missionary).v;
 // 성격별로 고를 확률
 const POSE_W = { shy: { missionary: 4, prone: 1, doggy: 1, cowgirl: .5, lotus: 2, legsUp: .6, reverse: .3, seated: .8 },
   bold: { cowgirl: 3, doggy: 2.5, missionary: 1, prone: 1.5, reverse: 2.5, legsUp: 2, lotus: 1, seated: 1.5 },
@@ -487,7 +581,8 @@ const POSE_W0 = { missionary: 2, doggy: 1.5, cowgirl: 1.5, prone: 1, lotus: 1.2,
 // 체위 고르기 (not: 방금 한 체위는 빼고). 주소에 ?pose=doggy 처럼 고정 가능
 function pickPose(personality, not) {
   const forced = FORCE_POSE || (location.search.match(/[?&]pose=(\w+)/) || [])[1];
-  if (forced && POSES[forced]) return forced;
+  if (forced && POSES[forced] && (!POOL || POOL.includes(forced))) return forced;
+  if (POOL) { const ks = POOL.length > 1 ? POOL.filter(k => k !== not) : POOL; return ks[Math.floor(Math.random() * ks.length)]; }   // 서서 하는 곳: 그 장소의 체위만
   const w = POSE_W[personality] || POSE_W0, ks = Object.keys(w).filter(k => k !== not);
   let r = Math.random() * ks.reduce((a, k) => a + w[k], 0);
   return ks.find(k => (r -= w[k]) < 0) || ks[0];
@@ -538,6 +633,7 @@ const CLIMAX = { minor: { W: 3, strong: 1, finals: [.6], rest: 1.2 }, mid: { W: 
 const CLIMAX_LABEL = { minor: '소절정', mid: '중절정', major: '대절정' };
 function nightPlan(sc, tier, personality) {
   const good = tier >= 2;
+  POOL = STAND_POSES[KIND(sc.spot)] || null;
   const fl = sc.flow || { dur: [2, 4, 7, 10, 13][tier], early: tier === 0, grade: 3, minor: Math.max(0, tier - 1), mid: tier >= 3 ? 1 : 0, major: tier >= 4 ? 1 : 0 };
   const gi = fl.grade ?? 3, T = Math.max(fl.early ? 5 : 8, fl.dur * 60 / SPEED);
   const Tb = .64 - .028 * gi, Tf = .38 - .018 * gi, jit = gi <= 2 ? .22 : gi <= 5 ? .1 : .05, A0 = 2.6 + .45 * gi;
@@ -618,7 +714,9 @@ function run(stage, job, done) {
   const cam = q('.nt-cam'), bed = q('.nt-bed'), quilt = q('.nt-q'), qclip = q('.nt-qc'), stitch = q('.nt-st'), hemEl = q('.nt-hem'), rim = q('.nt-rim'), warm = q('.nt-warm');
   const silF = q('.nt-sf'), silM = q('.nt-sm'), heartsEl = q('.nt-hearts'), fx = q('.nt-fx'), face = stage.querySelector('.nt-face'), folds = svg.querySelectorAll('.nt-f');
   const G = window.Game, { sc, p } = job, tier = [30, 50, 70, 90].filter(v => (sc.sat ?? 50) >= v).length, good = tier >= 2;
-  const debug = /[?&#]dummy/.test(location.href), M = BODY.m, F = BODY.f;
+  const stand = !!STAND[stage.dataset.kind];   // 골목·화장실: 서서 (이불 없이 실루엣 그대로, 사람은 작게)
+  if (stand) WX = WALLX[stage.dataset.kind];
+  const debug = /[?&#]dummy/.test(location.href), M = stand ? scaleBody(BODY.m, STAND_K) : BODY.m, F = stand ? scaleBody(BODY.f, STAND_K) : BODY.f;
   const park = stage.dataset.kind === 'park';
   const plan = nightPlan(sc, tier, p.personality), S = plan.S, SLUMP = .7, AFTER = SLUMP + (good ? 1.9 : 2.3);
   let end = plan.end(), END = end + AFTER;
@@ -664,7 +762,7 @@ function run(stage, job, done) {
   // 평소 반응 (절정 말고): 섹스 기술 등급·크기에 따라 달아오르는 속도(ar)와 표정·움찔(아픔)·헉·하트가 다름
   let ar = 0, gaspAt = -9, jolt = 0, lastPop = 0;
   const vw = Object.assign({}, VIEW[poseName] || VIEW.missionary), pops = stage.querySelector('.nt-pops');
-  if (face) face.dataset.view = vw.v;
+  if (face) face.dataset.view = viewOf(poseName, stage.dataset.kind);
   function pop(txt, cls) {
     if (!pops) return;
     const el = document.createElement('span');
@@ -691,7 +789,7 @@ function run(stage, job, done) {
   let lastSay = -9, sayUntil = 0;
   const pickOf = a => a && a.length ? a[Math.floor(Math.random() * a.length)] : '';
   function say(txt, cls, dur = 1.5) {
-    if (!sayEl || !txt) return;
+    if (!sayEl || !txt || (stand && BEDWORD.test(txt))) return;
     sayEl.textContent = txt.includes('{') ? fillT(txt) : txt; sayEl.className = 'nt-say on' + (cls ? ' ' + cls : '');
     sayUntil = t + dur; lastSay = t;
   }
@@ -767,7 +865,7 @@ function run(stage, job, done) {
     else if (t < 5) pool = NARR.start[good ? 'good' : 'bad'];
     else if (Math.random() < .4 && NARR.pose[poseName]) pool = NARR.pose[poseName][band === 'low' ? 0 : 1];
     else pool = NARR.band[band];
-    const txt = pickOf(pool);
+    const txt = pickOf(stand ? (pool || []).filter(x => !BEDWORD.test(x)) : pool);   // 골목·화장실엔 이불·침대 말 없이
     if (!txt) return;
     narEl.textContent = fillT(txt); narEl.classList.add('on'); narUntil = t + 4.4; lastNar = t;
   }
@@ -784,7 +882,7 @@ function run(stage, job, done) {
     // 시트를 움켜쥔 손 주름 (이불 밖으로 보이는 곳에서만)
     const hh = P[her].hand, gx = hh[0], gy = Math.max(MY - 8, Math.min(MY + 6, hh[1]));
     wrEl.setAttribute('d', [200, 232, 264, 296, 328].map((dg, j) => { const a = dg * Math.PI / 180, r0 = 2.5, r1 = 7 + (j % 2) * 3; return `M${f(gx + r0 * Math.cos(a))},${f(gy + r0 * Math.sin(a) * .5)} Q${f(gx + (r0 + r1) * .5 * Math.cos(a + .25))},${f(gy + (r0 + r1) * .5 * Math.sin(a + .25) * .5)} ${f(gx + r1 * Math.cos(a))},${f(gy + r1 * Math.sin(a) * .5)}`; }).join(''));
-    wrEl.setAttribute('opacity', (gripK * .85).toFixed(3));
+    wrEl.setAttribute('opacity', (stand || park ? 0 : gripK * .85).toFixed(3));   // 시트 주름은 침대에서만
     for (let i = sfxs.length - 1; i >= 0; i--) {
       const s2 = sfxs[i], k = (t - s2.t0) / s2.life;
       if (k >= 1) { s2.el.remove(); sfxs.splice(i, 1); continue; }
@@ -828,7 +926,7 @@ function run(stage, job, done) {
   function poseNow() {
     pi = Math.min(pi, plan.poses.length - 1);
     while (pi < plan.poses.length - 1 && t >= plan.poses[pi + 1].at) {
-      pi++; poseName = plan.poses[pi].name; stage.dataset.pose = poseName; showPose(); if (face) face.dataset.view = (VIEW[poseName] || VIEW.missionary).v;
+      pi++; poseName = plan.poses[pi].name; stage.dataset.pose = poseName; showPose(); if (face) face.dataset.view = viewOf(poseName, stage.dataset.kind);
       stats.poses.push(poseName);
       if (DETAIL && P) sfxAt('털썩', actHip()[0], at(y, actHip()[0]) - 12, 1.05);
     }
@@ -863,7 +961,7 @@ function run(stage, job, done) {
   }
   function surface(i) {
     const x = CX[i];
-    let top = Math.min(MY, park ? Infinity : capTop([62, 122, 98, 122, 6, 6], x));   // 베개 (공원엔 없음)
+    let top = stand ? FY : Math.min(MY, park ? Infinity : capTop([62, 122, 98, 122, 6, 6], x));   // 베개 (공원·골목·화장실엔 없음)
     for (const c of capsF) top = Math.min(top, capTop(c, x));
     for (const c of capsM) top = Math.min(top, capTop(c, x));
     return top - 3.2;
@@ -942,6 +1040,7 @@ function run(stage, job, done) {
     if (DETAIL && t - lastSfx > (s.kind === 'n' ? .5 : .2)) {   // 효과음 글자
       const hard = s.kind !== 'n';
       if (park) { if (hard || Math.random() < .2 + heat * .3) sfxAt('바스락', 90 + Math.random() * 160, 146 + Math.random() * 10, .85); }
+      else if (stand) { if (hard || Math.random() < .18 + heat * .3) sfxAt(kind === 'toilet' ? (Math.random() < .5 ? '덜컹' : '쿵') : (Math.random() < .5 ? '탁' : '스윽'), WX + 8 + Math.random() * 10, 60 + Math.random() * 60, .9); }
       else {
         if (hard || Math.random() < .16 + heat * .38) sfxAt(Math.random() < .6 ? '삐걱' : '끼익', Math.random() < .5 ? 60 : 276, 162, .85);
         if (HEADB && KNOCK[poseName] && (hard || (heat > .6 && Math.random() < .22))) sfxAt('쿵', HEADB[0] + Math.random() * 4, HEADB[1], hard ? 1.3 : 1);
@@ -1259,7 +1358,7 @@ function run(stage, job, done) {
 }
 
 window.Night = {
-  html: spot => `<div class="nt-stage" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div><div class="nt-pops"></div><div class="nt-say"></div><div class="nt-pl" title="쾌락"><span>💗 쾌락</span><em><i></i></em><b>0</b></div>${SYM}<div class="nt-nar"></div><div class="nt-hud"></div></div>`,
+  html: spot => `<div class="nt-stage${STAND[KIND(spot)] ? ' stand' : ''}" data-kind="${KIND(spot)}">${room(KIND(spot))}<div class="nt-face"></div><div class="nt-pops"></div><div class="nt-say"></div><div class="nt-pl" title="쾌락"><span>💗 쾌락</span><em><i></i></em><b>0</b></div>${SYM}<div class="nt-nar"></div><div class="nt-hud"></div></div>`,
   detail: () => DETAIL, setDetail: on => { DETAIL = !!on; try { localStorage.setItem('llife.ntDetail', DETAIL ? '1' : '0'); } catch (e) { /* 무시 */ } return DETAIL; },
   forcePose: name => { FORCE_POSE = name && POSES[name] ? name : null; }, lastStats: () => (LAST ? LAST() : null), resetStats: () => { LAST = null; },
   rate: () => RATE, setRate: r => { RATE = [1, 2, 4, 8].includes(+r) ? +r : 1; try { localStorage.setItem('llife.ntRate', RATE); } catch (e) { /* 무시 */ } return RATE; },

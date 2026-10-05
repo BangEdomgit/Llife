@@ -255,6 +255,43 @@ const PRIVATE = ['home', 'motel'];
 // 동행으로 데려옴: 여기 없으면 내 옆으로 (모텔·집으로 가면 같이 감)
 function comeAlong(s, p, a) { a.setCompanion(p); if (s.place && !s.here.some(h => h.key === p.id)) s.here.push({ key: p.id, doing: '내 옆에 붙어 있다', used: true }); }
 const ALLEY_LINE = ' {p|이} 내 손목을 잡고 가게 옆 골목으로 이끌었다. 네온 불빛 아래에서 숨이 먼저 닿았다.';
+// 동행과 '지금 여기서' — 장소마다 골목·화장실이 다름 (어른 둘만, 아이들 오는 곳·학교·직장·병원·교회는 없음)
+//   caught: 들킬 확률 (골목은 밤이면 줄고 낮이면 늘어남). scene: 그날 밤 장면 (alley 골목 · toilet 화장실 칸 · park 수풀)
+GAME_DATA.quickSpots = {
+  bar:     { alley: { label: '술집 뒷골목', caught: .12 }, toilet: { label: '술집 화장실 칸', caught: .2 } },
+  concert: { alley: { label: '공연장 뒷문 골목', caught: .14 }, toilet: { label: '공연장 화장실', caught: .22 } },
+  mall:    { alley: { label: '번화가 뒷골목', caught: .16 }, toilet: { label: '상가 건물 화장실', caught: .18 } },
+  cafe:    { alley: { label: '카페 옆 좁은 골목', caught: .16 }, toilet: { label: '카페 화장실', caught: .24 } },
+  station: { alley: { label: '터미널 뒤 굴다리', caught: .15 }, toilet: { label: '터미널 화장실 맨 끝 칸', caught: .18 } },
+  diner:   { alley: { label: '식당 뒤 골목', caught: .15 }, toilet: { label: '식당 화장실', caught: .22 } },
+  pcbang:  { alley: { label: '건물 뒤 계단 골목', caught: .12 }, toilet: { label: 'PC방 화장실', caught: .2 } },
+  conveni: { alley: { label: '편의점 뒤 골목', caught: .15 } },
+  market:  { alley: { label: '시장 뒷골목', caught: .17 }, toilet: { label: '시장 공중화장실', caught: .2 } },
+  park:    { bush: { label: '산책로 옆 수풀 속', scene: 'park', caught: .14 }, toilet: { label: '공원 공중화장실', caught: .16 } },
+  gym:     { toilet: { label: '헬스장 샤워실 칸', caught: .16 } },
+};
+const spotHere = (s, kind) => (s.place && (GAME_DATA.quickSpots[s.place] || {})[kind]) || null;
+const QUICK_TXT = {
+  alley: ['{spot}. {p|이} 벽에 등을 기대며 내 옷깃을 끌어당겼다. 골목 밖에서 사람들 웃음소리가 들렸다.', '{spot}으로 들어서자 가로등 불빛이 끊겼다. 서로의 숨소리만 들렸다.',
+    '{spot}. 누가 지나갈까 봐 귀를 세운 채, 서로를 놓지 못했다.', '{spot}. 차가운 벽돌과 뜨거운 숨 사이에서 {p|이} 내 이름을 작게 불렀다.'],
+  toilet: ['{spot}. 문을 잠그는 딸깍 소리가 유난히 컸다. 좁은 칸 안에서 {p|와} 숨을 죽였다.', '{spot}. 밖에서 손 씻는 물소리가 들렸다. {p|이} 입술에 손가락을 댔다. "쉿."',
+    '{spot} 문이 닫히자마자 {p|이} 나를 칸막이 벽으로 밀었다.', '{spot}. 형광등이 깜빡였다. 바깥 음악이 쿵쿵 울려서 다행이었다.'],
+  bush: ['{spot}. 풀벌레 소리 사이로 {p|이} 내 손을 끌었다. 나뭇잎이 바스락거렸다.', '{spot}. 가로등 불빛이 닿지 않는 곳에서 {p|이} 먼저 입을 맞췄다.'],
+};
+const QUICK_ON = ['급하게, 소리를 삼키며.', '누가 올까 봐 숨을 죽인 채, 짧고 뜨겁게.', '시간이 멈춘 것 같았다. 실제로는 10분도 안 됐다.', '심장 소리가 바깥까지 들릴 것 같았다.'];
+// 지금 여기서 (골목·화장실·수풀): 함께 밤을 보내는 것과 같지만 짧고, 들킬 수 있음 (sp_caught)
+function quickIt(id, kind, label, icon) {
+  return { id, label, icon, noFree: true,
+    if: (s, p, a) => a.canSex(p) && a.companion() === p && !!spotHere(s, kind) && !a.jailed(),
+    run: (s, p, a) => {
+      const sp = spotHere(s, kind), night = s.time === 2, cp = (sp.caught ?? .15) * (kind !== 'toilet' ? (night ? .6 : 1.5) : 1);
+      return { intimate: true, fling: true, direct: true, quick: true, spot: sp.scene || kind, mood: 10, p: { heart: [5, 9], close: [2, 5] }, effect: { happy: [3, 6] },
+        memory: !p.nights, pregnant: lover(p) ? .06 : .04, risk: a.main() && a.main() !== p ? .25 : 0, riskTaken: statusRisk(p, 1.2),
+        do: () => { s.vars.spotLabel = sp.label; s.vars.spotKind = kind; s.vars.spotCaught = Math.random() < cp; },
+        then: () => (s.vars.spotCaught ? 'sp_caught' : undefined),
+        text: () => a.pick(QUICK_TXT[kind] || QUICK_TXT.alley).replace(/\{spot\}/g, sp.label) + ' ' + a.pick(QUICK_ON) };
+    } };
+}
 
 // 대화 이벤트(data/dialogues.js)에서 고른 말의 결과 — ch: { tone 말투, risk 0 살짝·1 보통·2 과감하게, fit 상대 성격과 말투 궁합 +1·0·-1, ok/ng 선택지 반응 }
 const react = (a, table, p) => a.pick(table[p.personality] || table.warm);
@@ -447,7 +484,7 @@ GAME_DATA.social = [
         text: () => nightText(a, p) };
       return { do: () => comeAlong(s, p, a), p: { heart: [2, 4] }, effect: { happy: [1, 3] },
         scene: !ALLEY_NO.includes(s.place) ? 'alley' : undefined,
-        text: '"…어디로 갈까?" {p|이} 내 팔짱을 꼈다. (동행 — 모텔이나 집으로 가면 같이 간다)' };
+        text: '"…어디로 갈까?" {p|이} 내 팔짱을 꼈다. (동행 — 집·모텔로 가거나, 장소에 따라 지금 골목·화장실에서)' };
     } },
 
   { id: 'enjoy', label: '즐기기', icon: '♂♀',
@@ -458,6 +495,10 @@ GAME_DATA.social = [
       memory: !p.nights, pregnant: lover(p) ? .08 : .05, risk: a.main() && a.main() !== p ? .2 : 0, riskTaken: statusRisk(p),
       text: () => (s.place === 'motel' ? '방 문이 닫히자마자 서로를 끌어당겼다. ' : '') + nightText(a, p) }) },
 
+  quickIt('quickAlley', 'alley', '지금 골목에서', '🌃'),
+  quickIt('quickToilet', 'toilet', '화장실에서', '🚻'),
+  quickIt('quickBush', 'bush', '수풀 속에서', '🌳'),
+
   // 그저 즐기는 사이 (섹파) 제안 — 애인이 있는 상대도 헤어지지 않은 채로. 외모·매력이 높을수록 잘 받아줌
   { id: 'casualAsk', label: '가볍게 즐기자고 하기', icon: '🔥',
     if: (s, p, a) => a.canSex(p) && !lover(p) && !p.fwb && ((p.nights || 0) >= 1 || a.casualReady(p)) && !a.jailed(),
@@ -465,7 +506,7 @@ GAME_DATA.social = [
       ? { do: () => { p.fwb = true; p.fling = true; comeAlong(s, p, a); }, p: { close: [2, 4] }, effect: { happy: [2, 4] },
           scene: s.place && !PRIVATE.includes(s.place) && !ALLEY_NO.includes(s.place) ? 'alley' : undefined,
           text: (p.taken || p.married ? `"${mateOf(p)}한테는 비밀이야." {p|이} 웃으며 새끼손가락을 걸었다. 서로 즐기기만 하기로 했다.` : '"서로 부담 갖지 말자." {p|이} 웃었다. 즐기기만 하는 사이로 하기로 했다.')
-            + (PRIVATE.includes(s.place) ? '' : ' 오늘은 같이 있기로 했다. (동행 — 모텔이나 집으로 가면 같이 간다)') }
+            + (PRIVATE.includes(s.place) ? '' : ' 오늘은 같이 있기로 했다. (동행 — 집·모텔로 가거나, 장소에 따라 지금 골목·화장실에서)') }
       : { p: { heart: [-6, -3], close: [-4, -2] }, effect: { happy: -2 }, text: ['{p|이} 고개를 저었다. "난 그런 거 못 해."', '{p|이} 잠깐 생각하더니 "그건 좀 아닌 것 같아."라고 했다.'] } },
 
   { id: 'confess', label: '고백하기', icon: '💌',

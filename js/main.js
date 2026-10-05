@@ -118,7 +118,10 @@ function render(S) {
   if (ti.phase === 'adult' && !S.ended) {
     const d = ti.duty;
     flow.hidden = false;
-    flow.innerHTML = (d ? `<button type="button" data-flow="duty"${wait ? ' disabled' : ''}>${d.id === 'work' ? '💼' : d.id === 'class' ? '🎓' : '🪖'} ${d.label} <small>⚡${d.ap}</small></button>` : '') +
+    const c = ti.cls, cn = c && c.next;   // 대학생: 대학 밖이면 '학교 가기'(지도에서 교통수단), 캠퍼스면 다음 강의 듣기
+    flow.innerHTML = (d ? `<button type="button" data-flow="duty"${wait ? ' disabled' : ''}>${d.id === 'work' ? '💼' : '🪖'} ${d.label} <small>⚡${d.ap}</small></button>` : '') +
+      (cn ? (c.onCampus ? `<button type="button" data-flow="attend"${wait || c.why ? ' disabled' : ''}>📖 ${cn.time} ${esc(cn.name)} <small>⚡${c.need}</small></button>`
+        : `<button type="button" data-flow="toschool"${wait ? ' disabled' : ''}>🎓 학교 가기 <small>${cn.time} ${esc(cn.name)}</small></button>`) : '') +
       `<button type="button" data-flow="week"${wait ? ' disabled' : ''}>⏭ 이번 주 넘기기</button><button type="button" data-flow="month"${wait ? ' disabled' : ''}>⏩ 이번 달 넘기기</button><button type="button" data-flow="event"${wait ? ' disabled' : ''}>⏬ 다음 일까지</button>`;
   } else { flow.hidden = true; flow.innerHTML = ''; }
 
@@ -188,7 +191,7 @@ function actButtons(acts) {
 const WHY_SHORT = { '같이 갈 사람이 있어야': '동행 필요', '직업이 있어야': '직장인만', '지금은 못 감': '닫힘' };
 // mode: 'city' 시내 지도 / 'campus' 대학 캠퍼스 지도 (캠퍼스 안 장소들, 정문 = 시내의 '대학')
 let mapMode = null;
-const campusOK = () => G.places().some(p => p.campus && p.id !== 'campus');
+const campusOK = () => !!G.state().flags.student && G.places().some(p => p.campus && p.id !== 'campus');   // 캠퍼스 지도는 재학생만
 // 시내 지도는 720×920 — 크게 보기(스크롤) / 한눈에 보기. 열 때·움직일 때 지금 있는 곳을 가운데로
 let mapZoom = (() => { try { return localStorage.getItem('llife-mapzoom') || 'big'; } catch (e) { return 'big'; } })(), mapCenterKey = null;
 function mapHTML(list, mode) {
@@ -382,6 +385,24 @@ function crowdLine(here) {
   const sum = xs.length ? [`주로 ${Math.floor(mid / 10) * 10}대`, `여자 ${nF} · 남자 ${xs.length - nF}`, nC ? `커플 ${nC}쌍` : ''].filter(Boolean).join(' · ') : '';
   return `<p class="crowd-note"><span>${note.open ? '📅' : '👥'} ${esc(note.t)}</span>${sum ? `<small>${esc(sum)}${note.open ? ' · 매일 다른 사람들' : ''}</small>` : ''}</p>`;
 }
+// 🎓 오늘 강의 (대학생 평일): 시각·강의·상태(출석·지각·결석·진행 중), 캠퍼스에 있으면 다음 강의 듣기 버튼
+const LC_ST = { ok: '✅ 출석', late: '⏰ 지각', miss: '❌ 결석', gone: '❌ 끝남', now: '🔔 시작함', lateNow: '⏰ 지금 가면 지각', later: '' };
+function classCard(ci) {
+  if (!ci || ci.vac) return '';
+  const rows = ci.today.map(x => `<li class="lc-r ${x.state}"><b>${x.time}</b><span class="lc-n">${esc(x.name)}${x.major ? ' <small class="dim">전공</small>' : ''}${x.exam ? ' <small class="lc-ex">시험</small>' : ''}</span><span class="lc-s">${LC_ST[x.state] || `~${x.end}`}</span></li>`).join('');
+  const btn = ci.next && ci.onCampus ? `<button type="button" class="hot lc-go" data-attend="${ci.next.i}"${ci.why ? ' disabled' : ''}>📖 ${ci.next.time} ${esc(ci.next.name)} 듣기 <small>⚡${ci.need}${ci.wait >= 1 ? ` · ${ci.wait}시간 기다림` : ''}${ci.why ? ' · ' + esc(ci.why) : ''}</small></button>${ci.wait >= 1 && !ci.why ? '<p class="hint">시작까지 시간이 남았다 — 학생식당·도서관에 들렀다 와도 된다 (캠퍼스 지도).</p>' : ''}`
+    : ci.next ? '<button type="button" class="lc-go" data-toschool>🎓 학교 가기 <small>지도에서 교통수단 고르기</small></button>' : '';
+  return `<div class="lc-card"><p class="sec-t">🎓 오늘 강의 <span class="dim">· ${esc(ci.term)}${ci.rate != null ? ` · 출석률 ${ci.rate}%` : ''}</span></p>${rows ? `<ul class="lc-list">${rows}</ul>` : '<p class="dim">오늘은 강의가 없다.</p>'}${btn}</div>`;
+}
+// 지도에서 그곳 핀을 찾아 '가는 방법' 창 (메인 화면에 지도가 없으면 지도 창을 열고)
+function routeTo(id) {
+  let pin = document.querySelector(`#where .cmap .pin[data-pl="${id}"]`);
+  if (!pin) { mapMode = 'city'; openMap(); pin = mBody.querySelector(`.cmap .pin[data-pl="${id}"]`); }
+  if (!pin) return;
+  const v = pin.closest('.cmap-view');
+  if (v) { const m = v.querySelector('.cmap'); v.scrollLeft = Math.max(0, parseFloat(pin.style.left) / 100 * m.offsetWidth - v.clientWidth / 2); v.scrollTop = Math.max(0, parseFloat(pin.style.top) / 100 * m.offsetHeight - v.clientHeight / 2); }
+  if (pin.disabled || !openRoute(id, pin)) G.goPlace(id);
+}
 function renderWhere(S) {
   const box = $('#where');
   if (S.jail) {
@@ -396,7 +417,7 @@ function renderWhere(S) {
     const adult = ti.phase === 'adult', at = list.find(p => p.at);
     const head = adult ? `<p class="sec-t">🗺️ 어디로 갈까? <span class="dim">· ${at ? `지금 ${esc(at.label)} 근처` : `지금 ${esc(ti.zone)}`} · 핀을 누르면 이동 (⚡ 거리만큼)</span></p>`
       : ti.apMax ? `<p class="sec-t">🗺️ ${esc(ti.kindLabel)} 턴 <span class="dim">· 이동 ⚡${G.teenPt} · 행동 ⚡${G.teenPt} · 같이 있는 사람에게 말 걸기는 행동력 안 씀</span></p>` : '';
-    const duty = adult && ti.duty ? `<p class="hint">평일이다. 먼저 ${ti.duty.id === 'work' ? '출근' : ti.duty.id === 'class' ? '수업' : '훈련'}부터 (⚡${ti.duty.ap}). 아침밥은 그 전에 먹을 수 있다.</p>` : '';
+    const duty = (adult && ti.duty ? `<p class="hint">평일이다. 먼저 ${ti.duty.id === 'work' ? '출근' : '훈련'}부터 (⚡${ti.duty.ap}). 아침밥은 그 전에 먹을 수 있다.</p>` : '') + (adult && ti.cls && ti.cls.today.length ? classCard(ti.cls) : '');
     const mode = mapModeNow();
     const keep = box.querySelector('.cmap-view'), sx = keep ? keep.scrollLeft : 0, sy = keep ? keep.scrollTop : 0;
     box.innerHTML = list.length
@@ -411,6 +432,7 @@ function renderWhere(S) {
   box.innerHTML = `
     <div class="here-head"><span>📍 현재 장소: <b>${esc(pl.label)}</b> ${pl.icon}${S.regular[pl.id] ? ' <small class="dim">단골</small>' : ''}${S.drunk ? ` <small class="drunk d${S.drunk}">🍺 ${G.drunkLabel()}</small>` : ''}</span><button type="button" class="map-btn" data-map>🗺️ 지도</button></div>
     ${compBar(pl)}
+    ${pl.campus ? classCard(G.timeInfo().cls) : ''}
     <p class="sec-t">👥 여기 있는 사람 ${nStaff + nKnown + nNew}명 <span class="dim">· ${nStaff ? `일하는 사람 ${nStaff} · ` : ''}아는 사람 ${nKnown} · 처음 보는 사람 ${nNew} · 말 걸기는 행동력 안 씀</span>${pl.crowd ? ' <button type="button" class="br-open" data-browse>👀 둘러보기</button>' : ''}</p>
     ${crowdLine(here)}
     <div class="here">${here.length ? [['🧑‍💼 여기서 일하는 사람', here.filter(h => h.staff)], ['아는 사람', here.filter(h => !h.stranger && !h.staff)], ['처음 보는 사람', here.filter(h => h.stranger)]].filter(g => g[1].length).map(([t, L]) => `<p class="here-g">${t} <small>${L.length}</small></p>${L.map(hereRow).join('')}`).join('') : '<p class="empty">아무도 없다.</p>'}</div>
@@ -427,7 +449,13 @@ function compBar(pl) {
   const go = inside ? '' : G.places().filter(x => x.id === 'motel' || x.id === 'home').map(x =>
     `<button type="button" data-pl="${x.id}"${x.ok ? '' : ' disabled'}>${x.icon} ${esc(G.josa(x.label, '으로'))}${x.cost ? ` <small>⚡${x.cost}</small>` : ''}</button>`).join('');
   const enjoy = inside && G.interactions(c.id).some(i => i.id === 'enjoy') ? `<button type="button" class="hot" data-enjoy="${c.id}">♂♀ 즐기기</button>` : '';
-  return `<p class="comp">🤝 동행: <b>${esc(G.pname(c))}</b> <span class="dim">${inside ? '— 단둘이' : '— 같이 간다'}</span><span class="go">${go}${enjoy}<button type="button" data-endco>헤어지기</button></span></p>`;
+  // 지금 여기서: 장소마다 골목·화장실·수풀이 다름 (data/social.js quickSpots) — 들킬 수도
+  const QS = (window.GAME_DATA.quickSpots || {})[pl.id] || {}, its = inside ? [] : G.interactions(c.id);
+  const now = [['quickAlley', 'alley', '🌃'], ['quickBush', 'bush', '🌳'], ['quickToilet', 'toilet', '🚻']].filter(([, k]) => !inside && QS[k]).map(([id, k, ic]) => {
+    const it = its.find(i => i.id === id);
+    return `<button type="button" class="hot" data-quick="${id}" data-who="${c.id}"${it && it.ok ? '' : ' disabled'}>${ic} 지금 ${esc(QS[k].label)}에서 <small>⚡${it ? it.ap : 5}</small></button>`;
+  }).join('');
+  return `<div class="comp"><span>🤝 동행: <b>${esc(G.pname(c))}</b> <span class="dim">${inside ? '— 단둘이' : '— 어디서?'}</span></span><span class="go">${go}${now}${enjoy}<button type="button" data-endco>헤어지기</button></span></div>`;
 }
 
 /* ---------- 연출 (S.scene) ---------- */
@@ -495,14 +523,14 @@ function playScene(sc, testP) {
     sceneCard(`<div class="sc-card">${art}<p>${esc(sc.text || '')}</p><button type="button" data-sc-next>계속</button></div>`);
     return;
   }
-  const morningQ = [() => `<div class="sc-card sc-morning">${morningCard(sc, p)}</div>`];   // 보여 줄 때 그림 (디테일 모드의 어젯밤 기록)
+  const morningQ = sc.quick ? [] : [() => `<div class="sc-card sc-morning">${morningCard(sc, p)}</div>`];   // 보여 줄 때 그림 (디테일 모드의 어젯밤 기록) — 골목·화장실에서 잠깐이면 아침 카드 없음
   const pregQ = sc.preg ? [`<div class="sc-card">${CONCEIVE}<p class="sc-later">몇 주 뒤, ${esc(G.josa(G.pname(p), '이'))} 할 말이 있다고 했다.</p><button type="button" data-sc-next>계속</button></div>`] : [];
   nightJob = { sc, p };
   if (window.Night) Night.resetStats();   // 어젯밤 기록은 이번 그날 밤을 본 경우에만 (동작 줄이기면 없음)
   // 서서 다가감 → 그날 밤 → (콘돔 없이면) 자궁 그림 → 다음 날 아침 → (임신이면) 몇 주 뒤
   const S = G.state(), inside = sc.contra === 'none' || sc.contra === 'pill';
   const tops = [Avatar.topColor(S.gender === 'm' ? G.myLook() : G.look(p)), Avatar.topColor(S.gender === 'm' ? G.look(p) : G.myLook())];
-  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [() => `<div class="sc-card sc-fp">${Night.foreplay(tops, Night.detail() ? window.GAME_DATA.foreCap : null)}</div>`]).concat([() => `<div class="sc-night"><p class="sc-t">그날 밤${sc.test ? ' <small class="dim">(테스트)</small>' : ''}</p>${Night.html(sc.spot)}<div class="nt-bar"><span class="nt-clock">⏱ 0:00</span><span class="nt-pose"></span><span class="nt-cnt"></span></div><div class="nt-btns"><span class="nt-rate" role="group" aria-label="배속">${[1, 2, 4, 8].map(r => `<button type="button" data-nt-rate="${r}"${Night.rate() === r ? ' class="on"' : ''}>×${r}</button>`).join('')}</span><button type="button" class="nt-dbtn${Night.detail() ? ' on' : ''}" data-nt-detail title="디테일 모드 (테스트용)">🔬 디테일</button><button type="button" class="nt-skip" data-nt-skip>⏩ 건너뛰기</button><button type="button" class="nt-end" data-nt-end>종료</button></div></div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
+  const nightQ = calm || !window.Night ? [] : (sc.direct ? [] : [() => `<div class="sc-card sc-fp">${Night.foreplay(tops, Night.detail() ? window.GAME_DATA.foreCap : null)}</div>`]).concat([() => `<div class="sc-night"><p class="sc-t">${sc.quick ? esc(sc.spotLabel || '그 자리에서') : '그날 밤'}${sc.test ? ' <small class="dim">(테스트)</small>' : ''}</p>${Night.html(sc.spot)}<div class="nt-bar"><span class="nt-clock">⏱ 0:00</span><span class="nt-pose"></span><span class="nt-cnt"></span></div><div class="nt-btns"><span class="nt-rate" role="group" aria-label="배속">${[1, 2, 4, 8].map(r => `<button type="button" data-nt-rate="${r}"${Night.rate() === r ? ' class="on"' : ''}>×${r}</button>`).join('')}</span><button type="button" class="nt-dbtn${Night.detail() ? ' on' : ''}" data-nt-detail title="디테일 모드 (테스트용)">🔬 디테일</button><button type="button" class="nt-skip" data-nt-skip>⏩ 건너뛰기</button><button type="button" class="nt-end" data-nt-end>종료</button></div></div>`])   // 즐기기·잠자리 제안은 바로 그날 밤
     .concat(inside ? [() => `<div class="sc-card sc-ut">${Night.uterus(!!sc.preg, Night.detail() ? { pregP: sc.pregP, contra: CONTRA_LABEL[sc.contra] } : null)}</div>`] : []);
   sceneQueue = nightQ.concat(morningQ, pregQ);
   nextScene();
@@ -903,7 +931,7 @@ function openJobs(tab) {
     const R = J.resume();
     const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
     body = `<div class="jb-cv"><div class="jb-cvh"><span class="jb-ph">👤</span><div><b>${esc(S.name)}</b><span class="dim">${S.age}살 · ${S.gender === 'm' ? '남' : '여'}</span></div></div>
-      <table class="rt-table">${row('학력', esc(R.edu))}${row('경력', R.career.length ? R.career.map(esc).join('<br>') : '없음 (신입)')}${row('어학', esc(R.lang))}${row('자격증', R.certs.length ? R.certs.map(esc).join(', ') : '없음')}${row('자기소개서', `${esc(R.introT)} ${'★'.repeat(R.intro)}${'☆'.repeat(3 - R.intro)}`)}</table>
+      <table class="rt-table">${row('학력', esc(R.edu))}${row('경력', R.career.length ? `<b>총 ${esc(R.yearsT)}</b><br>` + R.career.map(esc).join('<br>') : '없음 (신입)')}${row('어학', esc(R.lang))}${row('자격증', (R.certs.length ? R.certs.map(esc).join(', ') : '없음') + ' <button type="button" class="rt-mini" data-app="cert">📜 자격증 앱</button>')}${row('자기소개서', `${esc(R.introT)} ${'★'.repeat(R.intro)}${'☆'.repeat(3 - R.intro)}`)}</table>
       <button type="button" class="hot jb-pol" data-jpolish${R.intro >= 3 || S.ap < J.polishPt ? ' disabled' : ''}>✍ 자기소개서 다듬기 <small>⚡${J.polishPt}</small></button>
       <p class="hint">자기소개서를 공들일수록 서류·면접에 유리하다. 같은 업종 경력이 있으면 경력직 공고에도 붙을 수 있다.</p></div>`;
   } else if (jbTab === 'apps') {
@@ -1077,6 +1105,7 @@ function openMe() {
   const me = G.myLook() && window.Avatar ? avBtn('me', Avatar.render(G.myLook(), 60, { age: S.age, fig: G.figure(null), ctx: G.outfitCtx(null) })) : '';
   showModal('me', `👤 ${S.name}`, `
     <div class="me-top">${me}<dl class="prof">${prof}</dl></div>
+    ${S.sandbox && G.myLook() ? `<div class="chips"><button type="button" data-gray="${G.myLook().gray ? 0 : 1}">${G.myLook().gray ? '🙂 내 얼굴 보이기' : '🩶 회색 아바타로'}</button></div>` : ''}
     ${fullView === 'me' && G.myLook() ? fullAv(G.myLook(), S.age, G.figure(null), S.personality, false, G.outfitCtx(null)) : ''}
     ${S.preg && S.preg.mode ? `<p class="dim" style="font-size:13px">${S.gender === 'f' ? '임신 중' : '곧 아이가 태어난다'} — ${S.preg.due > S.age ? '내년' : '올해'} 출산 예정</p>` : ''}
     <p class="sec-t">상태</p>
@@ -1109,8 +1138,8 @@ function randomDraft(mode, region) {
 }
 function openCreate(closable) {
   if (!draft) draft = randomDraft();
-  if (draft.mode === 'q20' && draft.step > 0) { openQuick(closable); return; }
-  const q20 = draft.mode === 'q20';
+  if ((draft.mode === 'q20' || draft.mode === 'grad') && draft.step > 0) { openQuick(closable); return; }
+  const q20 = draft.mode === 'q20' || draft.mode === 'grad';   // 20세 시작 · 🎓 졸업 후 시작은 같은 단계 화면
   G.previewRegion(draft.region);
   const regs = Object.values(G.regions), rsel = G.regions[draft.region] || regs[0];
   const regionFld = `<div class="fld"><div class="fl"><span>나라</span></div><div class="chips mode">${regs.map(r => `<button type="button" data-region="${r.id}" aria-pressed="${r.id === draft.region}">${r.flag} ${esc(r.label)}</button>`).join('')}</div><p class="desc">${esc(rsel.desc || '')}</p></div>`;
@@ -1123,8 +1152,8 @@ function openCreate(closable) {
   }).join('');
   showModal('create', '🌱 새 인생', `<div class="create">
     <div class="fld"><div class="fl"><span>시작</span></div><div class="chips mode">
-      <button type="button" data-mode="full" aria-pressed="${!q20}">처음부터 (0세~)</button><button type="button" data-mode="q20" aria-pressed="${q20}">20세 시작</button></div>
-      <p class="desc">${q20 ? '0~19살을 건너뛴다. 학력·능력치·몸·관계를 직접 정하고 스무 살 봄부터.' : '태어나는 순간부터. 어린 시절의 선택이 성격과 취향이 된다.'}</p></div>
+      <button type="button" data-mode="full" aria-pressed="${!q20}">처음부터 (0세~)</button><button type="button" data-mode="q20" aria-pressed="${draft.mode === 'q20'}">20세 시작</button><button type="button" data-mode="grad" aria-pressed="${draft.mode === 'grad'}">🎓 대학 졸업 후</button></div>
+      <p class="desc">${draft.mode === 'grad' ? '대학을 막 졸업한 봄(4년제 24살 · 군필 남자 26살 · 전문대 22살)부터. 학점·자격증·인턴 경력을 정하고, 취업 준비생이거나 첫 출근을 앞두고 시작한다.' : q20 ? '0~19살을 건너뛴다. 학력·능력치·몸·관계를 직접 정하고 스무 살 봄부터.' : '태어나는 순간부터. 어린 시절의 선택이 성격과 취향이 된다.'}</p></div>
     ${regionFld}
     <div class="fld"><div class="fl"><span>이름 (비우면 랜덤)</span></div><input id="cName" maxlength="${draft.region === 'kr' ? 6 : 12}" value="${esc(draft.name)}" placeholder="${draft.region === 'kr' ? '예: 김하늘' : '예: 에밀리 존슨'}" autocomplete="off"></div>
     ${fields}
@@ -1140,7 +1169,7 @@ function createClick(b) {
   else if (d.rf) { const f = CREATE_FIELDS.find(x => x[0] === d.rf); draft[d.rf] = rnd(optsOf(f)).id; }
   else if ('rall' in d) { const n = draft.name, m = draft.mode, r = draft.region; draft = randomDraft(m, r); draft.name = n; }
   else if ('go' in d) {
-    if (draft.mode === 'q20') { quickSync(); draft.step = 1; draft.maxStep = Math.max(draft.maxStep || 1, 1); openQuick(!$('#mClose').hidden); return; }
+    if (draft.mode === 'q20' || draft.mode === 'grad') { quickSync(); draft.step = 1; draft.maxStep = Math.max(draft.maxStep || 1, 1); openQuick(!$('#mClose').hidden); return; }
     const opt = draft; draft = null; G.newLife(opt); closeModal(); return;
   }
   const top = mBody.scrollTop;
@@ -1162,7 +1191,7 @@ function qFace(q, P) {
 }
 /* ── 20세 시작: 배경 → 능력치 → 외모·신체 → 성격·취향 → 관계 → 확인 (뒤로 가기 가능, 오른쪽에 전신 미리보기) ── */
 const QSTEPS = ['배경', '능력치', '외모·신체', '성격·취향', '관계', '확인'];
-const QNUM = ['hair', 'hc', 'skin', 'iris', 'eyes', 'shape', 'brow', 'lashLv', 'browLv', 'friends', 'ly'], QBOOL = ['exp', 'lsex'];
+const QNUM = ['hair', 'hc', 'skin', 'iris', 'eyes', 'shape', 'brow', 'lashLv', 'browLv', 'friends', 'ly'], QBOOL = ['exp', 'lsex', 'gray'];
 const QD = () => G.quick.data();
 // 처음 들어올 때(또는 성별을 바꿨을 때) 기본값: 첫 화면에서 뽑힌 성격·집안·취미·꿈·형제를 이어받음
 function quickSync() {
@@ -1177,8 +1206,14 @@ function quickSync() {
       personality: draft.personality, hobbies: [draft.hobby], value: draft.value, dream: draft.dream,
       parents: 'both', sibling: draft.sibling, friends: 2, love: 'none', lp: 'warm', ly: 1, lsex: false, exWhy: Q.exWhy[0].id,
       diff: 'normal', money: null, lst: { close: 70, trust: 65, heart: 70, compat: 50, libido: 45 },
+      gpa: '3.2', intern: 'none', gjob: 'hunt', certs: [],
     };
   }
+  // 🎓 졸업 후 시작 ↔ 20세 시작: 학력 목록이 다름
+  q.grad = draft.mode === 'grad';
+  if (q.grad && !/^g_/.test(q.edu)) { q.edu = 'g_normal'; if (!['done', 'exempt'].includes(q.army)) q.army = 'done'; }
+  if (!q.grad && /^g_/.test(q.edu)) { q.edu = 'normal'; if (!Q.army.some(a => a.id === q.army)) q.army = 'next'; }
+  q.certs = q.certs || []; q.gpa = q.gpa || '3.2'; q.intern = q.intern || 'none'; q.gjob = q.gjob || 'hunt';
   if (q.gender !== g || q.height == null) {
     const a = window.Avatar ? Avatar.make(`${q.seed}:me`, g) : {};
     Object.assign(q, { gender: g, height: g === 'm' ? 173 : 162, hair: a.hair ?? 0, hc: a.hc ?? 0, skin: a.skin ?? 1, eyes: a.eyes ?? 0 });
@@ -1187,7 +1222,7 @@ function quickSync() {
 }
 // 학력이 바뀌면 그 등급의 대학·학과로 맞춤
 function quickFixEdu() {
-  const q = draft.q, e = QD().edu.find(x => x.id === q.edu);
+  const q = draft.q, e = (q.grad ? QD().gradEdu : QD().edu).find(x => x.id === q.edu);
   if (!e || !e.tiers) return;
   const unis = G.quick.tierUnis(e.tiers);
   if (!unis.some(u => u.id === q.univ)) q.univ = unis[0].id;
@@ -1232,8 +1267,27 @@ const qFld = (title, body, desc) => `<div class="fld"><div class="fl"><span>${ti
 const qRange = (key, min, max, val, label, attr = 'qr') => `<div class="qs-r"><span class="qs-rl">${label}</span><input type="range" data-${attr}="${key}" min="${min}" max="${max}" step="1" value="${val}" aria-label="${esc(label.replace(/<[^>]+>/g, ''))}"><span class="qs-rv" data-qlab="${key}">${qLabel(key)}</span></div>`;
 // 컵 아이콘: 옆모습 실루엣 — 컵이 클수록 앞으로 더 나옴
 const cupIcon = i => `<svg class="cup-i" viewBox="0 0 18 18" width="16" height="16" aria-hidden="true"><path d="M3 1 L3 4.5 Q${(3 + 2.2 + i * 2.1).toFixed(1)} ${(7.5 + i * .45).toFixed(1)} 3 ${(11.5 + i * .55).toFixed(1)} L3 17" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// 🎓 졸업 후 시작 — 1단계: 졸업한 대학·학과 · 학점 · 딴 자격증(3개까지) · 인턴·알바 경력 · 취업 확정 여부 · 집안 · 사는 곳 · 병역
+function quickGradStep() {
+  const q = draft.q, Q = QD(), C = G.creation, e = Q.gradEdu.find(x => x.id === q.edu) || Q.gradEdu[1];
+  const unis = G.quick.tierUnis(e.tiers), u = unis.find(x => x.id === q.univ) || unis[0];
+  const certs = G.cert.list(), mr = Q.money[q.wealth] || [0, 0], w = C.wealth.find(x => x.id === q.wealth) || {};
+  const years = (G.departments.find(x => x.id === q.dept) || {}).years || (u.tier === 5 && q.dept !== 'nursing' ? 2 : 4), age = 20 + years + (q.gender === 'm' && G.region() === 'kr' && q.army !== 'exempt' ? 2 : 0);
+  return qFld('졸업한 학교', qChips('edu', Q.gradEdu, q.edu), esc(e.desc))
+    + qFld('대학', `<div class="chips unis">${unis.map(x => qChip('univ', x.id, `${logo(x.id, 18)} ${esc(x.short || x.name)}`, x.id === q.univ, x.name)).join('')}</div>`, `${esc(u.name)} · ${esc(G.tierLabel(u.tier))}`)
+    + qFld('학과', `<div class="chips">${u.departments.map(id => { const d = G.departments.find(x => x.id === id); return qChip('dept', id, esc(d.icon + ' ' + d.name), id === q.dept); }).join('')}</div>`, `${years}년제 → ${age}살 봄에 시작`)
+    + qFld('학점', qChips('gpa', Q.gpas, q.gpa))
+    + qFld(`딴 자격증 <small class="dim">${Q.gradCertMax}개까지</small>`, `<div class="chips">${certs.map(c => `<button type="button" data-qcert="${c.id}" aria-pressed="${q.certs.includes(c.id)}">${esc(c.name)}</button>`).join('')}</div>`, '고른 자격증은 이미 딴 채로 시작한다 (어학은 능력치대로 점수). 이후엔 📱 자격증 앱으로 공부·접수.')
+    + qFld('인턴·알바 경력', qChips('intern', Q.intern, q.intern))
+    + qFld('취업', qChips('gjob', Q.gjob, q.gjob), q.gjob === 'hired' ? '학과에 맞는 첫 직장이 정해진 채로 시작한다 (조건이 안 되면 취업 준비부터).' : '구인 앱으로 지원·면접. 자격증·경력이 서류에 도움이 된다.')
+    + qFld('집안', qChips('wealth', C.wealth, q.wealth), `${esc(w.desc || '')} 시작 돈 ${G.fmtMoney(mr[0])}~${G.fmtMoney(mr[1])}${q.wealth === 'poor' ? ' (학자금 대출이 남아 있다)' : ''}`)
+    + (qSandbox(q) ? qFld('시작 돈 <small class="dim">샌드박스 · 만원, 비우면 집안대로</small>', `<input type="number" id="qsMoney" min="0" max="${Q.rangeSandbox.money[1]}" step="10" inputmode="numeric" value="${q.money ?? ''}" placeholder="예: 5000">`) : '')
+    + qFld('사는 곳', qChips('home', Q.home, q.home))
+    + (q.gender === 'm' && G.region() === 'kr' ? qFld('병역', qChips('army', Q.gradArmy, q.army)) : '');
+}
 function quickStep(n) {
   const q = draft.q, Q = QD(), C = G.creation, L = (list, id) => (list.find(x => x.id === id) || {}).label || '';
+  if (n === 1 && q.grad) return quickGradStep();
   if (n === 1) {
     const e = Q.edu.find(x => x.id === q.edu);
     let more = '';
@@ -1273,7 +1327,11 @@ function quickStep(n) {
         + `<div class="qs-rs">${qRange('waist', R.waist[0], R.waist[1], q.waist, '허리')}${qRange('hip', R.hip[0], R.hip[1], q.hip, '골반')}</div>`
       : `<div class="qs-rs">${qRange('shoulder', R.shoulder[0], R.shoulder[1], q.shoulder, '어깨')}${qRange('penis', R.penis[0], R.penis[1], q.penis, '크기')}</div>`;
     const sw = (f, list) => `<div class="chips sw">${list.map(o => qChip(f, o.id, `<i style="background:${o.color}"></i>${esc(o.label)}`, o.id === q[f])).join('')}</div>`;
-    return `<div class="qs-rs">${qRange('height', R.height[g][0], R.height[g][1], q.height, '키')}</div>`
+    // 샌드박스: 외모를 정하지 않고 회색 아바타로 (얼굴·머리 고르기 생략 — 생김새는 능력치 숫자로만)
+    const gray = qSandbox(q) ? qFld('아바타 <small class="dim">샌드박스</small>', `<div class="chips">${qChip('gray', 0, '🙂 직접 꾸미기', !q.gray)}${qChip('gray', 1, '🩶 정하지 않음 (회색 아바타)', q.gray)}</div>`,
+      q.gray ? '내 모습은 회색 실루엣으로만 보인다. 생김새는 능력치 숫자대로 사람들 반응에 들어간다. 나중에 내 정보에서 바꿀 수 있다.' : '얼굴·머리·피부를 직접 고른다.') : '';
+    if (qSandbox(q) && q.gray) return gray + `<div class="qs-rs">${qRange('height', R.height[g][0], R.height[g][1], q.height, '키')}</div>` + qFld('체형', qChips('build', Q.builds, q.build)) + body;
+    return gray + `<div class="qs-rs">${qRange('height', R.height[g][0], R.height[g][1], q.height, '키')}</div>`
       + qFld('체형', qChips('build', Q.builds, q.build)) + body
       + qFld('머리 스타일', `<div class="chips">${P.hair[g].map((l, i) => qChip('hair', i, esc(l), i === q.hair)).join('')}</div>`)
       + qFld('머리색', sw('hc', P.hc)) + qFld('피부', sw('skin', P.skin)) + (P.iris ? qFld('눈동자', sw('iris', P.iris)) : '')
@@ -1300,13 +1358,14 @@ function quickStep(n) {
       + qFld('연인', qChips('love', Q.love, q.love)) + love;
   }
   // 6: 확인
-  const e = Q.edu.find(x => x.id === q.edu), u = q.univ && G.universities.find(x => x.id === q.univ), d = q.dept && G.departments.find(x => x.id === q.dept);
+  const e = (q.grad ? Q.gradEdu : Q.edu).find(x => x.id === q.edu), u = q.univ && G.universities.find(x => x.id === q.univ), d = q.dept && G.departments.find(x => x.id === q.dept);
   const f = qFig(q), P = window.Avatar ? Avatar.parts : null;
   const rows = [
     ['이름', `${draft.name.trim() || '(랜덤)'} · ${genderKo(q.gender)} · ${draft.month}월생`],
     ['난이도', `${L(Q.diffs, q.diff)}${qSandbox(q) && q.money != null && q.money !== '' ? ` · 시작 돈 ${G.fmtMoney(+q.money)}` : ''}`],
-    ['학력', e.tiers && u ? `${e.label} — ${u.name} ${d ? d.name : ''}` : q.edu === 'work' ? `${e.label} — ${(G.quick.jobs().find(j => j.id === q.job) || {}).label || ''}` : e.label],
-    ['집안', `${L(C.wealth, q.wealth)} · ${L(Q.home, q.home)}${q.gender === 'm' && G.region() === 'kr' ? ` · ${L(Q.army, q.edu === 'retake' && q.army === 'now' ? 'next' : q.army)}` : ''}`],
+    ['학력', e.tiers && u ? `${e.label} — ${u.name} ${d ? d.name : ''}${q.grad ? ` · 학점 ${L(Q.gpas, q.gpa)}` : ''}` : q.edu === 'work' ? `${e.label} — ${(G.quick.jobs().find(j => j.id === q.job) || {}).label || ''}` : e.label],
+    ...(q.grad ? [['경력·자격증', `${L(Q.intern, q.intern)} · ${q.certs.length ? q.certs.map(id => (G.cert.list().find(c => c.id === id) || {}).name).join(', ') : '자격증 없음'} · ${L(Q.gjob, q.gjob)}`]] : []),
+    ['집안', `${L(C.wealth, q.wealth)} · ${L(Q.home, q.home)}${q.gender === 'm' && G.region() === 'kr' ? ` · ${q.grad ? L(Q.gradArmy, q.army) : L(Q.army, q.edu === 'retake' && q.army === 'now' ? 'next' : q.army)}` : ''}`],
     ['능력치', Q.stats.map(k => `${G.LABEL[k]} ${G.quick.grade(q.st[k])}`).join(' · ') + ` · 꾸밈 ${G.quick.grade(q.style)}`],
     ['소질', L(C.traits, q.trait) + (qSandbox(q) ? ((q.sexg || 'F') !== 'F' ? ` · 섹스 기술 ${q.sexg}` : '') : q.exp ? ' · 경험 있음' : '')],
     ['몸', `${f.height}cm · ${L(Q.builds, q.build)} · ${q.gender === 'f' ? `${f.under}${f.cup} · ${f.bust}-${f.waist}-${f.hip}` : `어깨 ${f.shoulder}cm · ${q.penis}cm`}`],
@@ -1314,13 +1373,13 @@ function quickStep(n) {
     ['성격·취향', `${L(C.personalities, q.personality)} · ${q.hobbies.map(h => L(C.hobbies, h)).join('·')} · ${L(C.values, q.value)} · 꿈 ${L(C.dreams, q.dream)}`],
     ['관계', `부모님 ${L(Q.parents, q.parents)} · ${L(C.siblings, q.sibling)} · 친구 ${q.friends}명 · ${q.love === 'yes' ? `연인 (${L(C.personalities, q.lp)}, ${q.ly}년)` : q.love === 'ex' ? `전 연인 (${L(Q.exWhy, q.exWhy)})` : '솔로'}`],
   ];
-  return `<dl class="prof qs-sum">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl><p class="hint">스무 살 3월 1일, 새 학년도의 첫날부터 시작한다.</p>`;
+  return `<dl class="prof qs-sum">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl><p class="hint">${q.grad ? '대학을 졸업한 해 3월 1일부터 시작한다.' : '스무 살 3월 1일, 새 학년도의 첫날부터 시작한다.'}</p>`;
 }
 function openQuick(closable) {
   const n = draft.step, q = draft.q;
   const steps = QSTEPS.map((t, i) => { const k = i + 1; return `<button type="button" class="${k === n ? 'on' : k < n ? 'done' : ''}" data-qstep="${k}"${k > (draft.maxStep || 1) ? ' disabled' : ''}>${k} ${t}</button>`; }).join('');
   const warn = n === 4 && !q.hobbies.length ? '취미를 하나 이상 골라줘.' : '';
-  showModal('quick', `🌱 20세 시작 · ${n}/6 ${QSTEPS[n - 1]}`, `<div class="create qs">
+  showModal('quick', `${q.grad ? '🎓 졸업 후 시작' : '🌱 20세 시작'} · ${n}/6 ${QSTEPS[n - 1]}`, `<div class="create qs">
     <div class="qs-steps">${steps}</div>
     <div class="qs-grid"><div class="qs-main">${quickStep(n)}</div><div class="qs-side" id="qsPrev">${qPreview()}</div></div>
     ${warn ? `<p class="hint warn">${warn}</p>` : ''}
@@ -1341,6 +1400,7 @@ function quickRandom() {
 function quickClick(b) {
   const d = b.dataset, q = draft.q, Q = QD();
   if ('qback' in d) { draft.step--; if (draft.step <= 0) { draft.step = 0; openCreate(!$('#mClose').hidden); } else openQuick(); return; }
+  if (d.qcert) { const i = q.certs.indexOf(d.qcert); if (i >= 0) q.certs.splice(i, 1); else if (q.certs.length < (Q.gradCertMax || 3)) q.certs.push(d.qcert); const top = mBody.scrollTop; openQuick(); mBody.scrollTop = top; return; }
   if ('qnext' in d) { draft.step = Math.min(6, draft.step + 1); draft.maxStep = Math.max(draft.maxStep || 1, draft.step); openQuick(); return; }
   if (d.qstep) { draft.step = +d.qstep; openQuick(); return; }
   if ('qgo' in d) { const opt = Object.assign({}, q, { name: draft.name, gender: draft.gender, month: draft.month, region: draft.region }); draft = null; closeModal(); G.newLife20(opt); return; }   // 닫고 나서 만들어야 '나의 20년' 창이 뜸
@@ -1382,7 +1442,7 @@ function openIntro() {
   if (!it) return;
   const me = G.myLook() && window.Avatar ? Avatar.render(G.myLook(), 58, { age: S.age, fig: G.figure(null), ctx: G.outfitCtx(null) }) : '';
   const lines = it.lines.map(([i, t, sub]) => `<p class="il"><span class="ii">${i}</span><span>${esc(t)}${sub ? `<br><small class="dim">${esc(sub)}</small>` : ''}</span></p>`).join('');
-  showModal('intro', '나의 20년', `<div class="intro">
+  showModal('intro', `나의 ${G.state().age}년`, `<div class="intro">
     <div class="intro-top">${me}<span><b>${esc(S.name)}</b><br><span class="dim">스무 살 · ${S.date.y}년 3월 1일</span></span></div>
     ${lines}
     <p class="il"><span class="ii">📷</span><span>추억${it.mems.map(m => `<br>• "${esc(m)}"`).join('')}</span></p>
@@ -1464,7 +1524,7 @@ function openNightTest() {
       ${row('성격', sel('personality', D.personalities.map(x => [x.id, x.label])))}${row('가슴', sel('chest', [['small', '작은 편'], ['avg', '보통'], ['large', '큰 편']]))}
       ${row('체형', sel('build', [['slim', '마름'], ['avg', '보통'], ['fit', '탄탄'], ['chubby', '통통']]))}${row('섹스 기술', sel('grade', G.sexGrades.map((g, i) => [i, g])))}
       ${row('크기 cm', num('cm', 6, 26))}${row('만족감', num('sat', 0, 130, '자동'))}
-      ${row('체위', sel('pose', [['', '자동 (성격대로)']].concat(Object.entries(Night.poseLabel))))}${row('장소', sel('spot', [['home', '집'], ['hotel', '호텔'], ['travel', '여행지'], ['park', '공원'], ['motel', '모텔']]))}
+      ${row('체위', sel('pose', [['', '자동 (성격대로)']].concat(Object.entries(Night.poseLabel))))}${row('장소', sel('spot', [['home', '집'], ['hotel', '호텔'], ['travel', '여행지'], ['park', '공원'], ['motel', '모텔'], ['alley', '골목 (서서)'], ['toilet', '화장실 칸 (서서)']]))}
       ${row('피임', sel('contra', Object.entries(CONTRA_LABEL)))}
     </div>
     <div class="nt-chks">${chk('detail', '🔬 디테일 모드')}${chk('fore', '다가가는 카드부터')}${chk('preg', '임신 연출')}</div>
@@ -1487,7 +1547,7 @@ function confirmRestart() {
 /* ═════════ 📱 게임 속 핸드폰 — 홈 화면 + 앱 (연락처·관계망·방구하기·구인·은행·지도·앨범·저장) ═════════
    폰에서 연 창은 폰 모양(상태 표시줄 · ‹ 뒤로). 앱 안에서 연 사람 창·지도도 폰 안에서. 열 살부터 (그 전엔 폰이 없음) */
 let inPhone = false;
-const PHONE_MODES = new Set(['phone', 'people', 'person', 'jobs', 'posting', 'map', 'realty', 'listing', 'contract', 'bank', 'album', 'slots', 'delivery', 'store']);
+const PHONE_MODES = new Set(['phone', 'people', 'person', 'jobs', 'posting', 'map', 'realty', 'listing', 'contract', 'bank', 'album', 'slots', 'delivery', 'store', 'cert']);
 const PHONE_APPS = [
   { id: 'contacts', icon: '📇', label: '연락처', bg: '#3fae73' },
   { id: 'web', icon: '🕸️', label: '관계망', bg: '#8a6cf0' },
@@ -1495,6 +1555,7 @@ const PHONE_APPS = [
   { id: 'delivery', icon: '🛵', label: () => G.food.delivery().app, bg: '#2ac1bc', age: 19 },
   { id: 'jobs', icon: '💼', label: () => G.jobsite.app(), bg: '#f2994a', age: 16 },
   { id: 'bank', icon: '🏦', label: '은행', bg: '#1f9d6b', age: 16 },
+  { id: 'cert', icon: '📜', label: () => G.cert.info().app, bg: '#9b59b6', age: 19 },
   { id: 'map', icon: '🗺️', label: '지도', bg: '#33a9d6' },
   { id: 'album', icon: '📷', label: '앨범', bg: '#e0555f' },
   { id: 'slots', icon: '💾', label: '저장', bg: '#7d8592' },
@@ -1508,6 +1569,7 @@ function openPhone(app = 'home', arg) {
   if (app === 'delivery') return openDelivery();
   if (app === 'jobs') return openJobs();
   if (app === 'bank') return openBank();
+  if (app === 'cert') return openCert();
   if (app === 'map') return openMap();
   if (app === 'album') return openAlbum();
   if (app === 'slots') return openSlots();
@@ -1536,7 +1598,7 @@ function phoneBack() {
   phoneHome();
 }
 // 다시 그리기 (상태가 바뀌면 그 앱 화면 그대로)
-const PHONE_RENDER = { phone: () => phoneHome(), realty: () => openRealty(rtTab), listing: () => openListing(modalArg), contract: () => openContract(modalArg), bank: () => openBank(), album: () => openAlbum(), delivery: () => openDelivery(), store: () => openStore(modalArg), posting: () => openPosting(modalArg) };
+const PHONE_RENDER = { phone: () => phoneHome(), realty: () => openRealty(rtTab), listing: () => openListing(modalArg), contract: () => openContract(modalArg), bank: () => openBank(), cert: () => openCert(), album: () => openAlbum(), delivery: () => openDelivery(), store: () => openStore(modalArg), posting: () => openPosting(modalArg) };
 
 /* 🍽 먹을 것 (data/food.js) — 장소 메뉴 · 사서 챙기기 · 집밥·해 먹기 / 🎒 가방 / 🛵 배달 앱 */
 let foodTab = 'eat', dlvCat = '전체';
@@ -1803,6 +1865,18 @@ function openBank() {
     <div class="bk-net"><span>한 달에</span><b class="${b.net < 0 ? 'neg' : 'pos'}">${b.net < 0 ? '−' : '+'}${f(Math.abs(b.net))}</b></div>
     <p class="hint">매달 1일에 월급이 들어오고 월세·관리비·생활비·대출 이자가 빠져나간다. 쇼핑·술값 같은 그때그때 쓰는 돈은 빼고.</p>`);
 }
+// 📜 자격증 앱 (자격넷 / 서트허브): 공부 진도·응시료·다음 시험·관련 직업 → 인강 듣기(⚡6) · 접수
+function openCert() {
+  const C = G.cert.info(), have = C.list.filter(c => c.has);
+  const rows = C.list.map(c => `<div class="ct-r${c.has && !c.score ? ' has' : ''}">
+    <div class="ct-h"><b>${esc(c.name)}</b><span class="bd">${esc(c.kind)}</span><span class="dim ct-s">${'★'.repeat(c.diff)}${'☆'.repeat(5 - c.diff)} · ${esc(c.stat)}</span>${c.has ? (c.score ? `<span class="bd ok">${c.best}점</span>` : '<span class="bd ok">✔ 취득</span>') : ''}</div>
+    <p class="ct-d">${esc(c.desc)}${c.jobs.length ? ` <span class="dim">· 관련: ${c.jobs.map(esc).join(', ')}</span>` : ''}</p>
+    ${!c.has || c.score ? `<div class="ct-bar"><i style="width:${c.prog}%"></i></div>
+    <p class="ct-m">진도 ${c.prog}% · 응시료 ${c.feeT} · ${c.reg ? `📅 ${esc(c.reg.t)} 시험 (D-${c.reg.dd})` : c.wait != null ? `⏳ 발표까지 ${c.wait}일` : c.next ? `다음 시험 ${esc(c.next.t)} (D-${c.next.dd})` : '일정 없음'}${c.tries ? ` · 응시 ${c.tries}번` : ''}</p>
+    <div class="ct-b"><button type="button" data-cstudy="${c.id}"${c.study.ok ? '' : ' disabled'}>📖 인강 듣기 <small>${c.study.ok ? `⚡${C.ap}` : esc(c.study.why)}</small></button><button type="button" data-capply="${c.id}"${c.apply.ok ? '' : ' disabled'}>📝 접수 <small>${c.apply.ok ? c.feeT : esc(c.apply.why)}</small></button></div>` : ''}</div>`).join('');
+  showModal('cert', `📜 ${esc(C.app)}`, `<p class="hint">인강은 어디서나 ⚡${C.ap}${C.lib ? ' — 도서관이라 진도가 더 잘 나간다.' : ' (도서관에서 들으면 진도가 더 나간다).'} 접수해 두면 시험 날(토요일) 아침에 보러 간다 (⚡${C.examAp}), 발표는 2~3주 뒤. 딴 자격증은 이력서에 올라가 관련 직업 서류에 유리하다.</p>
+    ${have.length ? `<p class="sec-t">✔ 딴 자격증 ${have.length}개</p>` : ''}<div class="ct">${rows}</div>`);
+}
 function openAlbum() {
   const M = G.state().memories.slice().reverse();
   showModal('album', '📷 앨범', M.length ? `<p class="hint">추억 ${M.length}개 — 최근 것부터</p><div class="al">${M.map(m => `<div class="al-i"><span class="al-a">${m.age}살 · ${esc(m.season || '')} ${m.wx ? wxIcon(m.wx) : ''}</span><p>${esc(m.text)}</p></div>`).join('')}</div>` : '<p class="empty">아직 추억이 없다.</p>');
@@ -1877,6 +1951,8 @@ $('#where').addEventListener('click', e => {
   const d = b.dataset;
   if (d.a) { const a = G.actionList().find(x => x.id === d.a); if (a && G.needsSubject(a)) (a.id === 'shop' ? openShop() : a.id === 'houseHunt' ? openPhone('realty') : openStudy()); else if ((G.actPreview(d.a) || {}).dice) openAct(d.a); else G.doAction(d.a); }
   else if (d.pl) { mapMode = null; if (!(b.classList.contains('pin') && openRoute(d.pl, b))) G.goPlace(d.pl); }
+  else if (d.attend != null) G.attend(+d.attend);
+  else if ('toschool' in d) routeTo('campus');
   else if ('leave' in d) G.leavePlace();
   else if ('map' in d) openMap();
   else if (d.mapmode) { mapMode = d.mapmode; render(G.state()); }
@@ -1886,6 +1962,7 @@ $('#where').addEventListener('click', e => {
   else if ('dlv' in d) openPhone('delivery');
   else if ('endco' in d) G.endCompany();
   else if (d.enjoy) G.interact(d.enjoy, 'enjoy');
+  else if (d.quick) G.interact(d.who, d.quick);
   else if (d.hp) {
     const h = G.here().find(x => x.key === d.hp);
     if (!h) return;
@@ -1904,7 +1981,7 @@ $('#flow').addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   const f = b.dataset.flow;
-  if (f === 'duty') G.doDuty(); else G.skip(f);
+  if (f === 'duty') G.doDuty(); else if (f === 'attend') G.attend(); else if (f === 'toschool') routeTo('campus'); else G.skip(f);
 });
 $('#phoneBtn').addEventListener('click', () => openPhone('home'));
 $('#mBack').addEventListener('click', phoneBack);
@@ -1921,6 +1998,8 @@ mBody.addEventListener('click', e => {
   if (!b || b.disabled) return;
   const d = b.dataset;
   if (modalMode === 'create') { createClick(b); return; }
+  if (d.gray != null && modalMode === 'me') { G.setGray(d.gray === '1'); openMe(); return; }   // 샌드박스: 회색 아바타 켜고 끄기
+  if (modalMode === 'cert') { const top = mBody.scrollTop; if (d.cstudy) G.cert.study(d.cstudy); else if (d.capply) G.cert.apply(d.capply); if (modalMode === 'cert') { openCert(); mBody.scrollTop = top; } return; }
   if ('ntest' in d) { openNightTest(); return; }   // 💾 저장 칸 → 🧪 그날 밤 테스트
   if (modalMode === 'ntest') { if ('ntgo' in d) runNightTest(); return; }
   if (modalMode === 'quick') { quickClick(b); return; }

@@ -31,6 +31,22 @@ GAME_DATA.quick = {
     { id: 'work',    label: '취업 (고졸)', desc: '고등학교를 졸업하고 바로 일을 시작했다. 모아둔 돈은 있지만 학력은 없다.' },
   ],
   jobs: ['cvs', 'barista', 'rider', 'cook', 'hair', 'mechanic', 'creator', 'musician'],   // 고졸로 바로 시작할 수 있는 일
+  // 🎓 대학 졸업 후 시작: 2월 졸업식을 마치고 3월 1일부터. 나이는 학제·병역대로 (4년제 24 · 군필 남자 26 · 전문대 22 · 건축 5년 25 · 의대 6년 26)
+  gradEdu: [
+    { id: 'g_elite',   label: '명문대 졸업', tiers: [1, 2], desc: '이름 있는 대학을 막 졸업했다. 서류에서 눈에 띈다.', bonus: { smart: 10 } },
+    { id: 'g_normal',  label: '일반대 졸업', tiers: [3, 4], desc: '4년제를 막 졸업했다. 이제 취업 준비.' },
+    { id: 'g_college', label: '전문대 졸업', tiers: [5],    desc: '2년제를 마치고 바로 사회로. 실무 자격증이 힘이 된다.', bonus: { craft: 10 } },
+  ],
+  gpas: [{ id: '2.6', label: '2점대' }, { id: '3.2', label: '3.0~3.4' }, { id: '3.7', label: '3.5~3.9' }, { id: '4.2', label: '4.0 이상' }],
+  intern: [{ id: 'none', label: '없음' }, { id: 'office', label: '사무 인턴 6개월' }, { id: 'part', label: '알바 1년' }],
+  gjob: [{ id: 'hunt', label: '취업 준비 중' }, { id: 'hired', label: '졸업 전에 취업 확정' }],
+  gradArmy: [{ id: 'done', label: '군필 (전역)' }, { id: 'exempt', label: '면제' }],
+  gradCertMax: 3,
+  // 졸업 전에 취업이 확정됐을 때 학과별로 들어가는 자리 (조건이 안 맞으면 다음 것)
+  gradJobs: { cs: ['dev', 'data', 'gamedev'], business: ['marketer', 'office', 'sales'], economics: ['bank', 'office', 'insurance'], law: ['civil', 'office'], korean_lit: ['reporter', 'writer', 'office'],
+    media: ['pd', 'marketer', 'reporter'], psychology: ['hr', 'office'], political: ['civil', 'reporter', 'office'], philosophy: ['writer', 'office'], education: ['teacher', 'tutor'], social: ['caregiver', 'civil', 'office'],
+    theology: ['office', 'writer'], physics: ['data', 'office'], chemistry: ['office', 'data'], biology: ['data', 'office'], engineering: ['electric', 'office'], architecture: ['architect', 'interior'],
+    design: ['designer', 'marketer'], music: ['musician', 'tutor'], arts: ['designer', 'photographer'], medicine: ['doctor'], nursing: ['nurse'], culinary: ['cook', 'baker'], beauty: ['hair'] },
   money: { rich: [1000, 2000], comfy: [400, 800], normal: [100, 300], tight: [20, 50], poor: [0, 0], complex: [30, 150] },   // 시작 돈 (만원)
   wealthAdj: { rich: '부유한', comfy: '여유 있는', normal: '평범한', tight: '빠듯한', poor: '어려운', complex: '복잡한' },
   home: [{ id: 'parents', label: '본가에서' }, { id: 'goshiwon', label: '고시원' }, { id: 'own', label: '원룸 자취' }, { id: 'officetel', label: '오피스텔' }],   // data/housing.js

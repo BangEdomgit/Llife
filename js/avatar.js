@@ -2335,11 +2335,19 @@ function renderFull(a, size, st) {
   if (st.guides) o += guidesSVG(A);
   return o + '</svg>';
 }
+// 회색 아바타: 얼굴 없이 머리·어깨(전신이면 몸까지) 실루엣
+function graySVG(w, h, full) {
+  const vb = full ? 280 : 160;
+  return `<svg class="av av-gray" width="${w}" height="${h}" viewBox="0 0 120 ${vb}" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="${vb - 1}" rx="10"/><g fill="#9aa1aa">` + (full
+    ? '<circle cx="60" cy="40" r="19"/><path d="M60,63 C38,63 31,78 29,98 L25,168 H38 L43,262 H57 L60,182 L63,262 H77 L82,168 H95 L91,98 C89,78 82,63 60,63 Z"/>'
+    : '<circle cx="60" cy="62" r="27"/><path d="M60,95 C30,95 14,114 12,160 H108 C106,114 90,95 60,95 Z"/>') + '</g></svg>';
+}
 function render(a, size = 48, state = 25) {
   const st = typeof state === 'object' && state ? state : { age: state };
   const age = st.age ?? 25, full = !!st.full, adult = age >= 20;
   const w = Math.round(size), h = Math.round(size * (full ? 7 / 3 : 4 / 3));
   if (!a) return `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 ${full ? 280 : 160}" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="${full ? 279 : 159}" rx="10"/></svg>`;
+  if (a.gray) return graySVG(w, h, full);   // 샌드박스 '외모 정하지 않음' — 회색 실루엣
   if (adult && st.preIntimate) return renderPreIntimate(a, size, st);
   if (full) { LOD = size < 200 ? 1 : 2; LW = LOD < 2 ? 1.2 : 1; try { return renderFull(a, size, st); } finally { LOD = 2; LW = 1; } }
   // 작은 화면 (FACE_UPGRADE 1절): 96px 이하는 얼굴만 크롭 + 선 ×1.3 + 작은 디테일 끔. 함께 밤·아침 장면은 그대로

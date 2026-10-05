@@ -2139,8 +2139,26 @@ GAME_DATA.events = [
         memory: firstNight, pregnant: .05,
         risk: (s, a) => a.main() && a.main() !== a.focused() ? .2 : 0, riskTaken: (s, a) => (a.focused() || {}).taken ? .12 : 0,
         text: (s, a) => '모텔 엘리베이터 문이 닫히기도 전이었다. ' + nightLine(a, lover(a.focused()) ? 'lover' : 'fling') },
+      { label: '여기서, 지금', intimate: true, fling: true, quick: true, spot: 'alley', mood: 12, effect: { happy: [3, 6] }, p: { heart: [5, 9], close: [2, 5] },
+        memory: firstNight, pregnant: .04,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .25 : 0, riskTaken: (s, a) => (a.focused() || {}).taken ? .14 : 0,
+        do: s => { s.vars.spotLabel = '골목'; s.vars.spotKind = 'alley'; s.vars.spotCaught = Math.random() < (s.time === 2 ? .1 : .22); },
+        then: s => (s.vars.spotCaught ? 'sp_caught' : undefined),
+        text: '모텔까지 갈 여유가 없었다. 차가운 벽돌에 등을 기댄 {fp|이} 내 목을 끌어당겼다. 누가 올까 봐 숨을 죽인 채, 짧고 뜨겁게.' },
       { label: '오늘은 여기까지', p: { heart: [3, 6] }, effect: { happy: 1 },
         text: '이마를 맞댄 채 숨을 골랐다. "다음엔 안 놔줄 거야." {fp|이} 웃으며 먼저 골목을 나갔다.' },
+    ] },
+  // 골목·화장실에서 — 누가 봤다 (data/social.js quickSpots 의 caught 확률)
+  { id: 'sp_caught', type: 'trigger',
+    text: s => s.vars.spotKind === 'toilet' ? `옷매무새를 고치는데 ${s.vars.spotLabel || '화장실'} 칸 밖에서 누가 문을 쾅쾅 두드렸다. "안에 두 명 있는 거 다 들려요!"`
+      : s.vars.spotKind === 'bush' ? '수풀 밖에서 손전등 불빛이 흔들렸다. 산책하던 사람이 이쪽을 비추고 있었다.'
+      : `${s.vars.spotLabel || '골목'} 입구에서 누군가 걸음을 멈췄다. "…거기 뭐 해요?"`,
+    choices: [
+      { label: '태연한 척 나간다', check: { stat: 'charm', diff: 90 },
+        success: { text: '"속이 좀 안 좋아서요." 눈 하나 깜짝 안 하고 걸어 나왔다. 상대는 고개를 갸웃하더니 그냥 지나갔다.', effect: { happy: 1 } },
+        fail: { text: '얼굴이 새빨개진 채 빠져나왔다. 뒤에서 휴대폰 카메라 셔터 소리가 들린 것 같았다.', effect: { happy: -4 }, karma: -1 } },
+      { label: '손을 잡고 뛴다', text: '"뛰어!" {fp|의} 손을 잡고 반대쪽 끝까지 달렸다. 숨이 턱까지 찼는데 둘 다 웃음이 터졌다.', p: { close: [2, 4], heart: [2, 4] }, effect: { happy: 2 }, memory: true },
+      { label: '고개 숙여 사과한다', text: '"죄송합니다…" 고개를 푹 숙이고 빠져나왔다. 당분간 여긴 못 오겠다.', effect: { happy: -2 } },
     ] },
   // 애인·배우자가 있는 상대가 먼저 제안 — 내 외모(첫인상)나 매력이 A 이상이고 플러팅·섹드립·스킨십으로 달아올랐을 때 (data/social.js inviteRoll)
   //   집·모텔이면 바로 그날 밤, 밖이면 동행. 그 자리에선 상대 애인에게 안 들키고, 밤을 보낸 뒤 흔적(문자·자국)으로 들킬 수 있음
