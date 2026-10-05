@@ -1678,6 +1678,7 @@ function guidesSVG(A) {
 const tierOf = v => v >= 90 ? 4 : v >= 70 ? 3 : v >= 50 ? 2 : v >= 30 ? 1 : 0;
 // 맨몸 상반신 (전신 앵커, 전신 px 좌표): 팔(몸통 뒤) → 몸통 → 쇄골·겨드랑이 경계 → 가슴
 //   여자: 가슴 자리(꼭짓점 ±bx, 반지름 r)에만 윤곽선 + 입체 그림자 / 남자: 가슴 근육
+const BUST_MARK = '<!--bust-->';
 function bareTorso(a, A, skin, id) {
   const { y, w } = A, k = A.hs, { uw } = A.arm, female = a.g === 'f', sk = v => shade(skin, v), ny = y.neck;
   const ln = (d, c, wd, op) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${f1(wd * k)}" stroke-linecap="round" opacity="${op}"/>`;
@@ -1698,6 +1699,7 @@ function bareTorso(a, A, skin, id) {
   o += ln(clavD, sk(.66), 1.2, .45) + `<g transform="translate(0,${f1(-1.3 * k)})">${ln(clavD, '#fff', .9, .16)}</g>`;
   o += ln(`M${f1(60 - 1.5 * k)},${f1(cy0 - .2 * k)} Q60,${f1(cy0 + 2.4 * k)} ${f1(60 + 1.5 * k)},${f1(cy0 - .2 * k)}`, sk(.6), 1.1, .5);
   if (female && A.adult) {
+    o += BUST_MARK;
     // 가슴: 위쪽 바깥 둥근 선 + 안쪽에서 가슴골로 모이는 선 + 아래 윤곽 — 모두 가슴 자리 안에서만
     const bx = w.bust * .5, r = w.bust * (.42 + A.ci * .022), cy = y.bust, gap = Math.max(.5 * k, bx - r * .9);
     o += [-1, 1].map(s => {
@@ -1707,6 +1709,7 @@ function bareTorso(a, A, skin, id) {
         ln(`M${X(bx + r * .97)},${f1(cy + r * .1)} Q${X(bx + r * .62)},${f1(cy + r * 1.06)} ${X(Math.max(gap, bx - r * .45))},${f1(cy + r * .96)}`, sk(.6), 1.2, .45);
     }).join('');
     o += bustVolume(id + 'b', bx, cy, r, sk(.5), .34, true, k);
+    o = o.replace(BUST_MARK, `<g class="av-bust" data-cy="${f1(cy)}" data-r="${f1(r)}" data-k="${k.toFixed(4)}">`) + '</g>';   // 가슴 (함께 밤을 보내는 중엔 js/night.js가 출렁이게 함)
   } else if (A.adult) {
     // 가슴 근육 아랫선 + 아래 그림자 + 가운데 오목한 선
     const px = w.rib * .45, pr = w.rib * .5, py = y.bust - 2 * k;
@@ -1736,12 +1739,13 @@ function bareBody(a, A, skin, o) {
   // 이불(밤과 같은 라벤더 이불): 살 위 그림자 → 이불 → 접힌 단 → 주름 → 윗선 하이라이트
   const top = `M0,${by + 5} C18,${by - 3} 38,${by + 3} 60,${by} C80,${by - 3} 102,${by + 4} 120,${by - 1}`;
   s += `<path d="${top} L120,${by - 4} C102,${by + 1} 80,${by - 6} 60,${by - 3} C38,${by} 18,${by - 6} 0,${by + 2} Z" fill="${sk(.55)}" opacity=".22"/>`;
-  s += `<path d="${top} L120,160 L0,160 Z" fill="url(#${id}q)"/>`;
+  s += `<g transform="translate(60 0) scale(1.14 1) translate(-60 0)">`;   // 이불은 칸보다 조금 넓게 (인물이 흔들려도 가장자리가 안 보이게)
+  s += `<path d="${top} L120,178 L0,178 Z" fill="url(#${id}q)"/>`;
   s += `<path d="${top} L120,${by + 6} C102,${by + 11} 80,${by + 4} 60,${by + 7} C38,${by + 10} 18,${by + 4} 0,${by + 12} Z" fill="#ecdcf2" opacity=".45"/>`;
   s += `<path d="M0,${by + 10} C18,${by + 2} 38,${by + 8} 60,${by + 5} C80,${by + 2} 102,${by + 9} 120,${by + 4}" fill="none" stroke="#f3e6f8" stroke-width=".8" stroke-dasharray="2 2.4" opacity=".5"/>`;
   s += ln(`M20,${by + 14} C28,${by + 22} 24,${by + 32} 30,160 M86,${by + 12} C78,${by + 22} 84,${by + 30} 82,160 M52,${by + 13} C56,${by + 20} 52,${by + 28} 56,${by + 36}`, '#6e4d84', 2, .35);
   s += ln(`M22,${by + 14} C30,${by + 22} 26,${by + 32} 32,160 M88,${by + 12} C80,${by + 22} 86,${by + 30} 84,160`, '#f3e6f8', 1, .25);
-  s += ln(top, '#f6ecfa', 1.4, .75);
+  s += ln(top, '#f6ecfa', 1.4, .75) + '</g>';
   if (o.clutch) {
     // 이불 끝을 움켜쥔 두 손: 손등은 이불 위로, 손가락 네 개는 이불 끝을 넘어 아래로
     s += [47, 73].map(x => `<path d="M${x - 6.2},${by + .5} Q${x - 6},${by - 5} ${x},${by - 5.4} Q${x + 6},${by - 5} ${x + 6.2},${by + .5} Z" fill="${skin}"/>` +
@@ -2172,7 +2176,10 @@ function renderPortrait(a, size, st, crop) {
   const neck = c => `<path d="M${f1(60 - nh)},94 L${f1(60 + nh)},94 L${f1(60 + nh)},${f1(neckBot)} L${f1(60 - nh)},${f1(neckBot)} Z" fill="${c}"/>`;
   let o = crop ? `<svg class="av" width="${w}" height="${h}" viewBox="18 14 84 112" aria-hidden="true"><rect class="av-bg" x="18.4" y="14.4" width="83.2" height="111.2" rx="7"/>`
     : `<svg class="av" width="${w}" height="${h}" viewBox="0 0 120 160" aria-hidden="true"><rect class="av-bg" x=".5" y=".5" width="119" height="159" rx="10"/>`;
-  o += hp.back;
+  // 함께 밤을 보내는 중: 칸은 그대로 두고 인물(av-fig)·머리(av-hb·av-head)·가슴(av-bust)을 js/night.js가 따로 움직임
+  const mv = !!du;
+  if (mv) o += `<g class="av-fig"><g class="av-hb">${hp.back}</g><g class="av-body">`;
+  else o += hp.back;
   let cut = 0;
   if (af || du) {
     // 이불 높이: 여자는 가슴 꼭짓점보다 늘 3 이상 위 (가슴골까지만). 아침엔 만족감이 높을수록 조금 내려가고, 소심형은 끌어올려 움켜쥠
@@ -2184,7 +2191,9 @@ function renderPortrait(a, size, st, crop) {
     const T = topFull(a, OF, A, skinD, X), AR = armsFull(A, null, 'default', skinD, T, A.w.hip + 2);
     o += BG(AR.back) + neck(skinD) + BG(T.svg + AR.front);
   }
+  if (mv) o += '</g><g class="av-head">';
   o += headSVG(a, X, age, st, { skin, hc: browColor(a, age), hp, nh, neckBot, af, tier, du, cut, chin2: A.chubbyM });
+  if (mv) o += '</g></g>';
   return o + '</svg>';
 }
 

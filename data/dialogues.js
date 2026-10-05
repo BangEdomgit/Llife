@@ -2,15 +2,20 @@
 // 엔진: js/game.js '대화 이벤트' (pickDialogue·dlgChoose) / 결과 계산: data/social.js 각 상호작용의 run(s, p, a, ch)
 //
 // 장면 { id, kind, text, when, weight, choices }
-//   kind     talk 대화 / flirt 플러팅 / dirty 섹드립 / touch 스킨십
+//   kind     talk 대화 / flirt 플러팅 / dirty 섹드립 / touch 스킨십 / hang 같이 놀기 / gift 선물 / listen 고민 들어주기 / family 함께 시간 보내기 /
+//            date 데이트 / drink 같이 한잔 / argue 다투기 / confess 고백 / apologize 사과 / propose 청혼 / bed 잠자리 제안
+//   follow   true면 2차 장면 (무작위로 안 뽑히고, 선택지의 next로만 이어짐). iid: 이어질 때 쓸 상호작용 (없으면 앞과 같음)
 //   text     상황 한 줄 ({p}: 상대, 조사는 {p|이}). 함수면 (s, p, a) → 문장
 //   when     pers [성격] / stage [new 처음 · acq 아는 사이 · friend 친구 · close 친한 · lover 연인 · fwb 섹파] / place [장소] / notPlace /
 //            night (저녁·밤) / weather [날씨] / season [계절] / drunk (최소 취기) / close [최소, 최대] / heart [최소, 최대] /
-//            taken (애인 있음, 내가 아닌) / married (기혼, 내가 배우자 아님) / kin (가족과의 장면) / gender (상대 성별) / me (내 성별) /
+//            taken (애인 있음, 내가 아닌) / married (기혼, 내가 배우자 아님) / kin (가족과의 장면, 'any'면 가족·남 모두) / gender (상대 성별) / me (내 성별) /
 //            age [최소, 최대] (상대 나이) / myAge [최소, 최대] / adult (둘 다 19살 이상) / if(s, p, a) /
 //            look [내 외모 hi·mid·lo] / theirLook [상대 외모 hi·mid·lo] (내 외모 = 첫인상 등급 A 이상 hi·D 이하 lo, 상대 = 생김새 B 이상 hi·E 이하 lo)
 //   weight   뽑힐 비중 (기본 1, 조건이 구체적일수록 엔진이 더 자주 뽑음)
-//   choices  [{ t: 내 말·행동 (함수면 (s, p) → 문장), tone: 말투, risk: 0 살짝 · 1 보통 · 2 과감하게 (플러팅·섹드립), ok/ng: 이 선택지만의 반응 }]
+//   choices  [{ t: 내 말·행동 (함수면 (s, p) → 문장), tone: 말투, risk: 0 살짝 · 1 보통 · 2 과감하게 (플러팅·섹드립), ok/ng: 이 선택지만의 반응,
+//              need: { 스탯: 등급 } 그 등급 이상일 때만 보이는 선택지(잘 맞음 취급 + ×1.2), look: [내 외모 단계], if(s, p): 보일 조건(상대 성격 등),
+//              next: 고른 뒤 이어지는 2차 장면 id (잘 됐을 때, nextIf: 'any'면 늘) }]
+//   스탯: smart 지능 / fit 체력 / face 생김새 / style 꾸밈 / charm 매력 / art 감성 / craft 손재주
 //
 // 말투(tone) — 상대 성격마다 좋아하는 말투(+1)와 싫어하는 말투(-1)가 있음 (toneFit)
 //   joke 농담 / warm 다정 / listen 들어주기 / ask 물어보기 / deep 진지하게 / tease 장난 / bold 직진 / shy 수줍게 / cool 무심하게 / smart 똑똑하게 / brag 자랑 / back 물러서기
@@ -267,6 +272,7 @@ GAME_DATA.dialogues = [
       { t: '"그거 나 데뷔 때부터 알았어."', tone: 'brag' },
       { t: '"아, 그거 원곡이 따로 있잖아. 그것도 좋아."', tone: 'smart' },
       { t: '"너 이런 노래 들어? 의외다~"', tone: 'tease' },
+      { t: '(한 소절 따라 불러 준다)', tone: 'warm', need: { art: 'B' }, ok: '{p|이} 이어폰을 빼고 넋을 놓고 들었다. "…너 노래 왜 이렇게 잘해?"' },
     ] },
   { id: 't_hungry', kind: 'talk',
     text: '{p|이} 배를 문지르며 말했다. "배고프다. 뭐 먹지?"',
@@ -303,8 +309,8 @@ GAME_DATA.dialogues = [
   { id: 't_secret', kind: 'talk', when: { stage: ['close', 'lover', 'fwb'] }, weight: 1.5,
     text: '{p|이} 머뭇거리다 말했다. "이거 아무한테도 말 안 한 건데…"',
     choices: [
-      { t: '"천천히 말해. 끝까지 들을게."', tone: 'listen' },
-      { t: '"말 안 해도 돼. 준비되면 해."', tone: 'deep' },
+      { t: '"천천히 말해. 끝까지 들을게."', tone: 'listen', next: 't2_secret' },
+      { t: '"말 안 해도 돼. 준비되면 해."', tone: 'deep', next: 't2_secret' },
       { t: '"드디어 나도 비밀 클럽 가입인가."', tone: 'joke' },
       { t: '"응, 말해."', tone: 'cool' },
     ] },
@@ -313,7 +319,7 @@ GAME_DATA.dialogues = [
     choices: [
       { t: '"당연하지. 그때 너 엄청 긴장했잖아."', tone: 'warm' },
       { t: '"기억나지. 너 그때 좀 이상했어."', tone: 'tease' },
-      { t: '"…솔직히 그때부터 좀 신경 쓰였어."', tone: 'shy' },
+      { t: '"…솔직히 그때부터 좀 신경 쓰였어."', tone: 'shy', next: 't2_firstmet' },
       { t: '"가물가물한데."', tone: 'cool' },
     ] },
   { id: 't_bored', kind: 'talk',
@@ -365,6 +371,7 @@ GAME_DATA.dialogues = [
       { t: '"그래서 그 팔뚝이구나."', tone: 'tease' },
       { t: '"나도 3대 300은 치지."', tone: 'brag' },
       { t: '"멋있다. 꾸준한 게 제일 어려운데."', tone: 'warm' },
+      { t: '"내일 아침에 같이 뛸래? 페이스 맞춰 줄게."', tone: 'bold', need: { fit: 'B' }, ok: '{p|이} 내 다리를 훑어보더니 웃었다. "…좀 하는 사람이네. 콜."' },
     ] },
   { id: 't_book', kind: 'talk', when: { if: hobbyOr('book', ['library']) }, weight: 1.5,
     text: '{p|이} 읽던 책을 덮으며 말했다. "이 책 결말이 너무 허무해."',
@@ -373,6 +380,7 @@ GAME_DATA.dialogues = [
       { t: '"작가가 일부러 열어 둔 거 아닐까? 해석하기 나름이잖아."', tone: 'smart' },
       { t: '"허무한 결말이 오히려 오래 남더라."', tone: 'deep' },
       { t: '"나는 책 표지만 봐도 졸려."', tone: 'joke' },
+      { t: '"그 작가 전작이랑 이어지는 결말이야. 같이 보면 보여."', tone: 'smart', need: { smart: 'B' }, ok: '{p|이} 눈을 반짝였다. "진짜? 그거 더 얘기해 줘."' },
     ] },
   { id: 't_cook', kind: 'talk', when: { if: hobbyOr('cook', ['market']) }, weight: 1.5,
     text: '{p|이} 장바구니를 들어 보였다. "오늘 김치찌개 끓일 거야."',
@@ -397,6 +405,7 @@ GAME_DATA.dialogues = [
       { t: '"음… 솔직하게 말해도 돼?"', tone: 'tease' },
       { t: '"그것보단 아까 그게 체형에 더 맞아."', tone: 'smart' },
       { t: '"다 비슷해 보이는데."', tone: 'cool' },
+      { t: '(옷걸이 사이에서 하나를 꺼내 건넨다) "이게 너한테 딱이야."', tone: 'smart', need: { style: 'B' }, ok: '{p|이} 거울 앞에 서더니 감탄했다. "…너 이거 일로 해야겠다."' },
     ] },
   { id: 't_draw', kind: 'talk', when: { if: (s, p) => p.hobby === 'draw' || p.hobby === 'music' }, weight: 1.5,
     text: (s, p) => p.hobby === 'draw' ? '{p|이} 수첩을 숨기다 들켰다. 그림이 빼곡했다.' : '{p|이} 흥얼거리던 노래를 멈췄다. "들었어? 내가 만든 거야."',
@@ -612,15 +621,16 @@ GAME_DATA.dialogues = [
   { id: 'f_type', kind: 'flirt', when: { stage: ['acq', 'friend', 'close'] },
     text: '{p|이} 물었다. "너는 이상형이 어떻게 돼?"',
     choices: [
-      { t: '"지금 내 앞에 있는 사람."', tone: 'bold', risk: 2 },
+      { t: '"지금 내 앞에 있는 사람."', tone: 'bold', risk: 2, next: 'f2_type' },
       { t: '"웃을 때 눈이 없어지는 사람. 어? 너네."', tone: 'joke', risk: 1 },
       { t: '"같이 있으면 편한 사람."', tone: 'deep', risk: 0 },
       { t: '"너부터 말해 봐."', tone: 'ask', risk: 0 },
+      { t: '(대답 대신 가만히 웃으며 눈을 맞춘다)', tone: 'bold', risk: 1, look: ['hi'], ok: '{p|이} 숨을 들이켰다. 대답을 들은 얼굴이었다.' },
     ] },
   { id: 'f_number', kind: 'flirt', when: { stage: ['new', 'acq'] }, weight: 1.5,
     text: '헤어질 때가 됐다. {p|이} 머뭇거리며 휴대폰을 만지작거렸다.',
     choices: [
-      { t: '"번호 줘. 다음엔 내가 먼저 연락할게."', tone: 'bold', risk: 2 },
+      { t: '"번호 줘. 다음엔 내가 먼저 연락할게."', tone: 'bold', risk: 2, next: 'f2_number' },
       { t: '"휴대폰 만지는 거 보니 내 번호 저장하려는 거지?"', tone: 'tease', risk: 1 },
       { t: '"…다음에 또 볼 수 있을까?"', tone: 'shy', risk: 0 },
       { t: '"그럼 다음에 봐."', tone: 'cool', risk: 0 },
@@ -862,8 +872,8 @@ GAME_DATA.dialogues = [
   { id: 'd_lastbus', kind: 'dirty', when: { night: true, notPlace: ['home', 'motel'] }, weight: 1.5,
     text: '{p|이} 시계를 보며 말했다. "막차 끊겼다…"',
     choices: [
-      { t: '"우리 집 가까운데. 자고 가."', tone: 'bold', risk: 2 },
-      { t: '"막차 끊긴 거, 일부러 그런 거지?"', tone: 'tease', risk: 1 },
+      { t: '"우리 집 가까운데. 자고 가."', tone: 'bold', risk: 2, next: 'd2_lastbus' },
+      { t: '"막차 끊긴 거, 일부러 그런 거지?"', tone: 'tease', risk: 1, next: 'd2_lastbus' },
       { t: '"그럼 첫차까지 같이 버티는 거다."', tone: 'joke', risk: 0 },
       { t: '"택시 잡아 줄게. 도착하면 연락해."', tone: 'back', risk: 0 },
     ] },
@@ -894,7 +904,7 @@ GAME_DATA.dialogues = [
   { id: 'd_dream', kind: 'dirty',
     text: '{p|이} 묘하게 웃으며 말했다. "어젯밤 꿈에 너 나왔어."',
     choices: [
-      { t: '"꿈에서 우리 뭐 했는데? 자세히."', tone: 'bold', risk: 2 },
+      { t: '"꿈에서 우리 뭐 했는데? 자세히."', tone: 'bold', risk: 2, next: 'd2_dream' },
       { t: '"꿈에서 나 잘했어?"', tone: 'tease', risk: 1 },
       { t: '"출연료 청구할게."', tone: 'joke', risk: 0 },
       { t: '"좋은 꿈이었길."', tone: 'back', risk: 0 },
@@ -1122,7 +1132,7 @@ GAME_DATA.dialogues = [
     text: '헤어질 시간이 됐다. {p|이} 쉽게 발을 떼지 못했다.',
     choices: [
       { t: '(가볍게 안아 준다)', tone: 'warm', risk: 1 },
-      { t: '(허리를 끌어당겨 이마를 맞댄다)', tone: 'bold', risk: 2 },
+      { t: '(허리를 끌어당겨 이마를 맞댄다)', tone: 'bold', risk: 2, next: 'h2_night' },
       { t: '(손을 꼭 잡았다 놓는다)', tone: 'shy', risk: 0 },
       { t: '"조심히 들어가."', tone: 'back', risk: 0 },
     ] },
@@ -1173,6 +1183,425 @@ GAME_DATA.dialogues = [
       { t: '(어깨에 붙은 머리카락을 떼어 주며 손끝을 머문다)', tone: 'warm', risk: 1 },
       { t: '(허리를 끌어당겨 이마를 맞댄다)', tone: 'bold', risk: 2 },
       { t: '(손을 거둔다)', tone: 'back', risk: 0 },
+    ] },
+
+  /* ═════════ 2차 장면 (선택지 next로만 이어짐) ═════════ */
+  { id: 'f2_number', kind: 'flirt', follow: true,
+    text: '{p|이} 휴대폰을 내밀었다. "그럼 저장해. 내 이름 뭐라고 저장할 건데?"',
+    choices: [
+      { t: '"…\'내 사람\'?"', tone: 'bold', risk: 2 },
+      { t: '"네 이름 그대로. 예쁘니까."', tone: 'warm', risk: 1 },
+      { t: '"하트 이모티콘 하나."', tone: 'tease', risk: 1 },
+      { t: '(웃으며 이름만 저장한다)', tone: 'cool', risk: 0 },
+    ] },
+  { id: 'f2_type', kind: 'flirt', follow: true,
+    text: '{p|이} 잠깐 굳었다가, 고개를 숙이고 웃었다. "…그거 진심이야?"',
+    choices: [
+      { t: '"응. 진심."', tone: 'deep', risk: 1 },
+      { t: '"반은 농담, 반은 진심."', tone: 'joke', risk: 0 },
+      { t: '"확인해 볼래?"', tone: 'bold', risk: 2 },
+      { t: '(대답 대신 웃는다)', tone: 'shy', risk: 0 },
+    ] },
+  { id: 't2_secret', kind: 'talk', follow: true,
+    text: '{p|이} 한참 이야기를 하다 눈가를 훔쳤다. "…이런 얘기 한 거 처음이야."',
+    choices: [
+      { t: '"말해 줘서 고마워. 아무한테도 안 해."', tone: 'warm' },
+      { t: '(말없이 어깨를 토닥인다)', tone: 'listen' },
+      { t: '"이제 너 약점 하나 잡았다."', tone: 'joke' },
+      { t: '"나도 하나 말해 줄까? 공평하게."', tone: 'deep' },
+    ] },
+  { id: 't2_firstmet', kind: 'talk', follow: true,
+    text: '{p|이} 눈을 동그랗게 떴다. "…진짜? 그때부터?"',
+    choices: [
+      { t: '"응. 그날 네가 웃는 거 보고."', tone: 'shy' },
+      { t: '"농담이야~ 반쯤."', tone: 'tease' },
+      { t: '"왜, 너는 아니었어?"', tone: 'ask' },
+      { t: '"됐어, 잊어."', tone: 'cool' },
+    ] },
+  { id: 'h2_night', kind: 'touch', follow: true,
+    text: '이마를 맞댄 채 숨이 섞였다. {p|이} 천천히 눈을 감았다.',
+    choices: [
+      { t: '(천천히 입을 맞춘다)', tone: 'bold', risk: 2, ok: '{p|이} 내 옷깃을 꼭 쥐었다. 한참 뒤에야 입술이 떨어졌다.' },
+      { t: '(코끝을 비비고 웃는다)', tone: 'warm', risk: 1 },
+      { t: '(꼭 끌어안는다)', tone: 'listen', risk: 1 },
+      { t: '"…오늘은 여기까지."', tone: 'back', risk: 0 },
+    ] },
+  { id: 'd2_lastbus', kind: 'dirty', follow: true,
+    text: '{p|이} 잠깐 고민하더니 휴대폰을 껐다. "…진짜 자기만 하는 거다?"',
+    choices: [
+      { t: '"그건 장담 못 하는데."', tone: 'tease', risk: 1, next: 'b2_home' },
+      { t: '(대답 대신 손을 잡고 걷는다)', tone: 'bold', risk: 2, next: 'b2_home' },
+      { t: '"응, 약속. 소파는 내가 쓸게."', tone: 'back', risk: 0 },
+      { t: '"너 하는 거 봐서."', tone: 'joke', risk: 0 },
+    ] },
+  { id: 'd2_dream', kind: 'dirty', follow: true,
+    text: '{p|이} 귀까지 빨개져서 내 팔을 때렸다. "…말 못 해. 그냥, 좋았어."',
+    choices: [
+      { t: '"그럼 꿈 말고 진짜로 해 볼래?"', tone: 'bold', risk: 2 },
+      { t: '"좋았다니 다행이네. 꿈속의 나한테 질투 나는데."', tone: 'tease', risk: 1 },
+      { t: '"오늘 밤에도 나와 줄게."', tone: 'joke', risk: 0 },
+      { t: '(웃으며 화제를 돌린다)', tone: 'back', risk: 0 },
+    ] },
+  { id: 'b2_home', kind: 'bed', follow: true, iid: 'sexAsk',
+    text: '현관문이 닫혔다. 불을 켜기도 전에 {p}의 숨이 가까웠다.',
+    choices: [
+      { t: '(벽에 기대 선 {p}를 끌어당긴다)', tone: 'bold', risk: 2 },
+      { t: '"…괜찮아?" (눈을 맞춘다)', tone: 'warm', risk: 1 },
+      { t: '(말없이 손을 잡고 안으로 이끈다)', tone: 'cool', risk: 1 },
+      { t: '"물 한 잔 줄까?" (한 발 물러선다)', tone: 'back', risk: 0 },
+    ] },
+  { id: 'c2_after', kind: 'talk', follow: true, iid: 'talk',
+    text: '{p|이} 붉어진 얼굴로 물었다. "그럼… 우리 이제 뭐라고 불러?"',
+    choices: [
+      { t: '"자기? 아니면 여보?"', tone: 'tease' },
+      { t: '"그냥 이름 불러 줘. 네가 부르면 다르게 들려."', tone: 'warm' },
+      { t: '"…애인?" (괜히 고개를 돌린다)', tone: 'shy' },
+      { t: '"천천히 정하자. 시간 많잖아."', tone: 'deep' },
+    ] },
+  { id: 'g2_duet', kind: 'hang', follow: true,
+    text: '{p|이} 마이크를 하나 더 집어 들었다. "듀엣 하자. 이거 알지?"',
+    choices: [
+      { t: '(화음까지 넣어 부른다)', tone: 'warm', need: { art: 'B' }, ok: '노래가 끝나자 {p|이} 박수를 치며 소리를 질렀다. "우리 데뷔하자!"' },
+      { t: '"내가 랩 파트 할게."', tone: 'joke' },
+      { t: '(가사 보면서 열심히 따라간다)', tone: 'shy' },
+      { t: '"난 탬버린 담당."', tone: 'tease' },
+    ] },
+  { id: 'gf2_open', kind: 'talk', follow: true, iid: 'talk',
+    text: '{p|이} 포장을 뜯다 말고 나를 봤다. "…이거 내가 갖고 싶다고 한 거 어떻게 알았어?"',
+    choices: [
+      { t: '"네가 하는 말은 다 기억해."', tone: 'warm' },
+      { t: '"내가 좀 눈치가 빠르지."', tone: 'brag' },
+      { t: '"비밀."', tone: 'tease' },
+      { t: '"지나가면서 한 말이 계속 생각나서."', tone: 'shy' },
+    ] },
+  { id: 'dt2_door', kind: 'touch', follow: true, iid: 'touch',
+    text: '데이트가 끝나고 집 앞. {p|이} 쉽게 발을 떼지 못했다.',
+    choices: [
+      { t: '(끌어안고 머리에 입을 맞춘다)', tone: 'warm', risk: 1 },
+      { t: '(허리를 당겨 이마를 맞댄다)', tone: 'bold', risk: 2 },
+      { t: '(손을 꼭 잡았다 놓는다)', tone: 'shy', risk: 0 },
+      { t: '"들어가. 도착하면 연락할게."', tone: 'back', risk: 0 },
+    ] },
+  { id: 'dr2_why', kind: 'talk', follow: true, iid: 'talk',
+    text: '{p|이} 잔을 내려놓고 턱을 괴었다. "근데 너는 왜 연애 안 해? 아니, 하고 있나?"',
+    choices: [
+      { t: '"좋은 사람 기다리는 중이야."', tone: 'deep' },
+      { t: '"지금 하는 중일지도?" (눈을 맞춘다)', tone: 'bold' },
+      { t: '"술 들어가니까 궁금한 게 많아지네?"', tone: 'tease' },
+      { t: '"그건 비밀."', tone: 'cool' },
+    ] },
+  { id: 'ar2_cold', kind: 'apologize', follow: true, iid: 'apologize',
+    text: '한참 말이 없었다. {p|이} 먼저 등을 돌렸다. 이대로 두면 오래갈 것 같았다.',
+    choices: [
+      { t: '"…미안. 내가 말이 심했어."', tone: 'deep' },
+      { t: '(뒤에서 조용히 기다린다)', tone: 'listen' },
+      { t: '"배고프지? 일단 밥부터 먹자."', tone: 'joke' },
+      { t: '(그대로 자리를 뜬다)', tone: 'cool' },
+    ] },
+
+  /* ═════════ 같이 놀기 ═════════ */
+  { id: 'g_karaoke', kind: 'hang', when: { myAge: [15, 45] },
+    text: '{p|와} 노래방에 왔다. {p|이} 리모컨을 건넸다. "너부터."',
+    choices: [
+      { t: '(18번을 열창한다)', tone: 'warm', need: { art: 'B' }, next: 'g2_duet', ok: '{p|이} 입을 벌린 채 박수를 쳤다. "가수 해도 되겠다!"' },
+      { t: '(신나는 노래로 분위기를 띄운다)', tone: 'joke', next: 'g2_duet' },
+      { t: '"너 먼저 해. 난 듣는 게 좋아."', tone: 'listen' },
+      { t: '(발라드를 진지하게 부른다)', tone: 'deep' },
+    ] },
+  { id: 'g_game', kind: 'hang', when: { if: (s, p) => p.hobby === 'game' || s.place === 'pcbang' }, weight: 1.5,
+    text: '{p|와} 게임을 하는데, {p|이} 계속 지고 있었다.',
+    choices: [
+      { t: '(슬쩍 져 준다)', tone: 'warm' },
+      { t: '(봐주지 않고 이긴다) "실력이지."', tone: 'brag' },
+      { t: '"이 캐릭터는 이렇게 하면 돼." (요령을 알려 준다)', tone: 'smart', need: { smart: 'C' } },
+      { t: '"진 사람이 음료수 사기다~"', tone: 'tease' },
+    ] },
+  { id: 'g_walk', kind: 'hang', when: { notPlace: ['home', 'motel'] },
+    text: '{p|와} 목적지 없이 동네를 걸었다. 낯선 골목이 나왔다.',
+    choices: [
+      { t: '"들어가 보자. 모험이야."', tone: 'bold' },
+      { t: '"여기 예전에 뭐 있었는지 알아?" (동네 이야기를 해 준다)', tone: 'smart' },
+      { t: '"다리 아프지 않아? 쉬었다 가자."', tone: 'warm' },
+      { t: '(사진을 찍어 준다)', tone: 'ask', need: { art: 'C' }, ok: '{p|이} 사진을 보더니 감탄했다. "나 이렇게 나온 거 처음 봐."' },
+    ] },
+  { id: 'g_sport', kind: 'hang', when: { if: (s, p) => p.hobby === 'sport' || ['park', 'gym'].includes(s.place) }, weight: 1.5,
+    text: '{p|이} 배드민턴 라켓을 들어 보였다. "한 판 할래?"',
+    choices: [
+      { t: '(진심으로 친다)', tone: 'bold', need: { fit: 'B' }, ok: '셔틀콕이 날카롭게 꽂혔다. {p|이} 땀을 닦으며 웃었다. "와, 너 운동 좀 했구나?"' },
+      { t: '(살살 맞춰 준다)', tone: 'warm' },
+      { t: '"지는 사람이 저녁 사기!"', tone: 'tease' },
+      { t: '"난 응원할게. 벤치에서."', tone: 'cool' },
+    ] },
+  { id: 'g_cook', kind: 'hang', when: { if: (s, p) => p.hobby === 'cook' || s.place === 'home' || s.place === 'market' },
+    text: '{p|와} 같이 요리를 하기로 했다. {p|이} 칼을 건넸다. "양파 썰 수 있어?"',
+    choices: [
+      { t: '(능숙하게 썬다)', tone: 'smart', need: { craft: 'B' }, ok: '{p|이} 감탄하며 내 손을 봤다. "…너 이런 것도 해?"' },
+      { t: '"눈물 나는 건 네가 해 줘."', tone: 'joke' },
+      { t: '(서툴지만 열심히 썬다)', tone: 'shy' },
+      { t: '"그냥 시켜 먹자."', tone: 'cool' },
+    ] },
+  { id: 'g_movie', kind: 'hang',
+    text: '{p|와} 영화를 고르는데, 둘이 보고 싶은 게 달랐다.',
+    choices: [
+      { t: '"네가 보고 싶은 거 보자."', tone: 'warm' },
+      { t: '"내 거 봐. 후회 안 하게 해 줄게."', tone: 'bold' },
+      { t: '"가위바위보로 정하자."', tone: 'joke' },
+      { t: '"평점이랑 감독 보면 이게 나아."', tone: 'smart' },
+    ] },
+  { id: 'g_any', kind: 'hang',
+    text: '{p|와} 오후 내내 같이 시간을 보냈다. {p|이} 다음엔 뭐 할지 물었다.',
+    choices: [
+      { t: '"너 하고 싶은 거."', tone: 'warm' },
+      { t: '"내가 아는 데 가자. 따라와."', tone: 'bold' },
+      { t: '"아무것도 안 하기. 이것도 놀이야."', tone: 'joke' },
+      { t: '"너는 쉬는 날 뭐 해?"', tone: 'ask' },
+    ] },
+
+  /* ═════════ 선물 ═════════ */
+  { id: 'gf_wrap', kind: 'gift',
+    text: '선물을 건네자 {p|이} 포장을 만지작거렸다. "뭐야, 무슨 날도 아닌데."',
+    choices: [
+      { t: '"그냥, 너 생각나서."', tone: 'warm', next: 'gf2_open' },
+      { t: '"무슨 날 만들려고."', tone: 'tease' },
+      { t: '"직접 만든 거야. 못생겨도 봐줘."', tone: 'shy', need: { craft: 'B' }, next: 'gf2_open', ok: '{p|이} 한참을 들여다봤다. "…이걸 만들었다고? 아까워서 못 쓰겠다."' },
+      { t: '"비싼 거니까 아껴 써."', tone: 'brag' },
+    ] },
+  { id: 'gf_style', kind: 'gift', when: { if: (s, p) => p.hobby === 'fashion' || p.style >= 3 },
+    text: '{p|이} 쇼핑백을 열어 보더니 눈을 크게 떴다. 옷이었다.',
+    choices: [
+      { t: '"네 스타일 보고 골랐어. 입어 봐."', tone: 'smart', need: { style: 'B' }, ok: '{p|이} 거울 앞에서 몇 번이나 돌아봤다. "나보다 내 취향을 더 잘 아네?"' },
+      { t: '"사이즈 안 맞으면 바꿔 줄게."', tone: 'warm' },
+      { t: '"커플로 샀어. 나도 하나 있어."', tone: 'bold' },
+      { t: '"점원이 추천해 줬어."', tone: 'cool' },
+    ] },
+  { id: 'gf_book', kind: 'gift', when: { if: (s, p) => ['book', 'draw', 'music'].includes(p.hobby) },
+    text: '{p|이} 선물을 풀었다. 좋아한다던 작가의 책, 첫 장에 손글씨가 적혀 있었다.',
+    choices: [
+      { t: '"첫 장에 쓴 거, 집에 가서 읽어."', tone: 'shy', need: { art: 'B' }, ok: '{p|이} 참지 못하고 그 자리에서 첫 장을 펼쳤다. 한참 말이 없었다.' },
+      { t: '"이 작가 신간 나왔길래."', tone: 'warm' },
+      { t: '"다 읽으면 나도 빌려줘."', tone: 'joke' },
+      { t: '"읽고 감상문 제출해."', tone: 'tease' },
+    ] },
+  { id: 'gf_any', kind: 'gift', when: { kin: 'any' },
+    text: '{p}에게 작은 선물을 내밀었다. {p|이} 놀란 얼굴로 받았다.',
+    choices: [
+      { t: '"별거 아니야. 그냥 주고 싶었어."', tone: 'warm' },
+      { t: '"이거 받으면 나한테 밥 한 번 사는 거다."', tone: 'joke' },
+      { t: '"…마음에 안 들면 말해."', tone: 'shy' },
+      { t: '"요즘 이게 유행이래."', tone: 'smart' },
+    ] },
+
+  /* ═════════ 고민 들어주기 ═════════ */
+  { id: 'l_work', kind: 'listen', when: { adult: true },
+    text: '{p|이} 한숨을 쉬었다. "회사에서 나만 일이 몰려. 그만둬야 하나 싶어."',
+    choices: [
+      { t: '(끝까지 듣고) "많이 지쳤구나."', tone: 'listen' },
+      { t: '"업무 목록 정리해서 팀장한테 보여 줘. 숫자로 말하면 달라."', tone: 'smart', need: { smart: 'B' }, ok: '{p|이} 휴대폰 메모장을 꺼냈다. "…그거 좋다. 내일 해 볼게."' },
+      { t: '"그만둬. 넌 어디 가도 잘해."', tone: 'bold' },
+      { t: '"그래도 버텨야지, 다들 그래."', tone: 'cool' },
+    ] },
+  { id: 'l_love', kind: 'listen',
+    text: '{p|이} 머뭇거리다 말했다. "좋아하는 사람이 있는데… 어떻게 해야 할지 모르겠어."',
+    choices: [
+      { t: '"어떤 사람인데? 천천히 말해 봐."', tone: 'listen' },
+      { t: '"그냥 말해. 후회하는 것보단 나아."', tone: 'bold' },
+      { t: '"…그 사람 혹시 내가 아는 사람이야?"', tone: 'tease' },
+      { t: '"상대 마음부터 확인해 봐. 신호가 있었어?"', tone: 'smart' },
+    ] },
+  { id: 'l_family', kind: 'listen',
+    text: '{p|이} 고개를 숙였다. "집에 무슨 일이 좀 있어. 말하기 좀 그런데…"',
+    choices: [
+      { t: '"말 안 해도 돼. 옆에 있을게."', tone: 'deep' },
+      { t: '(말없이 따뜻한 음료를 건넨다)', tone: 'warm' },
+      { t: '"내가 도울 수 있는 거 있으면 뭐든 말해."', tone: 'bold' },
+      { t: '"다들 그런 거 하나씩은 있어."', tone: 'cool' },
+    ] },
+  { id: 'l_self', kind: 'listen', when: { pers: ['shy', 'sensitive', 'warm'] }, weight: 1.5,
+    text: '{p|이} 작게 말했다. "나는 왜 이렇게 다 자신이 없을까."',
+    choices: [
+      { t: '"내가 아는 너는 생각보다 훨씬 괜찮은 사람이야."', tone: 'deep' },
+      { t: '(가만히 손을 잡아 준다)', tone: 'listen' },
+      { t: '"자신감은 연습이야. 작은 거부터 해 보자."', tone: 'smart' },
+      { t: '"에이, 그런 생각 하지 마!"', tone: 'joke' },
+    ] },
+  { id: 'l_any', kind: 'listen', when: { kin: 'any' },
+    text: '{p|이} 요즘 고민을 하나둘 꺼냈다.',
+    choices: [
+      { t: '(맞장구치며 끝까지 듣는다)', tone: 'listen' },
+      { t: '"그건 이렇게 해 보면 어때?"', tone: 'smart' },
+      { t: '"힘내! 넌 잘할 거야!"', tone: 'joke' },
+      { t: '"나도 비슷한 일 있었는데…" (내 얘기로 넘어간다)', tone: 'brag' },
+      { t: '(시처럼 다정한 말을 고른다)', tone: 'warm', need: { art: 'A' }, ok: '{p|이} 내 말을 한참 곱씹더니 웃었다. "…너한테 말하길 잘했다."' },
+    ] },
+
+  /* ═════════ 함께 시간 보내기 (가족) ═════════ */
+  { id: 'fm_cook', kind: 'family', when: { kin: true },
+    text: '{p|와} 저녁을 같이 차렸다. {p|이} 간을 보라며 숟가락을 내밀었다.',
+    choices: [
+      { t: '"맛있다! 역시."', tone: 'warm' },
+      { t: '"소금 조금만 더. 그럼 완벽해."', tone: 'smart', need: { craft: 'C' } },
+      { t: '"배고파서 다 맛있어."', tone: 'joke' },
+      { t: '"그냥 그래."', tone: 'cool' },
+    ] },
+  { id: 'fm_album', kind: 'family', when: { kin: true },
+    text: '{p|와} 옛날 사진첩을 넘겼다. 어릴 적 내 사진이 나왔다.',
+    choices: [
+      { t: '"이때 기억나? 이야기 해 줘."', tone: 'ask' },
+      { t: '"나 이때 진짜 귀여웠네."', tone: 'joke' },
+      { t: '(말없이 오래 들여다본다)', tone: 'deep' },
+      { t: '"그만 보자, 부끄러워."', tone: 'shy' },
+    ] },
+  { id: 'fm_any', kind: 'family', when: { kin: true },
+    text: '{p|와} 오랜만에 둘이 시간을 보냈다.',
+    choices: [
+      { t: '"요즘 별일 없지? 걱정돼서."', tone: 'warm' },
+      { t: '"맛있는 거 먹으러 가자. 내가 살게."', tone: 'bold' },
+      { t: '(가만히 이야기를 들어 준다)', tone: 'listen' },
+      { t: '(휴대폰을 보며 대충 대답한다)', tone: 'cool' },
+    ] },
+
+  /* ═════════ 데이트 ═════════ */
+  { id: 'dt_course', kind: 'date',
+    text: '데이트 날. {p|이} 물었다. "오늘 어디 갈 거야? 계획 있어?"',
+    choices: [
+      { t: '"완벽한 코스 짜 왔어. 따라오기만 해."', tone: 'bold', need: { style: 'B' }, next: 'dt2_door', ok: '저녁 노을이 지는 루프탑까지, 하루가 하나도 어긋나지 않았다. {p|이} 감동한 얼굴이었다.' },
+      { t: '"너 가고 싶은 데 다 가자."', tone: 'warm', next: 'dt2_door' },
+      { t: '"계획 없음! 발길 닿는 대로."', tone: 'joke' },
+      { t: '"맛집 리스트 3개 뽑아 왔어. 골라."', tone: 'smart' },
+    ] },
+  { id: 'dt_rain', kind: 'date', when: { weather: ['rain', 'storm'] }, weight: 1.5,
+    text: '데이트 도중 비가 쏟아졌다. 우산이 하나뿐이었다.',
+    choices: [
+      { t: '(우산을 {p} 쪽으로 기울인다)', tone: 'warm', next: 'dt2_door' },
+      { t: '"뛰자!" (손을 잡고 달린다)', tone: 'bold' },
+      { t: '"비 그칠 때까지 카페 가자."', tone: 'smart' },
+      { t: '"…이참에 붙어 있자."', tone: 'tease' },
+    ] },
+  { id: 'dt_exhibit', kind: 'date', when: { if: (s, p) => ['draw', 'music', 'book'].includes(p.hobby) },
+    text: '{p|와} 전시를 보러 왔다. {p|이} 한 그림 앞에서 오래 멈췄다.',
+    choices: [
+      { t: '"이 그림, 색이 너랑 닮았어."', tone: 'deep', need: { art: 'B' }, ok: '{p|이} 그림과 나를 번갈아 봤다. "…너는 가끔 이상하게 정확해."' },
+      { t: '"뭐가 보여? 설명해 줘."', tone: 'ask' },
+      { t: '(옆에 서서 같이 본다)', tone: 'listen' },
+      { t: '"배고프다. 밥 먹으러 갈까?"', tone: 'cool' },
+    ] },
+  { id: 'dt_any', kind: 'date',
+    text: '{p|와} 데이트를 했다. 저녁이 되자 {p|이} 내 팔짱을 꼈다.',
+    choices: [
+      { t: '"오늘 너무 좋았어. 또 하자."', tone: 'warm', next: 'dt2_door' },
+      { t: '"다음엔 더 좋은 데 데려갈게."', tone: 'bold' },
+      { t: '"벌써 끝나는 거 아쉽다."', tone: 'shy', next: 'dt2_door' },
+      { t: '"다리 아프다."', tone: 'cool' },
+    ] },
+
+  /* ═════════ 같이 한잔 ═════════ */
+  { id: 'dr_toast', kind: 'drink',
+    text: '{p|이} 잔을 들었다. "뭐에 건배할까?"',
+    choices: [
+      { t: '"오늘 여기 같이 있는 거에."', tone: 'warm', next: 'dr2_why' },
+      { t: '"우리 둘의 간에."', tone: 'joke' },
+      { t: '"원샷 하는 사람이 다음 잔 고르기!"', tone: 'bold', need: { fit: 'B' }, ok: '연거푸 잔을 비웠는데 끄떡없었다. {p|이} 혀를 내둘렀다. "너 주량 뭐야?"' },
+      { t: '"건배는 무슨. 그냥 마셔."', tone: 'cool' },
+    ] },
+  { id: 'dr_game', kind: 'drink', when: { if: (s, p) => ['bold', 'playful', 'sunny'].includes(p.personality) }, weight: 1.5,
+    text: '{p|이} 갑자기 술게임을 하자고 했다. 주변 테이블까지 쳐다봤다.',
+    choices: [
+      { t: '(분위기를 휘어잡는다)', tone: 'bold', need: { charm: 'B' }, ok: '테이블 전체가 웃음바다가 됐다. {p|이} 나를 보며 엄지를 치켜세웠다.' },
+      { t: '"좋아! 걸리면 벌칙은 소원 들어주기."', tone: 'tease', next: 'dr2_why' },
+      { t: '"난 구경만 할게."', tone: 'shy' },
+      { t: '"게임은 무슨, 얘기나 하자."', tone: 'cool' },
+    ] },
+  { id: 'dr_any', kind: 'drink',
+    text: '{p|와} 잔을 부딪쳤다. {p|이} 볼을 붉히며 웃었다.',
+    choices: [
+      { t: '"오늘 얼굴 좋아 보인다."', tone: 'warm' },
+      { t: '"한 잔 더? 오늘은 내가 쏜다."', tone: 'bold' },
+      { t: '"너 취하면 무슨 얘기 하는지 궁금하다."', tone: 'tease', next: 'dr2_why' },
+      { t: '"요즘 제일 재밌는 게 뭐야?"', tone: 'ask' },
+    ] },
+
+  /* ═════════ 다투기 ═════════ */
+  { id: 'ar_late', kind: 'argue',
+    text: '{p|이} 팔짱을 꼈다. "너 요즘 왜 이렇게 연락이 늦어?"',
+    choices: [
+      { t: '"바빴다고 했잖아. 몇 번을 말해."', tone: 'cool', next: 'ar2_cold', nextIf: 'any', ng: '{p}의 눈빛이 차갑게 식었다.' },
+      { t: '"그럼 너는? 너도 저번에 그랬잖아."', tone: 'smart', need: { smart: 'B' }, ok: '조목조목 따지자 {p|이} 말문이 막혔다. 이겼는데 이상하게 씁쓸했다.', next: 'ar2_cold', nextIf: 'any' },
+      { t: '(언성을 높인다)', tone: 'bold', next: 'ar2_cold', nextIf: 'any' },
+      { t: '"알았어, 알았어. 화내지 마~" (농담으로 넘긴다)', tone: 'joke', need: { charm: 'B' }, ok: '{p|이} 화를 내다 말고 피식 웃어 버렸다. "…진짜 못 살아."' },
+    ] },
+  { id: 'ar_any', kind: 'argue', when: { kin: 'any' },
+    text: '사소한 말 한마디가 문제였다. {p}의 표정이 굳었다.',
+    choices: [
+      { t: '"내가 뭘 잘못했는데?"', tone: 'cool', next: 'ar2_cold', nextIf: 'any' },
+      { t: '(할 말을 다 쏟아낸다)', tone: 'bold', next: 'ar2_cold', nextIf: 'any' },
+      { t: '"…그 말은 좀 서운했어." (차분하게 말한다)', tone: 'deep' },
+      { t: '"됐어, 그만하자."', tone: 'back' },
+    ] },
+
+  /* ═════════ 고백 ═════════ */
+  { id: 'c_night', kind: 'confess', when: { night: true },
+    text: '집에 가는 길, {p|와} 단둘이 걸었다. 지금이 아니면 못 할 것 같았다.',
+    choices: [
+      { t: '"나 너 좋아해. 꽤 오래."', tone: 'deep', next: 'c2_after' },
+      { t: '(걸음을 멈추고 눈을 맞춘다) "사귀자."', tone: 'bold', next: 'c2_after' },
+      { t: '"…혹시 나 어떻게 생각해?"', tone: 'shy', next: 'c2_after' },
+      { t: '"우리 그냥 사귈까? 하하."', tone: 'joke', next: 'c2_after' },
+      { t: '(써 온 편지를 건넨다)', tone: 'warm', need: { art: 'B' }, next: 'c2_after', ok: '{p|이} 편지를 다 읽고 한참 고개를 들지 못했다. 그러고는 내 손을 잡았다.' },
+    ] },
+  { id: 'c_cafe', kind: 'confess',
+    text: '{p|와} 마주 앉았다. 커피가 다 식도록 말을 꺼내지 못했다.',
+    choices: [
+      { t: '"할 말이 있어. 나 너 좋아해."', tone: 'deep', next: 'c2_after' },
+      { t: '"너랑 매일 이렇게 보고 싶어. 사귀자."', tone: 'bold', next: 'c2_after' },
+      { t: '"…아니야, 다음에 말할게." (머뭇거린다)', tone: 'shy', next: 'c2_after' },
+      { t: '(눈을 보고 그냥 웃는다) "알지? 내 마음."', tone: 'tease', look: ['hi'], next: 'c2_after', ok: '{p|이} 얼굴을 감쌌다. "…알아. 나도야."' },
+    ] },
+
+  /* ═════════ 사과 ═════════ */
+  { id: 'ap_any', kind: 'apologize', when: { kin: 'any' },
+    text: '{p}에게 할 말이 있었다. {p|은} 아직 눈을 마주치지 않았다.',
+    choices: [
+      { t: '"미안해. 내가 잘못했어. 변명 안 할게."', tone: 'deep' },
+      { t: '(손편지를 건넨다)', tone: 'warm', need: { craft: 'C' }, ok: '{p|이} 편지를 접어 주머니에 넣었다. "…다음부턴 말로 해."' },
+      { t: '"맛있는 거 사 줄게. 화 풀어~"', tone: 'joke' },
+      { t: '"미안. 근데 너도 좀 그랬어."', tone: 'smart' },
+    ] },
+
+  /* ═════════ 청혼 ═════════ */
+  { id: 'pr_any', kind: 'propose',
+    text: '주머니 속 반지 상자를 몇 번이나 만지작거렸다. {p|이} 왜 그러냐고 물었다.',
+    choices: [
+      { t: '(무릎을 꿇는다) "나랑 결혼해 줄래?"', tone: 'bold' },
+      { t: '"너랑 늙어 가고 싶어. 매일 아침을 너랑 맞고 싶어."', tone: 'deep' },
+      { t: '(직접 만든 반지를 꺼낸다)', tone: 'warm', need: { craft: 'B' }, ok: '{p|이} 반지를 끼고 손을 이리저리 돌려 봤다. 눈물이 맺혀 있었다.' },
+      { t: '(준비한 노래를 부른다)', tone: 'shy', need: { art: 'B' }, ok: '노래가 끝나기도 전에 {p|이} 울음을 터뜨렸다.' },
+      { t: '"우리 그냥… 결혼할까?"', tone: 'joke' },
+    ] },
+
+  /* ═════════ 잠자리 제안 ═════════ */
+  { id: 'b_eyes', kind: 'bed', when: { notPlace: ['home', 'motel'] },
+    text: '{p|와} 눈이 마주쳤다. 오늘은 그냥 헤어지기 싫었다.',
+    choices: [
+      { t: '"오늘 같이 있을래?"', tone: 'deep', risk: 1 },
+      { t: '(손을 잡고) "조용한 데 가자."', tone: 'bold', risk: 2 },
+      { t: '"…집에 가기 싫다." (혼잣말처럼)', tone: 'shy', risk: 0 },
+      { t: '(말없이 눈만 맞춘다)', tone: 'cool', risk: 1, look: ['hi'], ok: '{p|이} 대답 대신 내 손목을 잡았다.' },
+    ] },
+  { id: 'b_home', kind: 'bed', when: { place: ['home', 'motel'] },
+    text: '불이 은은했다. {p|이} 소파 끝에 앉아 나를 봤다.',
+    choices: [
+      { t: '(옆에 앉아 허리를 감싼다)', tone: 'bold', risk: 2 },
+      { t: '"…괜찮으면, 오늘은 같이 자자."', tone: 'deep', risk: 1 },
+      { t: '(머리카락을 쓸어 넘겨 준다)', tone: 'warm', risk: 1 },
+      { t: '(분위기 있는 음악을 튼다)', tone: 'smart', risk: 0, need: { art: 'C' } },
+    ] },
+  { id: 'b_any', kind: 'bed',
+    text: '{p|와} 단둘이 남았다. 공기가 달라졌다.',
+    choices: [
+      { t: '"오늘 밤, 너랑 있고 싶어."', tone: 'bold', risk: 2 },
+      { t: '"…싫으면 말해." (조심스럽게 다가간다)', tone: 'warm', risk: 1 },
+      { t: '"우리 오늘 좀 이상하지 않아?"', tone: 'tease', risk: 1 },
+      { t: '(웃으며 물 한 잔을 건넨다)', tone: 'back', risk: 0 },
     ] },
 
   { id: 'd_any', kind: 'dirty',

@@ -504,7 +504,7 @@ function allure(p, sit) {
   m += [0, 3, rand(10, 12), 5][d];
   return looks + human + rel + m;
 }
-const charmed = (p, sit, need) => allure(p, sit) + rand(-15, 15) >= need;
+const charmed = (p, sit, need) => allure(p, sit) + rand(-15, 15) + DLGB >= need;   // DLGB: 대화 이벤트에서 고른 말이 잘 맞으면 + (dlgChoose)
 // 그저 즐기는 관계: 외모(생김새·몸·꾸밈)와 매력이 높을수록 훨씬 쉬움 — 0(F·F) ~ 40(S·S)
 function casualBonus() {
   const st = S.stats, looks = g100(st.face) * .6 + g100(st.fit) * .2 + g100(st.style) * .2;
@@ -2338,13 +2338,13 @@ function interact(pid, iid) {
   const cost = socialCost(it, p);
   const ap = socialAp(it), h = hereEntry(pid), free = !!h && !h.used && !it.noFree && ap === 1;
   if (busy() || dutyPending() || (!free && S.ap < ap) || (cost && S.money < cost)) return;
-  const dlg = !cost && dlgFor(p, iid);
+  const dlg = dlgFor(p, iid);
   if (!free) spend(ap);
   if (h) h.used = true;
   if (['talk', 'hang', 'date', 'flirt', 'gift', 'listen', 'drinkWith'].includes(iid)) nearby(p);
   // 친밀 20~39인 기혼자: 이야기하다 보면 결혼한 티가 새어 나옴 (40이면 확실히 앎)
   if (['talk', 'hang', 'listen', 'drinkWith', 'date'].includes(iid) && p.married && !p.marriedKnown && p.close >= 20 && p.close < 40 && Math.random() < .35) { S.vars.fp = p.id; marriedHint(p); }
-  if (dlg) { openDialogue(p, iid, dlg); return; }   // 대화 이벤트: 장면을 띄우고, 고른 말로 결과 (dlgChoose)
+  if (dlg) { openDialogue(p, iid, dlg, cost); return; }   // 대화 이벤트: 장면을 띄우고, 고른 말로 결과 (dlgChoose). 돈은 고를 때 냄
   const o = it.run(S, p, api) || {};
   o.mult = interactMult(p, iid);
   if (cost) { const eff = Object.assign({}, resolve(o.effect)); eff.money = val(eff.money) - cost; o.effect = eff; }
@@ -2367,7 +2367,24 @@ function interactMult(p, iid) {
 // 대화하기·플러팅·섹드립 → 지금 상황·상대 성격에 맞는 장면 하나 → 고른 말의 말투(상대 성격과 궁합)·과감함에 따라 결과 (data/social.js run의 ch)
 //   같은 사람에게 최근 본 장면(8개)·전체 최근 장면(12개)은 다른 게 있으면 피함. 조건이 구체적인 장면일수록 더 잘 뽑힘
 //   대화 이벤트로 얻는 호감도는 그냥 행동보다 1.6배 (고르는 데 신경을 쓴 만큼)
-const DLG_KIND = { talk: 'talk', flirt: 'flirt', dirtyTalk: 'dirty', touch: 'touch' };
+const DLG_KIND = { talk: 'talk', flirt: 'flirt', dirtyTalk: 'dirty', touch: 'touch', hang: 'hang', gift: 'gift', listen: 'listen', family: 'family', date: 'date', drinkWith: 'drink',
+  argue: 'argue', confess: 'confess', apologize: 'apologize', propose: 'propose', sexAsk: 'bed' };
+// 그 밖의 상호작용(같이 놀기·선물·고민·가족·데이트·한잔·다투기)은 원래 결과에 고른 말의 궁합을 곱함 (잘 맞음 ×1.4 / 보통 ×1 / 안 맞음 ×0.5, 나쁜 값은 반대로)
+//   성공·실패가 있는 것(고백·사과·청혼·잠자리 제안)은 고른 말이 문턱을 바꿈 (DLGB: 궁합 ±10, 스탯 선택지 +8)
+//   선택지 need: { 스탯: 등급 } — 그 등급 이상일 때만 보임(스탯 선택지: 잘 맞음 취급 + ×1.2) / look: 내 외모 단계 / next: 이어지는 2차 장면 id (nextIf 'any'면 실패해도)
+const DLG_REACT = { hang: 1, gift: 1, listen: 1, family: 1, date: 1, drink: 1, argue: 0 }, DLG_CHECK = ['confess', 'apologize', 'propose', 'bed'], DLG_REPLACE = ['hang', 'gift', 'listen', 'family'];
+let DLGB = 0;
+const needMet = c => (!c.need || Object.keys(c.need).every(k => (S.stats[k] || 0) >= gradeMin(c.need[k]))) && (!c.look || c.look.includes(myLook()));
+const needTag = c => c.need ? ' · ' + Object.keys(c.need).map(k => `${LABEL[k]} ${c.need[k]}+`).join(', ') : '';
+// 원래 결과의 좋은 값은 k배, 나쁜 값(마이너스·원한)은 kn배
+function dlgScale(pd, k, kn) {
+  const out = {};
+  for (const key in pd) {
+    const bad = x => key === 'grudge' ? x > 0 : x < 0, sc = x => Math.round(x * (bad(x) ? kn : k)), v = pd[key];
+    out[key] = Array.isArray(v) ? v.map(sc) : typeof v === 'number' ? sc(v) : v;
+  }
+  return out;
+}
 const DLG_COND = ['pers', 'place', 'weather', 'season', 'drunk', 'taken', 'married', 'gender', 'if', 'night', 'heart', 'look', 'theirLook'];
 // 외모 단계: 나는 첫인상 등급(A 이상 hi · D 이하 lo), 상대는 생김새 등급(B 이상 hi · E 이하 lo — NPC 상위 15% / 하위 40%)
 const myLook = () => { const i = firstLook(); return i >= 5 ? 'hi' : i <= 2 ? 'lo' : 'mid'; };
@@ -2379,7 +2396,7 @@ const nightNow = () => phase() === 'adult' ? clockHour() >= 19 || clockHour() < 
 const inRange = (v, r) => !r || (v >= r[0] && v <= r[1]);
 function dlgFits(d, p) {
   const w = d.when || {}, age = npcAge(p);
-  if (!!w.kin !== (p.kind === 'family')) return false;
+  if (w.kin !== 'any' && !!w.kin !== (p.kind === 'family')) return false;
   if (w.pers && !w.pers.includes(p.personality)) return false;
   if (w.stage && !w.stage.includes(dlgStage(p))) return false;
   if (w.place && !w.place.includes(S.place)) return false;
@@ -2402,7 +2419,7 @@ function dlgFits(d, p) {
 function dlgFor(p, iid) {
   const kind = DLG_KIND[iid];
   if (!kind || !D.dialogues || S.age < 13 || p.kind === 'child' || npcAge(p) < 13) return null;
-  const all = D.dialogues.filter(d => d.kind === kind && dlgFits(d, p));
+  const all = D.dialogues.filter(d => d.kind === kind && !d.follow && dlgFits(d, p));
   if (!all.length) return null;
   const recent = new Set((p.dlg || []).concat(S.dlgR || [])), fresh = all.filter(d => !recent.has(d.id));
   return weighted(fresh.length ? fresh : all, d => (d.weight || 1) * (1 + DLG_COND.filter(k => (d.when || {})[k] != null).length));
@@ -2410,16 +2427,16 @@ function dlgFor(p, iid) {
 const dlgText = (v, p) => fill(typeof v === 'function' ? v(S, p, api) : v, { p: pname(p) });
 // 선택지 한 줄: 말투 아이콘 + 말 (+ 플러팅·섹드립은 살짝 / 과감하게)
 function dlgLabel(d, c, p) {
-  const r = d.kind === 'talk' || c.tone === 'back' ? '' : c.risk === 0 ? ' · 살짝' : c.risk === 2 ? ' · 과감하게' : '';
-  return `${(D.toneIcon || {})[c.tone] || '💬'} ${dlgText(c.t, p)}${r}`;
+  const r = c.risk == null || c.tone === 'back' || !['flirt', 'dirty', 'touch', 'bed'].includes(d.kind) ? '' : c.risk === 0 ? ' · 살짝' : c.risk === 2 ? ' · 과감하게' : '';
+  return `${(D.toneIcon || {})[c.tone] || '💬'} ${dlgText(c.t, p)}${needTag(c)}${r}`;
 }
-function openDialogue(p, iid, d) {
+function openDialogue(p, iid, d, cost) {
   S.vars.fp = p.id;
-  const text = dlgText(d.text, p), cs = d.choices.map((c, i) => i).filter(i => !d.choices[i].if || d.choices[i].if(S, p, api));
+  const text = dlgText(d.text, p), cs = d.choices.map((c, i) => i).filter(i => needMet(d.choices[i]) && (!d.choices[i].if || d.choices[i].if(S, p, api)));
   const tv = {}; TRANSIENT.forEach(k => { tv[k] = S.vars[k]; });
   p.dlg = (p.dlg || []).concat(d.id).slice(-8);
   S.dlgR = (S.dlgR || []).concat(d.id).slice(-12);
-  S.pending.push({ id: '@dlg', dlg: d.id, pid: p.id, iid, text, cs, labels: cs.map(i => dlgLabel(d, d.choices[i], p)), tv, who: p.id });
+  S.pending.push({ id: '@dlg', dlg: d.id, pid: p.id, iid, text, cs, labels: cs.map(i => dlgLabel(d, d.choices[i], p)), tv, who: p.id, cost: cost || 0 });
   log(text, { t: 'ask' });
   after();
 }
@@ -2429,11 +2446,30 @@ function dlgChoose(pd, i) {
   log('▸ ' + pd.labels[i], { t: 'pick' });
   if (!it.if(S, p, api)) { log('타이밍을 놓쳤다. 이야기가 흐지부지 끝났다.', { t: 'info' }); return; }
   S.vars.fp = p.id;
-  const fit = ((D.toneFit || {})[p.personality] || {})[c.tone] || 0;
-  const o = it.run(S, p, api, { tone: c.tone, risk: c.risk ?? 1, fit, ok: c.ok, ng: c.ng, scene: d.id }) || {};
+  const fit = ((D.toneFit || {})[p.personality] || {})[c.tone] || 0, kind = d.kind, stat = !!c.need;
+  let o;
+  if (kind in DLG_REACT || DLG_CHECK.includes(kind)) {
+    // 원래 결과 + 고른 말 (궁합·스탯 선택지·과감함)
+    DLGB = fit * 10 + (stat ? 8 : 0) + (c.risk === 2 ? (fit >= 0 ? 4 : -6) : c.risk === 0 ? 2 : 0);
+    try { o = it.run(S, p, api) || {}; } finally { DLGB = 0; }
+    const lv = fit > 0 || stat ? 'great' : fit < 0 ? 'meh' : 'good';
+    const k = (lv === 'great' ? 1.4 : lv === 'meh' ? .5 : 1) * (stat ? 1.2 : 1) * (c.risk === 2 ? 1.25 : c.risk === 0 ? .85 : 1), kn = lv === 'great' ? .6 : lv === 'meh' ? 1.4 : 1;
+    if (o.p) o.p = dlgScale(resolve(o.p), k, kn);
+    const ok = DLG_CHECK.includes(kind) ? o.ok !== false : lv !== 'meh', own = ok ? c.ok : c.ng, base = o.text;
+    if (DLG_REACT[kind]) {
+      const R = D.dlgReact.talk[lv], rx = own ? fill(own, { p: pname(p) }) : fill(pick(R[p.personality] || R.warm), { p: pname(p) });
+      if (lv === 'meh' && o.p && !Object.values(o.p).some(v => Array.isArray(v) ? v[1] < 0 : v < 0)) o.p.close = [-2, 0];   // 안 맞으면 조금 서먹해짐
+      o.text = DLG_REPLACE.includes(kind) ? rx : () => [fill(textOf(base) || '', { p: pname(p) }), rx].filter(Boolean).join(' ');
+    } else if (own) o.text = () => [fill(textOf(base) || '', { p: pname(p) }), fill(own, { p: pname(p) })].filter(Boolean).join(' ');
+    o.dlgOk = ok;
+  } else o = it.run(S, p, api, { tone: c.tone, risk: c.risk ?? 1, fit, ok: c.ok, ng: c.ng, scene: d.id }) || {};
+  if (pd.cost) { const eff = Object.assign({}, resolve(o.effect)); eff.money = val(eff.money) - pd.cost; o.effect = eff; }
   o.mult = interactMult(p, pd.iid);
   o.gk = Math.min(1, gainK() * 1.6);
   applyOutcome(o, p);
+  // 2차: 고른 말에 이어지는 장면 (잘 됐을 때만, nextIf 'any'면 늘). 행동은 더 안 씀
+  const okAll = o.dlgOk ?? o.ok ?? true, nx = c.next && dlgById(c.next);
+  if (nx && (c.nextIf === 'any' || okAll) && person(p.id) && !S.ended) openDialogue(p, nx.iid || pd.iid, nx);
 }
 
 /* ═════════ 직업 ═════════ */
@@ -2652,7 +2688,7 @@ const api = {
   changeP: (p, d) => applyP(p, d),
   startRelation, marry, breakUp, divorce, endMain, night, conceive, endAffair, guiltOf,
   drunk: () => S.drunk || 0, spouseWord: p => p && p.gender === 'f' ? '남편' : '아내',
-  canSex, onPill, fertile, refusal, known, myLook, theirLook, mateHere, sexIdx: () => sIdx(S.sexSkill), charmIdx: () => gIdx(S.stats.charm), lookIdx: () => firstLook(), sss: () => SSS(), sexGrade: () => sexGrade(S.sexSkill), turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
+  canSex, onPill, fertile, refusal, known, dlgBonus: () => DLGB, myLook, theirLook, mateHere, sexIdx: () => sIdx(S.sexSkill), charmIdx: () => gIdx(S.stats.charm), lookIdx: () => firstLook(), sss: () => SSS(), sexGrade: () => sexGrade(S.sexSkill), turn: () => turnNo(), today: () => S.dayN || 0, casualBonus, casualReady, companion, setCompanion, lust: p => lustOf(p), lustTop: () => lustTop().p, allure, charmed, need: k => C.allureNeed[k], firstLook, faceGrade: () => LETTERS[firstLook()], myFace: () => gIdx(S.stats.face),
   sentence, escape, tryJob, loseJob,
   perf: n => { S.perf = clamp(S.perf + n, 0, 100); },
   personality, sharedHobby, valueClash, valueLabel,

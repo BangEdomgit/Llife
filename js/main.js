@@ -376,12 +376,17 @@ function closeModal() {
   if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
 }
 
-const DLG_TITLE = { talk: '💬 대화', flirt: '😉 플러팅', dirty: '😏 섹드립', touch: '🤝 스킨십' };
+const DLG_TITLE = { talk: '💬 대화', flirt: '😉 플러팅', dirty: '😏 섹드립', touch: '🤝 스킨십', hang: '🎈 같이 놀기', gift: '🎁 선물', listen: '👂 고민 들어주기', family: '🏠 함께 시간 보내기',
+  date: '💕 데이트', drink: '🍻 같이 한잔', argue: '💢 다투기', confess: '💌 고백', apologize: '🙇 사과', propose: '💍 청혼', bed: '🛏 잠자리 제안' };
 const DLG_HINT = {
   talk: '말투가 상대 성격과 맞으면 훨씬 가까워지고, 안 맞으면 오히려 멀어진다.',
   flirt: '과감할수록 크게 설레게 하지만 실패하면 크게 잃는다. 말투가 성격과 맞으면 잘 통한다.',
   dirty: '과감할수록 크게 달아오르지만 선을 넘으면 신뢰를 잃는다. ✋ 물러서기는 늘 안전하다.',
   touch: '과감할수록 크게 달아오르지만 선을 넘으면 신뢰를 잃는다. 섹스 기술이 높을수록 손길이 잘 먹힌다.',
+  bed: '과감할수록 크게 얻고 크게 잃는다. 외모·매력이 높으면 더 잘 통한다.',
+  confess: '고백하는 방식이 상대 성격과 맞으면 받아줄 가능성이 커진다. 스탯이 받쳐 주면 특별한 방법이 생긴다.',
+  argue: '어떻게 다투느냐에 따라 상처가 커지거나 작아진다.',
+  _: '말투가 상대 성격과 맞으면 훨씬 좋아지고, 안 맞으면 효과가 줄어든다. 스탯이 높으면 특별한 선택지가 생긴다.',
 };
 let dlgBack = null;
 // 플러팅·섹드립 선택지 끝의 ' · 살짝' / ' · 과감하게'를 작은 표시로
@@ -393,7 +398,7 @@ function openEvent() {
   const who = ev.who && window.Avatar ? `<div class="ev-who">${Avatar.render(ev.who.look, 60, { age: ev.who.age, fig: ev.who.fig, libido: ev.who.libido || 0, ctx: ev.who.ctx })}<span><b>${esc(ev.who.name)}</b><br><span class="dim">${ev.who.age}살, ${esc(ev.who.rel)}</span></span></div>` : '';
   const dk = ev.dlg && DLG_TITLE[ev.dlg];   // 대화 이벤트: 제목 + 아래 도움말
   showModal('event', dk ? `${dk} · ${S.age}살 ${se.icon} ${wxIcon(S.weather)}` : `${S.age}살 ${se.icon} ${se.id} ${wxIcon(S.weather)}`,
-    `${who}<p>${esc(ev.text)}</p><div class="choices${dk ? ' dlg' : ''}">${ev.choices.map((c, i) => `<button type="button" data-c="${i}">[${i + 1}] ${dk ? riskTag(c) : esc(c)}</button>`).join('')}</div>${dk ? `<p class="dlg-hint">${DLG_HINT[ev.dlg]}</p>` : ''}`, false, ev.text);
+    `${who}<p>${esc(ev.text)}</p><div class="choices${dk ? ' dlg' : ''}">${ev.choices.map((c, i) => `<button type="button" data-c="${i}">[${i + 1}] ${dk ? riskTag(c) : esc(c)}</button>`).join('')}</div>${dk ? `<p class="dlg-hint">${DLG_HINT[ev.dlg] || DLG_HINT._}</p>` : ''}`, false, ev.text);
 }
 
 /* 성적표 (중간·기말·모의고사·수능) / 합격 — SCHOOL.md */
@@ -1121,7 +1126,7 @@ mBody.addEventListener('click', e => {
   if (d.s) { G.doAction('study', d.s === 'all' ? null : d.s); return; }
   if (d.shop != null) { closeModal(); G.doAction('shop', +d.shop); return; }
   if ('shopskip' in d) { closeModal(); G.doAction('shop'); return; }
-  if (d.dd != null) { const pid = modalArg; G.setDateOutfit(+d.dd); G.interact(pid, 'date'); return; }
+  if (d.dd != null) { const pid = modalArg; G.setDateOutfit(+d.dd); G.interact(pid, 'date'); dlgBack = G.state().pending.some(x => x.dlg) ? pid : null; return; }
   if (d.c != null) G.choose(+d.c);
   else if (d.full) { fullView = fullView === d.full ? null : d.full; if (d.full === 'me') openMe(); else openPerson(d.full); }
   else if (d.pv) { personFrom = 'people'; openPerson(d.pv); }

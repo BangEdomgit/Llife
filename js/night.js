@@ -449,6 +449,9 @@ function headReact(J, k, bury, jx, jy) {
 const POSE_LABEL = { missionary: '정상위', doggy: '후배위', cowgirl: '기승위', prone: '엎드려서', reverse: '역기승위', lotus: '좌위', legsUp: '굴곡위', seated: '뒤로 앉기' };
 // 절정 때 상대 고개: 엎드린 체위는 베개에 파묻고, 나머지는 뒤로 젖힘
 const BURY = { doggy: 1, prone: 1 };
+// 초상화 속 인물: 상대가 받는 쪽이면 부딪힐 때마다 밀렸다 돌아오고(방향은 체위마다), 움직이는 쪽(기승위·역기승위·좌위·뒤로 앉기)이면 박자를 따라 오르내림
+//   칸(초상화 테두리)은 그대로, 인물·머리·가슴이 따로 움직임 — 머리는 살짝 늦게, 가슴은 관성으로 출렁임
+const PUSH = { missionary: [0, -1], legsUp: [0, -1], doggy: [.55, -.6], prone: [.35, -.65], cowgirl: [0, .6], reverse: [0, .6], lotus: [0, .5], seated: [0, .6] };
 // 성격별로 고를 확률
 const POSE_W = { shy: { missionary: 4, prone: 1, doggy: 1, cowgirl: .5, lotus: 2, legsUp: .6, reverse: .3, seated: .8 },
   bold: { cowgirl: 3, doggy: 2.5, missionary: 1, prone: 1.5, reverse: 2.5, legsUp: 2, lotus: 1, seated: 1.5 },
@@ -623,11 +626,14 @@ function run(stage, job, done) {
   const E = Object.fromEntries(['back', 'fr', 'spec', 'cross', 'rip', 'tak', 'spark', 'g1', 'g2', 'ouch'].map(k => [k, sq('.sy-' + k)])), GB = sym.querySelector('#syBack'), GF = sym.querySelector('#syFront');
   // 받아들일 수 있는 세기: 체형이 가늘수록 낮음. 크기 × 세기가 넘으면 움찔, 아니면 하트
   const limit = { slim: 1.85, avg: 2.15, fit: 2.25, chubby: 2.35 }[sc.build] || 2.15, symHearts = [], symHS = sq('.sy-hs');
-  let symE = 0, symEV = 0, symX = 0, symXV = 0, ouchAt = -9, beatK = 0, beatKV = 0, faceY = 0, faceYV = 0, beatTxt = '', impT = -9, impS = 0, impExit = false, lastGx = null, lastHb = null, gv = 0;
+  let symE = 0, symEV = 0, symX = 0, symXV = 0, ouchAt = -9, beatK = 0, beatKV = 0, beatTxt = '', impT = -9, impS = 0, impExit = false, lastGx = null, lastHb = null, gv = 0;
   const beatEl = sq('.sy-beat'), sqEl = sq('.sy-sq'), drops = [];
   let peakUntil = -9, peakKind = '', sqBig = false, sqUntil = -9, lastSq = -9, ringX = 106, ringY = 28, ringRX = 9, ringRY = 12;   // 상대 절정: 초상화·♀ 물
   let t = 0, si = 0, hi = 0, sinkV = 0, bsV = 0, jy = 0, jyV = 0, jx = 0, jxV = 0, heat = 0, shakeAt = -9, shakeK = 0, buzz = 0, fount = 0;
   let P = null, capsM = [], capsF = [], lastD = 0, dEnd = null, faceKey = '', finale = false, acc = 0, last = 0;
+  // 초상화 속 인물 (상대 = p): 몸 figX·figY, 머리 늦음 hd, 가슴 출렁 bY (가슴이 클수록 크고 느리게)
+  const her = p.gender === 'f' ? 'f' : 'm', chest = ((G && G.look(p) || {}).body || {}).chest, cupK = her === 'f' ? ({ small: .7, large: 1.35 }[chest] || 1) : 0;
+  let figX = 0, figY = 0, figVX = 0, figVY = 0, lastVY = 0, hd = 0, hdV = 0, hdR = 0, bY = 0, bV = 0, figEl = null, headEls = [], bustEl = null, bustK = 1, bustCy = 0;
   const hearts = [];
   function poseNow() {
     pi = Math.min(pi, plan.poses.length - 1);
@@ -714,12 +720,14 @@ function run(stage, job, done) {
   }
   function impact(s) {
     const str = (s.kind === 'final' ? 2.2 : s.kind === 'strong' ? 1.8 : Math.min(1.2, .45 + .75 * s.A / 7)) * (s.her || s.fin ? 1 : snap);   // 찰짐: 섹스 기술 등급
-    sinkV += 40 * str; bsV -= 24 * str; symEV += 17 * str; symXV += 55 * str; beatKV += 9 * str; faceYV += 40 * str;
+    sinkV += 40 * str; bsV -= 24 * str; symEV += 17 * str; symXV += 55 * str; beatKV += 9 * str;
     impT = t; impS = Math.min(1.4, str); impExit = GX0 + ht > 106 + RX0 + 1;   // 탁: 부딪힘 선·물결, 촉이 고리 밖으로 나가면 반짝
     const force = str * (.55 + .1 * grade);
     if (force > limit) { ouchAt = t; symXV += 60 * str; symEV -= 8; }   // 움찔
     else if (good) for (let j = Math.round(force / 1.2 * [0, 0, 1, 1.6, 2.3][tier]); j > 0; j--) symHeart();
     jyV += (s.kind === 'n' ? 7 : 22) * str; jxV -= (s.kind === 'n' ? 2.5 : 9) * str;
+    const pu = PUSH[poseName] || [0, -1], mine = P.act === her;   // 초상화 인물: 받는 쪽이면 크게 밀리고, 움직이는 쪽이면 내려앉으며 쿵
+    figVX += pu[0] * (mine ? 18 : 120) * str; figVY += (mine ? 70 : pu[1] * 120) * str;
     if (s.kind !== 'n') { shakeAt = t; shakeK = str * .8; }
     // 받는 쪽 살을 찰싹 침
     const rcv = P.act === 'm' ? 'f' : 'm', kick = 70 * str;
@@ -754,6 +762,21 @@ function run(stage, job, done) {
       else headReact(P.f, react.k * env, BURY[poseName], react.k * env * 1.3 * Math.sin(a * 92), react.k * env * .9 * Math.cos(a * 117));
     }
     capsM = caps(M, P.m); capsF = caps(F, P.f);
+    if (!settle) {
+      // 초상화 인물: 움직이는 쪽이면 d(빼는 정도)를 따라 오르내림(좌위는 작은 원, 역기승위·뒤로 앉기는 살짝 앞뒤), 받는 쪽이면 제자리로 돌아오는 용수철. 끝나면 숨 고르기
+      const mine = P.act === her && t < end, after = t >= end;
+      const ty = mine ? -ms.d * .85 : after ? 1.4 * Math.sin(t * 2.2) : 0;
+      const tx = mine ? (poseName === 'lotus' ? 2.6 * Math.sin(t * 5.2) : poseName === 'reverse' || poseName === 'seated' ? ms.d * .18 : 0) : 0;
+      const kk = mine ? 300 : 420, cc = mine ? 21 : 15;
+      figVX += (kk * (tx - figX) - cc * figVX) * DT; figVY += (kk * (ty - figY) - cc * figVY) * DT;
+      figX += figVX * DT; figY += figVY * DT;
+      const acc = (figVY - lastVY) / DT; lastVY = figVY;
+      bV += (-520 * bY - 5.5 * bV - acc * .95) * DT; bY += bV * DT;   // 가슴: 몸이 갑자기 서거나 움직이면 늦게 따라오며 출렁
+      const bm = 6.5 * cupK; if (Math.abs(bY) > bm) { bY = Math.sign(bY) * bm; bV *= -.3; }
+      hdV += (-760 * hd - 16 * hdV - acc * .3) * DT; hd += hdV * DT;   // 머리: 살짝 늦게
+      hdR = react ? react.k * Math.max(0, Math.min(1, (t - react.t0) / .15)) * (t < react.hold ? 1 : Math.max(0, 1 - (t - react.hold) / .7)) : hdR * .96;   // 절정: 고개가 젖혀짐
+      if (quiv && t < quiv.until) figX += quiv.amp * 6 * Math.sin(t * 88);
+    }
     for (const b of blobs) {
       const pj = P[b.w][b.at];
       if (b.p2) for (let k = 0; k < 2; k++) b.v[k] += (-1200 * b.o[k] - 7 * b.v[k] - (pj[k] - 2 * b.p1[k] + b.p2[k]) / (DT * DT) * .45) * DT;
@@ -787,7 +810,6 @@ function run(stage, job, done) {
     symEV += (-650 * symE - 6 * symEV) * DT; symE += symEV * DT;      // ♀ 고리: 말랑하게 눌렸다 여러 번 출렁이며 돌아옴
     symXV += (-480 * symX - 9 * symXV) * DT; symX += symXV * DT;
     beatKV += (-700 * beatK - 18 * beatKV) * DT; beatK += beatKV * DT;
-    faceYV += (-500 * faceY - 18 * faceYV) * DT; faceY += faceYV * DT;
     if (!finale && t > end + .45) {
       if (good) symH.classList.add('on'); else sym.classList.add('sad');
       finale = true;
@@ -858,10 +880,16 @@ function run(stage, job, done) {
         faceKey = key;
         const du = key === 'major' ? { lv: 3, major: true, tongue: gi >= 7 } : key[0] === 'p' && key.length === 2 ? { lv: +key[1] } : { mood: key };   // 대절정: SS 이상이면 혀까지
         face.innerHTML = Avatar.render(G.look(p), 64, { age: G.npcAge(p), during: Object.assign(du, { personality: p.personality, fig: sc.fig }) });
+        figEl = face.querySelector('.av-fig'); headEls = [...face.querySelectorAll('.av-head, .av-hb')]; bustEl = face.querySelector('.av-bust');
+        if (bustEl) { bustK = +bustEl.dataset.k || 1; bustCy = +bustEl.dataset.cy || 0; }
       }
       face.classList.toggle('peak', t < peakUntil || (key === 'p3' && good));   // 절정: 초상화가 확 바뀌며 분홍빛으로 반짝
       face.classList.toggle('big', key === 'major');
-      face.style.transform = `translate(${f(cx * 1.2)}px,${f(cy * 1.2 + faceY)}px)`;   // 부딪힐 때마다 초상화도 출렁
+      // 칸은 고정, 안의 인물이 움직임: 몸(이불째) → 머리(살짝 늦게, 절정엔 젖혀짐) → 가슴(출렁)
+      if (figEl) figEl.setAttribute('transform', `translate(${f(figX)},${f(figY)})`);
+      const tilt = hdR * (P && P.act === her ? 7 : -9);
+      for (const el of headEls) el.setAttribute('transform', `translate(0,${f(hd)}) rotate(${f(tilt)} 60 104)`);
+      if (bustEl) { const ly = bY * bustK, sy = 1 - bY * .03; bustEl.setAttribute('transform', `translate(0,${ly.toFixed(2)}) translate(60 ${bustCy}) scale(${(1 + bY * .012).toFixed(4)} ${sy.toFixed(4)}) translate(-60 ${-bustCy})`); }
     }
     // ♂ 화살은 d를 따라 드나들고 맞닿으면 ♂ 원이 고리 뒤쪽 끝에 탁 걸림(더 밀면 고리째 밀려남). 만족감이 낮으면 끝나고 빠지며 고개를 숙임
     const intro = ease(Math.min(1, t / .8)), u = t >= end ? Math.min(1, (t - end) / SLUMP) : 0;

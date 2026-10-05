@@ -148,7 +148,7 @@ function talkChoice(s, p, a, ch) {
   // 물어보기: 아직 모르는 취미·꿈·가치관·형편 중 하나를 털어놓을 수 있음
   const f = ch.tone === 'ask' && lv !== 'meh' && DLG_REVEAL.find(k => !a.known(p, k));
   const tell = f && Math.random() < (lv === 'great' ? .8 : .5);
-  return { p: P, effect: lv === 'meh' ? { happy: -1 } : { happy: [0, 1] }, do: tell ? () => { p.told = (p.told || []).concat(f); } : undefined,
+  return { ok: lv !== 'meh', p: P, effect: lv === 'meh' ? { happy: -1 } : { happy: [0, 1] }, do: tell ? () => { p.told = (p.told || []).concat(f); } : undefined,
     text: ((lv === 'meh' ? ch.ng : ch.ok) || react(a, R[lv], p)) + (tell ? ' ' + GAME_DATA.pillowReveal[f] : '') + (lk && Math.random() < .3 ? ' ' + a.pick(GAME_DATA.lookReact.talk[lk]) : '') };
 }
 // 외모 차이 (내 첫인상 / 상대 생김새): 나 hi·상대 lo → 문턱 -8·얻는 것 ×1.25 / 둘 다 hi → ×1.15 / 상대 hi·나는 아님 → 문턱 +8 (눈이 높음)
@@ -177,13 +177,13 @@ function flirtChoice(s, p, a, ch) {
   const risk = a.main() && a.main() !== p ? [.1, .2, .3][r] : 0;
   if (ok) {
     const k = (ch.fit > 0 ? 1.3 : ch.fit < 0 ? .75 : 1) * lg.k, invite = inviteRoll(s, p, a, r);
-    return { p: { heart: kRange([[4, 7], [8, 13], [13, 20]][r], k), close: [[1, 2], [1, 3], [2, 4]][r] }, effect: { happy: r === 2 ? [2, 4] : [0, 2] },
+    return { ok: true, p: { heart: kRange([[4, 7], [8, 13], [13, 20]][r], k), close: [[1, 2], [1, 3], [2, 4]][r] }, effect: { happy: r === 2 ? [2, 4] : [0, 2] },
       risk, riskTaken: p.taken ? [.08, .15, .22][r] : 0, do: invite ? () => { p.inviteDay = a.today(); } : undefined, then: invite ? 'takenInvite' : undefined,
       text: (ch.ok || react(a, r === 2 ? R.big : R.ok, p)) + lookLine(a, 'flirtOk', lg.key) };
   }
   const P = [{ close: [-1, 0] }, { close: [-3, -1] }, { close: [-5, -3], trust: [-3, -1] }][r];
   if (ch.fit < 0 && r) P.grudge = [1, 3];
-  return { p: P, effect: { happy: [-1, -2, -3][r] }, risk, riskTaken: p.taken ? [.05, .1, .15][r] : 0, text: (ch.ng || react(a, R.ng, p)) + lookLine(a, 'flirtNg', lg.key) };
+  return { ok: false, p: P, effect: { happy: [-1, -2, -3][r] }, risk, riskTaken: p.taken ? [.05, .1, .15][r] : 0, text: (ch.ng || react(a, R.ng, p)) + lookLine(a, 'flirtNg', lg.key) };
 }
 function dirtyChoice(s, p, a, ch) {
   const T = GAME_DATA.teaseLines, R = GAME_DATA.dlgReact.dirty, r = ch.risk;
@@ -193,11 +193,11 @@ function dirtyChoice(s, p, a, ch) {
   if (!teaseOk(s, p, a, 42 + [-8, 0, 10][r] - ch.fit * 10 + lg.need)) {
     const P = [{ trust: [-2, -1], close: [-1, 0] }, { trust: [-6, -3], grudge: [2, 5], close: [-4, -2] }, { trust: [-10, -6], grudge: [5, 9], close: [-6, -3] }][r];
     if (p.personality === 'sharp' && P.grudge) P.grudge = [P.grudge[0] + 2, P.grudge[1] + 3];
-    return { p: P, effect: { happy: [-1, -2, -3][r] }, do: () => { p.teaseDay = a.today(); }, risk,
+    return { ok: false, p: P, effect: { happy: [-1, -2, -3][r] }, do: () => { p.teaseDay = a.today(); }, risk,
       text: (ch.ng || (p.personality === 'sharp' && r === 2 ? T.sayNoSharp : react(a, R.ng, p))) + lookLine(a, 'dirtyNg', lg.key) };
   }
   const gain = Math.round(heatRoll(p, a, ...[[3, 6], [6, 12], [11, 18]][r]) * lg.k), alley = alleyReady(s, p, a, gain), invite = !alley && inviteRoll(s, p, a, r);
-  return { p: { heart: [[0, 2], [1, 3], [2, 5]][r], close: [1, 2] }, libido: [[1, 3], [3, 6], [5, 9]][r], effect: { happy: [1, 2] }, risk, riskTaken: p.taken ? [.02, .04, .07][r] : 0,
+  return { ok: true, p: { heart: [[0, 2], [1, 3], [2, 5]][r], close: [1, 2] }, libido: [[1, 3], [3, 6], [5, 9]][r], effect: { happy: [1, 2] }, risk, riskTaken: p.taken ? [.02, .04, .07][r] : 0,
     do: () => { heat(s, p, a, gain, alley); if (invite) p.inviteDay = a.today(); }, scene: alley ? 'alley' : undefined, then: alley ? 'alleyHeat' : invite ? 'takenInvite' : undefined,
     text: () => (ch.ok || react(a, R.ok, p)) + lookLine(a, 'dirtyOk', lg.key) + (p.taken && !invite && Math.random() < .4 ? ' ' + takenLine(a, p, 'taken') : '') + (alley ? ALLEY_LINE : s.vars.heatUp ? T.heatUp : '') };
 }
@@ -208,13 +208,13 @@ function touchChoice(s, p, a, ch) {
   if (ch.tone === 'back') return { p: ch.fit > 0 ? { trust: [2, 4], close: [1, 2] } : ch.fit < 0 ? { close: [-1, 0] } : { trust: [0, 2] }, text: ch.ok || react(a, R.back, p) };
   if (!teaseOk(s, p, a, 52 + [-10, 0, 10][r] - ch.fit * 10 - sk * 2 + lg.need)) {
     const P = [{ trust: [-3, -1], close: [-1, 0] }, { trust: [-8, -4], grudge: [3, 6], close: [-4, -2] }, { trust: [-12, -7], grudge: [6, 10], close: [-6, -3] }][r];
-    return { p: P, karma: r ? -1 : 0, effect: { happy: [-1, -3, -4][r] }, do: () => { p.teaseDay = a.today(); }, risk, text: (ch.ng || react(a, R.ng, p)) + lookLine(a, 'touchNg', lg.key) };
+    return { ok: false, p: P, karma: r ? -1 : 0, effect: { happy: [-1, -3, -4][r] }, do: () => { p.teaseDay = a.today(); }, risk, text: (ch.ng || react(a, R.ng, p)) + lookLine(a, 'touchNg', lg.key) };
   }
   const gain = Math.round(heatRoll(p, a, ...[[4, 8], [8, 15], [12, 20]][r]) * (1 + sk * .06) * lg.k), alley = alleyReady(s, p, a, gain), invite = !alley && inviteRoll(s, p, a, r);
   const skilled = sk >= 5 ? ((p.nights || 0) >= 1 && Math.random() < .5 ? R.remember : R.skilled) : null;
   const P = { heart: [[1, 3], [2, 5], [3, 7]][r], close: [1, 3] };
   if (skilled) P.trust = [1, 2];
-  return { p: P, libido: [[2, 4], [4, 8], [6, 10]][r], effect: { happy: [1, 3] }, risk, riskTaken: p.taken ? [.03, .06, .09][r] : 0,
+  return { ok: true, p: P, libido: [[2, 4], [4, 8], [6, 10]][r], effect: { happy: [1, 3] }, risk, riskTaken: p.taken ? [.03, .06, .09][r] : 0,
     scene: alley ? 'alley' : r === 2 ? 'hug' : undefined, then: alley ? 'alleyHeat' : invite ? 'takenInvite' : undefined,
     do: () => { heat(s, p, a, gain, alley); if (invite) p.inviteDay = a.today(); },
     text: () => (ch.ok || react(a, R.ok, p)) + (skilled ? ' ' + a.pick(skilled) : '') + lookLine(a, 'touchOk', lg.key) + (p.taken && !invite && Math.random() < .3 ? ' ' + takenLine(a, p, 'taken') : '') + (alley ? ALLEY_LINE : s.vars.heatUp ? T.heatUp : '') };
@@ -312,9 +312,9 @@ GAME_DATA.social = [
   { id: 'sexAsk', label: '잠자리 제안', icon: '🛏',
     if: (s, p, a) => a.canSex(p) && a.companion() !== p && !a.jailed(),
     run: (s, p, a) => {
-      if (lover(p) || p.fwb) { const no = a.refusal(p); if (no) return { do: () => { s.vars.why = no; }, then: 'nightRefused' }; }
+      if (lover(p) || p.fwb) { const no = a.refusal(p); if (no) return { ok: false, do: () => { s.vars.why = no; }, then: 'nightRefused' }; }
       else if (!a.charmed(p, 'bed', a.need('bed') + statusNeed(p, a) + (p.close < 20 ? 12 : 0)))
-        return { p: { heart: [-6, -3], close: [-5, -2], grudge: p.close < 20 ? [4, 8] : [0, 2] }, effect: { happy: -2 },
+        return { ok: false, p: { heart: [-6, -3], close: [-5, -2], grudge: p.close < 20 ? [4, 8] : [0, 2] }, effect: { happy: -2 },
           text: p.married ? '{p|이} 왼손 반지를 만지작거렸다. "나 결혼한 사람이야."' : p.taken ? `"나 ${mateOf(p)} 있어." {p|이} 선을 그었다.`
             : ['{p|이} 어이없다는 듯 웃었다. "갑자기?"', '{p|이} 고개를 저었다. "우리 그런 사이 아니잖아."'] };
       if (PRIVATE.includes(s.place)) return {
@@ -347,12 +347,12 @@ GAME_DATA.social = [
   { id: 'confess', label: '고백하기', icon: '💌',
     if: (s, p, a) => a.canRomance(p) && p.heart >= 40 && !lover(p) && !a.jailed(),
     run: (s, p, a) => {
-      const ok = p.heart + p.close / 4 + a.rand(-15, 15) - (p.taken ? 15 : 0) >= 55;
-      if (!ok) return { p: { heart: [-18, -12], close: [-8, -4] }, effect: { happy: [-8, -4] },
+      const ok = p.heart + p.close / 4 + a.rand(-15, 15) - (p.taken ? 15 : 0) + a.dlgBonus() >= 55;   // 대화 이벤트에서 고른 고백이 잘 맞으면 +
+      if (!ok) return { ok: false, p: { heart: [-18, -12], close: [-8, -4] }, effect: { happy: [-8, -4] },
         text: ['{p|이} 미안하다고 했다.', '{p|은} 친구로 지내고 싶다고 했다.'] };
-      if (p.taken && !p.married) return { then: 'takenConfess' };   // 애인이 있는 상대: 정리할지, 몰래 만날지, 즐기기만 할지
+      if (p.taken && !p.married) return { ok: true, then: 'takenConfess' };   // 애인이 있는 상대: 정리할지, 몰래 만날지, 즐기기만 할지
       const sneaky = !!a.main();
-      return { do: () => a.startRelation(p, sneaky), memory: true, scene: 'kiss', effect: { happy: [6, 10] }, risk: sneaky ? .15 : 0,
+      return { ok: true, do: () => a.startRelation(p, sneaky), memory: true, scene: 'kiss', effect: { happy: [6, 10] }, risk: sneaky ? .15 : 0,
         text: sneaky ? '{p|와} 몰래 만나기 시작했다. 아무도 몰라야 한다.'
           : p.taken ? '{p|은} 만나던 사람과 정리하고 내 손을 잡았다.' : '{p|와} 사귀게 됐다!' };
     } },
@@ -367,9 +367,9 @@ GAME_DATA.social = [
 
   { id: 'propose', label: '청혼하기', icon: '💍',
     if: (s, p, a) => p.partner && p.heart >= 65 && p.trust >= 50 && s.age >= 22 && !a.jailed(),
-    run: (s, p, a) => p.heart + p.trust / 2 + a.rand(-10, 10) >= 95
-      ? { do: () => a.marry(p), memory: true, scene: 'hug', effect: { happy: 12, money: -1500 }, text: '{p|이} 고개를 끄덕였다. 결혼식을 올렸다!' }
-      : { p: { heart: -10 }, effect: { happy: -5 }, text: '{p|은} 아직은 아니라고 했다.' } },
+    run: (s, p, a) => p.heart + p.trust / 2 + a.rand(-10, 10) + a.dlgBonus() >= 95
+      ? { ok: true, do: () => a.marry(p), memory: true, scene: 'hug', effect: { happy: 12, money: -1500 }, text: '{p|이} 고개를 끄덕였다. 결혼식을 올렸다!' }
+      : { ok: false, p: { heart: -10 }, effect: { happy: -5 }, text: '{p|은} 아직은 아니라고 했다.' } },
 
   /* ── 술집 ── */
   { id: 'drinkWith', label: '같이 한잔', icon: '🍻',
@@ -459,9 +459,9 @@ GAME_DATA.social = [
 
   { id: 'apologize', label: '사과하기', icon: '🙇',
     if: (s, p, a) => p.grudge >= 10 && !a.jailed(),
-    run: (s, p, a) => p.trust + a.rand(-20, 20) >= 30
-      ? { p: { grudge: [-20, -12], close: [2, 4] }, karma: 2, text: '{p}에게 진심으로 사과했다. 조금은 풀린 눈치다.' }
-      : { p: { grudge: [-5, -2] }, text: '{p|은} 아직 화가 덜 풀렸다.' } },
+    run: (s, p, a) => p.trust + a.rand(-20, 20) + a.dlgBonus() >= 30
+      ? { ok: true, p: { grudge: [-20, -12], close: [2, 4] }, karma: 2, text: '{p}에게 진심으로 사과했다. 조금은 풀린 눈치다.' }
+      : { ok: false, p: { grudge: [-5, -2] }, text: '{p|은} 아직 화가 덜 풀렸다.' } },
 
   /* ── 돈 ── */
   { id: 'borrow', label: '돈 빌리기', icon: '💸',
