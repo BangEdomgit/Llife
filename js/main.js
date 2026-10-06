@@ -1164,6 +1164,7 @@ function openCreate(closable) {
   showModal('create', '🌱 새 인생', `<div class="create">
     <div class="fld"><div class="fl"><span>시작</span></div><div class="chips mode">
       <button type="button" data-mode="full" aria-pressed="${!q20}">처음부터 (0세~)</button><button type="button" data-mode="q20" aria-pressed="${draft.mode === 'q20'}">20세 시작</button><button type="button" data-mode="grad" aria-pressed="${draft.mode === 'grad'}">🎓 대학 졸업 후</button></div>
+      <p class="desc"><a href="realm.html" style="color:var(--accent);font-weight:700;text-decoration:none">⚜ 다른 세계 — 중세 판타지 「영지」: 영주의 자식으로 태어나 수성·교역·모험·결투 →</a></p>
       <p class="desc">${draft.mode === 'grad' ? '대학을 막 졸업한 봄(4년제 24살 · 군필 남자 26살 · 전문대 22살)부터. 학점·자격증·인턴 경력을 정하고, 취업 준비생이거나 첫 출근을 앞두고 시작한다.' : q20 ? '0~19살을 건너뛴다. 학력·능력치·몸·관계를 직접 정하고 스무 살 봄부터.' : '태어나는 순간부터. 어린 시절의 선택이 성격과 취향이 된다.'}</p></div>
     ${regionFld}
     <div class="fld"><div class="fl"><span>이름 (비우면 랜덤)</span></div><input id="cName" maxlength="${draft.region === 'kr' ? 6 : 12}" value="${esc(draft.name)}" placeholder="${draft.region === 'kr' ? '예: 김하늘' : '예: 에밀리 존슨'}" autocomplete="off"></div>

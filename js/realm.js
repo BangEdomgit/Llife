@@ -370,7 +370,7 @@ function startAdv(siteId) {
 function advInfo() {
   const A = S.adv; if (!A) return null;
   const site = D.sites.find(x => x.id === A.site);
-  return { site, i: A.i, n: A.path.length, path: A.path.map((k, j) => j < A.i ? k : j === A.i ? '?' : '·'), loot: A.loot, msg: A.msg, done: A.done, hp: S.hp, hpMax: hpMax(), potions: S.potions,
+  return { site, i: A.i, n: A.path.length, path: A.path.map((k, j) => j < A.i ? k : j === A.i ? '?' : '·'), loot: A.loot, msg: A.msg, summary: A.summary, done: A.done, hp: S.hp, hpMax: hpMax(), potions: S.potions,
     trapPct: clamp(Math.round(50 + (S.stats.agility - gradeMin(['D', 'C', 'B', 'A'][site.tier - 1])) * 1.5), 5, 95) };
 }
 function advStep() {
@@ -519,7 +519,7 @@ function rollPrices(init) {
     }
   }
 }
-const sellK = () => .85 + S.realm.b.market * .02 + S.stats.charm / 1000;
+const sellK = () => Math.min(.94, .8 + S.realm.b.market * .02 + S.stats.charm / 1000);
 function market() {
   return D.goods.map(g => ({ id: g.id, name: g.name, icon: g.icon, have: g.id === 'grain' ? Math.floor(S.realm.food / 10) : S.inv[g.id] || 0, buy: Math.round(S.prices.home[g.id] * 10) / 10, sell: Math.round(S.prices.home[g.id] * sellK() * 10) / 10,
     away: D.towns.filter(t => t.id !== 'home').map(t => ({ id: t.id, icon: t.icon, p: S.prices[t.id][g.id] })) }));

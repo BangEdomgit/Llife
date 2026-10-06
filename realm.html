@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Llife 영지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=Noto+Serif+KR:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/realm.css">
+<!-- 순서: 데이터 → 엔진 → 화면 -->
+<script defer src="data/realm.js"></script>
+<script defer src="data/realm-events.js"></script>
+<script defer src="js/realm.js"></script>
+<script defer src="js/realm-ui.js"></script>
+</head>
+<body>
+<div id="app" hidden>
+  <header id="hud"></header>
+  <section id="realm"></section>
+  <div id="threat" hidden></div>
+  <main id="log" aria-live="polite"></main>
+  <nav id="acts"></nav>
+</div>
+<div id="start" hidden></div>
+<div id="modal" hidden><div class="box" role="dialog" aria-modal="true"></div></div>
+</body>
+</html>
