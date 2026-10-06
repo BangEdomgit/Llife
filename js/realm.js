@@ -119,6 +119,8 @@ const hpMax = () => { const L = RACE().life, o = L.old - 13; return Math.max(20,
 function pushChild() {
   const c = D.childhood[S.childIdx];
   if (!c) return beginMain();
+  const d = c.age - S.age;
+  if (d > 0) S.people.forEach(p => { p.age += d; });   // 유년기 장면 사이에 가족도 함께 나이 먹음
   S.age = c.age;
   S.pending = [{ child: S.childIdx, text: c.text }];
 }
