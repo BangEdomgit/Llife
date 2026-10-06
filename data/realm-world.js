@@ -37,34 +37,34 @@ REALM.ranks = {
 REALM.peerage = [
   { id: 'knight',   name: '기사',  land: '장원',   size: .6,  threat: .8,  favor: 0,   fame: 0 },
   { id: 'baron',    name: '남작',  land: '남작령', size: 1,   threat: 1,   favor: 40,  fame: 40 },
-  { id: 'viscount', name: '자작',  land: '자작령', size: 1.35, threat: 1.15, favor: 120, fame: 110 },
-  { id: 'count',    name: '백작',  land: '백작령', size: 1.8, threat: 1.3, favor: 260, fame: 220 },
-  { id: 'marquis',  name: '후작',  land: '후작령', size: 2.4, threat: 1.45, favor: 480, fame: 380 },
-  { id: 'duke',     name: '공작',  land: '공작령', size: 3.2, threat: 1.6, favor: 800, fame: 600 },
+  { id: 'viscount', name: '자작',  land: '자작령', size: 1.35, threat: 1.15, favor: 140, fame: 120 },
+  { id: 'count',    name: '백작',  land: '백작령', size: 1.8, threat: 1.3, favor: 320, fame: 250 },
+  { id: 'marquis',  name: '후작',  land: '후작령', size: 2.4, threat: 1.45, favor: 600, fame: 450 },
+  { id: 'duke',     name: '공작',  land: '공작령', size: 3.2, threat: 1.6, favor: 1000, fame: 700 },
 ];
 
 /* ── 오러 (검사의 길) ── need: 이 단계에 오르는 데 필요한 오러 수련치, check: 돌파 판정 등급(무력+체력), mult: 오러 베기 배율, charges: 결투 한 번에 쓸 수 있는 오러 베기 횟수 */
 REALM.aura = [
   { lv: 0, name: '오러 없음', short: '—' },
   { lv: 1, name: '오러 유저', short: '유저', need: 40, check: 'D', mult: 1.5, charges: 1, atk: 2, desc: '검끝에 희미한 빛이 맺힌다.' },
-  { lv: 2, name: '소드 익스퍼트 초급', short: '익스퍼트 초급', need: 130, check: 'C', mult: 1.7, charges: 2, atk: 4, desc: '오러를 검신에 얇게 두른다.' },
-  { lv: 3, name: '소드 익스퍼트 중급', short: '익스퍼트 중급', need: 280, check: 'B', mult: 1.95, charges: 2, atk: 7, desc: '오러가 검을 따라 길게 뻗는다.' },
-  { lv: 4, name: '소드 익스퍼트 상급', short: '익스퍼트 상급', need: 500, check: 'A', mult: 2.25, charges: 3, atk: 10, desc: '갑옷을 종잇장처럼 가른다.' },
-  { lv: 5, name: '소드 마스터', short: '마스터', need: 820, check: 'S', mult: 2.8, charges: 3, atk: 15, insight: true, desc: '오러 블레이드. 왕국에 손꼽히는 경지.' },
-  { lv: 6, name: '그랜드 마스터', short: '그랜드 마스터', need: 1300, check: 'SS', mult: 3.6, charges: 4, atk: 22, insight: true, desc: '대륙의 전설. 혼자서 군대를 막는다.' },
+  { lv: 2, name: '소드 익스퍼트 초급', short: '익스퍼트 초급', need: 150, check: 'C', mult: 1.7, charges: 2, atk: 4, desc: '오러를 검신에 얇게 두른다.' },
+  { lv: 3, name: '소드 익스퍼트 중급', short: '익스퍼트 중급', need: 360, check: 'B', mult: 1.95, charges: 2, atk: 7, desc: '오러가 검을 따라 길게 뻗는다.' },
+  { lv: 4, name: '소드 익스퍼트 상급', short: '익스퍼트 상급', need: 720, check: 'A', mult: 2.25, charges: 3, atk: 10, desc: '갑옷을 종잇장처럼 가른다.' },
+  { lv: 5, name: '소드 마스터', short: '마스터', need: 1300, check: 'S', mult: 2.8, charges: 3, atk: 15, insight: true, desc: '오러 블레이드. 왕국에 손꼽히는 경지.' },
+  { lv: 6, name: '그랜드 마스터', short: '그랜드 마스터', need: 2400, check: 'SS', mult: 3.6, charges: 4, atk: 22, insight: true, desc: '대륙의 전설. 혼자서 군대를 막는다.' },
 ];
 /* ── 서클 (마법사의 길) ── need: 이 서클에 오르는 데 필요한 마나 수련치, stones: 돌파에 쓰는 마석, check: 판정 등급(마력+학식) */
 REALM.circles = [
   { lv: 0, name: '마법 없음' },
   { lv: 1, name: '1서클', title: '견습 마법사', need: 30, stones: 0, check: 'E' },
-  { lv: 2, name: '2서클', title: '견습 마법사', need: 90, stones: 1, check: 'D' },
-  { lv: 3, name: '3서클', title: '정식 마법사', need: 180, stones: 1, check: 'D' },
-  { lv: 4, name: '4서클', title: '중견 마법사', need: 320, stones: 2, check: 'C' },
-  { lv: 5, name: '5서클', title: '상급 마법사', need: 520, stones: 3, check: 'B' },
-  { lv: 6, name: '6서클', title: '대마법사', need: 800, stones: 4, check: 'A' },
-  { lv: 7, name: '7서클', title: '대마도사', need: 1200, stones: 6, check: 'A' },
-  { lv: 8, name: '8서클', title: '현자', need: 1700, stones: 8, check: 'S' },
-  { lv: 9, name: '9서클', title: '전설의 마도사', need: 2400, stones: 12, check: 'SS' },
+  { lv: 2, name: '2서클', title: '견습 마법사', need: 100, stones: 1, check: 'D' },
+  { lv: 3, name: '3서클', title: '정식 마법사', need: 220, stones: 1, check: 'D' },
+  { lv: 4, name: '4서클', title: '중견 마법사', need: 420, stones: 2, check: 'C' },
+  { lv: 5, name: '5서클', title: '상급 마법사', need: 720, stones: 3, check: 'B' },
+  { lv: 6, name: '6서클', title: '대마법사', need: 1120, stones: 4, check: 'A' },
+  { lv: 7, name: '7서클', title: '대마도사', need: 1700, stones: 6, check: 'A' },
+  { lv: 8, name: '8서클', title: '현자', need: 2450, stones: 8, check: 'S' },
+  { lv: 9, name: '9서클', title: '전설의 마도사', need: 3500, stones: 12, check: 'SS' },
 ];
 // 주문 — circle 이상이면 씀. mp: 마나, dmg: [기본, 마력 배율], 특수: heal(체력 %) · stun(적 한 턴 멈춤 확률) · shield(받는 피해 줄임)
 REALM.spells = [
@@ -85,11 +85,11 @@ REALM.spells = [
 REALM.mercGrades = [
   { id: 'F', name: 'F급', need: 0 },
   { id: 'E', name: 'E급', need: 20, test: null },
-  { id: 'D', name: 'D급', need: 55, test: 'bandit' },
-  { id: 'C', name: 'C급', need: 120, test: 'orc' },
-  { id: 'B', name: 'B급', need: 230, test: 'knight' },
-  { id: 'A', name: 'A급', need: 400, test: 'troll' },
-  { id: 'S', name: 'S급', need: 650, test: 'drake' },
+  { id: 'D', name: 'D급', need: 60, test: 'bandit' },
+  { id: 'C', name: 'C급', need: 150, test: 'orc' },
+  { id: 'B', name: 'B급', need: 300, test: 'knight' },
+  { id: 'A', name: 'A급', need: 540, test: 'troll' },
+  { id: 'S', name: 'S급', need: 950, test: 'drake' },
 ];
 // 의뢰 — 길드 게시판에 매달 새로 붙음. grade: 받을 수 있는 최소 등급(인덱스), kind: hunt 토벌(결투) · escort 호위(판정 + 습격) · gather 채집(판정) · probe 조사(판정 + 결투)
 REALM.quests = [

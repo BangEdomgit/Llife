@@ -288,10 +288,10 @@ const ACTIONS = [
   { id: 'ride', group: 'self', icon: '🏹', label: '승마·활쏘기', desc: '민첩·통솔', run: () => { const d = gainStats({ agility: [2, 4], command: [0, 1] }); log(`${pick(['말을 타고 과녁을 맞혔다.', '들판을 질주하며 활을 쐈다.', '기병들과 대형 연습을 했다.'])} (${fmtD(d) || '제자리걸음'})`); } },
   { id: 'study', group: 'self', icon: '📚', label: '서고에서 공부', desc: '학식·정무', run: () => { const d = gainStats({ lore: [2, 4], stewardship: [1, 2] }); log(`${pick(['낡은 연대기를 읽었다.', '집사와 장부를 맞췄다.', '왕국 법전을 베껴 썼다.'])} (${fmtD(d) || '제자리걸음'})`); } },
   { id: 'aura', group: 'self', icon: '🗡', label: '오러 수련', desc: '검에 오러를 맺는다 (무력 30부터)', if: () => S.aura.lv > 0 || S.stats.might >= 30,
-    run: () => { const d = gainStats({ might: [0, 2], vigor: [0, 1] }); const x = Math.round((8 + S.stats.might / 6 + S.stats.vigor / 12) * RACE().aura * randf(.8, 1.2)); S.aura.xp += x;
+    run: () => { const d = gainStats({ might: [0, 2], vigor: [0, 1] }); const x = Math.round((4 + S.stats.might / 11 + S.stats.vigor / 22) * RACE().aura * (1 - S.aura.lv * .07) * randf(.8, 1.2)); S.aura.xp += x;
       log(`${pick(['단전에 기를 모으며 검을 쥐었다.', '폭포 아래에서 검을 휘둘렀다.', '눈을 감고 검끝의 떨림을 느꼈다.'])} (오러 +${x}${fmtD(d) ? ' · ' + fmtD(d) : ''})`); auraBreak(); } },
   { id: 'magic', group: 'self', icon: '✨', label: '마나 수련', desc: '서클을 쌓는다 (학식이 받쳐 줘야)', if: () => S.flags.mage || CIRCLE() > 0 || S.stats.arcana >= 12 || S.stats.lore >= 35,
-    run: () => { const d = gainStats({ arcana: [1, 3], lore: [0, 1] }); const x = Math.round((8 + S.stats.arcana / 5 + S.stats.lore / 10) * RACE().magic * randf(.8, 1.2)); S.circle.xp += x;
+    run: () => { const d = gainStats({ arcana: [1, 3], lore: [0, 1] }); const x = Math.round((4 + S.stats.arcana / 10 + S.stats.lore / 20) * RACE().magic * (1 - CIRCLE() * .05) * randf(.8, 1.2)); S.circle.xp += x;
       if (Math.random() < .08) { S.hp = Math.max(1, S.hp - 8); log(`마나가 역류해 손끝이 데었다. (마나 +${x}${fmtD(d) ? ' · ' + fmtD(d) : ''} · 체력 -8)`); }
       else log(`${pick(['마석을 쥐고 명상했다.', '심장 둘레로 마나를 돌렸다.', '룬 문자를 허공에 새겼다.'])} (마나 +${x}${fmtD(d) ? ' · ' + fmtD(d) : ''})`); circleBreak(); } },
   { id: 'feast', group: 'self', icon: '🍷', label: '연회 열기', desc: '화술·민심·명성 (금화 25)', cost: 25, run: () => { const d = gainStats({ charm: [2, 3] }); realmDelta({ morale: 3 }); S.fame += 1; log(`가신과 마을 유지들을 불러 잔치를 열었다. (${fmtD(d)} · 민심 +3 · 명성 +1)`); } },
