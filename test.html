@@ -21,6 +21,17 @@
   .fig .lab { font-weight: 600; }
   .fig .num { font-size: 11px; color: var(--dim); text-align: center; white-space: pre; line-height: 1.35; }
   .av-bg { fill: #fbfaf7; stroke: #e6dfd3; }
+  .fg-bar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 8px; }
+  .fg-bar select, .fg-bar button { font: inherit; padding: 3px 6px; }
+  .fg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .fg-card { display: grid; justify-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 6px; padding: 6px; text-align: center; }
+  .fg-card .g { font-weight: 700; font-size: 15px; }
+  .fg-card .sc { font-size: 11px; color: var(--dim); }
+  .fg-card .tx { font-size: 11.5px; line-height: 1.35; }
+  .fg-row { display: flex; gap: 6px; align-items: center; overflow-x: auto; margin-bottom: 6px; }
+  .fg-row > b { width: 24px; font-size: 16px; flex: none; }
+  .fg-row .fg-card { width: 170px; flex: none; }
+  .gS { color: #b8860b; } .gA { color: #c0392b; } .gB { color: #8e44ad; } .gC { color: #2f6fb0; } .gD { color: #2f8a4a; } .gE, .gF { color: var(--dim); }
 </style>
 </head>
 <body>
@@ -29,6 +40,13 @@
 <div class="bar"><label><input type="checkbox" id="guides" checked> 앵커·바닥 가이드</label></div>
 <div class="checks" id="checks"></div>
 <div id="rows"></div>
+<div id="faces"></div>
+<div id="hcb"></div>
+<div id="fgal"></div>
+<div id="beauty"></div>
+<div id="fparts"></div>
+<script src="js/face.js"></script>
+<script src="js/outfit.js"></script>
 <script src="js/avatar.js"></script>
 <script>
 const A = window.Avatar;
@@ -78,6 +96,138 @@ function draw() {
 }
 document.getElementById('guides').addEventListener('change', draw);
 draw();
+
+// ── 얼굴 다양성 (FACE_VARIETY.md §12) ──
+// 1. 머리·옷 가림: 같은 대머리 + 같은 회색 상의 + 같은 피부로 24명 → 비슷한 얼굴 쌍이 없어야 함 (faceDistance 최솟값, 3 미만이면 경고)
+// 2. 같은 사람 일관성: 썸네일 / 상반신 / 전신 / 표정 7종
+// 3. 같은 시드 남·녀: 남매처럼 닮았지만 머리 없이도 성별이 구분돼야 함
+function drawFaces() {
+  const box = document.getElementById('faces'), cell = (svg, lab) => `<div class="fig">${svg}<span class="lab">${lab}</span></div>`;
+  const P = [];
+  for (let i = 0; i < 24; i++) { const a = A.make('face-' + i, i % 2 ? 'f' : 'm'); a.skin = 1; P.push(a); }
+  let min = 99, pair = '';
+  for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) { const d = A.faceDistance(P[i], P[j]); if (d < min) { min = d; pair = `${i}·${j}`; } }
+  const row1 = P.map((a, i) => cell(A.render(a, 96, { age: 26, mask: true }), `${i} ${(A.genes(a).arch && Face.ARCH[A.genes(a).arch].label) || Face.SHAPE_LABEL[A.genes(a).shape]}`)).join('');
+  const who = A.make('face-same', 'f');
+  const EX = [['neutral', '기본'], ['smile', '미소'], ['laugh', '웃음'], ['sad', '슬픔'], ['angry', '화남'], ['surprised', '놀람'], ['shy', '수줍음']];
+  const row2 = cell(A.render(who, 40, { age: 26 }), '썸네일') + cell(A.render(who, 120, { age: 26 }), '상반신') + cell(A.render(who, 100, { age: 26, full: true }), '전신')
+    + EX.map(([x, l]) => cell(A.render(who, 96, { age: 26, expr: x === 'neutral' ? null : x }), l)).join('');
+  const row3 = [0, 1, 2, 3, 4, 5].map(i => { const m = A.make('sib-' + i, 'm'), f = A.make('sib-' + i, 'f'); m.skin = f.skin = 1; return cell(A.render(m, 80, { age: 24, mask: true }), `시드 ${i} 남`) + cell(A.render(f, 80, { age: 24, mask: true }), `시드 ${i} 여`); }).join('');
+  if (min < 3) console.warn('비슷한 얼굴:', pair, min.toFixed(2)); else console.log('24명 faceDistance 최솟값', min.toFixed(2), pair);
+  box.innerHTML = `<section><h2>얼굴 1 · 머리·옷 가림 24명 — faceDistance 최솟값 <b class="${min < 3 ? 'bad' : 'ok'}">${min.toFixed(2)}</b> (${pair}, 3 미만이면 경고)</h2><div class="row" style="flex-wrap:wrap">${row1}</div></section>`
+    + `<section><h2>얼굴 2 · 같은 사람 — 썸네일 / 상반신 / 전신 / 표정 7종</h2><div class="row" style="flex-wrap:wrap">${row2}</div></section>`
+    + `<section><h2>얼굴 3 · 같은 시드 남·녀 (머리 없이)</h2><div class="row" style="flex-wrap:wrap">${row3}</div></section>`;
+}
+drawFaces();
+
+// ── 체형·머리·옷 (HAIR_CLOTHES_BODY.md 테스트 시트) ──
+// 1. 같은 얼굴·같은 옷으로 build 4종 × 남녀 = 8명 (체형이 구분되는지)
+// 2. 같은 얼굴·같은 체형으로 머리 스타일 32종 (실루엣만 봐도 구분되는지) + 앞머리 9종
+// 3. 한 NPC의 사계절 + 출근 + 데이트 + 잠옷 = 7벌 (같은 사람으로 보이는지)
+function drawHCB() {
+  const box = document.getElementById('hcb'), cell = (svg, lab) => `<div class="fig">${svg}<span class="lab">${lab}</span></div>`, O = window.Outfit;
+  const same = g => ({ inner: { k: 'tee', c: '#8d8d92' }, bottom: { k: 'jeans', c: O.N.denim, cut: 'straight' }, shoes: { k: 'sneaker', c: O.N.white }, acc: {} });
+  const BL = { slim: '마름', avg: '보통', fit: '근육', chubby: '통통' };
+  const row1 = ['f', 'm'].flatMap(g => Object.keys(BL).map(b => { const a = A.make('hcb-' + g, g); a.body = Object.assign({}, a.body, { build: b }); a.hacc = null; return cell(A.render(a, 96, { age: 27, full: true, outfit: same(g), pose: 'default' }), `${g === 'f' ? '여' : '남'} ${BL[b]}`); })).join('');
+  const row2 = ['f', 'm'].flatMap(g => A.parts.hair[g].map((lab, i) => { const a = A.make('hcb-h' + g, g); a.hair = i; a.hv = 2; a.hc = 1; a.hacc = null; return cell(A.render(a, 64, { age: 26 }), `${g === 'f' ? '여' : '남'} ${lab}`); })).join('')
+    + A.parts.front.map(f => { const a = A.make('hcb-hf', 'f'); a.hair = 0; a.hv = 2; a.hc = 1; a.front = f.id; a.hacc = null; return cell(A.render(a, 64, { age: 26 }), f.label); }).join('');
+  const who = { personality: 'warm', hobby: 'fashion', job: '회사원', styleG: 3 }, npc = A.make('hcb-npc', 'f', who);
+  const CT = [['봄', { season: 'spring', dayN: 3 }], ['여름', { season: 'summer', dayN: 4 }], ['가을', { season: 'fall', dayN: 5 }], ['겨울', { season: 'winter', dayN: 6 }], ['출근', { season: 'spring', working: true, dayN: 7 }], ['데이트', { season: 'fall', event: 'date', dayN: 8 }], ['잠옷', { season: 'fall', home: true, hour: 23, dayN: 9 }]];
+  const row3 = CT.map(([lab, c]) => { const ctx = Object.assign({ who }, c); return cell(A.render(npc, 96, { age: 29, full: true, ctx, personality: who.personality }), `${lab}<br><span class="num">${O.describe(O.pick(npc, 29, ctx))}</span>`); }).join('');
+  box.innerHTML = `<section><h2>체형 1 · 같은 얼굴·같은 옷 — build 4종 × 남녀</h2><div class="row" style="flex-wrap:wrap">${row1}</div></section>`
+    + `<section><h2>머리 · 같은 얼굴 — 스타일 여 18 · 남 14 + 앞머리 9종</h2><div class="row" style="flex-wrap:wrap">${row2}</div></section>`
+    + `<section><h2>옷 · 한 사람의 사계절 + 출근 + 데이트 + 잠옷</h2><div class="row" style="flex-wrap:wrap">${row3}</div></section>`;
+}
+drawHCB();
+
+// ── 얼굴 갤러리 (FACE_UPGRADE.md 6-5) ──
+// 랜덤 24명 + 다시 굴리기 / 필터(성별·나이대·등급·눈·코) / 카드에 등급·배치·파츠 점수·인상 묘사 / 등급별 1줄(S·A·B·C·D × 6) / 10,000개 분포 + 등급 기준점
+const FG = { seed: 0, sex: '', age: '20', grade: '', eye: '', nose: '', mode: 'rand' };
+const AGES = { 20: [20, 29], 30: [30, 39], 40: [40, 49], 50: [50, 70] };
+function fgSample(i) {
+  const sex = FG.sex || (i % 2 ? 'f' : 'm'), [lo, hi] = AGES[FG.age], a = A.make(`gal-${FG.seed}-${i}`, sex);
+  const age = lo + (i * 7 + FG.seed) % (hi - lo + 1);
+  return { a, age, inf: A.faceInfo(a, age) };
+}
+const fgPass = (x, grade) => (!grade || x.inf.grade === grade) && (FG.eye === '' || x.inf.eyeIx === +FG.eye) && (FG.nose === '' || x.inf.noseIx === +FG.nose);
+function fgCard(x, small) {
+  const f = x.inf;
+  return `<div class="fg-card">${A.render(x.a, small ? 80 : 120, { age: x.age })}<span class="g g${f.grade}">${f.grade}${x.fit ? ' <small class="dim">(맞춤)</small>' : ''}</span>`
+    + `<span class="sc">${x.a.g === 'f' ? '여' : '남'} ${x.age}살 · 합 ${f.raw.toFixed(1)} · ${f.type.id} ${Math.round(f.type.fit * 5)}/5</span>`
+    + `<span class="sc">윤곽 ${f.contour.toFixed(0)} · 비율 ${f.ratio.toFixed(0)} · 눈 ${f.eyes.toFixed(0)} · 코입 ${f.features.toFixed(0)} · 조화 ${f.harmony.toFixed(0)}</span>`
+    + `<span class="sc">눈 ${f.eyeName} · 코 ${f.noseName}</span>${small ? '' : `<span class="tx">${f.sentence}</span>`}</div>`;
+}
+function fgHist() {
+  const C = Face.cutoffs(), W = 560, H = 120, lo = 40, hi = 90, bins = 100, bw = (hi - lo) / bins;
+  return ['f', 'm'].map(sex => {
+    const n = new Array(bins).fill(0);
+    for (const r of C[sex].raws) { const k = Math.floor((r - lo) / bw); if (k >= 0 && k < bins) n[k]++; }
+    const mx = Math.max(...n), X = v => (v - lo) / (hi - lo) * W;
+    const bars = n.map((c, k) => `<rect x="${(k * W / bins).toFixed(1)}" y="${(H - c / mx * (H - 14)).toFixed(1)}" width="${(W / bins - .6).toFixed(1)}" height="${(c / mx * (H - 14)).toFixed(1)}" fill="${sex === 'f' ? '#d98ca0' : '#7f9fcc'}"/>`).join('');
+    const cuts = C[sex].cuts.map(([L, v]) => `<line x1="${X(v)}" x2="${X(v)}" y1="0" y2="${H}" stroke="#333" stroke-dasharray="3 2"/><text x="${X(v) + 2}" y="10" font-size="10">${L} ${v.toFixed(1)}</text>`).join('');
+    const ticks = [40, 50, 60, 70, 80, 90].map(v => `<text x="${X(v)}" y="${H + 12}" font-size="10" text-anchor="middle">${v}</text>`).join('');
+    return `<div><b>${sex === 'f' ? '여' : '남'}</b> 10,000명 <span class="dim">(S 1% · A 5% · B 15% · C 35% · D 60% · E 85% 위에서부터)</span><br><svg width="${W + 24}" height="${H + 16}" viewBox="0 0 ${W + 24} ${H + 16}"><g transform="translate(12,0)">${bars}${cuts}${ticks}</g></svg></div>`;
+  }).join('');
+}
+function drawGallery() {
+  const box = document.getElementById('fgal'), t0 = performance.now();
+  const opt = (id, list) => `<select data-fg="${id}">${list.map(([v, l]) => `<option value="${v}"${String(FG[id]) === String(v) ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  const bar = `<div class="fg-bar"><button data-fgroll>🎲 다시 굴리기</button><button data-fgmode>${FG.mode === 'rand' ? '등급별 1줄 보기' : '랜덤 24명 보기'}</button>`
+    + opt('sex', [['', '성별 전체'], ['f', '여'], ['m', '남']]) + opt('age', Object.keys(AGES).map(k => [k, k === '50' ? '50대 이상' : k + '대']))
+    + opt('grade', [['', '등급 전체'], ...['S', 'A', 'B', 'C', 'D', 'E', 'F'].map(g => [g, g])])
+    + opt('eye', [['', '눈 전체'], ...Face.EYES.map((e, i) => [i, e.name])]) + opt('nose', [['', '코 전체'], ...Face.NOSES.map((e, i) => [i, e.name])]) + '</div>';
+  let body = '', tries = 0;
+  if (FG.mode === 'rand') {
+    const out = [];
+    for (let i = 0; out.length < 24 && i < 6000; i++, tries++) { const x = fgSample(i); if (fgPass(x, FG.grade)) out.push(x); }
+    // 드문 조합(S 등): 모자라면 등급에 맞춰 찾은 얼굴로 채움
+    for (let i = 0; FG.grade && out.length < 24 && i < 24; i++) { const x = fgSample(9000 + i); x.inf = A.fitGrade(x.a, FG.grade); x.inf = A.faceInfo(x.a, x.age); x.fit = true; if (fgPass(x, FG.grade)) out.push(x); }
+    body = `<div class="fg-grid">${out.map(x => fgCard(x)).join('') || '<p class="dim">맞는 얼굴이 없다.</p>'}</div>`;
+  } else {
+    body = ['S', 'A', 'B', 'C', 'D'].map(g => {
+      const row = [];
+      for (let i = 0; row.length < 6 && i < 3000; i++, tries++) { const x = fgSample(g.charCodeAt(0) * 1000 + i); if (fgPass(x, g)) row.push(x); }
+      for (let i = 0; row.length < 6 && i < 12; i++) { const x = fgSample(50000 + g.charCodeAt(0) * 100 + i); A.fitGrade(x.a, g); x.inf = A.faceInfo(x.a, x.age); x.fit = true; if (x.inf.grade === g) row.push(x); }
+      return `<div class="fg-row"><b class="g${g}">${g}</b>${row.map(x => fgCard(x, true)).join('')}</div>`;
+    }).join('');
+  }
+  const ms = performance.now() - t0;
+  box.innerHTML = `<section><h2>얼굴 갤러리 (FACE_UPGRADE 6-5) <span class="dim">— ${tries}명 굴림, ${ms.toFixed(0)}ms</span></h2>${bar}${body}</section><section><h2>얼굴 점수 분포 + 등급 기준점</h2>${fgHist()}</section>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if ('fgroll' in b.dataset) { FG.seed++; drawGallery(); }
+  else if ('fgmode' in b.dataset) { FG.mode = FG.mode === 'rand' ? 'rows' : 'rand'; drawGallery(); }
+});
+document.addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.fg; if (k) { FG[k] = e.target.value; drawGallery(); } });
+drawGallery();
+
+// ── 최고 미녀·미남 (BEAUTY) ── 유형마다 설계한 얼굴 (Avatar.beauty). 피부색은 시드로 섞임. 아래 줄은 같은 사람의 전신
+function drawBeauty() {
+  const box = document.getElementById('beauty'), card = (a, lab, age = 24) => { const f = A.faceInfo(a, age); return `<div class="fg-card">${A.render(a, 140, { age })}<span class="g gS">${lab} · ${f.grade} ${f.raw.toFixed(1)}</span><span class="tx">${f.sentence}</span></div>`; };
+  const rows = ['f', 'm'].map(sex => A.BEAUTY_TYPES[sex].map(t => `<div class="fg-row"><b style="width:52px">${t}</b>${[0, 1, 2, 3].slice(0, sex === 'f' ? 4 : 2).map(i => card(A.beauty(t, sex, i), `${t} ${i + 1}`)).join('')}</div>`).join('')).join('');
+  const full = A.BEAUTY_TYPES.f.map(t => { const a = A.beauty(t, 'f', 0); return `<div class="fig">${A.render(a, 110, { age: 24, full: true, ctx: { season: 'spring', event: 'date', dayN: 2, who: { personality: { 청순: 'shy', 고혹: 'bold', 귀염: 'playful', 시크: 'cool' }[t], styleG: 5 } } })}<span class="lab">${t} 1 (데이트 옷)</span></div>`; }).join('');
+  box.innerHTML = `<section><h2>최고 미녀 · 미남 — 유형별로 설계한 얼굴 (모두 S, 상위 0.01% 안)</h2>${rows}<div class="row" style="flex-wrap:wrap;margin-top:8px">${full}</div></section>`;
+}
+drawBeauty();
+
+// ── 얼굴 파츠 시트 ── 같은 얼굴에서 한 가지만 바꿈: 얼굴형 12 / 눈 20 / 눈썹 18 (여·남) / 속눈썹 3단계 × 눈썹 진하기 3단계
+function drawParts() {
+  const box = document.getElementById('fparts'), cell = (svg, lab) => `<div class="fig">${svg}<span class="lab">${lab}</span></div>`;
+  const BASE = { asym: 0, arch: null, marks: { freckles: false, exag: null, scar: null }, eyeY: .01, eyeGap: 1, eyeSize: 1.1, eyeTilt: 3, noseLen: .92, mouthY: -.01, mouthW: .95, faceLen: .98, jawW: .86, chinPoint: .6, cheekW: .99,
+    nose: 5, mouth: 'bow', brow: 1, browThick: 1.02, lipFull: 1.15, noseW: .9, browY: .01, browAngle: 2, irisK: 1.05, lashLv: 1, shape: 3, eye: 6 };
+  const one = (sex, go, o = {}) => { const a = A.make('parts-' + sex, sex); Object.assign(a, { skin: 1, glasses: 0, hacc: null, hair: sex === 'f' ? 0 : 5, hv: 2, hc: 1, hcN: 1, front: 'none_side', xseed: 'parts' });
+    a.go = Object.assign({}, BASE, sex === 'm' ? { browThick: 1.36, jawW: .97, eyeSize: .98, mouth: 'line', nose: 2, shape: 1 } : {}, go); if (go.eye != null) a.eyes = go.eye; return A.render(a, o.size || 130, { age: 24, mask: !!o.mask }); };
+  const shapes = Face.SHAPE_LABEL.map((l, i) => cell(one('f', { shape: i }, { mask: true, size: 110 }), `${i} ${l}`)).join('');
+  const eyes = Face.EYES.map((e, i) => cell(one('f', { eye: i }), `${i} ${e.name}`)).join('');
+  const brows = ['f', 'm'].map(sx => Face.BROW_LABEL.map((l, i) => cell(one(sx, { brow: i }), `${sx === 'f' ? '여' : '남'} ${i} ${l}`)).join('')).join('');
+  const lv = [0, 1, 2].flatMap(la => [0, 1, 2].map(bl => cell(one('f', { lashLv: la, browThick: Face.BROW_LV.f[bl] }), `속눈썹 ${Face.LASH_LABEL[la]} · 눈썹 ${Face.BROWLV_LABEL[bl]}`))).join('');
+  box.innerHTML = `<section><h2>얼굴형 12 (머리 가림)</h2><div class="row" style="flex-wrap:wrap">${shapes}</div></section>`
+    + `<section><h2>눈 20</h2><div class="row" style="flex-wrap:wrap">${eyes}</div></section>`
+    + `<section><h2>눈썹 18 — 여 / 남</h2><div class="row" style="flex-wrap:wrap">${brows}</div></section>`
+    + `<section><h2>속눈썹 3단계 × 눈썹 진하기 3단계</h2><div class="row" style="flex-wrap:wrap">${lv}</div></section>`;
+}
+drawParts();
 </script>
 </body>
 </html>

@@ -3,8 +3,9 @@ window.GAME_DATA = window.GAME_DATA || {};
 
 GAME_DATA.config = {
   endAge: 50,
-  apPerYear: 10,
-  livingCost: 1200,
+  apPerYear: 10,              // (예전 기준) 1년 행동 수 — 지금은 단계마다 다름: js/game.js 시간(GAMEFLOW)
+  dayEventChance: .012,       // 하루를 통째로 넘길 때 그날 랜덤 이벤트 확률
+  livingCost: 900,           // 한 해 생활비(만원) — 밥값은 따로 (data/food.js: 식당·배달·가방)
   randomEventChance: .14,
   placeEventChance: .25,    // 장소에 도착했을 때 랜덤 이벤트 확률
   flavorChance: .3,
@@ -26,11 +27,16 @@ GAME_DATA.config = {
 // 외모는 3층 — 생김새(face): 타고남, 성형으로만 오름 / 몸(body): 체력 등급 그대로 / 꾸밈(style): 돈과 시간, 매년 떨어짐
 GAME_DATA.abilities = ['smart', 'fit', 'face', 'style', 'charm', 'art', 'craft'];
 GAME_DATA.statLabel = { happy: '행복', health: '건강', libido: '성욕', smart: '지능', fit: '체력', face: '생김새', style: '꾸밈', charm: '매력', art: '감성', craft: '손재주', money: '돈' };
-// [등급, 시작값, 이 등급에서 오르는 속도]
+// [등급, 시작값, 이 등급에서 오르는 속도] — 능력치는 상한 300(abilCap), 화면에는 ×10/3 해서 1000 만점으로 보임
+//   화면 기준: F 0 · E 100 · D 200 · C 300 · B 400 · A 550 · S 750 · SS 900 · 최대 1000
 GAME_DATA.grades = [
-  ['F', 0, 1], ['E', 25, 1], ['D', 50, 1], ['C', 80, .85],
-  ['B', 120, .7], ['A', 170, .55], ['S', 230, .4], ['SS', 300, .3],
+  ['F', 0, 1], ['E', 30, 1], ['D', 60, 1], ['C', 90, .85],
+  ['B', 120, .7], ['A', 165, .55], ['S', 225, .4], ['SS', 270, .3],
 ];
+GAME_DATA.abilCap = 300;          // 능력치 상한 (안쪽 값) — 화면 1000
+GAME_DATA.abilShow = 10 / 3;      // 화면에 보이는 값 = 안쪽 값 × 10/3
+// 섹스 기술은 SSS까지 (같은 문턱 + SSS 380). SSS: 애인 있는 사람·유부녀도 빠져들고 죄책감을 못 느낌, 만족감이 100을 넘을 수 있음
+GAME_DATA.sexGrades = GAME_DATA.grades.concat([['SSS', 380, .25]]);
 
 /* ───── 시작 특성 ───── */
 // 소질 — 하나 고름
@@ -51,15 +57,15 @@ GAME_DATA.traits = [
 GAME_DATA.faceStart = { F: 15, E: 25, D: 25, C: 20, B: 10, A: 5 };
 GAME_DATA.npcFace = { F: 15, E: 25, D: 25, C: 20, B: 10, A: 4, S: 1 };
 GAME_DATA.styleDecay = [20, 30];        // 꾸밈은 안 하면 매년 이만큼 떨어짐
-GAME_DATA.surgeryCost = 1500;
-GAME_DATA.sizeWeights = { small: 20, avg: 50, large: 25, xlarge: 5 };
-// 체형 — 아바타의 appearance.body (키·체격·가슴·어깨), 남자는 크기(size)도 있음
+GAME_DATA.surgeryCost = [1000, 3000];   // 성형 상담 때마다 이 사이에서 견적
+// 남자 성기 크기 등급: [최소 cm, 최대 cm, 라벨, 확률, 만족감 보정]. 함께 밤을 보낸 뒤에만 보임
+GAME_DATA.penisGrades = [[8, 9, '단소', 5, -5], [10, 12, '소형', 20, -2], [13, 15, '보통', 45, 0], [16, 17, '큰 편', 20, 3], [18, 19, '대물', 8, 6], [20, 22, '흉기', 2, 8]];
+// 체형 — 아바타의 appearance.body (키·체격·가슴·어깨), 남자는 성기 크기(penis, cm)도 있음
 GAME_DATA.bodyLabel = {
   height:   { short: '작은 키', avg: '보통 키', tall: '큰 키' },
   build:    { slim: '마른 체형', avg: '보통 체형', fit: '탄탄한 체형', chubby: '통통한 체형' },
   chest:    { small: '아담한 가슴', avg: '보통 가슴', large: '풍만한 가슴' },
   shoulder: { narrow: '좁은 어깨', avg: '보통 어깨', wide: '넓은 어깨' },
-  size:     { small: '작은 편', avg: '보통', large: '큰 편', xlarge: '아주 큰 편' },
 };
 // 친밀 30부터 보이는 인상 (20살 이상)
 GAME_DATA.bodyImpression = {
@@ -68,7 +74,7 @@ GAME_DATA.bodyImpression = {
   // 등급이 높으면 덧붙는 인상
   extra: { cup: '가슴이 큰 편이다', hip: '골반이 넓다', shoulder: '어깨가 넓다', height: '키가 훤칠하다' },
 };
-// 피임 — preg: 아이가 생길 확률 배율 / sat: 상대 만족감 보정 (콘돔은 밤의 기술 B 이상이면 절반)
+// 피임 — preg: 아이가 생길 확률 배율 / sat: 상대 만족감 보정 (콘돔은 섹스 기술 B 이상이면 절반)
 GAME_DATA.contra = {
   methods: {
     none:   { preg: 1,    sat: 0 },
@@ -157,7 +163,7 @@ GAME_DATA.satLines = {
   3: ['{p|이} 만족스러운 얼굴로 기지개를 켰다.', '{p|이} 콧노래를 흥얼거리며 머리를 묶었다.'],
   4: ['{p|이} "어떻게 이래?" 하며 한참을 웃었다. 잊을 수가 없는 밤이었다.', '{p|이} 하루 종일 그 밤 이야기만 했다. 잊을 수가 없는 밤이었다.'],
   firstLow: ['서툴렀지만 상관없었다. 둘 다 처음 같은 밤이었다.', '어색하고 서툴렀다. 그래도 {p}의 손은 계속 따뜻했다.', '서툴렀지만 {p|이} 싫지는 않은 표정이었다.'],
-  // 밤의 기술이 F일 때 끼어드는 어색한 순간
+  // 섹스 기술이 F일 때 끼어드는 어색한 순간
   awkward: ['어디에 손을 둬야 할지 모르겠다.', '이상한 데 팔꿈치가 부딪혔다. 둘 다 웃었다.', '"이거 맞아?" "…아마?"', '이불이 엉망이 됐다. 뭘 한 건지 잘 모르겠다.'],
 };
 // 거절 — 사귀는 사이여도 내키지 않을 때가 있음 (성격마다). why: 생리 중 / 피곤함 / 싸운 뒤
@@ -275,74 +281,96 @@ GAME_DATA.siblings = [
 GAME_DATA.features = ['안경을 썼다', '키가 크다', '보조개가 있다', '목소리가 크다', '손글씨가 예쁘다', '웃음소리가 특이하다',
   '늘 이어폰을 끼고 있다', '말끝을 흐린다', '눈썹이 진하다', '걸음이 빠르다', '주근깨가 있다', '향수 냄새가 난다'];
 // 사람 정보가 보이기 시작하는 친밀도 (친밀·신뢰 중 높은 쪽 기준)
-GAME_DATA.revealAt = { personality: 15, hobby: 30, dream: 40, value: 50, wealth: 60 };
+// NPC_ENCOUNTER: 10 특징·키·체형 인상 / 20 반지(💍❓) / 30 직업 / 40 결혼 여부 확정 / 50 성격 / 60 쓰리 사이즈 (js/game.js bodyInfo)
+GAME_DATA.revealAt = { feature: 10, body: 10, job: 30, personality: 50, hobby: 30, dream: 40, value: 50, wealth: 60 };
 
 GAME_DATA.surnames = ['김','이','박','최','정','강','조','윤','장','임','한','오','서','신','권','황','안','송','류','홍'];
 GAME_DATA.namesM = ['민준','서준','도윤','예준','시우','하준','지호','주원','지후','준우','건우','현우','우진','선우','유찬','은호','태윤','하람','재민','승현'];
 GAME_DATA.namesF = ['서연','서윤','지우','하은','민서','하윤','윤서','지유','채원','수아','지아','다은','예린','소율','은서','나윤','유나','하린','수빈','가은'];
 GAME_DATA.dogNames = ['초코','보리','콩이','두부','몽이','해피','구름','밤이'];
 
-/* ───── 행동 (장소에서 행동 1 사용, cost는 18살부터 내 돈에서) ───── */
+/* ───── 행동 (장소에서 — 어른은 행동력 pt만큼 씀(기본 6 ≈ 1시간, 하루 100), 학교 다닐 땐 50. cost는 18살부터 내 돈에서) ───── */
 // 어느 장소에서 할 수 있는지는 data/places.js의 actions에서 정함
 // perf: 일 성과 / subjAll: 중·고등학생이면 모든 과목 실력이 오름
 GAME_DATA.actions = [
-  { id: 'rest',      label: '쉬기',   icon: '🛋', minAge: 0,  effect: { health: [1, 2], happy: [1, 3] },
+  { id: 'rest',      label: '쉬기',   icon: '🛋', pt: 6, minAge: 0,  effect: { health: [1, 2], happy: [1, 3] },
     text: s => s.age < 4 ? ['낮잠을 푹 잤다.', '엄마 품에서 잠들었다.', '모빌을 보다가 잠들었다.']
       : ['이불 속에서 뒹굴었다.', '아무것도 안 하고 하루를 보냈다.', '낮잠을 자고 일어나니 저녁이었다.'] },
-  { id: 'selfRelief', label: '자위',  icon: '🚿', minAge: 20, if: s => s.stats.libido >= 30, libido: [-50, -40], effect: { happy: [-1, 1] },
+  { id: 'selfRelief', label: '자위',  icon: '🚿', pt: 4, minAge: 20, if: s => s.stats.libido >= 30, libido: [-50, -40], effect: { happy: [-1, 1] },   // 대상이 있는 성욕만 있으므로, 가장 높은 대상이 30 이상일 때. 모든 대상이 내려감
     text: ['샤워를 오래 했다.', '혼자만의 시간을 보냈다.', '좀 나아졌다.'] },
-  { id: 'play',      label: '놀기',   icon: '🪁', minAge: 4,  effect: { happy: [3, 5], fit: [1, 3], charm: [0, 1] },
+  { id: 'play',      label: '놀기',   icon: '🪁', pt: 6, minAge: 4,  effect: { happy: [3, 5], fit: [1, 3], charm: [0, 1] },
     text: ['해가 질 때까지 뛰어놀았다.', '무릎이 까지도록 놀았다.', '모래 범벅이 돼서 집에 갔다.'] },
-  { id: 'study',     label: '공부',   icon: '📚', minAge: 6,  effect: { smart: [2, 5], happy: [-2, 0] },
+  { id: 'study',     label: '공부',   icon: '📚', pt: 7, minAge: 6,  effect: { smart: [2, 5], happy: [-2, 0] },
     text: ['문제집 한 권을 끝냈다.', '노트 정리를 깔끔하게 끝냈다.', '밤늦게까지 책상 앞에 앉아 있었다.'] },
-  { id: 'exercise',  label: '운동',   icon: '🏃', minAge: 5,  effect: { fit: [3, 6], health: [1, 3] },
-    text: ['동네를 몇 바퀴 뛰었다.', '땀을 흠뻑 흘렸다.', '숨이 턱까지 차도록 움직였다.'] },
-  { id: 'read',      label: '독서',   icon: '📖', minAge: 7,  effect: { smart: [1, 3], art: [0, 2], happy: [1, 2] },
+  { id: 'exercise',  label: '운동',   icon: '🏃', pt: 7, minAge: 5,  effect: { fit: [3, 6], health: [1, 3] },
+    text: s => s.place === 'gym' ? ['러닝머신에서 30분을 달렸다.', '어깨 운동 루틴을 끝까지 돌렸다.', '땀을 흠뻑 흘렸다.'] : s.place === 'park' ? ['공원 트랙을 몇 바퀴 뛰었다.', '숨이 턱까지 차도록 달렸다.']
+      : s.place === 'school' ? ['운동장을 몇 바퀴 뛰었다.', '체육관에서 줄넘기를 했다.'] : ['동네를 몇 바퀴 뛰었다.', '땀을 흠뻑 흘렸다.', '숨이 턱까지 차도록 움직였다.'] },
+  { id: 'read',      label: '독서',   icon: '📖', pt: 6, minAge: 7,  extra: .5, effect: { smart: [1, 3], art: [0, 2], happy: [1, 2] },
     text: ['책 한 권을 다 읽었다.', '책에 빠져 시간 가는 줄 몰랐다.', '읽다 만 책을 드디어 끝냈다.'] },
-  { id: 'artPrac',   label: '예술',   icon: '🎨', minAge: 5,  effect: { art: [3, 6], happy: [1, 2] },
+  { id: 'artPrac',   label: '예술',   icon: '🎨', pt: 7, minAge: 5,  effect: { art: [3, 6], happy: [1, 2] },
     text: ['그림을 한 장 완성했다.', '피아노 앞에 오래 앉아 있었다.', '노래를 녹음해봤다.'] },
-  { id: 'make',      label: '만들기', icon: '🔧', minAge: 6,  effect: { craft: [3, 6], happy: [0, 2] },
+  { id: 'make',      label: '만들기', icon: '🔧', pt: 7, minAge: 6,  effect: { craft: [3, 6], happy: [0, 2] },
     text: ['고장 난 라디오를 뜯어봤다.', '나무로 작은 상자를 만들었다.', '레고로 성을 쌓았다.'] },
-  { id: 'walk',      label: '산책',   icon: '🌳', minAge: 4,  effect: { happy: [2, 5], health: [0, 1] },
-    text: ['바람 쐬러 동네를 걸었다.', '공원 벤치에 한참 앉아 있었다.', '처음 가보는 골목을 걸어봤다.'] },
+  // 동아리 (중·고등학생, 학교에서): 고른 동아리(없으면 취미)에 맞는 능력치 + 비교과(수시 종합)
+  { id: 'club',      label: '동아리', icon: '🎸', minAge: 13, maxAge: 18, extra: 1,
+    effect: s => Object.assign({ happy: [1, 3] }, { music: { art: [2, 3] }, sport: { fit: [2, 3] }, game: { smart: [1, 2], craft: [1, 2] }, book: { smart: [1, 2], art: [1, 2] }, volunteer: { charm: [1, 2] },
+      cook: { craft: [2, 3] }, draw: { art: [2, 3] }, fashion: { style: [2, 3] }, travel: { art: [1, 2] } }[s.school.club || s.hobby] || { charm: [1, 2] }),
+    text: s => ({ music: ['합주실에서 같은 곡을 스무 번 맞췄다.', '공연 연습이 길어졌다.'], sport: ['해가 질 때까지 공을 던졌다.', '연습 경기에서 이겼다.'], game: ['동아리방에서 밤늦게까지 코드를 짰다.'], book: ['돌아가며 시를 낭독했다.'],
+      volunteer: ['공부방 아이들 숙제를 봐줬다.'] }[s.school.club] || ['동아리방에서 시간을 보냈다.', '선후배들과 다음 행사를 준비했다.']) },
+  // 유치원·초등학교: 아이 데리러 가기 (그 나이 아이와 가까워짐 — js/game.js doAction)
+  { id: 'pickup',    label: '아이 데리러 가기', icon: '🧒', pt: 6, minAge: 20, effect: { happy: [2, 4] },
+    text: s => s.place === 'kinder' ? ['아이가 "엄마!", "아빠!" 하며 달려와 안겼다.', '오늘 만든 종이 왕관을 머리에 씌워 줬다.', '하원 버스에서 내린 아이가 하루 종일 있었던 일을 쉬지 않고 떠들었다.']
+      : ['교문 앞에서 아이 가방을 받아 들었다.', '아이가 받아쓰기 100점을 자랑했다.', '하굣길에 떡볶이를 같이 사 먹었다.'] },
+  { id: 'walk',      label: '산책',   icon: '🌳', pt: 5, minAge: 4,  effect: { happy: [2, 5], health: [0, 1] },
+    text: s => s.place === 'park' ? ['공원 산책로를 한 바퀴 돌았다.', '공원 벤치에 한참 앉아 있었다.', '호숫가를 따라 천천히 걸었다.'] : s.place === 'quad' ? ['잔디밭 둘레를 천천히 걸었다.']
+      : ['바람 쐬러 동네를 걸었다.', '처음 가보는 골목을 걸어봤다.', '편의점까지 일부러 돌아서 걸었다.'] },
   { id: 'cram',      label: '수업',   icon: '📝', minAge: 7,  cost: 20, subjAll: [2, 3], effect: { smart: [2, 4], happy: [-3, -1] },
     text: ['학원 수업을 끝까지 버텼다.', '단어 시험에서 재시험을 봤다.', '밤 10시에 학원 문을 나섰다.'] },
-  { id: 'game',     label: '게임',   icon: '🎮', minAge: 8,  effect: { happy: [3, 6], smart: [-1, 0] },
+  { id: 'game',     label: '게임',   icon: '🎮', pt: 6, minAge: 8,  effect: { happy: [3, 6], smart: [-1, 0] },
     text: ['게임 한 판만 하려다 세 시간이 지났다.', '드디어 어려운 판을 깼다.', '친구들이랑 밤늦게까지 게임을 했다.'] },
-  { id: 'style',     label: '꾸미기', icon: '💇', minAge: 13, cost: 20, effect: { style: [10, 16], charm: [0, 1], happy: [0, 2] },
+  { id: 'style',     label: '꾸미기', icon: '💇', pt: 8, minAge: 13, cost: 20, effect: { style: [10, 16], charm: [0, 1], happy: [0, 2] },
     text: ['머리를 새로 했다.', '옷장을 정리하고 새 옷을 샀다.', '거울 앞에서 한참을 고민했다.'] },
-  { id: 'parttime',  label: '알바',   icon: '🏪', minAge: 16, req: { job: false }, effect: { money: [30, 70], health: [-2, 0], charm: [0, 1], happy: [-2, 0] },
+  { id: 'parttime',  label: '알바',   icon: '🏪', pt: 22, minAge: 16, req: { job: false }, effect: { money: [30, 70], health: [-2, 0], charm: [0, 1], happy: [-2, 0] },
     text: s => s.place === 'cafe' ? ['카페에서 주말 알바를 했다.', '하루 종일 우유 거품을 냈다.'] : s.place === 'conveni' ? ['편의점 야간 알바를 했다.', '새벽에 들어온 물건을 진열했다.']
       : ['옷 가게에서 하루 종일 옷을 갰다.', '전단지를 돌렸다.', '물류센터에서 하루 일했다.'] },
-  { id: 'work',      label: '일',     icon: '💼', minAge: 19, req: { job: true }, work: true, effect: { money: [50, 150], health: [-4, -1], happy: [-3, -1] },
+  { id: 'work',      label: '일',     icon: '💼', pt: 12, minAge: 19, req: { job: true }, work: true, effect: { money: [50, 150], health: [-4, -1], happy: [-3, -1] },
     text: ['하루 종일 일에 매달렸다.', '맡은 일을 끝까지 해냈다.', '정신없이 하루가 지나갔다.'] },
-  { id: 'overtime',  label: '야근',   icon: '🌙', minAge: 19, req: { job: true }, work: true, perf: [10, 18], effect: { money: [80, 180], health: [-7, -3], happy: [-5, -2] },
+  { id: 'overtime',  label: '야근',   icon: '🌙', pt: 12, minAge: 19, req: { job: true }, work: true, perf: [10, 18], effect: { money: [80, 180], health: [-7, -3], happy: [-5, -2] },
     text: ['사무실 불을 마지막으로 껐다.', '막차를 놓쳐서 택시를 탔다.', '주말에도 나와서 일했다.'] },
   // 피임약 — 20살 이상 여자. 처방받으면 해마다 약값이 나감 (끊으면 플래그 해제)
-  { id: 'pill',      label: '피임약 처방', icon: '💊', minAge: 20, cost: 5, if: s => s.gender === 'f' && !s.flags.onPill, set: 'onPill', effect: { happy: [0, 1] },
+  { id: 'pill',      label: '피임약 처방', icon: '💊', pt: 3, minAge: 20, cost: 5, if: s => s.gender === 'f' && !s.flags.onPill, set: 'onPill', effect: { happy: [0, 1] },
     text: ['산부인과에서 피임약을 처방받았다. 매일 같은 시간에 먹어야 한다.', '진료를 받고 피임약을 받아 왔다. 알람을 하나 더 맞췄다.'] },
-  { id: 'pillStop',  label: '피임약 끊기', icon: '💊', minAge: 20, if: s => !!s.flags.onPill, unset: 'onPill',
+  { id: 'pillStop',  label: '피임약 끊기', icon: '💊', pt: 2, minAge: 20, if: s => !!s.flags.onPill, unset: 'onPill',
     text: ['피임약을 그만 먹기로 했다.', '마지막 한 알을 먹고 약 상자를 버렸다.'] },
-  { id: 'doctor',    label: '진료',   icon: '🩺', minAge: 5,  cost: 30, effect: { health: [5, 10] },
+  { id: 'doctor',    label: '진료',   icon: '🩺', pt: 8, minAge: 5,  cost: 30, effect: { health: [5, 10] },
     text: s => s.age < 18 ? ['엄마 손을 잡고 소아과에 갔다.', '주사를 맞고 사탕을 받았다.'] : ['진료를 받고 약을 타 왔다.', '미뤄둔 치과에 다녀왔다.', '한의원에서 침을 맞았다.'] },
-  { id: 'coffee',    label: '커피',   icon: '☕', minAge: 13, cost: 5, effect: { happy: [2, 4] },
+  { id: 'coffee',    label: '커피',   icon: '☕', pt: 4, minAge: 13, cost: 5, effect: { happy: [2, 4] },
     text: ['창가 자리에서 커피를 마셨다.', '처음 보는 메뉴를 시켜봤다.', '커피 한 잔을 두고 멍하니 있었다.'] },
-  { id: 'shop',      label: '쇼핑',   icon: '🛍', minAge: 10, cost: 30, effect: { happy: [3, 6], style: [4, 8] },
+  { id: 'shop',      label: '쇼핑',   icon: '🛍', pt: 8, minAge: 10, cost: 30, effect: { happy: [3, 6], style: [4, 8] },
     text: ['충동구매를 했다. 후회는 없다.', '구경만 하려다 두 손이 무거워졌다.', '오래 고민하던 신발을 샀다.'] },
-  { id: 'drink',     label: '한잔',   icon: '🍺', minAge: 19, cost: 20, drunk: 1, effect: { happy: [3, 6], health: [-2, -1] },
+  { id: 'drink',     label: '한잔',   icon: '🍺', pt: 6, minAge: 19, cost: s => 10 + 10 * Math.min(2, s.drunk || 0), drunk: 1,   // 술값은 취할수록 비싸짐 (단계당 10~30만원) effect: { happy: [3, 6], health: [-2, -1] },
     text: s => [, ['시원한 생맥주 한 잔에 하루가 풀렸다.', '첫 잔이 목을 타고 내려갔다.'], ['볼이 뜨끈해졌다. 말이 많아졌다.', '안주가 맛있어서 술이 술술 들어갔다.'],
       ['세상이 빙글빙글 돈다.', '한 잔만 하려다 두 병을 비웠다. 기억이 군데군데 끊겼다.']][s.drunk] },
-  { id: 'pray',      label: '기도',   icon: '🙏', minAge: 4,  effect: { happy: [1, 3] }, karma: [1, 3],
+  { id: 'pray',      label: '기도',   icon: '🙏', pt: 5, minAge: 4,  effect: { happy: [1, 3] }, karma: [1, 3],
     text: ['눈을 감고 오래 앉아 있었다.', '두 손을 모으고 소원을 빌었다.', '마음이 조금 가라앉았다.'] },
-  { id: 'snack',     label: '간식',   icon: '🍙', minAge: 6,  cost: 5, effect: { happy: [1, 3] },
+  { id: 'snack',     label: '간식',   icon: '🍙', pt: 3, minAge: 6, maxAge: 18, cost: 5, effect: { happy: [1, 3] },
     text: ['삼각김밥과 바나나우유를 샀다.', '컵라면에 물을 붓고 3분을 기다렸다.', '1+1 과자를 두 개 집었다.'] },
-  { id: 'watch',     label: '공연',   icon: '🎵', minAge: 15, cost: 40, effect: { happy: [5, 9], art: [1, 3] }, memoryChance: .2,
+  { id: 'watch',     label: '공연',   icon: '🎵', pt: 12, minAge: 15, cost: 40, effect: { happy: [5, 9], art: [1, 3] }, memoryChance: .2,
     text: ['목이 쉬도록 따라 불렀다.', '앙코르 곡에서 소름이 돋았다.', '공연이 끝나고도 귀가 웅웅거렸다.'] },
-  { id: 'volunteer', label: '봉사',   icon: '🤝', minAge: 12, effect: { happy: [2, 4], charm: [0, 2] }, karma: [4, 8],
+  { id: 'volunteer', label: '봉사',   icon: '🤝', pt: 12, minAge: 12, extra: 1, effect: { happy: [2, 4], charm: [0, 2] }, karma: [4, 8],
     text: ['보육원에서 아이들과 놀아줬다.', '유기견 보호소 청소를 도왔다.', '무료 급식소에서 배식을 했다.'] },
-  { id: 'donate',    label: '기부',   icon: '💝', minAge: 20, cost: 100, effect: { happy: [2, 4] }, karma: [8, 14],
+  { id: 'donate',    label: '기부',   icon: '💝', pt: 3, minAge: 20, cost: 100, effect: { happy: [2, 4] }, karma: [8, 14],
     text: ['조금이지만 기부를 했다.', '정기 후원을 시작했다.', '모금함에 봉투를 넣었다.'] },
-  { id: 'travel',    label: '여행',   icon: '🧳', minAge: 20, cost: 150, effect: { happy: [6, 12], art: [0, 2] }, memoryChance: .35,
+  // 대학 캠퍼스: 학생식당 밥(끼니로 침) · 동아리 활동(대학 — 취미에 맞는 능력치)
+  { id: 'cafMeal', label: '학식', icon: '🍱', pt: 4, minAge: 19, cost: 1, meal: true, effect: { health: [1, 1], happy: [1, 2] },
+    text: ['돈가스가 생각보다 두꺼웠다.', '오늘의 메뉴는 김치볶음밥. 무난했다.', '라면 코너에 줄을 섰다. 학식 라면은 왜 이렇게 맛있을까.'] },
+  { id: 'uclub', label: '동아리 활동', icon: '🎸', pt: 10, minAge: 19,
+    effect: s => Object.assign({ happy: [2, 4] }, { music: { art: [2, 3] }, sport: { fit: [2, 3] }, game: { smart: [1, 2], craft: [1, 2] }, book: { smart: [1, 2], art: [1, 2] },
+      cook: { craft: [2, 3] }, draw: { art: [2, 3] }, fashion: { style: [2, 3] }, travel: { art: [1, 2] } }[s.hobby] || { charm: [1, 2] }),
+    text: ['동아리방에서 정기 공연 연습을 했다.', '선후배들과 다음 행사를 준비했다.', '동아리방 소파에서 수다를 떨다 해가 졌다.', '신입 부원들에게 동아리 역사를 늘어놓았다.'] },
+  // 부동산에서: 집 종류를 고르는 창 (이사는 행동력 30 + 보증금 차액 — js/game.js moveHome)
+  { id: 'houseHunt', label: '집 보기', icon: '🔑', pt: 0, minAge: 19 },
+  { id: 'travel',    label: '여행',   icon: '🧳', pt: 30, minAge: 20, cost: 150, effect: { happy: [6, 12], art: [0, 2] }, memoryChance: .35,
     text: ['훌쩍 바다를 보러 다녀왔다.', '처음 가보는 도시를 걸었다.', '기차 창밖만 보다가 돌아왔다.'] },
 ];
 

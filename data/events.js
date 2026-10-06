@@ -61,13 +61,59 @@ GAME_DATA.events = [
     do: (s, a) => { a.meet({ kind: 'classmate', ageRange: [13, 13], close: 25 }); } },
   { id: 'high', type: 'must', at: 16, text: '고등학교에 입학했다. 3년이 길 것 같기도, 짧을 것 같기도 하다.', memory: true,
     do: (s, a) => { a.meet({ kind: 'classmate', ageRange: [16, 16], close: 25 }); } },
-  { id: 'schoolTrip', type: 'must', at: 17, text: '수학여행을 갔다. 밤새 떠드느라 한숨도 못 잤다.', memory: true, effect: { happy: 8 } },
+  // 수학여행 (고2 가을)
+  { id: 'schoolTrip', type: 'must', at: 17, season: ['가을'], text: '수학여행! 버스 안이 시끄럽다.', memory: true,
+    choices: [
+      { label: '짝꿍이랑 얘기한다', do: (s, a) => { const f = a.find(p => p.kind === 'classmate').sort((x, y) => y.close - x.close)[0]; if (f) a.changeP(f, { close: [5, 10] }); }, effect: { happy: 4 }, text: '창밖 풍경보다 짝꿍 이야기가 더 재밌었다. 밤새 떠드느라 한숨도 못 잤다.' },
+      { label: '자리에서 잔다', effect: { health: 3 }, text: '눈을 떠 보니 숙소 앞이었다.' },
+      { label: '뒤에서 몰래 과자 파티', effect: { happy: 5 }, karma: -1, text: '선생님한테 걸려서 다 같이 반성문을 썼다. 그래도 웃겼다.' },
+    ] },
+  // 고1 봄: 계열·선택 과목 (SCHOOL.md) / 고2 봄: 확정하거나 한 번 바꾸기
+  { id: 'trackChoice', type: 'must', at: 16, season: ['봄'], text: '과목 선택의 시간이 왔다. 어떤 길을 갈까?',
+    choices: GAME_DATA.tracks.map(t => ({ label: t.label, do: (s, a) => a.chooseTrack(t.id), text: t.text })) },
+  { id: 'trackConfirm', type: 'must', at: 17, season: ['봄'], text: s => `문·이과를 확정할 때다. 지금은 ${(GAME_DATA.tracks.find(t => t.id === s.school.track) || {}).label || '아직 미정'}.`,
+    choices: [{ label: '이대로 간다', text: '마음을 굳혔다.' }].concat(GAME_DATA.tracks.map(t => ({ label: `${t.label}(으)로 바꾼다`, if: s => s.school.track !== t.id, do: (s, a) => a.chooseTrack(t.id), text: `${t.label}(으)로 바꿨다. 새 교과서가 낯설었다.`, effect: { happy: -1 } }))) },
+  // 고1 동아리 — 자유 턴의 '동아리' 행동이 이쪽으로 (비교과)
+  { id: 'clubJoin', type: 'must', at: 16, season: ['여름'], text: '동아리 가입 신청서를 받았다.',
+    choices: [
+      { label: '밴드부', do: s => { s.school.club = 'music'; }, text: '드럼 스틱을 처음 잡았다.', effect: { art: 1 } },
+      { label: '농구부', do: s => { s.school.club = 'sport'; }, text: '키 큰 선배들 사이에서 공을 튀겼다.', effect: { fit: 1 } },
+      { label: '코딩 동아리', do: s => { s.school.club = 'game'; }, text: '첫날부터 게임을 만들자는 얘기가 나왔다.', effect: { smart: 1 } },
+      { label: '문예부', do: s => { s.school.club = 'book'; }, text: '동아리방 책장이 마음에 들었다.', effect: { art: 1 } },
+      { label: '봉사 동아리', do: s => { s.school.club = 'volunteer'; }, text: '첫 활동은 동네 공부방이었다.', karma: 2 },
+      { label: '안 든다', text: '방과 후엔 집에 가는 게 좋았다.' },
+    ] },
+  // 수능 전날 → 수능 (고3 학교 턴 csat)
+  // 외박한 다음 날 어제 옷 그대로 (HAIR_CLOTHES_BODY 3-7)
+  { id: 'sameClothes', type: 'trigger', text: s => s.vars.dutyKind === 'work' ? '"어? 어제 그 옷 아니에요?" 옆자리 동료가 의미심장하게 웃었다.' : '"너 어제랑 옷 똑같은데?" 동기가 눈썹을 치켜올렸다.',
+    choices: [
+      { label: '"집에 못 들어갔어." 웃어넘긴다', effect: { happy: 1, charm: [0, 1] }, text: '"오~" 소리가 몇 번 오갔다. 점심시간 내내 그 얘기였다.' },
+      { label: '"똑같은 옷이 두 벌이야." 둘러댄다', effect: { happy: -1 }, text: '아무도 안 믿는 눈치였다.' },
+      { label: '못 들은 척한다', effect: { happy: -1, style: -2 }, text: '하루 종일 괜히 옷깃만 만지작거렸다.' },
+    ] },
+  { id: 'csatEve', type: 'trigger', text: s => s.age >= 19 ? '두 번째 수능 전날. 작년 이맘때가 떠오른다.' : '수능 전날. 내일이다.',
+    choices: [
+      { label: '마지막으로 정리한다', do: (s, a) => { s.vars.csatCond = a.rand(-3, 6); a.takeCSAT(); }, text: '오답 노트를 한 번 더 넘겼다. 새벽 한 시에 불을 껐다.' },
+      { label: '일찍 잔다', do: (s, a) => { s.vars.csatCond = a.rand(3, 8); a.takeCSAT(); }, text: '아홉 시에 누웠다. 생각보다 잠이 잘 왔다.' },
+      { label: '친구들과 서로 응원한다', effect: { happy: 3 }, do: (s, a) => { s.vars.csatCond = a.rand(0, 5); a.takeCSAT(); }, text: '"잘 보자!" 서로 찹쌀떡을 나눠 먹었다.' },
+    ] },
+  // 합격한 곳 고르기 (수시 또는 정시)
+  { id: 'pickUniv', type: 'trigger', text: '합격한 곳 중에서 골라야 한다.',
+    choices: [0, 1, 2, 3, 4, 5].map(i => ({
+      label: (s, a) => { const o = s.school.offers[i]; return `${a.univ(o.u).name} ${a.dept(o.d).name}`; },
+      if: s => !!(s.school.offers && s.school.offers[i]),
+      do: (s, a) => { const o = s.school.offers[i]; a.admit(o.u, o.d); }, memory: true,
+      text: (s, a) => `${a.univ(s.school.univ).name} ${a.dept(s.school.dept).name}에 가기로 했다.`, effect: { happy: 10 },
+    })).concat([{ label: '전부 포기하고 재수한다', if: s => s.age === 18, set: 'retake', do: s => { s.school.offers = null; }, text: '더 높은 곳을 보기로 했다. 1년만 더.', effect: { happy: -4 } }]) },
+  // 어디에도 붙지 못했을 때 (SCHOOL.md 재수 선택)
+  { id: 'retakeChoice', type: 'trigger', text: '어디에도 붙지 못했다. 어떻게 할까?', memory: true,
+    choices: [
+      { label: '재수한다', if: s => s.age === 18, set: 'retake', text: '1년을 더 투자하기로 했다. 길고 외로운 시간이 시작됐다.', effect: { happy: -6 } },
+      { label: '취업한다', set: 'noCollege', unset: 'retake', text: '학교가 전부는 아니다. 내 길을 가기로 했다.', effect: { happy: 1 } },
+      { label: '전문대라도 간다', do: (s, a) => { const u = a.college(); a.admit(u.id, a.pick(u.departments)); }, text: '갈 수 있는 곳에 갔다. 여기서 다시 시작이다.' },
+    ] },
   { id: 'dreamSpeech', type: 'must', at: 10, text: '장래희망 발표 시간. "{dreamSpeech}"', memory: true },
-  { id: 'suneung', type: 'must', at: 18, season: ['겨울'], req: { noFlags: ['inJail'] },
-    do: (s, a) => a.takeSuneung(0), text: s => s.vars.satText, memory: true, then: 'collegeApply' },
-  { id: 'suneung2', type: 'must', at: 19, season: ['겨울'], req: { flags: ['retake'], noFlags: ['inJail'] },
-    do: (s, a) => a.takeSuneung(6), text: s => '두 번째 수능. ' + s.vars.satText, memory: true, then: 'collegeApply' },
-  { id: 'enlist', type: 'must', at: 20, req: { gender: 'm', noFlags: ['inJail'] },
+  { id: 'enlist', type: 'must', age: [20, 21], season: ['봄'], req: { gender: 'm', noFlags: ['inJail', 'exempt'] }, when: s => s.age === (s.vars.enlistAt || 20),   // 20세 시작에선 내년으로 미루거나 면제
     text: '입영 통지서가 날아왔다. 머리를 짧게 깎았다.', memory: true, set: ['army', 'inArmy'], effect: { happy: -6, health: 4 },
     do: s => {
       s.vars.enlistAge = s.age; s.job = null; s.salary = 0;
@@ -97,6 +143,13 @@ GAME_DATA.events = [
       { label: '이혼하자고 한다', memory: true, effect: { happy: -6 }, do: (s, a) => a.divorce(a.focused()), text: '{fp|와} 갈라서기로 했다.' },
     ] },
   { id: 'fiftyEve', type: 'must', at: 49, season: ['겨울'], text: '내년이면 쉰이다. 시간이 참 빠르다.' },
+  // 만성 피로 (새벽까지 깨는 날이 쌓이면, js/game.js endDay에서 한 달에 한 번까지)
+  { id: 'burnedOut', type: 'trigger', once: false,
+    text: '요즘 너무 무리하고 있다. 아침에 눈을 떠도 개운하지가 않다.',
+    choices: [
+      { label: '하루 푹 쉰다', effect: { health: [3, 5], happy: [2, 4] }, do: s => { s.fatigue = 0; s.wake = 4; }, text: '알람을 끄고 점심때까지 잤다. 몸이 조금 가벼워졌다.' },
+      { label: '커피로 버틴다', effect: { health: -2 }, do: s => { s.fatigue = Math.max(0, s.fatigue - 1); }, text: '세 번째 커피를 마셨다. 손이 조금 떨렸다.' },
+    ] },
 
   /* ═════ 고정 — 어린 시절 ═════ */
   { id: 'kinderFight', type: 'fixed', age: [4, 6], text: '어린이집에서 장난감 때문에 친구랑 싸웠다.',
@@ -145,9 +198,42 @@ GAME_DATA.events = [
 
   /* ═════ 고정 — 10대 ═════ */
   { id: 'puberty', type: 'fixed', age: [13, 14], text: '거울 보는 시간이 부쩍 늘었다.', effect: { style: [3, 6], happy: -2 } },
-  { id: 'midterm', type: 'fixed', age: [13, 15], season: ['봄', '겨울'],
-    text: (s, a) => a.subjAvg() >= 60 ? '중간고사에서 반 5등 안에 들었다.' : '중간고사 성적표를 가방 깊숙이 넣었다.',
-    effect: (s, a) => a.subjAvg() >= 60 ? { happy: 4 } : { happy: -3 } },
+  // 짝사랑 (중학생, 아직 없으면) — 감정만. 고등학교 고백 이벤트로 이어짐
+  { id: 'crushMs', type: 'fixed', age: [14, 15], when: (s, a) => !a.find(p => p.crush).length,
+    onStart: (s, a) => { const p = a.meet({ kind: 'classmate', gender: s.gender === 'm' ? 'f' : 'm', ageRange: [s.age, s.age], close: 20, trust: 15 }); p.crush = true; },
+    text: '{new|이} 지나갈 때마다 괜히 머리를 매만지게 된다.', effect: { happy: 2, style: 1 } },
+  /* ═════ 고등학교 (SCHOOL.md) ═════ */
+  { id: 'sportsFest', type: 'fixed', age: [16, 18], season: ['봄'], once: false, cooldown: 1, text: '체육대회 날이다!',
+    choices: [
+      { label: '전력 질주', check: { stat: 'fit', diff: 60, dice: true },
+        success: { text: '1등! 반 아이들이 환호했다.', effect: { happy: 5, fit: 2 }, memory: true }, fail: { text: '넘어졌다... 무릎이 까졌다.', effect: { happy: -2, health: -3 } } },
+      { label: '적당히 한다', text: '무난하게 끝냈다.', effect: { happy: 1 } },
+    ] },
+  { id: 'festival', type: 'fixed', age: [16, 18], season: ['겨울'], once: false, cooldown: 1, text: '학교 축제. 반에서 무엇을 할까?',
+    choices: [
+      { label: '무대 공연', check: { stat: 'charm', diff: 50, dice: true },
+        success: { text: '환호 속에 무대가 끝났다. 잊을 수 없는 순간이다.', effect: { happy: 8, charm: 3 }, memory: true, extra: 1 }, fail: { text: '삐끗했다. 하지만 나름 즐거웠다.', effect: { happy: 2 } } },
+      { label: '포장마차 운영', effect: { happy: 4, money: [5, 20], craft: 1 }, extra: .5, text: '떡볶이가 동났다. 반 회비가 두둑해졌다.' },
+      { label: '돌아다니기', effect: { happy: 3 }, text: '다른 반 귀신의 집에서 소리를 질렀다.' },
+    ] },
+  // 고백 (짝사랑) — 고등학생은 사귀는 데까지 (손잡기까지만). 19살이 되면 이어지거나 흐지부지
+  { id: 'confess', type: 'random', age: [16, 18], once: true, weight: 2,
+    when: (s, a) => a.find(p => p.crush && !p.teenLove).length > 0,
+    onStart: (s, a) => a.focus(a.pick(a.find(p => p.crush && !p.teenLove))),
+    text: '더 이상 참을 수 없다. {fp}에게 고백할까?',
+    choices: [
+      { label: '고백한다', check: { stat: 'charm', diff: 55, dice: true },
+        success: { text: '{fp|이} "나도..." 라고 했다. 세상이 달라 보였다.', p: { close: [15, 20], trust: [8, 12] }, effect: { happy: 10 }, memory: true, do: (s, a) => { a.focused().teenLove = true; } },
+        fail: { text: '{fp|이} 미안하다고 했다. 가슴이 아팠다.', effect: { happy: -8 }, memory: true, do: (s, a) => { a.focused().crush = false; } } },
+      { label: '아직은 아니다', text: '오늘도 마음을 삼켰다.' },
+    ] },
+  { id: 'teenDate', type: 'fixed', age: [16, 18], once: false, cooldown: 1, when: (s, a) => a.find(p => p.teenLove).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => p.teenLove)[0]),
+    text: '{fp|와} 학교 끝나고 떡볶이를 먹으러 갔다.',
+    choices: [
+      { label: '손을 잡는다', p: { close: [4, 8] }, effect: { happy: 5 }, text: '손바닥에 땀이 났다. {fp|도} 놓지 않았다.', memory: true },
+      { label: '시험 얘기만 한다', p: { close: [1, 3] }, text: '둘 다 수학이 제일 싫다는 걸 알게 됐다.' },
+    ] },
   { id: 'bigFight', type: 'fixed', age: [13, 15],
     onStart: (s, a) => {
       let f = friends(a).sort((x, y) => y.close - x.close)[0];
@@ -185,7 +271,7 @@ GAME_DATA.events = [
   { id: 'collegeFest', type: 'fixed', age: [19, 23], season: ['봄'], req: { flags: ['student'] }, text: '대학 축제. 처음 보는 사람들이랑 밤새 놀았다.', memory: true, effect: { happy: 6 },
     meet: s => ({ kind: 'friend', ageRange: [s.age - 1, s.age + 2], close: 25 }) },
   { id: 'mt', type: 'fixed', age: [19, 21], season: ['봄'], req: { flags: ['student'] }, text: '첫 MT. 밤새 게임하다가 아침에 라면을 먹었다.', memory: true, effect: { happy: 5 } },
-  { id: 'moveOut', type: 'fixed', age: [21, 30], req: { noFlags: ['married'] }, text: '처음으로 자취방을 구했다. 좁지만 온전히 내 공간이다.', memory: true, set: 'ownPlace', effect: { happy: 5, money: -300 } },
+  { id: 'moveOut', type: 'fixed', age: [21, 30], req: { noFlags: ['married', 'ownPlace'] }, text: '처음으로 자취방을 구했다. 좁지만 온전히 내 공간이다.', memory: true, set: 'ownPlace', effect: { happy: 5, money: -300 } },
   { id: 'jobSeason', type: 'fixed', age: [23, 30], once: false, cooldown: 2, req: { job: false, noFlags: ['student', 'inArmy', 'inJail'] }, text: '공채 시즌이다.',
     choices: [
       { label: '원서를 왕창 쓴다', do: (s, a) => a.tryJob(), text: s => s.job ? '드디어 합격 문자가 왔다.' : '불합격 메일만 잔뜩 쌓였다.', effect: s => s.job ? { happy: 6 } : { happy: -4 } },
@@ -257,7 +343,7 @@ GAME_DATA.events = [
     onStart: (s, a) => { s.vars.dadClose = a.person('dad').close; },
     text: s => s.vars.dadClose >= 70 ? '아버지가 돌아가셨다. 마지막까지 손을 꼭 잡고 있었다.' : '아버지가 돌아가셨다. 하지 못한 말들이 자꾸 떠올랐다.',
     memory: true, effect: { happy: -15 }, do: (s, a) => { a.person('dad').gone = true; } },
-  { id: 'reunion', type: 'fixed', age: [40, 48],
+  { id: 'reunion', type: 'fixed', age: [40, 48], past: true,   // past: 지나온 어린 시절을 떠올리는 이벤트 — 20세 시작이면 안 나옴
     text: s => s.flags.president ? '동창회에 나갔다. 다들 반장이었던 나를 기억하고 있었다.'
       : s.vars.bfName ? '동창회에 나갔다. {bfName|이} 제일 먼저 손을 흔들었다.'
       : '동창회에 나갔다. 이름이 잘 떠오르지 않는 얼굴이 많았다.',
@@ -509,7 +595,7 @@ GAME_DATA.events = [
         text: '{new|이} 고맙다며 다음 공연 날짜를 알려줬다.' },
       { label: '박수만 치고 간다', text: '노래가 귀에 오래 남았다.', effect: { art: [0, 1] } },
     ] },
-  { id: 'mallScout', type: 'random', on: ['mall', 'shop', 'style'], age: [15, 30], when: s => s.stats.face >= 120 && s.stats.style >= 50, text: '길에서 누가 명함을 내밀었다. 모델 일을 해볼 생각이 없냐고 한다.',
+  { id: 'mallScout', type: 'random', on: ['mall', 'shop', 'style'], age: [15, 30], when: s => s.stats.face >= 120 && s.stats.style >= 60, text: '길에서 누가 명함을 내밀었다. 모델 일을 해볼 생각이 없냐고 한다.',
     choices: [
       { label: '해본다', chance: .45,
         success: { text: '광고 사진 한 장에 내 얼굴이 실렸다. 버스 정류장에서 나를 마주쳤다.', memory: true, effect: { money: [100, 400], charm: [2, 4], happy: 6 } },
@@ -621,13 +707,15 @@ GAME_DATA.events = [
       { label: '옷이라도 신경 쓰자', text: '옷장을 뒤집어엎었다. 어울리는 색을 찾았다.', effect: { style: [5, 10], happy: 1 } },
       { label: '신경 안 쓰기로 했다', text: '거울을 뒤집어 놓았다. 그래도 가끔 생각났다.', effect: { happy: -2 } },
     ] },
+  // 견적은 상담 때마다 1000~3000만원 (100만원 단위)
   { id: 'surgery', type: 'fixed', age: [20, 45], once: false, cooldown: 5,
-    when: (s, a) => s.stats.face < a.gradeMin('B') && s.money >= GAME_DATA.surgeryCost && !s.flags.unnatural,
-    text: '성형외과 앞을 지나갔다. 상담만 받아볼까.',
+    when: (s, a) => s.stats.face < a.gradeMin('B') && s.money >= GAME_DATA.surgeryCost[0] && !s.flags.unnatural,
+    onStart: (s, a) => { const [lo, hi] = GAME_DATA.surgeryCost; s.vars.quote = Math.min(Math.floor(s.money / 100) * 100, a.rand(lo / 100, hi / 100) * 100); },
+    text: s => `성형외과 앞을 지나갔다. 상담만 받아볼까. 견적은 ${s.vars.quote}만원.`,
     choices: [
-      { label: `한다 (${GAME_DATA.surgeryCost}만원)`, chance: .8,
-        success: { text: '붓기가 빠지자 거울 속 얼굴이 달라져 있었다.', memory: true, effect: { money: -GAME_DATA.surgeryCost, happy: 8 }, do: (s, a) => a.faceStep(1) },
-        fail: { text: '수술이 잘 안 됐다. 어딘가 부자연스럽다.', memory: true, set: 'unnatural', effect: { money: -GAME_DATA.surgeryCost, health: -10, happy: -8 }, do: (s, a) => a.faceStep(-1) } },
+      { label: s => `한다 (${s.vars.quote}만원)`, chance: .8,
+        success: { text: '붓기가 빠지자 거울 속 얼굴이 달라져 있었다.', memory: true, effect: s => ({ money: -s.vars.quote, happy: 8 }), do: (s, a) => a.faceSurgery(true) },
+        fail: { text: '수술이 잘 안 됐다. 어딘가 부자연스럽다.', memory: true, set: 'unnatural', effect: s => ({ money: -s.vars.quote, health: -10, happy: -8 }), do: (s, a) => a.faceSurgery(false) } },
       { label: '이대로가 나다', text: '상담 실장의 명함을 가방 깊숙이 넣었다.' },
     ] },
 
@@ -809,7 +897,7 @@ GAME_DATA.events = [
     ] },
   // 싸운 뒤 (6턴 안), 설렘이 아직 30 넘게 남아 있을 때
   { id: 'makeupSex', type: 'random', on: ['home'], age: [20, 49], once: false, cooldown: 1, weight: 3,
-    when: mainIs((m, s, a) => (m.partner || m.spouse) && a.canSex(m) && m.fought != null && a.turn() - m.fought <= 6 && m.heart >= 30), onStart: focusMain,
+    when: mainIs((m, s, a) => (m.partner || m.spouse) && a.canSex(m) && m.fought != null && a.turn() - m.fought <= 3 && m.heart >= 30), onStart: focusMain,
     text: '싸운 뒤 냉전이 이어졌다. {fp|이} 먼저 내 방문을 열었다.',
     choices: [
       { label: '끌어안는다', intimate: true, satBonus: 15, memory: true, pregnant: (s, a) => a.focused().spouse ? .12 : .06,
@@ -821,10 +909,10 @@ GAME_DATA.events = [
 
   // 크기 — 기술이 결국 이김 / 크기만 믿으면 안 됨 (내가 남자일 때)
   { id: 'skillOverSize', type: 'fixed', age: [20, 49], req: { flags: ['hadSex'] },
-    when: (s, a) => s.gender === 'm' && s.size === 'small' && (s.sexSkill || 0) >= a.gradeMin('B'),
+    when: (s, a) => s.gender === 'm' && a.pGrade(s.penis) <= 2 && (s.sexSkill || 0) >= a.gradeMin('B'),
     text: '크기가 다가 아니라는 걸 알았다. 기술이 좋으면 상대의 표정이 달라진다.', effect: { happy: 5 }, memory: true },
   { id: 'sizeNotEnough', type: 'fixed', age: [20, 49], req: { flags: ['hadSex'] },
-    when: (s, a) => s.gender === 'm' && s.size === 'xlarge' && (s.sexSkill || 0) < a.gradeMin('D') && !!a.main() && a.canSex(a.main()), onStart: focusMain,
+    when: (s, a) => s.gender === 'm' && a.pGrade(s.penis) >= 5 && (s.sexSkill || 0) < a.gradeMin('D') && !!a.main() && a.canSex(a.main()), onStart: focusMain,
     text: '크기만 믿으면 안 된다는 걸 알았다. {fp|이} "좀 더… 천천히"라고 했다.', effect: { happy: -2 } },
   { id: 'hiddenChildSeen', type: 'fixed', age: [28, 50], req: { flags: ['hiddenChild'] },
     text: '길에서 나를 꼭 닮은 아이를 봤다. 아이 손을 잡고 걷던 {hiddenName|이} 나를 보고 걸음을 멈췄다.',
@@ -896,10 +984,16 @@ GAME_DATA.events = [
       { label: '"간지러워" 하고 웃는다', p: { heart: [2, 4] }, text: '{fp|이} 장난스럽게 한 번 더 그랬다.' },
     ] },
   { id: 'npcApproach', type: 'random', on: NOT_ROUTINE, age: [20, 49], once: false, weight: 3,
+    // 생김새 S는 한 해 1~2번, A는 2년에 1번, B는 3~4년에 1번 (몸 A 이상이면 S·A는 한 번 더, B는 2년마다). C 이하는 몸·매력이 좋으면 가끔
     when: (s, a) => {
-      const g = a.myFace(), gap = g >= 6 ? 1 : g >= 5 ? 2 : g >= 4 ? 3 : s.stats.fit >= a.gradeMin('A') && s.stats.charm >= a.gradeMin('C') ? 4 : 99;
-      return s.age - (s.last.npcApproach ?? -99) >= gap;
+      const g = a.myFace(), bodyA = s.stats.fit >= a.gradeMin('A');
+      const gap = g >= 6 ? 1 : g >= 5 ? 2 : g >= 4 ? (bodyA ? 2 : 3) : bodyA && s.stats.charm >= a.gradeMin('C') ? 4 : 99;
+      const quota = (g >= 6 ? (Math.random() < .5 ? 2 : 1) : 1) + (g >= 5 && bodyA ? 1 : 0), w = s.vars.npcApp || { from: -99, n: 0 };
+      s.vars.npcAppGap = gap;
+      return s.age - w.from >= gap || w.n < quota;
     },
+    // 기간(gap년) 안에서 몇 번 왔는지 셈
+    do: s => { const w = s.vars.npcApp; s.vars.npcApp = w && s.age - w.from < s.vars.npcAppGap ? { from: w.from, n: w.n + 1 } : { from: s.age, n: 1 }; },
     meet: s => ({ kind: 'friend', gender: s.gender === 'm' ? 'f' : 'm', ageRange: [Math.max(20, s.age - 5), Math.min(49, s.age + 5)], hangout: s.place, close: 30, heart: 20 }),
     text: s => s.place === 'bar' ? ['옆 테이블 {new|이} 먼저 말을 걸어왔다. "혼자세요?"', '{new|이} "같이 한 잔 해도 돼요?"라며 옆에 앉았다.']
       : ['{new|이} 웃으며 자기 번호를 적은 냅킨을 밀어왔다.', '{new|이} 머뭇거리다 먼저 말을 걸어왔다. "아까부터 보고 있었어요."'] },
@@ -958,9 +1052,13 @@ GAME_DATA.events = [
         text: '어색했지만 끝까지 이야기했다. 서로 몰랐던 게 많았다.' },
       { label: '모른 척한다', p: { heart: [-6, -3] }, text: '침대 양 끝에 누워 잠들었다.' },
     ] },
-  { id: 'libidoRestless', type: 'random', age: [20, 49], once: false, cooldown: 2, when: s => s.stats.libido >= 80,
-    text: '밤마다 잠이 안 온다. 괜히 휴대폰 연락처만 위아래로 넘겼다.',
+  // 성욕은 늘 대상이 있음 — 가장 높은 대상(a.lustTop)이 80을 넘으면 그 사람 생각에 잠이 안 옴
+  { id: 'libidoRestless', type: 'random', age: [20, 49], once: false, cooldown: 2, when: (s, a) => s.stats.libido >= 80 && !!a.lustTop(),
+    onStart: (s, a) => a.focus(a.lustTop()),
+    text: '밤마다 {fp} 생각에 잠이 안 온다. 괜히 휴대폰 연락처만 위아래로 넘겼다.',
     choices: [
+      { label: '{fp}에게 연락한다', p: { heart: [3, 6] }, libido: [4, 8], risk: (s, a) => a.focused() && !lover(a.focused()) ? .1 : 0,
+        text: (s, a) => lover(a.focused()) || a.focused().fwb ? '"자?" 1이 사라지자마자 전화가 걸려왔다.' : '"자?" 한 글자를 보냈다. 한참 뒤에 1이 사라졌다.' },
       { label: '전 연인에게 연락한다', if: (s, a) => a.find(p => p.ex && a.canSex(p) && p.grudge < 40).length > 0, risk: .15,
         do: (s, a) => a.focus(a.find(p => p.ex && a.canSex(p) && p.grudge < 40)[0]), p: { heart: [4, 8] }, text: '"자?" 한 글자를 보냈다. 1이 금방 사라졌다.' },
       { label: '편한 사람을 부른다', if: (s, a) => a.find(p => (p.fwb || p.fling) && a.canSex(p)).length > 0,
@@ -968,8 +1066,9 @@ GAME_DATA.events = [
         text: (s, a) => '"지금 와." 답장은 한 글자였다. ' + nightLine(a, 'fling') },
       { label: '찬물로 샤워한다', libido: [-25, -15], effect: { health: 1 }, text: '이가 딱딱 부딪혔다. 조금 나아졌다.' },
     ] },
-  { id: 'libidoDistract', type: 'random', on: ['work', 'study', 'office'], age: [20, 49], once: false, cooldown: 2, when: s => s.stats.libido >= 70,
-    text: '도무지 집중이 안 된다. 같은 문장을 다섯 번째 읽고 있다.', effect: { happy: -1 }, do: (s, a) => a.perf(-3) },
+  { id: 'libidoDistract', type: 'random', on: ['work', 'study', 'office'], age: [20, 49], once: false, cooldown: 2, when: (s, a) => s.stats.libido >= 70 && !!a.lustTop(),
+    onStart: (s, a) => a.focus(a.lustTop()),
+    text: '도무지 집중이 안 된다. {fp|이} 자꾸 떠올라 같은 문장을 다섯 번째 읽고 있다.', effect: { happy: -1 }, do: (s, a) => a.perf(-3) },
 
   /* ═════ 섹파 (감정은 깊지 않고, 서로 성욕이 차면 만나는 사이) ═════ */
   { id: 'fwbOffer', type: 'fixed', age: [20, 49], once: false, cooldown: 2, weight: 1.5,
@@ -983,8 +1082,8 @@ GAME_DATA.events = [
       { label: '그건 싫어', do: (s, a) => { const p = a.focused(); p.fling = false; }, p: { heart: [-10, -5], close: [-3, -1] }, text: '{fp|이} 알겠다며 웃었다. 그 뒤로 조금 어색해졌다.' },
     ] },
   { id: 'fwbCall', type: 'random', age: [20, 49], once: false, cooldown: 1, weight: 1.5,
-    when: (s, a) => a.find(p => p.fwb && a.canSex(p) && (s.stats.libido >= 60 || (p.libido || 0) >= 60)).length > 0,
-    onStart: (s, a) => a.focus(a.find(p => p.fwb && a.canSex(p) && (s.stats.libido >= 60 || (p.libido || 0) >= 60))[0]),
+    when: (s, a) => a.find(p => p.fwb && a.canSex(p) && (a.lust(p) >= 60 || (p.libido || 0) >= 60)).length > 0,
+    onStart: (s, a) => a.focus(a.find(p => p.fwb && a.canSex(p) && (a.lust(p) >= 60 || (p.libido || 0) >= 60))[0]),
     text: '{fp}에게서 문자가 왔다. "오늘 시간 돼?"',
     choices: [
       { label: '간다', intimate: true, fling: true, p: { close: [2, 4] }, effect: { happy: [2, 4] }, risk: .15, pregnant: .04,
@@ -1084,7 +1183,7 @@ GAME_DATA.events = [
     when: (s, a) => a.find(p => p.married && p.secret && p.heart >= 80 && p.trust >= 65).length > 0,
     onStart: (s, a) => a.focus(a.find(p => p.married && p.secret && p.heart >= 80 && p.trust >= 65)[0]),
     text: (s, a) => a.main() && a.main() !== a.focused() ? '{fp|이} 말했다. "이혼했어. 이제 너만 정리하면 돼."' : '{fp|이} 말했다. "이혼했어. 이제 숨지 않아도 돼."',   // 문장은 do 다음에 정해짐
-    do: (s, a) => { const p = a.focused(); p.married = false; p.taken = false; if (!a.main()) { p.secret = false; p.partner = true; } },
+    do: (s, a) => { const p = a.focused(); p.married = false; p.divorced = true; p.divorcedKnown = true; p.taken = false; if (!a.main()) { p.secret = false; p.partner = true; } },
     memory: true, effect: { happy: 8 } },
   { id: 'marriedReturn', type: 'fixed', age: [20, 50], once: false, cooldown: 3,
     when: (s, a) => a.find(p => p.married && (p.secret || p.fwb || p.fling) && p.heart < 40).length > 0,
@@ -1153,29 +1252,7 @@ GAME_DATA.events = [
   { id: 'kLucky', type: 'karma', sign: 1, once: false, text: '이상하게 일이 술술 풀리는 날들이었다.', effect: { happy: 6 } },
 
 
-  /* ═════ 학교 — 대학 지원 (엔진이 수능 뒤에 부름) ═════ */
-  { id: 'collegeApply', type: 'trigger',
-    text: s => `${['가', '나', '다'][s.vars.attempt - 1]}군 원서를 쓴다. 환산 등급 ${s.vars.uniScore.toFixed(2)}.`,
-    choices: GAME_DATA.univTiers.map(t => ({
-      label: (s, a) => `${t.label} (${a.chanceText(t)})`,
-      if: (s, a) => a.reachable(t),
-      chance: (s, a) => a.admitChance(t),
-      success: { do: (s, a) => a.admit(t.id), text: `${t.label}에 합격했다!`, memory: true, effect: { happy: 10 }, then: 'chooseMajor' },
-      fail: { text: `${t.label} 불합격.`, effect: { happy: -4 }, then: s => ++s.vars.attempt <= 3 ? 'collegeApply' : 'collegeFail' },
-    })).concat([
-      { label: '재수한다', if: s => !s.flags.retake, set: 'retake', text: '1년만 더 해보기로 했다.', effect: { happy: -6 } },
-      { label: '대학 대신 사회로 나간다', set: 'noCollege', text: '대학 대신 바로 일을 시작하기로 했다.', effect: { happy: 1 } },
-    ]) },
-  { id: 'collegeFail', type: 'trigger', text: '세 군데 모두 떨어졌다.',
-    choices: [
-      { label: '재수한다', if: s => !s.flags.retake, set: 'retake', text: '이를 악물었다. 1년만 더.', effect: { happy: -4 } },
-      { label: '사회로 나간다', set: 'noCollege', text: '다른 길도 있다고 생각하기로 했다.' },
-    ] },
-  { id: 'chooseMajor', type: 'trigger', text: '어떤 전공으로 갈까?',
-    choices: GAME_DATA.majors.map(m => ({
-      label: m.label, if: (s, a) => a.majorOk(m),
-      do: (s, a) => a.setMajor(m.id), text: `${m.label}에 들어갔다.`,
-    })) },
+  /* ═════ 학교 — 대학 (원서·합격은 js/game.js 학교 턴: 수시 → 수능 → 정시 → 발표, 위 csatEve·pickUniv·retakeChoice) ═════ */
   { id: 'gpaWarning', type: 'fixed', age: [19, 26], req: { flags: ['student'] }, when: s => s.school.gpa > 0 && s.school.gpa < 2.5,
     text: '학사경고 안내 문자가 왔다.',
     choices: [
@@ -1344,7 +1421,7 @@ GAME_DATA.events = [
         success: { text: '오히려 신뢰를 얻었다.', do: (s, a) => a.perf(10) },
         fail: { text: '클라이언트가 떨어져 나갔다.', do: (s, a) => a.perf(-10) } },
     ] },
-  { id: 'designAward', type: 'fixed', weight: 2, when: s => s.job === 'designer' && s.stats.art >= 170, text: '내 디자인이 상을 받았다.', memory: true, effect: { happy: 8 } },
+  { id: 'designAward', type: 'fixed', weight: 2, when: s => s.job === 'designer' && s.stats.art >= 165, text: '내 디자인이 상을 받았다.', memory: true, effect: { happy: 8 } },
   { id: 'teacherCounsel', type: 'fixed', weight: 2.5, once: false, cooldown: 3, when: JOB('teacher'), text: '반 아이 하나가 고민이 있다며 남았다.',
     choices: [
       { label: '끝까지 들어준다', text: '해가 질 때까지 이야기했다. 아이가 웃으며 돌아갔다.', karma: 5, effect: { happy: 3 } },
@@ -2054,6 +2131,65 @@ GAME_DATA.events = [
       { label: '끝까지 잡아뗀다', chance: .35,
         success: { text: '겨우 넘어갔다. 하지만 눈빛이 달라졌다.', do: (s, a) => { const m = a.person(s.vars.mainId); if (m) a.changeP(m, { trust: -15 }); } },
         fail: { text: '거짓말까지 들통났다. {mainName|은} 짐을 쌌다.', memory: true, do: (s, a) => a.endMain(50) } },
+    ] },
+  // 골목 (섹드립·스킨십으로 짧은 시간에 끌어올렸을 때, 엔진이 바로 부름) → 모텔에서 그날 밤 / 여기까지. 골목 연출은 키스까지
+  { id: 'alleyHeat', type: 'trigger', text: '골목 끝에서 모텔 간판이 깜빡였다. {fp|이} 내 셔츠 깃을 잡은 채 숨을 골랐다.',
+    choices: [
+      { label: '모텔로 간다', intimate: true, fling: true, spot: 'motel', mood: 15, effect: { happy: [3, 6], money: -6 }, p: { heart: [6, 10], close: [3, 5] },
+        memory: firstNight, pregnant: .05,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .2 : 0, riskTaken: (s, a) => (a.focused() || {}).taken ? .12 : 0,
+        text: (s, a) => '모텔 엘리베이터 문이 닫히기도 전이었다. ' + nightLine(a, lover(a.focused()) ? 'lover' : 'fling') },
+      { label: '여기서, 지금', intimate: true, fling: true, quick: true, spot: 'alley', mood: 12, effect: { happy: [3, 6] }, p: { heart: [5, 9], close: [2, 5] },
+        memory: firstNight, pregnant: .04,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .25 : 0, riskTaken: (s, a) => (a.focused() || {}).taken ? .14 : 0,
+        do: s => { s.vars.spotLabel = '골목'; s.vars.spotKind = 'alley'; s.vars.spotCaught = Math.random() < (s.time === 2 ? .1 : .22); },
+        then: s => (s.vars.spotCaught ? 'sp_caught' : undefined),
+        text: '모텔까지 갈 여유가 없었다. 차가운 벽돌에 등을 기댄 {fp|이} 내 목을 끌어당겼다. 누가 올까 봐 숨을 죽인 채, 짧고 뜨겁게.' },
+      { label: '오늘은 여기까지', p: { heart: [3, 6] }, effect: { happy: 1 },
+        text: '이마를 맞댄 채 숨을 골랐다. "다음엔 안 놔줄 거야." {fp|이} 웃으며 먼저 골목을 나갔다.' },
+    ] },
+  // 골목·화장실에서 — 누가 봤다 (data/social.js quickSpots 의 caught 확률)
+  { id: 'sp_caught', type: 'trigger',
+    text: s => s.vars.spotKind === 'toilet' ? `옷매무새를 고치는데 ${s.vars.spotLabel || '화장실'} 칸 밖에서 누가 문을 쾅쾅 두드렸다. "안에 두 명 있는 거 다 들려요!"`
+      : s.vars.spotKind === 'bush' ? '수풀 밖에서 손전등 불빛이 흔들렸다. 산책하던 사람이 이쪽을 비추고 있었다.'
+      : `${s.vars.spotLabel || '골목'} 입구에서 누군가 걸음을 멈췄다. "…거기 뭐 해요?"`,
+    choices: [
+      { label: '태연한 척 나간다', check: { stat: 'charm', diff: 90 },
+        success: { text: '"속이 좀 안 좋아서요." 눈 하나 깜짝 안 하고 걸어 나왔다. 상대는 고개를 갸웃하더니 그냥 지나갔다.', effect: { happy: 1 } },
+        fail: { text: '얼굴이 새빨개진 채 빠져나왔다. 뒤에서 휴대폰 카메라 셔터 소리가 들린 것 같았다.', effect: { happy: -4 }, karma: -1 } },
+      { label: '손을 잡고 뛴다', text: '"뛰어!" {fp|의} 손을 잡고 반대쪽 끝까지 달렸다. 숨이 턱까지 찼는데 둘 다 웃음이 터졌다.', p: { close: [2, 4], heart: [2, 4] }, effect: { happy: 2 }, memory: true },
+      { label: '고개 숙여 사과한다', text: '"죄송합니다…" 고개를 푹 숙이고 빠져나왔다. 당분간 여긴 못 오겠다.', effect: { happy: -2 } },
+    ] },
+  // 애인·배우자가 있는 상대가 먼저 제안 — 내 외모(첫인상)나 매력이 A 이상이고 플러팅·섹드립·스킨십으로 달아올랐을 때 (data/social.js inviteRoll)
+  //   집·모텔이면 바로 그날 밤, 밖이면 동행. 그 자리에선 상대 애인에게 안 들키고, 밤을 보낸 뒤 흔적(문자·자국)으로 들킬 수 있음
+  { id: 'takenInvite', type: 'trigger',
+    text: (s, a) => {
+      const p = a.focused() || {};
+      if (p.married) return p.ringOff ? '{fp|이} 빈 약지를 만지작거리며 말했다. "…오늘은 늦게 들어가도 돼."' : '{fp|이} 반지를 빼서 주머니에 넣었다. "오늘은 늦게 들어가도 돼. …조용한 데 갈래?"';
+      return '{fp|이} 휴대폰을 무음으로 돌렸다. "애인한텐 친구 만난다고 했어. …오늘 나랑 같이 있을래?"';
+    },
+    choices: [
+      { label: '같이 있자', if: s => s.place === 'home' || s.place === 'motel', intimate: true, fling: true, direct: true, mood: 14,
+        p: { heart: [6, 10], close: [3, 6] }, effect: { happy: [3, 6] }, memory: firstNight, pregnant: .05,
+        risk: (s, a) => a.main() && a.main() !== a.focused() ? .2 : 0, riskTaken: .12,
+        text: (s, a) => '{fp|이} 먼저 문을 잠갔다. ' + nightLine(a, 'fling') },
+      { label: '같이 간다', if: s => s.place !== 'home' && s.place !== 'motel',
+        do: (s, a) => { const p = a.focused(); if (!p) return; a.setCompanion(p); if (s.place && !s.here.some(h => h.key === p.id)) s.here.push({ key: p.id, doing: '내 옆에 붙어 있다', used: true }); },
+        p: { heart: [3, 5] }, effect: { happy: [2, 4] },
+        text: '{fp|이} 내 팔짱을 끼고 걸음을 재촉했다. (동행 — 모텔이나 집으로 가면 같이 간다)' },
+      { label: '오늘은 들어가', p: { trust: [3, 6], heart: [1, 3] }, karma: 1,
+        text: '{fp|이} 잠깐 아쉬운 얼굴을 하더니 웃었다. "…그래서 네가 더 좋아."' },
+    ] },
+  // 애인이 있는 상대가 고백을 받아줬을 때: 정리하고 만날지, 헤어지지 않은 채 몰래 만날지, 사귀지 않고 즐기기만 할지
+  { id: 'takenConfess', type: 'trigger',
+    text: (s, a) => { const p = a.focused(); return `{fp|이} 내 손을 잡은 채 망설였다. "근데 나… 아직 ${p && p.gender === 'm' ? '여자친구' : '남자친구'}가 있어."`; },
+    choices: [
+      { label: '정리하고 나랑 만나자', do: (s, a) => { const p = a.focused(); a.startRelation(p, !!a.main() && a.main() !== p); }, memory: true, scene: 'kiss', effect: { happy: [6, 10] },
+        text: '{fp|은} 만나던 사람과 정리하고 내 손을 잡았다.' },
+      { label: '지금처럼, 몰래 만나자', do: (s, a) => { const p = a.focused(); a.startRelation(p, true); p.taken = true; }, memory: true, scene: 'kiss', effect: { happy: [4, 8] }, risk: .1, riskTaken: .1,
+        text: '{fp|은} 애인과 헤어지지 않은 채 나를 만나기로 했다. 둘만의 비밀이다.' },
+      { label: '사귀진 말고 즐기기만 하자', if: (s, a) => a.canSex(a.focused()), do: (s, a) => { const p = a.focused(); p.fwb = true; p.fling = true; }, p: { heart: [-5, -2], close: [2, 4] },
+        text: '"그게 서로 편하겠다." {fp|이} 피식 웃었다. 애인과는 그대로, 나와는 즐기기만 하기로 했다.' },
     ] },
   { id: 'rivalFound', type: 'trigger', text: '{fp}의 애인이 나를 찾아왔다. 표정이 심상치 않았다.',
     choices: [

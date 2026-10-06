@@ -116,24 +116,30 @@ let stars = [];
 function buildStars() { const R = rng(7); stars = Array.from({ length: 70 }, () => ({ x: R(), y: R() * .42, r: R() < .15 ? 1.6 : 1, ph: R() * 6.28 })); }
 
 /* ---------- 산·건물 ---------- */
-let ridge = [], farB = [], nearB = [], winW = 4, winH = 6, skyKey = '';
+let ridge = [], farB = [], nearB = [], winW = 4, winH = 6, skyKey = '', CITY = 'kr';
+// 도시 모양: kr 서울(뒤로 산 능선 + 고만고만한 빌딩) / ny 뉴욕(산 없이 높은 마천루 + 첨탑·계단식 꼭대기, 앞 건물 옥상의 물탱크)
+function setCity(c) { if (c === CITY) return; CITY = c; if (W) buildSkyline(); }
 function buildSkyline() {
-  const R = rng(1234);
+  const R = rng(1234), ny = CITY === 'ny';
   ridge = [];
   const step = Math.max(14, W / 48), ph = [R() * 6.28, R() * 6.28, R() * 6.28];
   for (let x = -step; x <= W + step; x += step) {
     const u = x / Math.max(W, 600);
     const n = Math.sin(u * 3.2 + ph[0]) * .5 + Math.sin(u * 7.7 + ph[1]) * .3 + Math.sin(u * 16.1 + ph[2]) * .14;
-    ridge.push([x, H * .66 - n * H * .055]);
+    ridge.push([x, ny ? H + 10 : H * .66 - n * H * .055]);
   }
   const sc = clamp(W / 1000, .75, 1.2);
   farB = []; let x = -10;
-  while (x < W + 10) { const w = (34 + R() * 60) * sc; farB.push({ x, w, h: H * (.17 + R() * .15), ant: R() < .25 }); x += w + (R() * 14 - 4) * sc; }
+  while (x < W + 10) {
+    const w = (34 + R() * 60) * sc, tall = ny && R() < .3;
+    farB.push({ x, w, h: H * (ny ? (tall ? .36 + R() * .16 : .22 + R() * .14) : .17 + R() * .15), ant: R() < (ny ? .35 : .25), step: ny && R() < .45, spire: tall && R() < .6 });
+    x += w + (R() * 14 - 4) * sc;
+  }
   nearB = []; x = -6;
   const gx = 9 * sc, gy = 12 * sc; winW = 4 * sc; winH = 6 * sc;
   while (x < W + 6) {
     const w = (30 + R() * 46) * sc; let h = H * (.09 + R() * .13); if (R() < .12) h *= 1.45;
-    const b = { x, w, h, wins: [] };
+    const b = { x, w, h, wins: [], tank: ny && w > 34 * sc && R() < .45 ? x + w * (.25 + R() * .5) : null };
     const cols = Math.floor((w - 8 * sc) / gx), rows = Math.floor((h - 14 * sc) / gy);
     const ox = x + (w - (cols * gx - (gx - winW))) / 2;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (R() < .82) b.wins.push([ox + c * gx, H - h + 9 * sc + r * gy, R()]);
@@ -157,11 +163,21 @@ function renderSkyline(skyMid) {
   for (const p of ridge) sk.lineTo(p[0], p[1]);
   sk.lineTo(ridge[ridge.length - 1][0], H); sk.closePath(); sk.fill();
   sk.fillStyle = rgba(fcol); sk.beginPath();
-  for (const b of farB) { sk.rect(b.x, H - b.h, b.w, b.h); if (b.ant) sk.rect(b.x + b.w * .5 - 1, H - b.h - 14, 2, 14); }
+  for (const b of farB) {
+    sk.rect(b.x, H - b.h, b.w, b.h);
+    if (b.step) { sk.rect(b.x + b.w * .15, H - b.h - b.w * .22, b.w * .7, b.w * .22); sk.rect(b.x + b.w * .3, H - b.h - b.w * .4, b.w * .4, b.w * .18); }   // 계단식 꼭대기
+    if (b.spire) { const t = H - b.h - (b.step ? b.w * .4 : 0); sk.moveTo(b.x + b.w * .42, t); sk.lineTo(b.x + b.w * .5, t - b.w * .9); sk.lineTo(b.x + b.w * .58, t); sk.closePath(); }   // 첨탑
+    if (b.ant) sk.rect(b.x + b.w * .5 - 1, H - b.h - (b.step ? b.w * .4 : 0) - 14, 2, 14);
+  }
   sk.fill();
   const cap = tm(SNOW_CAP);
   if (snow > .01) { sk.fillStyle = rgba(cap, snow * .8); sk.beginPath(); for (const b of farB) sk.rect(b.x - 1, H - b.h - 2, b.w + 2, 3); sk.fill(); }
-  sk.fillStyle = rgba(bcol); sk.beginPath(); for (const b of nearB) sk.rect(b.x, H - b.h, b.w, b.h); sk.fill();
+  sk.fillStyle = rgba(bcol); sk.beginPath();
+  for (const b of nearB) {
+    sk.rect(b.x, H - b.h, b.w, b.h);
+    if (b.tank) { const s2 = clamp(W / 1000, .75, 1.2), tx = b.tank, ty = H - b.h; sk.rect(tx - 1.2 * s2, ty - 6 * s2, 1.4 * s2, 6 * s2); sk.rect(tx + 6.8 * s2, ty - 6 * s2, 1.4 * s2, 6 * s2); sk.rect(tx - 2 * s2, ty - 15 * s2, 11 * s2, 9 * s2); sk.moveTo(tx - 2.6 * s2, ty - 15 * s2); sk.lineTo(tx + 3.5 * s2, ty - 20 * s2); sk.lineTo(tx + 9.6 * s2, ty - 15 * s2); sk.closePath(); }   // 옥상 물탱크
+  }
+  sk.fill();
   sk.fillStyle = rgba(winDay, .55); sk.beginPath();
   for (const b of nearB) for (const w of b.wins) if (w[2] >= lit) sk.rect(w[0], w[1], winW, winH);
   sk.fill();
@@ -424,5 +440,5 @@ function setWeather(p, instant) {
   if (instant) for (const key of KEYS) P[key] = TG[key];
 }
 
-window.WeatherBG = { init, setTime, setWeather };
+window.WeatherBG = { init, setTime, setWeather, setCity };
 })();
