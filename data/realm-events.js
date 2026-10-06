@@ -19,14 +19,14 @@ RE.push(
   { id: 'fatherFate', story: true, once: true, when: s => s.monthN >= 30 && s.monthN <= 60 && Math.random() < .08,
     text: '전선에서 전령이 말을 몰고 왔다. 얼굴이 굳어 있었다.',
     choices: [{ label: '편지를 연다', do: (s, R) => R.fatherFate() }] },
-  { id: 'proposal', when: s => s.age >= 17 && !s.spouse && !s.flags.noMarry && (s.monthN - (s.lastProposal ?? -99)) >= 10, weight: 1.4,
+  { id: 'proposal', when: s => s.age >= 20 && !s.spouse && !s.flags.noMarry && (s.monthN - (s.lastProposal ?? -99)) >= 10, weight: 1.4,
     text: (s, R) => { const h = R.proposalHouse(); return `${h.sym} ${h.name} 가문에서 혼담이 왔다. ${h.trait}. 상대는 ${R.proposalWho().name}(${R.proposalWho().age}살)이라고 한다.`; },
     choices: [
       { label: '혼담을 받아들인다', do: (s, R) => R.marry() },
       { label: '직접 만나 보고 정한다 (화술 판정)', check: { stat: 'charm', g: 'C' }, ok: { do: (s, R) => R.marry(true) }, no: { text: '어색한 만남이었다. 상대 가문이 혼담을 거뒀다.', do: s => { s.lastProposal = s.monthN; } } },
       { label: '아직은 이르다며 거절한다', text: '사절이 정중히 물러갔다.', do: s => { s.lastProposal = s.monthN; } },
     ] },
-  { id: 'heir', when: s => !!s.spouse && s.age <= 48 && (s.children || []).length < 4 && Math.random() < .35, weight: 1,
+  { id: 'heir', when: (s, R) => !!s.spouse && R.fertile() && (s.children || []).length < 4 && Math.random() < .35, weight: 1,
     text: (s, R) => `${R.josa(R.spouseName(), '이')} 수줍게 말했다. "아이가 생겼어요."`,
     choices: [{ label: '기뻐하며 끌어안는다', do: (s, R) => R.child(), text: '성 안에 경사가 났다.' }] },
 );

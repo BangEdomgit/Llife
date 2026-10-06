@@ -92,7 +92,7 @@ REALM.houses = [
   { id: 'valen',  name: '발렌',  color: '#3d6fd8', sym: '🦁', trait: '부유한 상인 귀족 — 지참금이 크다' },
   { id: 'morrow', name: '모로우', color: '#7b3fb0', sym: '🦉', trait: '마법사 가문 — 학식·마력이 높은 자식들' },
   { id: 'harth',  name: '하스',  color: '#b53a2e', sym: '🐗', trait: '무가 — 동맹하면 위기 때 기사를 보내 준다' },
-  { id: 'eloin',  name: '엘로인', color: '#2e8f5e', sym: '🦌', trait: '오래된 숲의 가문 — 민심과 명성이 오른다' },
+  { id: 'eloin',  name: '엘로인', color: '#2e8f5e', sym: '🦌', trait: '오래된 숲의 엘프 가문 — 민심과 명성이 오른다', race: 'elf' },
 ];
 REALM.names = {
   m: ['알드릭', '베른', '카일', '도리안', '에드윈', '펠릭스', '가레스', '하롤드', '이반', '율리안', '케인', '레온', '마르셀', '오스릭', '롤랑', '세드릭', '테오도르', '울릭'],

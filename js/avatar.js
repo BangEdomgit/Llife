@@ -46,12 +46,14 @@ let LOD = 2, LW = 1;
 /* ---------- 팔레트 ---------- */
 // 피부 10톤: 0 밝은, 1 보통, 2 어두운, 3 진한 + (뉴욕 등에서) 4 아주 밝은, 5 밝은 올리브, 6 올리브, 7 따뜻한 갈색, 8 짙은 갈색, 9 아주 짙은
 //   피부색은 그림에만 쓰고 생김새 점수·등급과는 무관
-const SKIN = ['#f7dcc5', '#e9bf98', '#c68b60', '#8b5a3c', '#fbe6d6', '#efcba7', '#d6a274', '#a8693f', '#7a4a2c', '#57331f'];
+const SKIN = ['#f7dcc5', '#e9bf98', '#c68b60', '#8b5a3c', '#fbe6d6', '#efcba7', '#d6a274', '#a8693f', '#7a4a2c', '#57331f',
+  '#a9bd8a', '#8aa46c', '#6c8652'];   // 10~12: 판타지(영지) 오크의 초록 피부
 // 머리색 (2-5): 0 흑발, 1 짙은 갈색, 2 밝은 갈색, 3 회색(예전 저장), 4 와인, 5 애쉬 금발, 6 애쉬브라운, 7 구릿빛, 8 밀크티 베이지, 9 핑크 브라운,
 //   10 흑갈색, 11 밀크브라운, 12 다크초코, 13 탈색 금발, 14 애쉬그레이, 15 핑크, 16 블루블랙, 17 레드
 //   18 골든 금발, 19 밝은 금발, 20 스트로베리 블론드, 21 진저 레드, 22 적갈색(오번), 23 더티 블론드 — 타고난 색 (염색 아님)
 const HAIR = ['#23201f', '#4b3022', '#7d5536', '#a19d98', '#7e3343', '#c9a66c', '#6c625a', '#9a5a35', '#cdb594', '#9b6266',
-  '#2e2420', '#a07c5c', '#4a2c22', '#dcc38f', '#9c9ca2', '#d08aa2', '#1e2333', '#8c2f33', '#d5b16e', '#e6cf9c', '#c98b58', '#a5512c', '#6c3622', '#a88a5c'];
+  '#2e2420', '#a07c5c', '#4a2c22', '#dcc38f', '#9c9ca2', '#d08aa2', '#1e2333', '#8c2f33', '#d5b16e', '#e6cf9c', '#c98b58', '#a5512c', '#6c3622', '#a88a5c',
+  '#d9dde3', '#efe4c6', '#2c3f6e', '#9e1f2c', '#3f5e3a', '#3b3936'];   // 24~29: 판타지(영지) 타고난 색 — 은발·백금발·짙은 청발·진홍·숲빛 초록·잿빛 흑발
 const GRAY = 3;
 const DYED = new Set([4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17]);   // 18~23은 타고난 색   // 염색 — 정수리·가르마에 원래 머리색 뿌리가 보임
 const HC_NAT = [0, 0, 0, 10, 10, 1, 1], HC_MILD = [6, 11, 12, 8], HC_BOLD = [13, 14, 15, 16, 17, 4, 5, 9];
@@ -62,7 +64,7 @@ const IRIS = ['#2b1d16', '#5b3a26', '#8a5c38', '#6e5a32', '#4d4c4b', '#3f6fa4', 
 const METAL = ['#d8b45a', '#c9ced6'];   // 귀걸이·목걸이·안경테: 금, 은
 const WHITE = '#fbf8f4', PUPIL = '#120c09', MOUTH_IN = '#7a2f33';
 const LIPS = ['#d4707a', '#c9606b', '#b8434f', '#e0898f'];   // 어른 여자 립 색
-const NATURAL_LIP = ['#e0a49b', '#cf8f80', '#a9654f', '#7d4535', '#e8aaa2', '#d4977f', '#b97c62', '#93573f', '#6f3d2b', '#562b1f'];
+const NATURAL_LIP = ['#e0a49b', '#cf8f80', '#a9654f', '#7d4535', '#e8aaa2', '#d4977f', '#b97c62', '#93573f', '#6f3d2b', '#562b1f', '#8f8a62', '#77724f', '#5f5b3e'];
 // 배경(인종)별 타고난 색 비중 — 뉴욕처럼 섞여 사는 곳에서 피부·머리색·눈동자·머리 스타일을 고를 때만 씀 (점수와 무관)
 const ETH = {
   white:  { skin: { 4: 3, 0: 4, 5: 2, 1: 1 }, hc: { 18: 2, 19: 1, 23: 2.5, 2: 3, 1: 3, 0: .5, 10: 1, 21: .6, 20: .5, 22: .7 }, iris: { 1: 3, 2: 2, 3: 1.5, 5: 2.5, 6: 1.5, 7: 1.2, 8: 1, 9: .8 }, lid: [2, 2, 2, 1], freckle: .14 },
@@ -142,8 +144,27 @@ function make(seed, gender, opt = {}) {
     a.hcN = nat; if (!keep) a.hc = nat;
     if (r() < E.freckle + (nat === 21 || nat === 20 ? .4 : 0)) a.freckles = true;
   }
+  // 종족 (판타지 영지 모드만 넘김): 엘프 귀 · 수인 귀(늑대·여우·고양이·토끼) · 오크 초록 피부와 엄니 · 드워프 수염. 피부·머리·눈동자를 종족 비중으로 다시 고름
+  const RC = opt.race && RACE_LOOK[opt.race];
+  if (RC) {
+    a.race = opt.race;
+    if (opt.beast) a.beast = opt.beast;
+    if (opt.skin == null) a.skin = wPick(r, RC.skin);
+    a.hc = a.hcN = wPick(r, RC.hc);
+    a.iris = wPick(r, RC.iris);
+    if (RC.height) a.body.height = RC.height;
+    if (opt.race === 'dwarf' && g === 'm') a.beard = 1 + Math.floor(r() * 3);
+    if (opt.race === 'orc') a.body.build = r() < .7 ? 'fit' : 'avg';
+  }
   return a;
 }
+const RACE_LOOK = {
+  human: { skin: { 0: 3, 1: 3, 4: 2, 5: 2, 2: 1, 6: 1 }, hc: { 0: 2, 1: 3, 2: 3, 10: 2, 18: 2, 19: 1, 21: .6, 22: 1, 23: 1.5, 24: .3 }, iris: { 0: 1, 1: 4, 2: 2, 3: 1.5, 5: 2, 6: 1, 7: 1.2, 9: .8 } },
+  elf:   { skin: { 4: 4, 0: 3, 5: 1 }, hc: { 19: 3, 24: 3, 25: 3, 18: 2, 28: 1, 26: .6 }, iris: { 5: 2, 6: 3, 7: 3, 8: 1, 9: 1 } },
+  dwarf: { skin: { 1: 3, 5: 2, 2: 2, 6: 1 }, hc: { 21: 3, 22: 3, 1: 2, 2: 2, 18: 1, 12: 1 }, iris: { 1: 3, 2: 2, 3: 2, 9: 1 }, height: 'short' },
+  beast: { skin: { 0: 2, 1: 3, 5: 2, 2: 1 }, hc: { 0: 1.5, 1: 2, 2: 2, 10: 1, 18: 1.5, 19: 1, 24: 1.5, 21: 1.5, 3: .4 }, iris: { 2: 2, 3: 3, 7: 2, 8: 2, 1: 1 } },
+  orc:   { skin: { 10: 3, 11: 4, 12: 3 }, hc: { 0: 4, 29: 4, 10: 2 }, iris: { 0: 2, 1: 2, 3: 2, 8: 1 }, height: 'tall' },
+};
 // 세부 — make() 값에서 늘 똑같이 나옴 (예전 저장의 얼굴도 그대로 살아남)
 //   뒤쪽 세부(코·쌍꺼풀·수염·점·귀걸이…)는 나중에 더한 것 — 앞 순서를 건드리지 않게 이어서 뽑음
 function extras(a) {
@@ -2122,7 +2143,7 @@ function headSVG(a, X, age, st, g) {
   o += `<path d="M${f1(60 - nh + 1.6)},104 L${f1(60 - nh + 1.6)},${f1(neckBot - 2)} M${f1(60 + nh - 1.6)},104 L${f1(60 + nh - 1.6)},${f1(neckBot - 2)}" stroke="${shade(skin, .66)}" stroke-width="2" opacity=".14"/>`;
   if (a.buds && !af && !du) o += `<path d="M34,78 C30,96 40,112 47,130" fill="none" stroke="#f4f4f4" stroke-width="1.3"/>`;
   // 귀, 얼굴 (6살 이하는 둥근 얼굴). 얼굴은 가운데가 밝고 가장자리로 살짝 어두워짐
-  o += G(L && L.earT(-1), earSVG(skin, -1)) + G(L && L.earT(1), earSVG(skin, 1));
+  if (a.race !== 'beast' && a.race !== 'elf') o += G(L && L.earT(-1), earSVG(skin, -1)) + G(L && L.earT(1), earSVG(skin, 1));
   if (a.buds && !af && !du) o += `<circle cx="33" cy="76" r="2.6" fill="#f4f4f4"/>`;
   const faceD = L ? L.warp(FACES[FG.shape] || FACES[0]) : FACES[age <= 6 ? 0 : a.face] || FACES[0], fid = `av${UID}f`;
   o += `<defs><radialGradient id="${fid}g" cx=".5" cy=".44" r=".62"><stop offset=".58" stop-color="${skin}"/><stop offset="1" stop-color="${shade(skin, .91)}"/></radialGradient><clipPath id="${fid}c"><path d="${faceD}"/></clipPath></defs>`;
@@ -2257,8 +2278,50 @@ function headSVG(a, X, age, st, g) {
       o += G(L && L.mouthT, `<g class="av-breath" opacity="0"><ellipse cx="70" cy="93.5" rx="2.6" ry="1.8" fill="url(#${fid}br)" opacity=".7"/><ellipse cx="75.5" cy="91.5" rx="3.4" ry="2.3" fill="url(#${fid}br)" opacity=".5"/><ellipse cx="81.5" cy="89" rx="4.2" ry="2.8" fill="url(#${fid}br)" opacity=".32"/></g>`);
     }
   }
+  // 종족 장식 (판타지 영지 모드): 앞머리 위에 그림
+  if (a.race) o += raceSVG(a, skin, hairColor(a, age), L, G);
   // 안경 (눈 간격·크기를 따라감)
   o += G(L && a.glasses && L.glassT, glassesSVG(a.glasses, X.glc));
+  return o;
+}
+// 종족 장식 — 엘프 귀(길고 뾰족, 머리 위로 비죽) · 수인 귀(늑대·여우·고양이·토끼, 머리색 털 + 분홍 속) · 오크 아래 엄니 · 드워프 수염(남자, 1 짧게 다듬음 · 2 풍성 · 3 땋은 긴 수염)
+function raceSVG(a, skin, hc, L, G) {
+  let o = '';
+  const ln = shade(skin, .62), d = shade(skin, .88);
+  if (a.race === 'elf') {
+    const ear = s => { const X = dx => f1(60 + s * dx);
+      return `<path d="M${X(24.6)},63.5 C${X(28.5)},61 ${X(34)},55 ${X(41.5)},45.5 C${X(39.5)},55 ${X(36)},64 ${X(32)},71.5 C${X(31)},76.5 ${X(29.6)},80.6 ${X(27)},81.2 C${X(25.4)},81.5 ${X(24.5)},80 ${X(24.3)},77.6 Z" fill="${d}" stroke="${ln}" stroke-width=".7" stroke-opacity=".7"/>` +
+        `<path d="M${X(27)},66 C${X(30)},62.5 ${X(34)},57 ${X(38)},50.5 M${X(27.2)},68.5 C${X(30)},70 ${X(30.4)},73.5 ${X(29.2)},76.5" fill="none" stroke="${ln}" stroke-width=".8" stroke-linecap="round" opacity=".5"/>`; };
+    o += G(L && L.earT(-1), ear(-1)) + G(L && L.earT(1), ear(1));
+  } else if (a.race === 'beast') {
+    const kind = a.beast || 'wolf', fur = hc, furD = shade(hc, .72), inner = '#efb7ae', tip = kind === 'fox' ? '#2a211d' : null;
+    const shapes = {   // 왼쪽 귀 (오른쪽은 거울): 바깥 · 안쪽
+      wolf:   ['M33,49 C31,38 32,27 36,19 C42,24 48,31 51,39 Z', 'M36.5,45 C35.5,37 36.5,30 38.3,25.5 C41.5,29 44.5,33.5 46.5,38.5 Z'],
+      fox:    ['M31,51 C27,38 28,23 33,13 C41,19 49,30 52,40 Z', 'M34.8,46.5 C32.8,37 33.4,27 35.8,20.5 C40.5,25.5 45,32 47.5,39 Z'],
+      cat:    ['M34,47 C33,40 34,33 37,27 C42,30 47,35 50,40 Z', 'M37,44 C36.6,39 37.4,34.5 39,31 C41.8,33.5 44.5,36.5 46.2,39.6 Z'],
+      rabbit: ['M41,44 C36,33 33,18 35,6 C37.5,2 41.5,3 43,8 C46,19 47,32 47.5,42 Z', 'M41.6,38 C38.6,29 37,18 38.2,9.5 C39.4,7.6 40.8,8 41.4,10.5 C43.4,19 44.4,28.5 44.8,37 Z'],
+    }[kind] || [];
+    const one = s => { const m = s > 0 ? ' transform="translate(120,0) scale(-1,1)"' : '';
+      return `<g${m}><path d="${shapes[0]}" fill="${fur}" stroke="${furD}" stroke-width=".9"/><path d="${shapes[1]}" fill="${inner}" opacity=".9"/>` +
+        (tip ? `<path d="M31.6,24 C31.2,19.5 32,16 33,13 C36,15.2 38.6,17.6 40.6,20.6 Z" fill="${tip}" opacity=".85"/>` : '') +
+        `<path d="${shapes[1]}" fill="none" stroke="#fff" stroke-width=".8" stroke-dasharray="1.4 1.8" opacity=".55"/></g>`; };
+    o += one(-1) + one(1);
+  } else if (a.race === 'orc') {
+    const t = `<path d="M53.2,94.6 L52.2,88.2 Q53.4,87.4 54.6,88.4 L55.6,94.2 Z" fill="#f1ead6" stroke="#8d8466" stroke-width=".6"/><path d="M66.8,94.6 L67.8,88.2 Q66.6,87.4 65.4,88.4 L64.4,94.2 Z" fill="#f1ead6" stroke="#8d8466" stroke-width=".6"/>`;
+    o += G(L && L.mouthT, t);
+    o += `<path d="M44,62.5 Q49,60.2 54.5,62.4 M65.5,62.4 Q71,60.2 76,62.5" fill="none" stroke="${shade(skin, .6)}" stroke-width="1.2" opacity=".35"/>`;   // 굵은 눈두덩
+  }
+  if (a.beard) {
+    const bc = hc, bd = shade(hc, .72), lv = a.beard;
+    const body = lv === 1 ? 'M39,84 C40,96 49,104 60,105 C71,104 80,96 81,84 C77,92 70,96 60,96.5 C50,96 43,92 39,84 Z'
+      : lv === 2 ? 'M37,80 C37,98 46,112 60,114 C74,112 83,98 83,80 C79,92 71,97 60,97.5 C49,97 41,92 37,80 Z'
+      : 'M37,80 C36,98 44,110 52,116 L54,126 L57,117 L60,128 L63,117 L66,126 L68,116 C76,110 84,98 83,80 C79,92 71,97 60,97.5 C49,97 41,92 37,80 Z';
+    const stache = 'M50.5,90.6 C53.5,87.6 57.5,88 60,89.6 C62.5,88 66.5,87.6 69.5,90.6 C66,90.4 63,91.6 60,92 C57,91.6 54,90.4 50.5,90.6 Z';
+    o += G(L && `translate(0,${f1(L.chinDy)})`, `<path d="${body}" fill="${bc}" stroke="${bd}" stroke-width=".8"/>` +
+      `<path d="M46,101 q2,6 1,11 M54,104 q1,6 0,10 M66,104 q-1,6 0,10 M74,101 q-2,6 -1,11" fill="none" stroke="${bd}" stroke-width=".8" opacity=".55"/>` +
+      (lv === 3 ? `<path d="M54.5,118 h3 M58.5,121 h3 M62.5,118 h3" stroke="#c9a24a" stroke-width="1.6" stroke-linecap="round"/>` : ''));
+    o += G(L && L.mouthT, `<path d="${stache}" fill="${bc}" stroke="${bd}" stroke-width=".6"/>`);
+  }
   return o;
 }
 // 머리색 (흰머리 섞기 전). 어린이·10대는 염색 안 함 → 원래 머리색
