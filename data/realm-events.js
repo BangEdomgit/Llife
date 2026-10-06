@@ -27,7 +27,7 @@ RE.push(
       { label: '아직은 이르다며 거절한다', text: '사절이 정중히 물러갔다.', do: s => { s.lastProposal = s.monthN; } },
     ] },
   { id: 'heir', when: s => !!s.spouse && s.age <= 48 && (s.children || []).length < 4 && Math.random() < .35, weight: 1,
-    text: (s, R) => `${R.spouseName()}이(가) 수줍게 말했다. "아이가 생겼어요."`,
+    text: (s, R) => `${R.josa(R.spouseName(), '이')} 수줍게 말했다. "아이가 생겼어요."`,
     choices: [{ label: '기뻐하며 끌어안는다', do: (s, R) => R.child(), text: '성 안에 경사가 났다.' }] },
 );
 

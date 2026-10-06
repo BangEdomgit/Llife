@@ -79,12 +79,12 @@ REALM.sites = [
 
 // 영지를 노리는 위협 — 전력(power) 범위는 해가 지날수록 커짐. 정찰 보고 뒤 1~2달 뒤 도착
 REALM.threats = [
-  { id: 'wolves',  name: '늑대 무리',      icon: '🐺', power: [15, 35],  champ: 'wolf',    tribute: false, from: 1 },
-  { id: 'bandits', name: '산적단',         icon: '🗡', power: [35, 80],  champ: 'bandit',  tribute: true,  from: 1 },
-  { id: 'goblins', name: '고블린 떼',      icon: '👺', power: [50, 110], champ: 'goblin',  tribute: false, from: 1 },
-  { id: 'orcs',    name: '오크 습격대',     icon: '👹', power: [100, 200], champ: 'orc',    tribute: false, from: 3 },
-  { id: 'baron',   name: '이웃 남작의 군대', icon: '⚔️', power: [150, 280], champ: 'warlord', tribute: true,  from: 4 },
-  { id: 'drake',   name: '비룡',           icon: '🐉', power: [220, 320], champ: 'drake',   tribute: false, from: 7 },
+  { id: 'wolves',  name: '늑대 무리',      icon: '🐺', power: [70, 140], champ: 'wolf',    tribute: false, from: 1 },
+  { id: 'bandits', name: '산적단',         icon: '🗡', power: [140, 260], champ: 'bandit',  tribute: true,  from: 1 },
+  { id: 'goblins', name: '고블린 떼',      icon: '👺', power: [170, 320], champ: 'goblin',  tribute: false, from: 1 },
+  { id: 'orcs',    name: '오크 습격대',     icon: '👹', power: [300, 500], champ: 'orc',    tribute: false, from: 3 },
+  { id: 'baron',   name: '이웃 남작의 군대', icon: '⚔️', power: [420, 680], champ: 'warlord', tribute: true,  from: 4 },
+  { id: 'drake',   name: '비룡',           icon: '🐉', power: [600, 880], champ: 'drake',   tribute: false, from: 7 },
 ];
 
 // 이웃 가문 (혼담·외교)
